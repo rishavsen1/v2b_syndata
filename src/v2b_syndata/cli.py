@@ -26,10 +26,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
         noise_profile_override=args.noise_profile,
     )
     print(f"generated {manifest['scenario_id']} seed={manifest['seed']} -> {args.output_dir}")
-    # Auto-validate only on a clean noise profile — perturbed outputs may
-    # legitimately violate hard invariants (this is the point of the
-    # adversarial profile). Use `validate <dir>` for explicit checks.
-    if manifest.get("noise_profile") == "clean":
+    # Auto-validate only when no perturbation was actually applied. Per-jitter
+    # knobs are authoritative — checking profile name alone misses cases where
+    # the user overrode individual jitters under a clean profile (or vice
+    # versa). Run `cli validate <dir>` explicitly for noisy outputs.
+    if _all_jitters_zero(manifest):
         rep = validate(Path(args.output_dir), strict=False)
         if not rep.passed:
             print("VALIDATION FAILED:", file=sys.stderr)
@@ -40,6 +41,27 @@ def cmd_generate(args: argparse.Namespace) -> int:
             for w in rep.warnings:
                 print(f"  warning: {w}", file=sys.stderr)
     return 0
+
+
+_JITTER_KNOBS = (
+    "noise.building_load_jitter_pct",
+    "noise.arrival_time_jitter_min",
+    "noise.soc_arrival_jitter_pct",
+    "noise.dr_notification_dropout_prob",
+    "noise.price_jitter_pct",
+    "noise.occupancy_jitter_pct",
+)
+
+
+def _all_jitters_zero(manifest: dict) -> bool:
+    res = manifest.get("knob_resolution", {})
+    for k in _JITTER_KNOBS:
+        entry = res.get(k)
+        if entry is None:
+            continue
+        if float(entry["value"]) != 0.0:
+            return False
+    return True
 
 
 def cmd_validate(args: argparse.Namespace) -> int:

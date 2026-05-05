@@ -122,23 +122,45 @@ to avoid pandas/Python version-dependent default rendering.
 The acceptance criterion checks the `csv_sha256` dict in manifest.json (not the
 manifest itself, which contains a `generated_at` timestamp).
 
-## 9. CLI auto-validate runs only on `clean` noise
+## 9. CLI auto-validate runs only when every per-jitter knob is zero
 
-`v2b_syndata.cli generate` automatically runs the validator on its output, but
-only when the resolved noise profile is `clean`. Noise profiles by design
-perturb values past hard invariants (e.g. `light_noise` shifts arrival_soc by
-~8 percentage points, which can push it below `min_allowed_soc` or break D5
-reachability). Skipping auto-validate keeps the post-noise CSVs faithful to
-the noise spec; an explicit `cli validate <dir>` still flags the
-out-of-bound rows when you want to inspect them.
+`v2b_syndata.cli generate` runs the validator after generation iff every
+knob in the `noise.` bucket resolves to 0.0 (`building_load_jitter_pct`,
+`arrival_time_jitter_min`, `soc_arrival_jitter_pct`, `dr_notification_dropout_prob`,
+`price_jitter_pct`, `occupancy_jitter_pct`). Profile name is not the gate —
+a user may set `noise.profile=clean` while overriding `noise.arrival_time_jitter_min=15`,
+or the reverse, and the per-jitter values are what determine whether
+perturbation actually fired.
 
-## 10. `noise.profile` knob is informational only
+Noise profiles by design perturb values past hard invariants (D5 reachability
+can break when arrival shifts shrink charging duration; soc jitter can push
+arrival_soc outside `[min_allowed_soc, max_allowed_soc]`). Skipping
+auto-validate keeps the post-noise CSVs faithful to the noise spec; run
+`cli validate <dir>` explicitly to inspect violations on a noisy output.
 
-The active noise profile is selected at CLI / scenario level, not per individual
-noise field. The bucketed knobs (`noise.building_load_jitter_pct` etc.) record
-the resolved values from the chosen profile. Setting `noise.profile = clean` and
-overriding e.g. `noise.building_load_jitter_pct = 0.05` is supported via
-`--override`; profile values otherwise win.
+## 10. `noise.profile` is a fan-out knob
+
+Setting `noise.profile` (via CLI override, scenario YAML overrides,
+`--noise-profile` flag, or scenario `descriptors.noise:`) drives expansion
+of the matching entry in `configs/noise_profiles.yaml` into the six
+per-jitter knobs in the `noise.` bucket. The runner peeks at `noise.profile`
+**before** descriptor expansion, in this priority order:
+
+1. `cli_overrides["noise.profile"]` (`--override 'noise.profile=X'`)
+2. `noise_profile_override` parameter (`--noise-profile X`)
+3. `scenario_overrides["noise.profile"]`
+4. `scenario.descriptors.noise`
+
+Whichever wins becomes the active noise descriptor; the per-jitter knobs
+get `source = descriptor:<profile_name>` in the manifest. Per-jitter
+overrides still beat the profile via the standard resolution chain
+(`noise.building_load_jitter_pct=0.05` survives even when
+`noise.profile=clean`).
+
+Earlier builds treated `noise.profile` as informational only — overriding
+it changed the manifest tag but not the per-jitter values, so noise was
+silently no-op'd. That was a bug; the regression test
+`test_noise_profile_changes_output` guards against re-introducing it.
 
 ## 11. F_SHARE_TOL = 0.20 (4× spec value)
 

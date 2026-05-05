@@ -1,11 +1,16 @@
 """End-to-end: generate S01, every artifact present, validator passes."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 from v2b_syndata.runner import generate
 from v2b_syndata.validate import validate
+
+
+def _sha(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
 def test_s01_generate_validate(tmp_path, config_dir):
@@ -31,6 +36,53 @@ def test_override_recorded_explicit(tmp_path, config_dir):
         m = json.load(f)
     assert m["knob_resolution"]["ev_fleet.ev_count"]["value"] == 10
     assert m["knob_resolution"]["ev_fleet.ev_count"]["source"] == "explicit"
+
+
+def test_noise_profile_changes_output(tmp_path, config_dir):
+    """Override on noise.profile must fan out to per-jitter knobs and change bytes."""
+    clean = tmp_path / "clean"
+    noisy = tmp_path / "noisy"
+    clean2 = tmp_path / "clean2"
+
+    generate("S01", seed=42, output_dir=clean, config_dir=config_dir)
+    generate("S01", seed=42, output_dir=noisy, config_dir=config_dir,
+             cli_overrides={"noise.profile": "light_noise"})
+    generate("S01", seed=42, output_dir=clean2, config_dir=config_dir,
+             cli_overrides={"noise.profile": "clean"})
+
+    # Light noise must alter both building_load and sessions
+    assert _sha(clean / "building_load.csv") != _sha(noisy / "building_load.csv"), \
+        "noise.profile=light_noise did not change building_load.csv bytes"
+    assert _sha(clean / "sessions.csv") != _sha(noisy / "sessions.csv"), \
+        "noise.profile=light_noise did not change sessions.csv bytes"
+
+    # Explicit clean override matches default (no override)
+    for n in ("building_load", "sessions", "grid_prices", "dr_events"):
+        assert _sha(clean / f"{n}.csv") == _sha(clean2 / f"{n}.csv"), \
+            f"clean override changed {n}.csv vs default"
+
+    # Manifest reflects fan-out: per-jitter knobs source = descriptor:light_noise
+    with (noisy / "manifest.json").open() as f:
+        m = json.load(f)
+    res = m["knob_resolution"]
+    assert res["noise.profile"]["value"] == "light_noise"
+    assert res["noise.profile"]["source"] == "explicit"
+    for k in ("building_load_jitter_pct", "arrival_time_jitter_min",
+             "soc_arrival_jitter_pct", "occupancy_jitter_pct"):
+        assert res[f"noise.{k}"]["source"] == "descriptor:light_noise", \
+            f"noise.{k} source != descriptor:light_noise"
+
+
+def test_noise_profile_repro_within_profile(tmp_path, config_dir):
+    """Same seed + same profile → bitwise-identical bytes."""
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    for d in (a, b):
+        generate("S01", seed=42, output_dir=d, config_dir=config_dir,
+                 cli_overrides={"noise.profile": "light_noise"})
+    for n in ("building_load", "sessions", "grid_prices", "dr_events"):
+        assert _sha(a / f"{n}.csv") == _sha(b / f"{n}.csv"), \
+            f"{n}.csv reproducibility broken under light_noise"
 
 
 def test_clean_noise_idempotent_when_overrides_zero(tmp_path, config_dir):

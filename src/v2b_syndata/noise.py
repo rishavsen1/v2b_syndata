@@ -56,12 +56,16 @@ def apply_noise(ctx: ScenarioContext) -> None:
             t_jit = float(n.get("arrival_time_jitter_min", 0.0))
             s_jit = float(n.get("soc_arrival_jitter_pct", 0.0))
             if t_jit > 0:
-                shifts = rng.normal(0.0, t_jit, size=len(df))
+                # Round shifts to whole seconds. CSV stores arrival at second
+                # precision (strftime '%H:%M:%S' truncates fractions); leaving
+                # microsecond-level shifts in the in-memory timestamp would
+                # make duration_sec disagree with (departure - reloaded_arrival)
+                # → C6 mismatch on validate.
+                shifts_sec = np.round(rng.normal(0.0, t_jit, size=len(df)) * 60.0).astype(int)
                 arrivals = pd.to_datetime(df["arrival"])
-                new_arrivals = arrivals + pd.to_timedelta(shifts, unit="m")
+                new_arrivals = arrivals + pd.to_timedelta(shifts_sec, unit="s")
                 df["arrival"] = new_arrivals.dt.strftime("%Y-%m-%d %H:%M:%S")
-                # Update duration to keep departure stable, since renderer
-                # already stored departure as text. Recompute duration_sec.
+                # Departure stays fixed in seconds; duration_sec is the exact int delta.
                 deps = pd.to_datetime(df["departure"])
                 df["duration_sec"] = (deps - new_arrivals).dt.total_seconds().astype(int)
             if s_jit > 0:

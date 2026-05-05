@@ -109,12 +109,24 @@ def generate(
 
     scenario = load_scenario(config_dir / "scenarios" / f"{scenario_id}.yaml")
     descriptors = dict(scenario["descriptors"])
-    if noise_profile_override is not None:
+    scenario_overrides = scenario.get("overrides") or {}
+
+    # noise.profile is a fan-out knob: setting it MUST also set every
+    # per-jitter knob (noise.building_load_jitter_pct, etc.) from
+    # noise_profiles.yaml. Resolution priority for the profile name:
+    # CLI override > --noise-profile flag > scenario.overrides > scenario descriptor.
+    # Whichever wins drives the descriptor expansion so the per-jitter knobs
+    # come from the matching profile entry. Individual jitter overrides
+    # still beat the profile via the standard resolution chain.
+    if "noise.profile" in cli_overrides:
+        descriptors["noise"] = str(cli_overrides["noise.profile"])
+    elif noise_profile_override is not None:
         descriptors["noise"] = noise_profile_override
+    elif "noise.profile" in scenario_overrides:
+        descriptors["noise"] = str(scenario_overrides["noise.profile"])
 
     registry = load_knob_registry(config_dir / "knobs.yaml")
     descriptor_values = expand_descriptors(descriptors, config_dir)
-    scenario_overrides = scenario.get("overrides") or {}
 
     resolved = resolve_knobs(
         registry=registry,
