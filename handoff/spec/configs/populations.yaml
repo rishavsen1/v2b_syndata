@@ -1,0 +1,77 @@
+# populations.yaml — Population descriptor library (post-D24, D28)
+#
+# Each entry resolves into knobs:
+#   user_behavior.axes_distribution (region grid over (φ, κ, δ))
+#   user_behavior.negotiation_mix
+#   user_behavior.w_multiplier
+#   ev_fleet.ev_count, battery_mix, battery_heterogeneity
+#
+# Per-user sampling:
+#   1. Region assigned ~ Categorical(weights)
+#   2. (φ, κ, δ) ~ Uniform within region bounds
+#   3. negotiation_type ~ Categorical(negotiation_mix)
+#   4. (w1, w2) ~ Normal(cluster mean, cluster std) clipped ≥ 0; scaled by w_multiplier
+#   5. battery_class ~ Categorical(battery_mix)
+
+# ──────────────────────────────────────────────────────────────────────────
+# CONSENT-default mixed-flex baseline (S01, used in CONSENT validation)
+# ──────────────────────────────────────────────────────────────────────────
+consent_default:
+  description: "Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes"
+
+  axes_distribution:
+    - {name: stable_commuter,    freq: [0.85, 1.00], consist: [0.75, 1.00], dist_km: [40, 80],  weight: 0.35}
+    - {name: flexible_local,     freq: [0.70, 0.95], consist: [0.50, 0.80], dist_km: [5, 15],   weight: 0.25}
+    - {name: irregular_distant,  freq: [0.40, 0.70], consist: [0.20, 0.50], dist_km: [40, 100], weight: 0.20}
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [3, 50],   weight: 0.10}
+    - {name: erratic,            freq: [0.30, 0.70], consist: [0.05, 0.30], dist_km: [5, 80],   weight: 0.10}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+
+# ──────────────────────────────────────────────────────────────────────────
+# High-ψ extreme: stable, predictable office workforce
+# ──────────────────────────────────────────────────────────────────────────
+stable_commuter_heavy:
+  description: "Stable office workforce — high frequency, high consistency. High ψ."
+
+  axes_distribution:
+    - {name: stable_commuter,    freq: [0.85, 1.00], consist: [0.80, 1.00], dist_km: [30, 70],  weight: 0.65}
+    - {name: flexible_local,     freq: [0.75, 0.95], consist: [0.60, 0.85], dist_km: [5, 20],   weight: 0.25}
+    - {name: irregular_distant,  freq: [0.50, 0.75], consist: [0.40, 0.65], dist_km: [40, 90],  weight: 0.10}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [0.85, 0.85]   # slightly more flexible
+
+  fleet:
+    ev_count: 25
+    battery_mix: [0.10, 0.20, 0.45, 0.25]   # premium-leaning (long-distance commuters)
+    battery_heterogeneity: mixed
+
+# ──────────────────────────────────────────────────────────────────────────
+# Low-ψ extreme: visitor-heavy retail
+# ──────────────────────────────────────────────────────────────────────────
+visitor_heavy:
+  description: "Retail clientele — low frequency, low consistency, varied distance. Low ψ."
+
+  axes_distribution:
+    - {name: occasional_visitor, freq: [0.05, 0.25], consist: [0.05, 0.35], dist_km: [3, 30],   weight: 0.55}
+    - {name: erratic,            freq: [0.20, 0.50], consist: [0.05, 0.25], dist_km: [5, 50],   weight: 0.25}
+    - {name: flexible_local,     freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [3, 12],   weight: 0.15}
+    - {name: stable_commuter,    freq: [0.70, 0.90], consist: [0.65, 0.90], dist_km: [10, 30],  weight: 0.05}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.25, 1.25]   # less flexible (impatient retail visitors)
+
+  fleet:
+    ev_count: 15
+    battery_mix: [0.30, 0.35, 0.25, 0.10]   # economy-leaning
+    battery_heterogeneity: mixed

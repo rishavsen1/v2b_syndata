@@ -1,0 +1,322 @@
+# knobs.yaml — full tunable knob registry (v2, post-D28)
+#
+# Schema is fixed (see 01_data_schema.md); knobs are tunable parameters.
+#
+# Resolution chain at generation time:
+#   1. CLI override (--knob_overrides)
+#   2. Scenario YAML overrides (scenario_yaml.overrides[knob])
+#   3. Descriptor expansion (Tier 0 library lookup)
+#   4. default field below
+#
+# Manifest records source per knob: explicit | descriptor:<name> | default
+#
+# Type system:
+#   int, float, bool, categorical, simplex, vec2, list[vec2], list[region],
+#   timestamp, path
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 1: EV Fleet
+# ──────────────────────────────────────────────────────────────────────────
+ev_fleet:
+
+  ev_count:
+    type: int
+    range: [1, 200]
+    default: 20
+    description: "Number of distinct EVs in fleet"
+    affects_csv: [cars.csv, sessions.csv, users.csv]
+
+  battery_mix:
+    type: simplex
+    components: [leaf_24, bolt_40, m3_75, rivian_100]
+    default: [0.20, 0.30, 0.40, 0.10]
+    description: "Battery class distribution. Capacities: 24, 40, 75, 100 kWh."
+    affects_csv: [cars.csv]
+
+  battery_heterogeneity:
+    type: categorical
+    choices: [homog, mixed]
+    default: mixed
+    affects_csv: [cars.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 2: Charging Infrastructure
+# ──────────────────────────────────────────────────────────────────────────
+charging_infra:
+
+  charger_count:
+    type: int
+    range: [1, 100]
+    default: 20
+    affects_csv: [chargers.csv]
+
+  directionality_frac:
+    type: float
+    range: [0.0, 1.0]
+    default: 0.50
+    description: "Fraction of chargers that are bidirectional"
+    affects_csv: [chargers.csv]
+
+  uni_rate_kw:
+    type: float
+    range: [3.3, 350.0]
+    default: 20.0
+    affects_csv: [chargers.csv]
+
+  bi_rate_kw:
+    type: float
+    range: [3.3, 350.0]
+    default: 20.0
+    description: "Symmetric ± rate for bidirectional chargers"
+    affects_csv: [chargers.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 3: User Behavior (axis-based, per D24)
+# ──────────────────────────────────────────────────────────────────────────
+user_behavior:
+
+  axes_distribution:
+    type: list[region]
+    default:
+      - {name: stable_commuter,    freq: [0.85, 1.00], consist: [0.75, 1.00], dist_km: [40, 80],  weight: 0.35}
+      - {name: flexible_local,     freq: [0.70, 0.95], consist: [0.50, 0.80], dist_km: [5, 15],   weight: 0.25}
+      - {name: irregular_distant,  freq: [0.40, 0.70], consist: [0.20, 0.50], dist_km: [40, 100], weight: 0.20}
+      - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [3, 50],   weight: 0.10}
+      - {name: erratic,            freq: [0.30, 0.70], consist: [0.05, 0.30], dist_km: [5, 80],   weight: 0.10}
+    description: "Region-grid distribution over (φ, κ, δ) axes. Weights must sum to 1. Per-user values sampled uniformly within assigned region."
+    affects_csv: [users.csv, sessions.csv]
+
+  negotiation_mix:
+    type: simplex
+    components: [type_i, type_ii, type_iii, type_iv]
+    default: [0.107, 0.536, 0.321, 0.036]
+    description: "CONSENT empirical (n=28 survey)"
+    affects_csv: [users.csv]
+
+  w_multiplier:
+    type: vec2
+    range: [[0.1, 5.0], [0.1, 5.0]]
+    default: [1.0, 1.0]
+    description: "(α_w1, α_w2) global scale on CONSENT (w1, w2). E5 sweep lever."
+    affects_csv: [users.csv]
+
+  min_depart_soc:
+    type: float
+    range: [0.5, 1.0]
+    default: 0.80
+    description: "Floor on required_soc_at_depart"
+    affects_csv: [sessions.csv]
+
+  external_charge_cost:
+    type: float
+    range: [0.10, 1.00]
+    default: 0.30
+    description: "Outside-option price ($/kWh). CONSENT default."
+    affects_csv: []
+
+  menu_levels:
+    type: list[vec2]
+    default:
+      - [0.0,    0]
+      - [0.0625, 30]
+      - [0.10,   15]
+      - [0.20,   105]
+    description: "(Δe_max, Δt_max_min) per CONSENT negotiation level. Used for ψ canonical-menu computation."
+    affects_csv: []
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 4: Building Load
+# ──────────────────────────────────────────────────────────────────────────
+building_load:
+
+  climate:
+    type: categorical
+    choices: [temperate, cold, tropical, subtropical]
+    default: temperate
+    description: "Climate label (categorical, used for indexing). Weather W carries actual signal."
+    affects_csv: [building_load.csv]
+
+  weather_lat:
+    type: float
+    range: [-90.0, 90.0]
+    default: 36.1627
+    description: "NASAPower weather latitude (default: Nashville, TN)"
+    affects_csv: [building_load.csv, dr_events.csv]
+
+  weather_lon:
+    type: float
+    range: [-180.0, 180.0]
+    default: -86.7816
+    description: "NASAPower weather longitude"
+    affects_csv: [building_load.csv, dr_events.csv]
+
+  weather_year:
+    type: int
+    range: [1990, 2024]
+    default: 2020
+    description: "TMY year for NASAPower pull"
+    affects_csv: [building_load.csv, dr_events.csv]
+
+  archetype:
+    type: categorical
+    choices: [office, retail, mixed]
+    default: office
+    description: "DOE prototype building family"
+    affects_csv: [building_load.csv]
+
+  size:
+    type: categorical
+    choices: [small, med, large]
+    default: med
+    description: "DOE size bin"
+    affects_csv: [building_load.csv]
+
+  occupancy_source:
+    type: categorical
+    choices: [ashrae_90_1_office, ashrae_90_1_retail, ashrae_90_1_mixed, custom_path]
+    default: ashrae_90_1_office
+    description: "Base occupancy schedule. Modulated by EV-user pipeline downstream."
+    affects_csv: [building_load.csv, sessions.csv]
+
+  peak_kw:
+    type: float
+    range: [50.0, 5000.0]
+    default: 500.0
+    description: "Target peak building load. EnergyPlus output rescaled."
+    affects_csv: [building_load.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 5: Utility Rate
+# ──────────────────────────────────────────────────────────────────────────
+utility_rate:
+
+  tariff_type:
+    type: categorical
+    choices: [flat, TOU, demand_charge, DR]
+    default: TOU
+    affects_csv: [grid_prices.csv, dr_events.csv]
+
+  energy_price_offpeak:
+    type: float
+    range: [0.05, 0.50]
+    default: 0.137
+    description: "Off-peak energy ($/kWh). CONSENT default = SVP commercial."
+    affects_csv: [grid_prices.csv]
+
+  energy_price_peak:
+    type: float
+    range: [0.05, 0.80]
+    default: 0.178
+    affects_csv: [grid_prices.csv]
+
+  peak_window:
+    type: vec2
+    range: [[0, 23], [0, 23]]
+    default: [6, 22]
+    description: "(start_hour, end_hour) for peak pricing"
+    affects_csv: [grid_prices.csv]
+
+  demand_charge_per_kw:
+    type: float
+    range: [0.0, 50.0]
+    default: 11.67
+    description: "Monthly demand charge. Consumed by simulator; not rendered."
+    affects_csv: []
+
+  dr_program:
+    type: categorical
+    choices: [none, CBP, BIP, ELRP]
+    default: none
+    description: "DR program type. Determines notification lead, season, magnitude bounds."
+    affects_csv: [dr_events.csv]
+
+  dr_magnitude_kw_range:
+    type: vec2
+    range: [[0.0, 1000.0], [0.0, 1000.0]]
+    default: [50.0, 200.0]
+    description: "Per-event magnitude sample range (min, max kW)"
+    affects_csv: [dr_events.csv]
+
+  dr_lambda_base:
+    type: float
+    range: [0.0, 1.0]
+    default: 0.05
+    description: "Baseline daily Poisson rate (events/day) before seasonal/temp/dow modulation"
+    affects_csv: [dr_events.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 6: Simulation Window (meta)
+# ──────────────────────────────────────────────────────────────────────────
+sim_window:
+
+  mode:
+    type: categorical
+    choices: [four_weeks_seasonal, full_year, custom]
+    default: four_weeks_seasonal
+    affects_csv: [building_load.csv, grid_prices.csv, sessions.csv, dr_events.csv]
+
+  weekdays_only:
+    type: bool
+    default: true
+    affects_csv: [sessions.csv]
+
+  custom_start:
+    type: timestamp
+    default: null
+    affects_csv: []
+
+  custom_end:
+    type: timestamp
+    default: null
+    affects_csv: []
+
+# ──────────────────────────────────────────────────────────────────────────
+# Bucket 7: Noise (post-render perturbation, per D25)
+# ──────────────────────────────────────────────────────────────────────────
+noise:
+
+  profile:
+    type: categorical
+    choices: [clean, light_noise, realistic_noise, adversarial, custom]
+    default: clean
+    description: "Named profile from configs/noise_profiles.yaml. 'custom' uses fields below."
+    affects_csv: [building_load.csv, sessions.csv, grid_prices.csv, dr_events.csv]
+
+  building_load_jitter_pct:
+    type: float
+    range: [0.0, 0.50]
+    default: 0.0
+    description: "Multiplicative Gaussian noise std on power_kw"
+    affects_csv: [building_load.csv]
+
+  arrival_time_jitter_min:
+    type: float
+    range: [0.0, 60.0]
+    default: 0.0
+    description: "Additive Gaussian noise std on arrival timestamps (minutes)"
+    affects_csv: [sessions.csv]
+
+  soc_arrival_jitter_pct:
+    type: float
+    range: [0.0, 0.30]
+    default: 0.0
+    affects_csv: [sessions.csv]
+
+  dr_notification_dropout_prob:
+    type: float
+    range: [0.0, 1.0]
+    default: 0.0
+    description: "P(scheduled DR event missing from rendered file)"
+    affects_csv: [dr_events.csv]
+
+  price_jitter_pct:
+    type: float
+    range: [0.0, 0.30]
+    default: 0.0
+    affects_csv: [grid_prices.csv]
+
+  occupancy_jitter_pct:
+    type: float
+    range: [0.0, 0.30]
+    default: 0.0
+    affects_csv: [building_load.csv]

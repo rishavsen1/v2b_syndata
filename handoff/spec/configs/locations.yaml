@@ -1,0 +1,111 @@
+# locations.yaml — Location descriptor library
+#
+# Each entry resolves into knobs:
+#   building_load.climate, building_load.weather_lat, weather_lon, weather_year
+#   utility_rate.tariff_type, energy_price_offpeak/peak, peak_window,
+#   demand_charge_per_kw, dr_program
+
+nashville_tn:
+  description: "Nashville, TN — TVA territory, subtropical, low-cost commercial"
+  climate: subtropical
+  weather:
+    lat: 36.1627
+    lon: -86.7816
+    year: 2020
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.085
+    energy_price_peak: 0.135
+    peak_window: [14, 19]
+    demand_charge_per_kw: 8.50
+    dr_program: none
+
+san_jose_ca:
+  description: "San Jose, CA — Silicon Valley Power, temperate, CONSENT calibration site"
+  climate: temperate
+  weather:
+    lat: 37.3382
+    lon: -121.8863
+    year: 2020
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.137
+    energy_price_peak: 0.178
+    peak_window: [6, 22]
+    demand_charge_per_kw: 11.67
+    dr_program: none
+
+san_francisco_ca:
+  description: "San Francisco, CA — PG&E commercial, temperate, CBP-eligible"
+  climate: temperate
+  weather:
+    lat: 37.7749
+    lon: -122.4194
+    year: 2020
+  tariff:
+    type: demand_charge
+    energy_price_offpeak: 0.140
+    energy_price_peak: 0.230
+    peak_window: [16, 21]
+    demand_charge_per_kw: 22.50
+    dr_program: CBP
+
+minneapolis_mn:
+  description: "Minneapolis, MN — Xcel Energy, cold climate, winter-peaking"
+  climate: cold
+  weather:
+    lat: 44.9778
+    lon: -93.2650
+    year: 2020
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.095
+    energy_price_peak: 0.145
+    peak_window: [9, 21]
+    demand_charge_per_kw: 12.00
+    dr_program: none
+
+miami_fl:
+  description: "Miami, FL — FPL, tropical, summer-peaking, DR-active utility"
+  climate: tropical
+  weather:
+    lat: 25.7617
+    lon: -80.1918
+    year: 2020
+  tariff:
+    type: DR
+    energy_price_offpeak: 0.090
+    energy_price_peak: 0.125
+    peak_window: [12, 21]
+    demand_charge_per_kw: 9.50
+    dr_program: ELRP
+
+houston_tx:
+  description: "Houston, TX — CenterPoint, subtropical, summer-peaking"
+  climate: subtropical
+  weather:
+    lat: 29.7604
+    lon: -95.3698
+    year: 2020
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.095
+    energy_price_peak: 0.140
+    peak_window: [13, 20]
+    demand_charge_per_kw: 10.50
+    dr_program: none
+
+atlanta_ga:
+  description: "Atlanta, GA — Georgia Power, temperate, mixed-season"
+  climate: temperate
+  weather:
+    lat: 33.7490
+    lon: -84.3880
+    year: 2020
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.090
+    energy_price_peak: 0.140
+    peak_window: [14, 19]
+    demand_charge_per_kw: 9.00
+    dr_program: none

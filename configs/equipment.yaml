@@ -1,0 +1,39 @@
+# equipment.yaml — Equipment descriptor library
+#
+# Each entry resolves into knobs:
+#   charging_infra.charger_count, directionality_frac, uni_rate_kw, bi_rate_kw
+
+balanced_50pct:
+  description: "20 chargers, 50% bidirectional, all 20 kW. S01 default."
+  charger_count: 20
+  directionality_frac: 0.50
+  uni_rate_kw: 20.0
+  bi_rate_kw: 20.0
+
+uni_only:
+  description: "All unidirectional. Baseline V1G deployment."
+  charger_count: 20
+  directionality_frac: 0.0
+  uni_rate_kw: 20.0
+  bi_rate_kw: 20.0   # unused
+
+bi_heavy:
+  description: "Mostly bidirectional (CONSENT-style fleet pilot)"
+  charger_count: 20
+  directionality_frac: 0.80
+  uni_rate_kw: 20.0
+  bi_rate_kw: 20.0
+
+consent_calibration_site:
+  description: "Matches CONSENT validation site exactly: 10 uni + 5 bi, all 20 kW"
+  charger_count: 15
+  directionality_frac: 0.333
+  uni_rate_kw: 20.0
+  bi_rate_kw: 20.0
+
+high_power_dcfc:
+  description: "DCFC-style fast chargers, all unidirectional"
+  charger_count: 8
+  directionality_frac: 0.0
+  uni_rate_kw: 50.0
+  bi_rate_kw: 50.0   # unused

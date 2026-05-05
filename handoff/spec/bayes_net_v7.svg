@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 1080" font-family="system-ui, -apple-system, sans-serif">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<style>
+.tier-label { font-size: 17px; font-weight: 600; fill: #2C2C2A; }
+.tier-sub { font-size: 12px; fill: #5F5E5A; }
+.node-title { font-size: 16px; font-weight: 600; }
+.node-sub { font-size: 11px; }
+.legend { font-size: 12px; fill: #444441; }
+.note { font-size: 11px; font-style: italic; fill: #5F5E5A; }
+.descriptor-fill { fill: #FFE7C2; stroke: #B86E0E; stroke-width: 1.2; }
+.descriptor-text-title { fill: #5C2D04; }
+.descriptor-text-sub { fill: #7A4108; }
+.root-fill { fill: #F1EFE8; stroke: #5F5E5A; stroke-width: 1; }
+.root-text-title { fill: #2C2C2A; }
+.root-text-sub { fill: #444441; }
+.entity-fill { fill: #E5E1F4; stroke: #6B5DC4; stroke-width: 1.4; }
+.entity-text-title { fill: #1F1A4A; }
+.entity-text-sub { fill: #36307A; }
+.latent-fill { fill: #EEEDFE; stroke: #534AB7; stroke-width: 1; }
+.latent-text-title { fill: #26215C; }
+.latent-text-sub { fill: #3C3489; }
+.output-fill { fill: #E1F5EE; stroke: #0F6E56; stroke-width: 1; }
+.output-text-title { fill: #04342C; }
+.noise-fill { fill: #FCE2E2; stroke: #993556; stroke-width: 1.2; }
+.noise-text-title { fill: #5C0F1F; }
+.causal-edge { stroke: #5F5E5A; stroke-width: 1.2; fill: none; }
+.descriptor-edge { stroke: #B86E0E; stroke-width: 1.2; fill: none; }
+.entity-edge { stroke: #6B5DC4; stroke-width: 1.4; fill: none; }
+.occupancy-edge { stroke: #534AB7; stroke-width: 1.6; fill: none; }
+.weather-edge { stroke: #1B6F8C; stroke-width: 1.4; fill: none; }
+.copula-edge { stroke: #534AB7; stroke-width: 1.4; stroke-dasharray: 5 3; fill: none; }
+.noise-edge { stroke: #993556; stroke-width: 1.0; stroke-dasharray: 2 2; fill: none; }
+.long-edge { stroke: #888780; stroke-width: 0.9; fill: none; }
+</style>
+</defs>
+
+<rect width="1300" height="1080" fill="white"/>
+
+<text class="tier-label" x="40" y="32">Tier 0 — User-facing descriptors</text>
+<text class="tier-sub" x="40" y="50">Named bundles in scenario YAML; resolved via library files</text>
+
+<g>
+<rect x="120" y="68" width="200" height="60" rx="10" class="descriptor-fill"/>
+<text class="node-title descriptor-text-title" x="220" y="92" text-anchor="middle">Location</text>
+<text class="node-sub descriptor-text-sub" x="220" y="112" text-anchor="middle">e.g. nashville_tn</text>
+</g>
+
+<g>
+<rect x="370" y="68" width="200" height="60" rx="10" class="descriptor-fill"/>
+<text class="node-title descriptor-text-title" x="470" y="92" text-anchor="middle">Building</text>
+<text class="node-sub descriptor-text-sub" x="470" y="112" text-anchor="middle">e.g. medium_office_v1</text>
+</g>
+
+<g>
+<rect x="620" y="68" width="200" height="60" rx="10" class="descriptor-fill"/>
+<text class="node-title descriptor-text-title" x="720" y="92" text-anchor="middle">Population</text>
+<text class="node-sub descriptor-text-sub" x="720" y="112" text-anchor="middle">axes + nego + fleet</text>
+</g>
+
+<g>
+<rect x="870" y="68" width="200" height="60" rx="10" class="descriptor-fill"/>
+<text class="node-title descriptor-text-title" x="970" y="92" text-anchor="middle">Equipment</text>
+<text class="node-sub descriptor-text-sub" x="970" y="112" text-anchor="middle">e.g. balanced_50pct</text>
+</g>
+
+<text class="tier-label" x="40" y="180">Tier 1 — Exogenous roots</text>
+<text class="tier-sub" x="40" y="198">Resolved from descriptors via library files</text>
+
+<g>
+<rect x="40" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="90" y="240" text-anchor="middle">C</text>
+<text class="node-sub root-text-sub" x="90" y="260" text-anchor="middle">climate</text>
+</g>
+
+<g>
+<rect x="155" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="205" y="240" text-anchor="middle">W</text>
+<text class="node-sub root-text-sub" x="205" y="260" text-anchor="middle">weather</text>
+</g>
+
+<g>
+<rect x="270" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="320" y="240" text-anchor="middle">T</text>
+<text class="node-sub root-text-sub" x="320" y="260" text-anchor="middle">tariff</text>
+</g>
+
+<g>
+<rect x="385" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="435" y="240" text-anchor="middle">A</text>
+<text class="node-sub root-text-sub" x="435" y="260" text-anchor="middle">archetype</text>
+</g>
+
+<g>
+<rect x="500" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="550" y="240" text-anchor="middle">S</text>
+<text class="node-sub root-text-sub" x="550" y="260" text-anchor="middle">size</text>
+</g>
+
+<g>
+<rect x="615" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="665" y="240" text-anchor="middle">O</text>
+<text class="node-sub root-text-sub" x="665" y="260" text-anchor="middle">occupancy</text>
+</g>
+
+<g>
+<rect x="730" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="780" y="240" text-anchor="middle">U</text>
+<text class="node-sub root-text-sub" x="780" y="260" text-anchor="middle">user spec</text>
+</g>
+
+<g>
+<rect x="845" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="895" y="240" text-anchor="middle">F</text>
+<text class="node-sub root-text-sub" x="895" y="260" text-anchor="middle">fleet spec</text>
+</g>
+
+<g>
+<rect x="960" y="216" width="100" height="56" rx="10" class="root-fill"/>
+<text class="node-title root-text-title" x="1010" y="240" text-anchor="middle">X</text>
+<text class="node-sub root-text-sub" x="1010" y="260" text-anchor="middle">infra</text>
+</g>
+
+<line x1="180" y1="128" x2="90" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+<line x1="220" y1="128" x2="205" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+<line x1="260" y1="128" x2="320" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+
+<line x1="430" y1="128" x2="435" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+<line x1="470" y1="128" x2="550" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+<line x1="510" y1="128" x2="665" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+
+<line x1="680" y1="128" x2="780" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+<line x1="760" y1="128" x2="895" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+
+<line x1="970" y1="128" x2="1010" y2="214" class="descriptor-edge" marker-end="url(#arrow)"/>
+
+<text class="tier-label" x="40" y="332">Tier 1.5 — Per-entity instantiation</text>
+<text class="tier-sub" x="40" y="350">One sample per car_id; downstream samplers parameterized from these</text>
+
+<g>
+<rect x="690" y="368" width="180" height="64" rx="10" class="entity-fill"/>
+<text class="node-title entity-text-title" x="780" y="392" text-anchor="middle">A_user</text>
+<text class="node-sub entity-text-sub" x="780" y="414" text-anchor="middle">per car: φ, κ, δ, w1, w2</text>
+</g>
+
+<g>
+<rect x="880" y="368" width="180" height="64" rx="10" class="entity-fill"/>
+<text class="node-title entity-text-title" x="970" y="392" text-anchor="middle">A_fleet</text>
+<text class="node-sub entity-text-sub" x="970" y="414" text-anchor="middle">per car: battery, capacity</text>
+</g>
+
+<line x1="780" y1="272" x2="780" y2="366" class="entity-edge" marker-end="url(#arrow)"/>
+<line x1="895" y1="272" x2="970" y2="366" class="entity-edge" marker-end="url(#arrow)"/>
+
+<text class="tier-label" x="40" y="490">Tier 2 — Latent intermediates</text>
+<text class="tier-sub" x="40" y="508">Sampled distributions; (f_arr, f_dwell) jointly via Gaussian copula</text>
+
+<g>
+<rect x="60" y="528" width="160" height="60" rx="10" class="latent-fill"/>
+<text class="node-title latent-text-title" x="140" y="552" text-anchor="middle">L_flex</text>
+<text class="node-sub latent-text-sub" x="140" y="572" text-anchor="middle">HVAC + water (E+)</text>
+</g>
+
+<g>
+<rect x="240" y="528" width="160" height="60" rx="10" class="latent-fill"/>
+<text class="node-title latent-text-title" x="320" y="552" text-anchor="middle">L_inflex</text>
+<text class="node-sub latent-text-sub" x="320" y="572" text-anchor="middle">lights + plug (E+)</text>
+</g>
+
+<g>
+<rect x="500" y="528" width="160" height="60" rx="10" class="latent-fill"/>
+<text class="node-title latent-text-title" x="580" y="552" text-anchor="middle">f_arr</text>
+<text class="node-sub latent-text-sub" x="580" y="572" text-anchor="middle">Bern(φ_v) × TruncNorm</text>
+</g>
+
+<g>
+<rect x="680" y="528" width="160" height="60" rx="10" class="latent-fill"/>
+<text class="node-title latent-text-title" x="760" y="552" text-anchor="middle">f_dwell</text>
+<text class="node-sub latent-text-sub" x="760" y="572" text-anchor="middle">Weibull(φ_v, κ_v)</text>
+</g>
+
+<g>
+<rect x="860" y="528" width="160" height="60" rx="10" class="latent-fill"/>
+<text class="node-title latent-text-title" x="940" y="552" text-anchor="middle">f_soc</text>
+<text class="node-sub latent-text-sub" x="940" y="572" text-anchor="middle">Beta(δ_v) shifted</text>
+</g>
+
+<text class="tier-label" x="40" y="754">Tier 3 — Output CSVs</text>
+<text class="tier-sub" x="40" y="772">Deterministic given parents and seed; optional noise applied post-render</text>
+
+<g>
+<rect x="20" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="90" y="816" text-anchor="middle">building_</text>
+<text class="node-title output-text-title" x="90" y="838" text-anchor="middle">load.csv</text>
+</g>
+
+<g>
+<rect x="175" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="245" y="816" text-anchor="middle">grid_</text>
+<text class="node-title output-text-title" x="245" y="838" text-anchor="middle">prices.csv</text>
+</g>
+
+<g>
+<rect x="330" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="400" y="816" text-anchor="middle">dr_</text>
+<text class="node-title output-text-title" x="400" y="838" text-anchor="middle">events.csv</text>
+</g>
+
+<g>
+<rect x="485" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="555" y="828" text-anchor="middle">sessions.csv</text>
+</g>
+
+<g>
+<rect x="640" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="710" y="828" text-anchor="middle">users.csv</text>
+</g>
+
+<g>
+<rect x="795" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="865" y="828" text-anchor="middle">cars.csv</text>
+</g>
+
+<g>
+<rect x="950" y="792" width="140" height="64" rx="10" class="output-fill"/>
+<text class="node-title output-text-title" x="1020" y="816" text-anchor="middle">chargers</text>
+<text class="node-title output-text-title" x="1020" y="838" text-anchor="middle">.csv</text>
+</g>
+
+<g>
+<rect x="450" y="900" width="220" height="46" rx="10" class="noise-fill"/>
+<text class="node-title noise-text-title" x="560" y="926" text-anchor="middle">Optional noise layer (D25)</text>
+</g>
+
+<line x1="435" y1="272" x2="120" y2="526" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="550" y1="272" x2="140" y2="526" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="205" y1="272" x2="125" y2="526" class="weather-edge" marker-end="url(#arrow)"/>
+<line x1="665" y1="272" x2="160" y2="526" class="occupancy-edge" marker-end="url(#arrow)"/>
+
+<line x1="435" y1="272" x2="305" y2="526" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="550" y1="272" x2="325" y2="526" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="665" y1="272" x2="345" y2="526" class="occupancy-edge" marker-end="url(#arrow)"/>
+
+<line x1="780" y1="432" x2="595" y2="526" class="entity-edge" marker-end="url(#arrow)"/>
+<line x1="780" y1="432" x2="760" y2="526" class="entity-edge" marker-end="url(#arrow)"/>
+<line x1="780" y1="432" x2="925" y2="526" class="entity-edge" marker-end="url(#arrow)"/>
+
+<line x1="660" y1="558" x2="680" y2="558" class="copula-edge"/>
+<text class="note" x="670" y="515" text-anchor="middle">copula</text>
+
+<line x1="140" y1="588" x2="90" y2="790" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="320" y1="588" x2="90" y2="790" class="causal-edge" marker-end="url(#arrow)"/>
+
+<line x1="580" y1="588" x2="555" y2="790" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="760" y1="588" x2="555" y2="790" class="causal-edge" marker-end="url(#arrow)"/>
+<line x1="940" y1="588" x2="555" y2="790" class="causal-edge" marker-end="url(#arrow)"/>
+
+<path d="M 870 400 L 1100 400 L 1100 720 L 555 720 L 555 790" class="entity-edge" marker-end="url(#arrow)"/>
+<path d="M 1060 400 L 1130 400 L 1130 750 L 865 750 L 865 790" class="entity-edge" marker-end="url(#arrow)"/>
+
+<path d="M 870 400 L 760 400 L 760 720 L 710 720 L 710 790" class="entity-edge" marker-end="url(#arrow)"/>
+
+<path d="M 320 272 L 320 730 L 245 730 L 245 790" class="long-edge" marker-end="url(#arrow)"/>
+<path d="M 320 272 L 320 720 L 400 720 L 400 790" class="long-edge" marker-end="url(#arrow)"/>
+
+<path d="M 90 272 L 90 700 L 380 700 L 380 790" class="long-edge" marker-end="url(#arrow)"/>
+<path d="M 205 272 L 205 710 L 410 710 L 410 790" class="weather-edge" marker-end="url(#arrow)"/>
+
+<path d="M 1010 272 L 1010 740 L 1020 740 L 1020 790" class="long-edge" marker-end="url(#arrow)"/>
+
+<line x1="90" y1="856" x2="490" y2="899" class="noise-edge" marker-end="url(#arrow)"/>
+<line x1="245" y1="856" x2="510" y2="899" class="noise-edge" marker-end="url(#arrow)"/>
+<line x1="400" y1="856" x2="530" y2="899" class="noise-edge" marker-end="url(#arrow)"/>
+<line x1="555" y1="856" x2="560" y2="899" class="noise-edge" marker-end="url(#arrow)"/>
+
+<text class="tier-label" x="40" y="990">Legend</text>
+<rect x="40" y="1002" width="18" height="14" class="descriptor-fill"/>
+<text class="legend" x="64" y="1014">Descriptor</text>
+<rect x="160" y="1002" width="18" height="14" class="root-fill"/>
+<text class="legend" x="184" y="1014">Root</text>
+<rect x="280" y="1002" width="18" height="14" class="entity-fill"/>
+<text class="legend" x="304" y="1014">Per-entity (Tier 1.5)</text>
+<rect x="440" y="1002" width="18" height="14" class="latent-fill"/>
+<text class="legend" x="464" y="1014">Latent (Tier 2)</text>
+<rect x="580" y="1002" width="18" height="14" class="output-fill"/>
+<text class="legend" x="604" y="1014">Output CSV</text>
+<rect x="720" y="1002" width="18" height="14" class="noise-fill"/>
+<text class="legend" x="744" y="1014">Noise layer</text>
+
+<line x1="40" y1="1050" x2="76" y2="1050" class="descriptor-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="84" y="1054">Descriptor → root</text>
+<line x1="200" y1="1050" x2="236" y2="1050" class="entity-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="244" y="1054">Per-entity flow</text>
+<line x1="360" y1="1050" x2="396" y2="1050" class="causal-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="404" y="1054">Causal</text>
+<line x1="470" y1="1050" x2="506" y2="1050" class="occupancy-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="514" y="1054">Occupancy</text>
+<line x1="600" y1="1050" x2="636" y2="1050" class="weather-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="644" y="1054">Weather</text>
+<line x1="720" y1="1050" x2="756" y2="1050" class="copula-edge"/>
+<text class="legend" x="764" y="1054">Copula joint</text>
+<line x1="850" y1="1050" x2="886" y2="1050" class="noise-edge" marker-end="url(#arrow)"/>
+<text class="legend" x="894" y="1054">Optional perturbation</text>
+</svg>

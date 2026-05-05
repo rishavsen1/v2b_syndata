@@ -1,0 +1,60 @@
+# buildings.yaml — Building descriptor library
+#
+# Each entry resolves into knobs:
+#   building_load.archetype, size, occupancy_source, peak_kw
+#
+# default_population field per D21 (loose tie). User can override.
+
+medium_office_v1:
+  description: "Medium office, ~5000 m², standard work hours"
+  archetype: office
+  size: med
+  occupancy_source: ashrae_90_1_office
+  peak_kw: 500
+  default_population: consent_default
+  doe_prototype: MediumOffice
+
+small_office_v1:
+  description: "Small office, ~500 m², small business hours"
+  archetype: office
+  size: small
+  occupancy_source: ashrae_90_1_office
+  peak_kw: 100
+  default_population: consent_default
+  doe_prototype: SmallOffice
+
+large_office_v1:
+  description: "Large office tower, multi-tenant"
+  archetype: office
+  size: large
+  occupancy_source: ashrae_90_1_office
+  peak_kw: 2000
+  default_population: stable_commuter_heavy
+  doe_prototype: LargeOffice
+
+retail_strip_mall:
+  description: "Strip mall retail, evening-peaking customer traffic"
+  archetype: retail
+  size: med
+  occupancy_source: ashrae_90_1_retail
+  peak_kw: 300
+  default_population: visitor_heavy
+  doe_prototype: StripMall
+
+retail_standalone:
+  description: "Standalone retail (big box), all-day customer traffic"
+  archetype: retail
+  size: large
+  occupancy_source: ashrae_90_1_retail
+  peak_kw: 600
+  default_population: visitor_heavy
+  doe_prototype: RetailStandalone
+
+mixed_use_v1:
+  description: "Mixed office+retail, composite from DOE office and retail prototypes"
+  archetype: mixed
+  size: med
+  occupancy_source: ashrae_90_1_mixed
+  peak_kw: 400
+  default_population: consent_default
+  doe_prototype: composite_50_50_office_retail

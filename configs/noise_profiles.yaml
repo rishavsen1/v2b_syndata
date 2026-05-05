@@ -1,0 +1,44 @@
+# noise_profiles.yaml — Noise profile library (D25)
+#
+# Post-render perturbation for adversarial / robustness testing.
+# Each profile resolves into knobs in the noise: bucket of knobs.yaml.
+#
+# Default profile is `clean` (all zeros) — generation behaves as the
+# pure generative model. Higher-noise profiles enable testing of
+# learning-based methods under realistic / adversarial conditions.
+
+clean:
+  description: "No noise. Pure generative output. Default."
+  building_load_jitter_pct: 0.0
+  arrival_time_jitter_min: 0.0
+  soc_arrival_jitter_pct: 0.0
+  dr_notification_dropout_prob: 0.0
+  price_jitter_pct: 0.0
+  occupancy_jitter_pct: 0.0
+
+light_noise:
+  description: "Low-grade measurement noise consistent with calibrated AMI / telematics"
+  building_load_jitter_pct: 0.02      # 2% measurement std
+  arrival_time_jitter_min: 5.0        # 5 min reporting jitter
+  soc_arrival_jitter_pct: 0.03        # 3% SoC measurement std
+  dr_notification_dropout_prob: 0.0   # notifications are reliable
+  price_jitter_pct: 0.0               # price tape is deterministic
+  occupancy_jitter_pct: 0.05          # ASHRAE schedules approximate reality
+
+realistic_noise:
+  description: "Field-realistic noise: imperfect telematics, occasional dropouts"
+  building_load_jitter_pct: 0.05
+  arrival_time_jitter_min: 15.0
+  soc_arrival_jitter_pct: 0.08
+  dr_notification_dropout_prob: 0.02  # ~2% of DR notifications drop
+  price_jitter_pct: 0.0
+  occupancy_jitter_pct: 0.10
+
+adversarial:
+  description: "Worst-case stress test for learning methods"
+  building_load_jitter_pct: 0.15
+  arrival_time_jitter_min: 45.0
+  soc_arrival_jitter_pct: 0.20
+  dr_notification_dropout_prob: 0.10
+  price_jitter_pct: 0.05
+  occupancy_jitter_pct: 0.25

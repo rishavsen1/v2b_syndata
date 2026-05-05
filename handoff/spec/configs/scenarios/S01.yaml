@@ -1,0 +1,19 @@
+# S01.yaml — Default anchor scenario
+#
+# Uses 4-descriptor format (Tier 0). All knob values inherited via descriptor
+# expansion from library files. Manifest will record source per knob:
+#   descriptor:nashville_tn, descriptor:medium_office_v1, etc.
+#
+# To override specific knobs, add to the overrides: block.
+
+scenario_id: S01
+description: "Nashville medium office, mixed-flex CONSENT pop, balanced 50% bi chargers"
+
+descriptors:
+  location:    nashville_tn
+  building:    medium_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+# overrides: {}    # empty by design — S01 IS the canonical default
