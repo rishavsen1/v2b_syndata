@@ -2,17 +2,37 @@
 
 Implementation choices made where the spec was ambiguous. Each is reversible later.
 
-## 1. Sim window: `four_weeks_seasonal` = 28 contiguous days from 2020-04-06
+## 1. Sim window: `month` mode anchored at DEFAULT_SIM_START
 
-PLAN.md mentions "~7,680 rows" for building_load under this mode but no row-count
-interpretation cleanly recovers 7680 = 80 × 96 from "4 weeks" and 15-min sampling.
-We treat the figure as approximate and use 28 contiguous days starting Monday
-2020-04-06. This yields:
-- `building_load.csv` / `grid_prices.csv`: 28 × 96 = 2688 rows
-- ~20 weekdays for sessions (subject to φ gating)
+`sim_window.mode` choices: `month` (default), `full_year`, `custom`.
 
-Anchor date 2020-04-06 chosen as a Monday in the spring shoulder. To use a different
-window, override `sim_window.mode = custom` with `custom_start` / `custom_end`.
+The anchor and end are decoupled:
+
+- `sim_window.start` sets the anchor timestamp used by `month` and `full_year`.
+- `sim_window.custom_end` is only consulted when `sim_window.mode=custom`.
+- `sim_window.start = null` falls back to `DEFAULT_SIM_START` in `runner.py`.
+
+- `month`: window is the calendar month containing `DEFAULT_SIM_START` in
+  `runner.py` (currently 2020-04-01). Length = `calendar.monthrange()` days
+  (28/29/30/31). End is exclusive (first instant of next month). Default
+  yields April 2020 → 30 days × 96 = 2880 rows for `building_load.csv` /
+  `grid_prices.csv`. ~22 weekdays for sessions (φ-gated).
+- `full_year`: Jan 1 to Dec 31 of the anchor year, calendar-aligned.
+- `custom`: requires `sim_window.start` and `sim_window.custom_end` knobs
+  (timestamp). End is exclusive.
+
+PLAN.md previously referenced a "~7,680 rows" / "4-week seasonal" interpretation
+that did not have a clean row-count derivation. Replaced with calendar-month
+windows so row counts are unambiguous and align with utility billing periods.
+
+To change the default month: edit `DEFAULT_SIM_START` in
+`src/v2b_syndata/runner.py`. To override at the CLI:
+
+```
+--override 'sim_window.mode=custom' \
+--override 'sim_window.start=2020-05-01' \
+--override 'sim_window.custom_end=2020-06-01'
+```
 
 ## 2. Peak window semantics: hour ∈ [start, end)
 

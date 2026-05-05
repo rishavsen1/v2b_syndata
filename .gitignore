@@ -19,3 +19,4 @@ data/calibration/
 .idea/
 .vscode/
 uv.lock
+data/

@@ -1,0 +1,735 @@
+diff --git a/.gitignore b/.gitignore
+index 7ed0dc6..22a969c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -19,3 +19,4 @@ data/calibration/
+ .idea/
+ .vscode/
+ uv.lock
++data/
+\ No newline at end of file
+diff --git a/DESIGN_NOTES.md b/DESIGN_NOTES.md
+index 5ade494..d6e31d8 100644
+--- a/DESIGN_NOTES.md
++++ b/DESIGN_NOTES.md
+@@ -2,17 +2,31 @@
+ 
+ Implementation choices made where the spec was ambiguous. Each is reversible later.
+ 
+-## 1. Sim window: `four_weeks_seasonal` = 28 contiguous days from 2020-04-06
++## 1. Sim window: `month` mode anchored at DEFAULT_SIM_START
+ 
+-PLAN.md mentions "~7,680 rows" for building_load under this mode but no row-count
+-interpretation cleanly recovers 7680 = 80 × 96 from "4 weeks" and 15-min sampling.
+-We treat the figure as approximate and use 28 contiguous days starting Monday
+-2020-04-06. This yields:
+-- `building_load.csv` / `grid_prices.csv`: 28 × 96 = 2688 rows
+-- ~20 weekdays for sessions (subject to φ gating)
++`sim_window.mode` choices: `month` (default), `full_year`, `custom`.
+ 
+-Anchor date 2020-04-06 chosen as a Monday in the spring shoulder. To use a different
+-window, override `sim_window.mode = custom` with `custom_start` / `custom_end`.
++- `month`: window is the calendar month containing `DEFAULT_SIM_START` in
++  `runner.py` (currently 2020-04-01). Length = `calendar.monthrange()` days
++  (28/29/30/31). End is exclusive (first instant of next month). Default
++  yields April 2020 → 30 days × 96 = 2880 rows for `building_load.csv` /
++  `grid_prices.csv`. ~22 weekdays for sessions (φ-gated).
++- `full_year`: Jan 1 to Dec 31 of the anchor year, calendar-aligned.
++- `custom`: requires `sim_window.custom_start` and `sim_window.custom_end`
++  knobs (timestamp). End is exclusive.
++
++PLAN.md previously referenced a "~7,680 rows" / "4-week seasonal" interpretation
++that did not have a clean row-count derivation. Replaced with calendar-month
++windows so row counts are unambiguous and align with utility billing periods.
++
++To change the default month: edit `DEFAULT_SIM_START` in
++`src/v2b_syndata/runner.py`. To override at the CLI:
++
++```
++--override 'sim_window.mode=custom' \
++--override 'sim_window.custom_start=2020-05-01' \
++--override 'sim_window.custom_end=2020-06-01'
++```
+ 
+ ## 2. Peak window semantics: hour ∈ [start, end)
+ 
+diff --git a/configs/knobs.yaml b/configs/knobs.yaml
+index e00e922..8ae439d 100644
+--- a/configs/knobs.yaml
++++ b/configs/knobs.yaml
+@@ -251,8 +251,9 @@ sim_window:
+ 
+   mode:
+     type: categorical
+-    choices: [four_weeks_seasonal, full_year, custom]
+-    default: four_weeks_seasonal
++    choices: [month, full_year, custom]
++    default: month
++    description: "month = single calendar month anchored at runner's DEFAULT_SIM_START; length 28/29/30/31 per month. full_year = Jan 1 to Dec 31. custom = use custom_start/end."
+     affects_csv: [building_load.csv, grid_prices.csv, sessions.csv, dr_events.csv]
+ 
+   weekdays_only:
+diff --git a/src/v2b_syndata/knob_loader.py b/src/v2b_syndata/knob_loader.py
+index d18a581..622c162 100644
+--- a/src/v2b_syndata/knob_loader.py
++++ b/src/v2b_syndata/knob_loader.py
+@@ -101,9 +101,10 @@ def _check_type_and_range(path: str, value: Any, spec: dict[str, Any]) -> None:
+         if abs(total - 1.0) > 1e-6:
+             raise KnobValidationError(f"{path}: region weights must sum to 1.0, got {total}")
+     elif typ == "timestamp":
+-        # null or ISO string
+-        if value is not None and not isinstance(value, str):
+-            raise KnobValidationError(f"{path}: timestamp must be ISO string or null")
++        # null, ISO string, or date/datetime (YAML parses 'YYYY-MM-DD' to date).
++        import datetime as _dt
++        if value is not None and not isinstance(value, (str, _dt.date, _dt.datetime)):
++            raise KnobValidationError(f"{path}: timestamp must be ISO string, date, datetime, or null")
+     elif typ == "path":
+         if not isinstance(value, str):
+             raise KnobValidationError(f"{path}: expected string path")
+@@ -129,7 +130,7 @@ def parse_overrides(items: list[str]) -> dict[str, Any]:
+         if not m:
+             raise KnobValidationError(f"override {s!r} not in form 'bucket.knob=value'")
+         path, raw = m.group(1), m.group(2)
+-        out[path] = parse_override_value(raw)
++        out[path] = _normalize(parse_override_value(raw))
+     return out
+ 
+ 
+@@ -172,11 +173,19 @@ def resolve_knobs(
+ 
+ 
+ def _normalize(v: Any) -> Any:
+-    """Recursively coerce tuples → lists for stable equality and YAML round-trip."""
++    """Recursively coerce tuples → lists, dates → ISO strings.
++
++    Stable equality + YAML / JSON round-trip require Python primitives.
++    """
++    import datetime as _dt
+     if isinstance(v, tuple):
+         return [_normalize(x) for x in v]
+     if isinstance(v, list):
+         return [_normalize(x) for x in v]
+     if isinstance(v, dict):
+         return {k: _normalize(x) for k, x in v.items()}
++    if isinstance(v, _dt.datetime):
++        return v.isoformat()
++    if isinstance(v, _dt.date):
++        return v.isoformat()
+     return v
+diff --git a/src/v2b_syndata/runner.py b/src/v2b_syndata/runner.py
+index 2684b65..1c22696 100644
+--- a/src/v2b_syndata/runner.py
++++ b/src/v2b_syndata/runner.py
+@@ -3,8 +3,10 @@
+ Resolves knobs, builds context, runs the DAG, applies noise, writes CSVs +
+ manifest, and validates.
+ """
++
+ from __future__ import annotations
+ 
++import calendar
+ from datetime import datetime, timedelta
+ from pathlib import Path
+ from typing import Any
+@@ -14,7 +16,7 @@ import pandas as pd
+ from . import noise as noise_mod
+ from .dag import SamplerRegistry, build_graph
+ from .descriptor_loader import expand_descriptors, load_scenario
+-from .knob_loader import load_knob_registry, resolve_knobs
++from .knob_loader import _normalize, load_knob_registry, resolve_knobs
+ from .manifest import CSV_NAMES, write_manifest
+ from .renderers import building_load as r_building_load
+ from .renderers import cars as r_cars
+@@ -27,7 +29,7 @@ from .samplers import exogenous, per_entity, sessions_dist
+ from .samplers import load as load_sampler
+ from .types import ResolvedKnobs, ScenarioContext
+ 
+-DEFAULT_SIM_START = datetime(2020, 4, 6)  # Monday spring shoulder. See DESIGN_NOTES §1.
++DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. See DESIGN_NOTES §1.
+ 
+ 
+ def build_registry() -> SamplerRegistry:
+@@ -61,13 +63,17 @@ def build_registry() -> SamplerRegistry:
+ 
+ def _resolve_sim_window(knobs: ResolvedKnobs) -> tuple[datetime, datetime]:
+     mode = knobs.get("sim_window.mode")
+-    if mode == "four_weeks_seasonal":
+-        start = DEFAULT_SIM_START
+-        end = start + timedelta(days=28)
++    if mode == "month":
++        # Anchor at the calendar-month containing DEFAULT_SIM_START. Window length
++        # = days in that month (28/29/30/31). End is exclusive (first instant of
++        # next month) so 15-min grid gives exactly days*96 rows.
++        start = DEFAULT_SIM_START.replace(day=1)
++        days_in_month = calendar.monthrange(start.year, start.month)[1]
++        end = start + timedelta(days=days_in_month)
+         return start, end
+     if mode == "full_year":
+-        start = DEFAULT_SIM_START
+-        end = start + timedelta(days=365)
++        start = DEFAULT_SIM_START.replace(month=1, day=1)
++        end = start.replace(year=start.year + 1)
+         return start, end
+     if mode == "custom":
+         cs = knobs.get("sim_window.custom_start")
+@@ -98,7 +104,9 @@ def generate(
+     noise_profile_override: str | None = None,
+ ) -> dict[str, Any]:
+     """Run end-to-end generation. Returns the manifest dict."""
+-    cli_overrides = dict(cli_overrides or {})
++    # Normalize so direct-API callers can pass dates / tuples — keeps the
++    # manifest JSON-serializable and matches the shape parse_overrides emits.
++    cli_overrides = _normalize(dict(cli_overrides or {}))
+     output_dir = Path(output_dir)
+     output_dir.mkdir(parents=True, exist_ok=True)
+ 
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 9203c96..7547d0c 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -1,13 +1,22 @@
+ """Shared pytest fixtures."""
+ from __future__ import annotations
+ 
++from datetime import datetime, timedelta
+ from pathlib import Path
++from typing import Any, Callable
+ 
++import pandas as pd
+ import pytest
++import yaml
++
++from v2b_syndata.runner import generate
+ 
+ REPO_ROOT = Path(__file__).resolve().parent.parent
+ CONFIG_DIR = REPO_ROOT / "configs"
+ 
++DEFAULT_FAST_START = datetime(2020, 4, 1)
++DEFAULT_FAST_END = datetime(2020, 4, 8)
++
+ 
+ @pytest.fixture(scope="session")
+ def config_dir() -> Path:
+@@ -17,3 +26,136 @@ def config_dir() -> Path:
+ @pytest.fixture(scope="session")
+ def repo_root() -> Path:
+     return REPO_ROOT
++
++
++@pytest.fixture
++def tmp_scenario_dir(tmp_path: Path, config_dir: Path):
++    """Build a temp config directory backed by symlinks, with writable scenarios/.
++
++    Returns ``(cfg_dir, write_scenario)``. ``write_scenario(descriptors,
++    scenario_id="STEST", overrides=None)`` writes
++    ``cfg_dir/scenarios/<id>.yaml`` and returns ``(cfg_dir, scenario_id)``.
++    """
++    cfg = tmp_path / "cfg"
++    cfg.mkdir()
++    for f in config_dir.iterdir():
++        if f.name == "scenarios":
++            continue
++        (cfg / f.name).symlink_to(f)
++    (cfg / "scenarios").mkdir()
++
++    def write_scenario(
++        descriptors: dict[str, str],
++        scenario_id: str = "STEST",
++        overrides: dict[str, Any] | None = None,
++    ) -> tuple[Path, str]:
++        sc = {
++            "scenario_id": scenario_id,
++            "description": "test scenario",
++            "descriptors": dict(descriptors),
++            "overrides": overrides or {},
++        }
++        (cfg / "scenarios" / f"{scenario_id}.yaml").write_text(yaml.safe_dump(sc))
++        return cfg, scenario_id
++
++    return cfg, write_scenario
++
++
++@pytest.fixture
++def fast_generate(tmp_path: Path, config_dir: Path) -> Callable[..., tuple[Path, dict[str, Any]]]:
++    """Run ``runner.generate`` with a fast 7-day custom window by default.
++
++    Caller may override ``scenario``, ``seed``, ``config_dir``, ``overrides``,
++    or ``noise_profile``. ``ev_count`` is left at the descriptor's default
++    so F4/F5 share invariants stay above the validator's tolerance.
++    """
++    counter = {"i": 0}
++
++    def _go(
++        *,
++        scenario: str = "S01",
++        seed: int = 42,
++        config_dir: Path = config_dir,
++        overrides: dict[str, Any] | None = None,
++        noise_profile: str | None = None,
++        out_dir: Path | None = None,
++    ) -> tuple[Path, dict[str, Any]]:
++        merged: dict[str, Any] = {
++            "sim_window.mode": "custom",
++            "sim_window.custom_start": "2020-04-01",
++            "sim_window.custom_end": "2020-04-08",
++        }
++        merged.update(overrides or {})
++        if out_dir is None:
++            counter["i"] += 1
++            out_dir = tmp_path / f"out_{counter['i']}"
++        manifest = generate(
++            scenario_id=scenario,
++            seed=seed,
++            output_dir=out_dir,
++            config_dir=config_dir,
++            cli_overrides=merged,
++            noise_profile_override=noise_profile,
++        )
++        return out_dir, manifest
++
++    return _go
++
++
++@pytest.fixture
++def assert_sanity():
++    """Fixture wrapper around :func:`_assert_sanity` for ergonomic test use."""
++    return _assert_sanity
++
++
++def _assert_sanity(
++    out_dir: Path,
++    manifest: dict[str, Any],
++    *,
++    expected_start: datetime | None = None,
++    expected_end: datetime | None = None,
++) -> None:
++    """Cheap post-generate sanity checks.
++
++    1. building_load and grid_prices first/last datetimes match the input window.
++    2. cars and users row counts equal ev_count, with matching car_id sets.
++    3. chargers row count equals charger_count.
++    4. building_load and grid_prices row counts equal the 15-min window length.
++    """
++    if expected_start is None:
++        expected_start = DEFAULT_FAST_START
++    if expected_end is None:
++        expected_end = DEFAULT_FAST_END
++
++    bl = pd.read_csv(out_dir / "building_load.csv")
++    gp = pd.read_csv(out_dir / "grid_prices.csv")
++    cars = pd.read_csv(out_dir / "cars.csv")
++    users = pd.read_csv(out_dir / "users.csv")
++    chargers = pd.read_csv(out_dir / "chargers.csv")
++
++    expected_rows = int((expected_end - expected_start).total_seconds() // (15 * 60))
++    assert len(bl) == expected_rows, (
++        f"building_load rows {len(bl)} != expected {expected_rows} "
++        f"for window {expected_start} → {expected_end}"
++    )
++    assert len(gp) == expected_rows, f"grid_prices rows {len(gp)} != {expected_rows}"
++
++    bl_first = pd.to_datetime(bl["datetime"].iloc[0])
++    bl_last = pd.to_datetime(bl["datetime"].iloc[-1])
++    expected_last = expected_end - timedelta(minutes=15)
++    assert bl_first == expected_start, f"building_load first {bl_first} != {expected_start}"
++    assert bl_last == expected_last, f"building_load last {bl_last} != {expected_last}"
++    gp_first = pd.to_datetime(gp["datetime"].iloc[0])
++    gp_last = pd.to_datetime(gp["datetime"].iloc[-1])
++    assert gp_first == expected_start
++    assert gp_last == expected_last
++
++    res = manifest["knob_resolution"]
++    ev_count = int(res["ev_fleet.ev_count"]["value"])
++    charger_count = int(res["charging_infra.charger_count"]["value"])
++    assert len(cars) == ev_count, f"cars rows {len(cars)} != ev_count {ev_count}"
++    assert len(users) == ev_count, f"users rows {len(users)} != ev_count {ev_count}"
++    assert set(cars["car_id"]) == set(users["car_id"]), "cars/users car_id sets differ"
++    assert len(chargers) == charger_count, (
++        f"chargers rows {len(chargers)} != charger_count {charger_count}"
++    )
+diff --git a/tests/test_variation_descriptors.py b/tests/test_variation_descriptors.py
+new file mode 100644
+index 0000000..5f73e17
+--- /dev/null
++++ b/tests/test_variation_descriptors.py
+@@ -0,0 +1,138 @@
++"""Per-descriptor library coverage — every entry in every library generates."""
++from __future__ import annotations
++
++from datetime import datetime
++
++import pandas as pd
++import pytest
++
++from v2b_syndata.validate import validate
++
++S01_DEFAULTS = {
++    "location": "nashville_tn",
++    "building": "medium_office_v1",
++    "population": "consent_default",
++    "equipment": "balanced_50pct",
++    "noise": "clean",
++}
++
++CSV_NAMES = ("building_load", "cars", "users", "chargers",
++             "grid_prices", "dr_events", "sessions")
++
++
++def _run(tmp_scenario_dir, fast_generate, **descriptor_overrides):
++    cfg, write_scenario = tmp_scenario_dir
++    descriptors = {**S01_DEFAULTS, **descriptor_overrides}
++    cfg, sid = write_scenario(descriptors)
++    out, manifest = fast_generate(scenario=sid, config_dir=cfg)
++    return out, manifest, descriptors
++
++
++@pytest.mark.parametrize("location", [
++    "nashville_tn",
++    "san_jose_ca",
++    "san_francisco_ca",
++    "minneapolis_mn",
++    "miami_fl",
++    "houston_tx",
++    "atlanta_ga",
++])
++def test_each_location(location, tmp_scenario_dir, fast_generate, assert_sanity):
++    out, manifest, _ = _run(tmp_scenario_dir, fast_generate, location=location)
++    for n in CSV_NAMES:
++        assert (out / f"{n}.csv").exists(), f"missing {n}.csv"
++    assert (out / "manifest.json").exists()
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    rep = validate(out)
++    assert rep.passed, f"{location}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("building", [
++    "medium_office_v1",
++    "small_office_v1",
++    "large_office_v1",
++    "retail_strip_mall",
++    "retail_standalone",
++    "mixed_use_v1",
++])
++def test_each_building(building, tmp_scenario_dir, fast_generate, assert_sanity):
++    out, manifest, _ = _run(tmp_scenario_dir, fast_generate, building=building)
++    for n in CSV_NAMES:
++        assert (out / f"{n}.csv").exists()
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    rep = validate(out)
++    assert rep.passed, f"{building}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("population", [
++    "consent_default",
++    "stable_commuter_heavy",
++    "visitor_heavy",
++])
++def test_each_population(population, tmp_scenario_dir, fast_generate, assert_sanity):
++    cfg, write_scenario = tmp_scenario_dir
++    descriptors = {**S01_DEFAULTS, "population": population}
++    # stable_commuter_heavy has ev_count=25 but S01 equipment ships only 20 chargers,
++    # which would trip E5. Bump charger_count so the population swap is the only delta.
++    cfg, sid = write_scenario(descriptors,
++                              overrides={"charging_infra.charger_count": 30})
++    out, manifest = fast_generate(scenario=sid, config_dir=cfg)
++    for n in CSV_NAMES:
++        assert (out / f"{n}.csv").exists()
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    rep = validate(out)
++    assert rep.passed, f"{population}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("equipment,charger_count", [
++    ("balanced_50pct", 20),
++    ("uni_only", 20),
++    ("bi_heavy", 20),
++    ("consent_calibration_site", 15),
++    ("high_power_dcfc", 8),
++])
++def test_each_equipment(equipment, charger_count, tmp_scenario_dir, fast_generate,
++                        assert_sanity):
++    cfg, write_scenario = tmp_scenario_dir
++    descriptors = {**S01_DEFAULTS, "equipment": equipment}
++    # Scale the fleet to the chargers so E5 capacity holds across the parametrize.
++    cfg, sid = write_scenario(descriptors,
++                              overrides={"ev_fleet.ev_count": charger_count})
++    out, manifest = fast_generate(scenario=sid, config_dir=cfg)
++    for n in CSV_NAMES:
++        assert (out / f"{n}.csv").exists()
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    chargers = pd.read_csv(out / "chargers.csv")
++    assert len(chargers) == charger_count
++    if charger_count >= 15:
++        # F4/F5 share invariants get unreliable below n≈15. Below that, exit
++        # after structural sanity — equipment-specific knobs are still asserted
++        # via the chargers.csv row count above.
++        rep = validate(out)
++        assert rep.passed, f"{equipment}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("noise", [
++    "clean",
++    "light_noise",
++    "realistic_noise",
++    "adversarial",
++])
++def test_each_noise_profile(noise, tmp_scenario_dir, fast_generate, assert_sanity):
++    out, manifest, _ = _run(tmp_scenario_dir, fast_generate, noise=noise)
++    for n in CSV_NAMES:
++        assert (out / f"{n}.csv").exists()
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    if noise == "clean":
++        rep = validate(out)
++        assert rep.passed, f"{noise}: {'; '.join(rep.errors)}"
+diff --git a/tests/test_variation_modes.py b/tests/test_variation_modes.py
+new file mode 100644
+index 0000000..316bcb8
+--- /dev/null
++++ b/tests/test_variation_modes.py
+@@ -0,0 +1,113 @@
++"""Knob-mode and categorical-branch coverage."""
++from __future__ import annotations
++
++from datetime import datetime
++
++import pandas as pd
++import pytest
++
++from v2b_syndata.renderers.dr_events import _NOTIF_LEAD_HOURS
++from v2b_syndata.validate import validate
++
++
++@pytest.mark.parametrize("mode,extra,expected_start,expected_end,run_validate", [
++    ("month", {}, datetime(2020, 4, 1), datetime(2020, 5, 1), True),
++    ("full_year", {"ev_fleet.ev_count": 5},
++     datetime(2020, 1, 1), datetime(2021, 1, 1), False),
++    ("custom",
++     {"sim_window.custom_start": "2020-04-01",
++      "sim_window.custom_end": "2020-04-08"},
++     datetime(2020, 4, 1), datetime(2020, 4, 8), True),
++])
++def test_sim_window_modes(mode, extra, expected_start, expected_end, run_validate,
++                          fast_generate, assert_sanity):
++    overrides: dict = {"sim_window.mode": mode, **extra}
++    if mode != "custom":
++        overrides.update({"sim_window.custom_start": None,
++                          "sim_window.custom_end": None})
++    out, manifest = fast_generate(overrides=overrides)
++    assert_sanity(out, manifest,
++                  expected_start=expected_start, expected_end=expected_end)
++    if run_validate:
++        rep = validate(out)
++        assert rep.passed, f"mode={mode}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("tariff", ["flat", "TOU", "demand_charge", "DR"])
++def test_each_tariff(tariff, fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"utility_rate.tariff_type": tariff})
++    assert_sanity(out, manifest)
++    gp = pd.read_csv(out / "grid_prices.csv")
++    if tariff == "flat":
++        assert (gp["type"] == "off_peak").all()
++        assert gp["price_per_kwh"].nunique() == 1
++    rep = validate(out)
++    assert rep.passed, f"tariff={tariff}: {'; '.join(rep.errors)}"
++
++
++@pytest.mark.parametrize("program,lead_h", [
++    ("none", None),
++    ("CBP", _NOTIF_LEAD_HOURS["CBP"]),
++    ("BIP", _NOTIF_LEAD_HOURS["BIP"]),
++    ("ELRP", _NOTIF_LEAD_HOURS["ELRP"]),
++])
++def test_each_dr_program(program, lead_h, fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "utility_rate.dr_program": program,
++        "sim_window.custom_start": "2020-07-01",
++        "sim_window.custom_end": "2020-08-01",
++    })
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 7, 1),
++                  expected_end=datetime(2020, 8, 1))
++    dr = pd.read_csv(out / "dr_events.csv")
++    if program == "none":
++        assert len(dr) == 0
++    else:
++        assert len(dr) > 0, f"expected DR events for {program}, got 0"
++        leads = pd.to_datetime(dr["start"]) - pd.to_datetime(dr["notified_at"])
++        assert (leads == pd.Timedelta(hours=lead_h)).all(), (
++            f"{program}: notification lead doesn't match {lead_h}h"
++        )
++
++
++@pytest.mark.parametrize("hetero", ["homog", "mixed"])
++def test_battery_heterogeneity(hetero, fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"ev_fleet.battery_heterogeneity": hetero})
++    assert_sanity(out, manifest)
++    cars = pd.read_csv(out / "cars.csv")
++    if hetero == "homog":
++        assert cars["battery_class"].nunique() == 1, (
++            f"homog should yield one battery_class; got {cars['battery_class'].unique()}"
++        )
++    rep = validate(out)
++    assert rep.passed, f"hetero={hetero}: {'; '.join(rep.errors)}"
++
++
++def test_peak_window_wraparound(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "utility_rate.tariff_type": "TOU",
++        "utility_rate.peak_window": [22, 6],
++    })
++    assert_sanity(out, manifest)
++    gp = pd.read_csv(out / "grid_prices.csv")
++    hours = pd.to_datetime(gp["datetime"]).dt.hour
++    expected_peak = (hours >= 22) | (hours < 6)
++    assert ((gp["type"] == "peak") == expected_peak).all(), (
++        "peak/off_peak labels don't match wraparound peak_window=[22, 6]"
++    )
++    rep = validate(out)
++    assert rep.passed, f"wraparound: {'; '.join(rep.errors)}"
++
++
++def test_weekdays_only_false(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"sim_window.weekdays_only": False})
++    assert_sanity(out, manifest)
++    sess = pd.read_csv(out / "sessions.csv")
++    if len(sess) > 0:
++        weekday = pd.to_datetime(sess["arrival"]).dt.weekday
++        assert (weekday >= 5).any(), (
++            "weekdays_only=False should produce at least one weekend session"
++        )
++    rep = validate(out)
++    assert rep.passed, f"weekdays_only=False: {'; '.join(rep.errors)}"
+diff --git a/tests/test_variation_overrides.py b/tests/test_variation_overrides.py
+new file mode 100644
+index 0000000..ea78f85
+--- /dev/null
++++ b/tests/test_variation_overrides.py
+@@ -0,0 +1,116 @@
++"""One round-trip test per knob type. Exercises every branch of `_check_type_and_range`."""
++from __future__ import annotations
++
++import json
++from datetime import date, datetime
++
++import pandas as pd
++import pytest
++
++from v2b_syndata.knob_loader import (
++    KnobValidationError,
++    load_knob_registry,
++    resolve_knobs,
++)
++from v2b_syndata.validate import validate
++
++
++@pytest.mark.parametrize("ev_count", [1, 200])
++def test_int_boundary_ev_count(ev_count, fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"ev_fleet.ev_count": ev_count})
++    assert_sanity(out, manifest)
++    cars = pd.read_csv(out / "cars.csv")
++    assert len(cars) == ev_count
++
++
++@pytest.mark.parametrize("peak_kw", [50.0, 5000.0])
++def test_float_boundary_peak_kw(peak_kw, fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"building_load.peak_kw": peak_kw})
++    assert_sanity(out, manifest)
++    assert manifest["knob_resolution"]["building_load.peak_kw"]["value"] == peak_kw
++
++
++def test_bool_weekdays_only_false(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={"sim_window.weekdays_only": False})
++    assert_sanity(out, manifest)
++    assert manifest["knob_resolution"]["sim_window.weekdays_only"]["value"] is False
++
++
++def test_simplex_corner_battery_mix(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "ev_fleet.battery_mix": [1.0, 0.0, 0.0, 0.0],
++    })
++    assert_sanity(out, manifest)
++    cars = pd.read_csv(out / "cars.csv")
++    assert (cars["battery_class"] == "leaf_24").all(), (
++        "battery_mix=[1,0,0,0] should yield only leaf_24"
++    )
++
++
++def test_vec2_peak_window(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "utility_rate.tariff_type": "TOU",
++        "utility_rate.peak_window": [10, 14],
++    })
++    assert_sanity(out, manifest)
++    assert manifest["knob_resolution"]["utility_rate.peak_window"]["value"] == [10, 14]
++
++
++def test_list_vec2_menu_levels(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "user_behavior.menu_levels": [[0.0, 0]],
++    })
++    assert_sanity(out, manifest)
++    assert manifest["knob_resolution"]["user_behavior.menu_levels"]["value"] == [[0.0, 0]]
++
++
++def test_list_region_single_region(fast_generate, assert_sanity):
++    region = {
++        "name": "test_region",
++        "freq": [0.0, 1.0],
++        "consist": [0.0, 1.0],
++        "dist_km": [0.0, 100.0],
++        "weight": 1.0,
++    }
++    out, manifest = fast_generate(overrides={
++        "user_behavior.axes_distribution": [region],
++    })
++    assert_sanity(out, manifest)
++    users = pd.read_csv(out / "users.csv")
++    assert (users["region"] == "test_region").all()
++
++
++def test_timestamp_string(fast_generate, assert_sanity):
++    out, manifest = fast_generate(overrides={
++        "sim_window.custom_start": "2020-04-01",
++        "sim_window.custom_end": "2020-04-08",
++    })
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++
++
++def test_timestamp_date_via_direct_api(fast_generate, assert_sanity):
++    """Regression test: ``date`` objects passed via the direct API must
++    round-trip into the manifest (which is JSON-serialized).
++
++    Previously crashed because ``cli_overrides`` wasn't normalized before
++    ``write_manifest`` ran ``json.dump``.
++    """
++    out, manifest = fast_generate(overrides={
++        "sim_window.custom_start": date(2020, 4, 1),
++        "sim_window.custom_end": date(2020, 4, 8),
++    })
++    assert_sanity(out, manifest,
++                  expected_start=datetime(2020, 4, 1),
++                  expected_end=datetime(2020, 4, 8))
++    with (out / "manifest.json").open() as f:
++        m = json.load(f)
++    assert m["knob_overrides"]["sim_window.custom_start"] == "2020-04-01"
++    assert m["knob_overrides"]["sim_window.custom_end"] == "2020-04-08"
++
++
++def test_timestamp_wrong_type_rejected(config_dir):
++    reg = load_knob_registry(config_dir / "knobs.yaml")
++    with pytest.raises(KnobValidationError):
++        resolve_knobs(reg, {}, {"sim_window.custom_start": 12345}, {})

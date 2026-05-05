@@ -3,8 +3,10 @@
 Resolves knobs, builds context, runs the DAG, applies noise, writes CSVs +
 manifest, and validates.
 """
+
 from __future__ import annotations
 
+import calendar
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,7 +16,7 @@ import pandas as pd
 from . import noise as noise_mod
 from .dag import SamplerRegistry, build_graph
 from .descriptor_loader import expand_descriptors, load_scenario
-from .knob_loader import load_knob_registry, resolve_knobs
+from .knob_loader import _normalize, load_knob_registry, resolve_knobs
 from .manifest import CSV_NAMES, write_manifest
 from .renderers import building_load as r_building_load
 from .renderers import cars as r_cars
@@ -27,7 +29,7 @@ from .samplers import exogenous, per_entity, sessions_dist
 from .samplers import load as load_sampler
 from .types import ResolvedKnobs, ScenarioContext
 
-DEFAULT_SIM_START = datetime(2020, 4, 6)  # Monday spring shoulder. See DESIGN_NOTES §1.
+DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. See DESIGN_NOTES §1.
 
 
 def build_registry() -> SamplerRegistry:
@@ -61,20 +63,21 @@ def build_registry() -> SamplerRegistry:
 
 def _resolve_sim_window(knobs: ResolvedKnobs) -> tuple[datetime, datetime]:
     mode = knobs.get("sim_window.mode")
-    if mode == "four_weeks_seasonal":
-        start = DEFAULT_SIM_START
-        end = start + timedelta(days=28)
-        return start, end
+    raw_start = knobs.get("sim_window.start")
+    anchor = pd.to_datetime(raw_start).to_pydatetime() if raw_start is not None else DEFAULT_SIM_START
+
+    if mode == "month":
+        start = anchor.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        days_in_month = calendar.monthrange(start.year, start.month)[1]
+        return start, start + timedelta(days=days_in_month)
     if mode == "full_year":
-        start = DEFAULT_SIM_START
-        end = start + timedelta(days=365)
-        return start, end
+        start = anchor.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return start, start.replace(year=start.year + 1)
     if mode == "custom":
-        cs = knobs.get("sim_window.custom_start")
         ce = knobs.get("sim_window.custom_end")
-        if cs is None or ce is None:
-            raise ValueError("sim_window.mode=custom but custom_start/end is null")
-        return pd.to_datetime(cs).to_pydatetime(), pd.to_datetime(ce).to_pydatetime()
+        if raw_start is None or ce is None:
+            raise ValueError("sim_window.mode=custom requires sim_window.start and sim_window.custom_end")
+        return anchor, pd.to_datetime(ce).to_pydatetime()
     raise ValueError(f"unknown sim_window.mode={mode}")
 
 
@@ -98,7 +101,9 @@ def generate(
     noise_profile_override: str | None = None,
 ) -> dict[str, Any]:
     """Run end-to-end generation. Returns the manifest dict."""
-    cli_overrides = dict(cli_overrides or {})
+    # Normalize so direct-API callers can pass dates / tuples — keeps the
+    # manifest JSON-serializable and matches the shape parse_overrides emits.
+    cli_overrides = _normalize(dict(cli_overrides or {}))
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

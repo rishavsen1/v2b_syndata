@@ -251,8 +251,9 @@ sim_window:
 
   mode:
     type: categorical
-    choices: [four_weeks_seasonal, full_year, custom]
-    default: four_weeks_seasonal
+    choices: [month, full_year, custom]
+    default: month
+    description: "month = single calendar month anchored at runner's DEFAULT_SIM_START; length 28/29/30/31 per month. full_year = Jan 1 to Dec 31. custom = use custom_start/end."
     affects_csv: [building_load.csv, grid_prices.csv, sessions.csv, dr_events.csv]
 
   weekdays_only:
@@ -260,14 +261,16 @@ sim_window:
     default: true
     affects_csv: [sessions.csv]
 
-  custom_start:
+  start:
     type: timestamp
     default: null
+    description: "Window anchor. mode=month snaps to first of containing month; mode=full_year snaps to Jan 1; mode=custom takes the literal value. Null → use runner DEFAULT_SIM_START."
     affects_csv: []
 
   custom_end:
     type: timestamp
     default: null
+    description: "End of window. Only consulted when mode=custom."
     affects_csv: []
 
 # ──────────────────────────────────────────────────────────────────────────

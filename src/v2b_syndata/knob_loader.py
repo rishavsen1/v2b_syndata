@@ -101,9 +101,10 @@ def _check_type_and_range(path: str, value: Any, spec: dict[str, Any]) -> None:
         if abs(total - 1.0) > 1e-6:
             raise KnobValidationError(f"{path}: region weights must sum to 1.0, got {total}")
     elif typ == "timestamp":
-        # null or ISO string
-        if value is not None and not isinstance(value, str):
-            raise KnobValidationError(f"{path}: timestamp must be ISO string or null")
+        # null, ISO string, or date/datetime (YAML parses 'YYYY-MM-DD' to date).
+        import datetime as _dt
+        if value is not None and not isinstance(value, (str, _dt.date, _dt.datetime)):
+            raise KnobValidationError(f"{path}: timestamp must be ISO string, date, datetime, or null")
     elif typ == "path":
         if not isinstance(value, str):
             raise KnobValidationError(f"{path}: expected string path")
@@ -129,7 +130,7 @@ def parse_overrides(items: list[str]) -> dict[str, Any]:
         if not m:
             raise KnobValidationError(f"override {s!r} not in form 'bucket.knob=value'")
         path, raw = m.group(1), m.group(2)
-        out[path] = parse_override_value(raw)
+        out[path] = _normalize(parse_override_value(raw))
     return out
 
 
@@ -172,11 +173,19 @@ def resolve_knobs(
 
 
 def _normalize(v: Any) -> Any:
-    """Recursively coerce tuples → lists for stable equality and YAML round-trip."""
+    """Recursively coerce tuples → lists, dates → ISO strings.
+
+    Stable equality + YAML / JSON round-trip require Python primitives.
+    """
+    import datetime as _dt
     if isinstance(v, tuple):
         return [_normalize(x) for x in v]
     if isinstance(v, list):
         return [_normalize(x) for x in v]
     if isinstance(v, dict):
         return {k: _normalize(x) for k, x in v.items()}
+    if isinstance(v, _dt.datetime):
+        return v.isoformat()
+    if isinstance(v, _dt.date):
+        return v.isoformat()
     return v
