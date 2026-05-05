@@ -118,6 +118,57 @@ def test_c7_overlapping_sessions(baseline_dir, tmp_path):
     assert any("C7" in e for e in rep.errors)
 
 
+def test_d6_required_above_arrival(baseline_dir, tmp_path):
+    d = _copy_dir(baseline_dir, tmp_path / "case")
+    df = pd.read_csv(d / "sessions.csv")
+    if len(df) == 0:
+        pytest.skip("baseline has no sessions")
+    # Force required <= arrival on first session
+    df.loc[0, "required_soc_at_depart"] = float(df.loc[0, "arrival_soc"])
+    df.to_csv(d / "sessions.csv", index=False, lineterminator="\n")
+    rep = validate(d)
+    assert any("D6" in e for e in rep.errors), f"D6 not caught: {rep.errors}"
+
+
+def test_d7_required_above_min_depart(baseline_dir, tmp_path):
+    d = _copy_dir(baseline_dir, tmp_path / "case")
+    df = pd.read_csv(d / "sessions.csv")
+    if len(df) == 0:
+        pytest.skip("baseline has no sessions")
+    # min_depart_soc default is 0.80 → 80%. Force required to be just below floor.
+    # Pick a row where arrival is low enough that required can drop below 80
+    # without colliding with D6 (required > arrival). Otherwise inject after
+    # raising arrival downward too.
+    target_idx = None
+    for i in range(len(df)):
+        if float(df.loc[i, "arrival_soc"]) < 70:
+            target_idx = i
+            break
+    if target_idx is None:
+        df.loc[0, "arrival_soc"] = 50.0
+        target_idx = 0
+    df.loc[target_idx, "required_soc_at_depart"] = 75.0  # below 80% floor, above arrival
+    df.to_csv(d / "sessions.csv", index=False, lineterminator="\n")
+    rep = validate(d)
+    assert any("D7" in e for e in rep.errors), f"D7 not caught: {rep.errors}"
+
+
+def test_required_soc_invariants_on_s01(baseline_dir):
+    """S01/seed=42 generated output: D6 and D7 hold for every session."""
+    df = pd.read_csv(baseline_dir / "sessions.csv")
+    if len(df) == 0:
+        pytest.skip("baseline has no sessions")
+    with (baseline_dir / "manifest.json").open() as f:
+        manifest = json.load(f)
+    mds_pct = float(manifest["knob_resolution"]["user_behavior.min_depart_soc"]["value"]) * 100.0
+    # D6
+    assert (df["required_soc_at_depart"] > df["arrival_soc"]).all(), \
+        "D6 violated on baseline: required_soc_at_depart not > arrival_soc"
+    # D7
+    assert (df["required_soc_at_depart"] >= mds_pct).all(), \
+        f"D7 violated on baseline: required_soc_at_depart < min_depart_soc*100={mds_pct}"
+
+
 def test_d1_invalid_soc_bounds(baseline_dir, tmp_path):
     d = _copy_dir(baseline_dir, tmp_path / "case")
     df = pd.read_csv(d / "cars.csv")

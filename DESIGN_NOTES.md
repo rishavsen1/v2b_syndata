@@ -51,22 +51,41 @@ arrival). Define:
 For the first session per car, value = 0.0. Column is non-nullable (per validate
 spec A4 implications).
 
-## 4. `required_soc_at_depart` clamp for D5 reachability
+## 4. `required_soc_at_depart` rejection sampling (replaces earlier clamp)
 
-Spec sample step 3 produces `r ~ TruncNorm(0.85, 0.05) clipped to [min_depart_soc, max]`.
-Spec invariant D5 requires `(r - arr) * cap / 100 ≤ max_charger_rate * dwell_hr * 1.05`.
-For very short dwells with high-capacity batteries this is infeasible at any
-`r ≥ min_depart_soc`. We clamp:
+`required_soc_at_depart` represents the user's stated target. It must always
+sit above `arrival_soc` (D6) and at or above the `min_depart_soc` knob (D7).
+The earlier implementation clamped `required_soc` downward for D5 reachability,
+which could push it below either floor. That was a bug — V2B *discharge*
+happens at simulation/optimization time, not at generation time, so the
+generator never has a reason to emit `required ≤ arrival`.
+
+New algorithm per session-day (in `renderers/sessions.py::render`):
 
 ```
-reachable_max_soc = arrival_soc + max_charger_rate_kw * dwell_hr / capacity_kwh * 100 * 1.05
-required_soc      = min(sampled_required_soc, reachable_max_soc)
+floor   = max(min_depart_soc * 100, arrival_soc + epsilon)   # epsilon = 0.01
+ceiling = car.max_allowed_soc
+
+if floor >= ceiling:
+    drop the session for this car-day      # arrived too charged
+else:
+    r ~ TruncNorm(85, 5) clipped to [floor, ceiling]
+    if (r - arrival) / 100 * capacity_kwh > max_charger_rate * dwell_hr * 1.05:
+        retry whole session (arrival, dwell, soc, target), up to 5 retries
+        after 5 fails: drop the session for this car-day
 ```
 
-This may produce `required_soc < min_depart_soc` knob value in degenerate cases.
-That is acceptable: D4 only requires `required ∈ [car.min_allowed_soc, car.max_allowed_soc]`,
-and the knob `min_depart_soc` is not a hard invariant. When `required < arrival`
-we have a discharge case and D5 is skipped.
+D5 reachability is enforced by *rejection*, not clamping. This changes the
+random-number consumption pattern relative to the prior build, so SHA-256
+hashes on the same seed differ from previous builds. Reproducibility within
+the new build is preserved (same seed → same bytes across two runs).
+
+`validate.py` carries new hard invariants:
+
+- **D6**: `required_soc_at_depart > arrival_soc` for every session.
+- **D7**: `required_soc_at_depart >= min_depart_soc * 100` for every session.
+
+Both block generation on failure.
 
 ## 5. Non-overlap rejection
 

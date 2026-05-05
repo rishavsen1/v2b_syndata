@@ -63,6 +63,15 @@ Each check has an ID for test mapping (`tests/test_consistency.py::<id>`).
   assert energy_needed_kwh <= energy_available_kwh * 1.05  # 5% slack
   ```
   Discharge case (required < arrival) skips this check.
+- **D6.** ∀ session: `required_soc_at_depart > arrival_soc`. The generator never
+  emits required ≤ arrival; V2B discharge is decided downstream at
+  simulation/optimization time, not at data-generation time. Required
+  represents the user's stated charging target.
+- **D7.** ∀ session: `required_soc_at_depart >= min_depart_soc * 100`. The
+  `user_behavior.min_depart_soc` knob is the per-user floor on the target SoC.
+  Required is sampled with a hard floor at `max(min_depart_soc, arrival + ε)`;
+  reachability failures are rejected (not clamped) and the session is dropped
+  if no feasible sample lands within the retry budget.
 
 ## E. Charger / capacity
 

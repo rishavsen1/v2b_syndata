@@ -115,17 +115,17 @@ def validate(output_dir: Path, strict: bool = False) -> ValidationReport:
     # C — temporal consistency
     _check_c(rep, csvs)
 
-    # D — physical / SoC
-    _check_d(rep, csvs)
+    # I — manifest (load early so D7 can read min_depart_soc knob)
+    manifest = _check_i(rep, output_dir)
+
+    # D — physical / SoC (D7 needs manifest for the min_depart_soc knob)
+    _check_d(rep, csvs, manifest)
 
     # E — charger / capacity
     _check_e(rep, csvs)
 
     # G — behavioral axes (do before F because F4/F5 use users)
     _check_g(rep, csvs)
-
-    # I — manifest
-    manifest = _check_i(rep, output_dir)
 
     # F — CONSENT shares (depend on manifest knob_resolution)
     _check_f(rep, csvs, manifest)
@@ -258,7 +258,8 @@ def _check_c(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
         # Done in _check_h.
 
 
-def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
+def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
+             manifest: dict[str, Any]) -> None:
     cars = csvs["cars"]
     rep.add((cars["min_allowed_soc"] >= 0).all() and
             (cars["max_allowed_soc"] <= 100).all() and
@@ -315,6 +316,30 @@ def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
                 f"(need={need:.2f} kWh, avail={avail:.2f} kWh)"
             )
             break
+
+    # D6: required_soc_at_depart > arrival_soc for every session.
+    bad_d6 = sess[sess["required_soc_at_depart"] <= sess["arrival_soc"]]
+    if len(bad_d6) > 0:
+        first = bad_d6.iloc[0]
+        rep.errors.append(
+            f"D6: session {first['session_id']} car {first['car_id']} "
+            f"required_soc_at_depart={float(first['required_soc_at_depart']):.4f} "
+            f"<= arrival_soc={float(first['arrival_soc']):.4f}"
+        )
+
+    # D7: required_soc_at_depart >= min_depart_soc * 100 (knob from manifest).
+    res = manifest.get("knob_resolution", {})
+    mds_entry = res.get("user_behavior.min_depart_soc")
+    if mds_entry is not None:
+        mds_pct = float(mds_entry["value"]) * 100.0
+        bad_d7 = sess[sess["required_soc_at_depart"] < mds_pct]
+        if len(bad_d7) > 0:
+            first = bad_d7.iloc[0]
+            rep.errors.append(
+                f"D7: session {first['session_id']} car {first['car_id']} "
+                f"required_soc_at_depart={float(first['required_soc_at_depart']):.4f} "
+                f"< min_depart_soc * 100 = {mds_pct:.4f}"
+            )
 
 
 def _check_e(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
