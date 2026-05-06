@@ -70,7 +70,18 @@ def apply_noise(ctx: ScenarioContext) -> None:
                 df["duration_sec"] = (deps - new_arrivals).dt.total_seconds().astype(int)
             if s_jit > 0:
                 additive = rng.normal(0.0, s_jit * 100.0, size=len(df))
-                df["arrival_soc"] = np.clip(df["arrival_soc"].to_numpy() + additive, 0, 100)
+                jittered = df["arrival_soc"].to_numpy() + additive
+                # B3 fix: clamp per-car to [min_allowed_soc, max_allowed_soc]
+                # so noise cannot violate D3. Looking up bounds from cars.csv
+                # (already rendered) keeps this deterministic per car_id.
+                cars = ctx.rendered["cars.csv"]
+                bounds = cars.set_index("car_id")[
+                    ["min_allowed_soc", "max_allowed_soc"]
+                ].to_dict("index")
+                car_ids = df["car_id"].to_numpy()
+                lo = np.array([bounds[int(c)]["min_allowed_soc"] for c in car_ids])
+                hi = np.array([bounds[int(c)]["max_allowed_soc"] for c in car_ids])
+                df["arrival_soc"] = np.clip(jittered, lo, hi)
         ctx.rendered["sessions.csv"] = df
 
     if float(n.get("dr_notification_dropout_prob", 0.0)) > 0:

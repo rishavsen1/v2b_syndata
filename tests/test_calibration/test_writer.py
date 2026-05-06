@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml as pyyaml
 
 from v2b_syndata.calibration.writer import write_region_distributions
@@ -68,6 +69,44 @@ def test_writer_round_trip(tmp_path: Path):
     assert arr["ks_fit_quality"] == 0.04
 
     assert pop["calibration_metadata"]["source"] == "calibration:acn_data_2019_2021_20260506"
+
+
+def test_writer_preserves_yaml_comments(tmp_path: Path):
+    """ruamel.yaml round-trip must preserve hand-written # comments."""
+    p = tmp_path / "populations.yaml"
+    p.write_text("""# Top-level comment
+test_pop:
+  description: "Test"
+  # comment above axes
+  axes_distribution:
+    - {name: stable_commuter, freq: [0.85, 1.0], consist: [0.75, 1.0], dist_km: [40, 80], weight: 0.5}
+    - {name: flexible_local, freq: [0.70, 0.95], consist: [0.50, 0.80], dist_km: [5, 15], weight: 0.5}
+  negotiation:
+    cluster_mix: [0.1, 0.5, 0.3, 0.1]
+    w_multiplier: [1.0, 1.0]
+  fleet:
+    ev_count: 10
+    battery_mix: [0.2, 0.3, 0.4, 0.1]
+    battery_heterogeneity: het
+""")
+
+    write_region_distributions(p, "test_pop",
+        {"stable_commuter": {"arrival": {"mu": 8.7}}},
+        {"source": "calibration:test"},
+    )
+    text = p.read_text()
+    assert "# Top-level comment" in text
+    assert "# comment above axes" in text
+
+
+def test_writer_missing_population_key_raises(tmp_path: Path):
+    p = tmp_path / "populations.yaml"
+    p.write_text(SAMPLE_YAML)
+    with pytest.raises(KeyError, match="absent_pop"):
+        write_region_distributions(p, "absent_pop",
+            {"stable_commuter": {"arrival": {"mu": 8.7}}},
+            {"source": "calibration:test"},
+        )
 
 
 def test_writer_replaces_existing_block(tmp_path: Path):

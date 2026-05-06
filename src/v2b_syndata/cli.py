@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 
 from .knob_loader import all_knob_paths, load_knob_registry, parse_overrides
 from .runner import generate
@@ -13,6 +14,10 @@ from .validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_CONFIG_DIR = REPO_ROOT / "configs"
+
+# Auto-load .env at repo root if present. Existing env vars take precedence
+# (override=False) so shell-set ACN_API_TOKEN beats .env file.
+load_dotenv(REPO_ROOT / ".env", override=False)
 
 
 def cmd_generate(args: argparse.Namespace) -> int:

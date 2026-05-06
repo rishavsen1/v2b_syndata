@@ -24,15 +24,24 @@ def fetch_all_sessions(
     """Page through all sessions in [year_start, year_end] for a site.
 
     Caches to cache_dir/<site>_<start>_<end>.json. Re-uses cache if present.
+    Token only required when an actual HTTP fetch is needed; cache hits
+    bypass token resolution entirely (B1 fix from AUDIT_REPORT.md).
     """
-    if token is None:
-        token = os.environ["ACN_API_TOKEN"]
-
     cache_path: Path | None = None
     if cache_dir is not None:
         cache_path = cache_dir / f"{site}_{year_start}_{year_end}.json"
         if cache_path.exists():
             return json.loads(cache_path.read_text())
+
+    if token is None:
+        try:
+            token = os.environ["ACN_API_TOKEN"]
+        except KeyError as e:
+            raise RuntimeError(
+                "ACN_API_TOKEN not set and no cache file found at "
+                f"{cache_path}. Provide ACN_API_TOKEN env var (set in .env "
+                "or shell), or pre-populate the cache directory."
+            ) from e
 
     where = '{"connectionTime":{"$gte":"%s","$lt":"%s"}}' % (
         f"Mon, 01 Jan {year_start} 00:00:00 GMT",
