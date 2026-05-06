@@ -11,6 +11,9 @@ dependencies = [
     "pyyaml>=6.0",
     "scipy>=1.11",
     "pydantic>=2.5",
+    "eppy>=0.5.63",
+    "pyarrow>=14.0",
+    "requests>=2.31",
 ]
 
 [project.scripts]

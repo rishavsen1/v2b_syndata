@@ -1,0 +1,19 @@
+# S02.yaml — NYC anchor scenario
+#
+# Manhattan medium office, ConEd DR-active, mixed-flex pop, balanced 50% bi
+# chargers. Sim window covers July (DR season) so CBP events fire.
+
+scenario_id: S02
+description: "NYC medium office, ConEd CBP, mixed-flex CONSENT pop, balanced 50% bi chargers"
+
+descriptors:
+  location:    new_york_ny
+  building:    medium_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  sim_window.mode: custom
+  sim_window.start: '2020-07-01'
+  sim_window.custom_end: '2020-08-01'

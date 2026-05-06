@@ -16,7 +16,8 @@ htmlcov/
 .DS_Store
 data/output/
 data/calibration/
+data/load_pipeline_cache/
+data/stations/
 .idea/
 .vscode/
 uv.lock
-data/

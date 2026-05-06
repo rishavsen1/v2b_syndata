@@ -6,11 +6,54 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
 
 from v2b_syndata.runner import generate
+
+
+def _stub_simulate_building_load(
+    archetype: str,
+    size: str,
+    tmyx_station: str,
+    occupancy: pd.Series,
+    sim_window_start: pd.Timestamp,
+    sim_window_end: pd.Timestamp,
+    weather_type: str = "tmyx",
+    weather_year: int | None = None,
+) -> tuple[pd.Series, pd.Series]:
+    """Deterministic synthetic load. Replaces the EnergyPlus pipeline in unit tests
+    so test runs do not need the EnergyPlus binary."""
+    idx = pd.date_range(sim_window_start, sim_window_end, freq="15min", inclusive="left")
+    hour = idx.hour + idx.minute / 60.0
+    flex = np.clip(120.0 + 60.0 * np.sin(2 * np.pi * (hour - 6) / 24), 0.0, None)
+    inflex = np.clip(40.0 + 15.0 * np.sin(2 * np.pi * (hour - 6) / 24), 0.0, None)
+    return (
+        pd.Series(flex, index=idx, name="L_flex"),
+        pd.Series(inflex, index=idx, name="L_inflex"),
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "real_energyplus: opt this test out of the EnergyPlus pipeline stub "
+        "(test will invoke EnergyPlus subprocess for real).",
+    )
+
+
+@pytest.fixture(autouse=True)
+def stub_load_pipeline(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replace the EnergyPlus pipeline with a deterministic synthetic loader
+    for every test that does not opt in via ``@pytest.mark.real_energyplus``."""
+    if request.node.get_closest_marker("real_energyplus"):
+        return
+    monkeypatch.setattr(
+        "v2b_syndata.samplers.load.simulate_building_load",
+        _stub_simulate_building_load,
+    )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO_ROOT / "configs"

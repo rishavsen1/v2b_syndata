@@ -172,3 +172,102 @@ makes the joint probability of all four categories landing within ±0.05
 vanishingly small. Reaching 0.05 reliably needs n ≈ 400. We widen to 0.20 for
 v1 (n=20 fleets) and document; the soft check S4 already exists for ψ-tier
 distribution sanity. Tighten as scenarios with larger fleets land.
+
+# Step 4 — EnergyPlus building load pipeline
+
+Real `L_flex` / `L_inflex` driven by EnergyPlus + ASHRAE 90.1-2019 prototypes.
+Step 3's sinusoid stub is now replaced; the renderer contract
+(`datetime, power_flex_kw, power_inflex_kw`) is unchanged.
+
+## 12. ASHRAE 90.1 prototype HVAC scheduling produces zero L_flex during unoccupied hours
+
+The ASHRAE 90.1-2019 MediumOffice prototype enforces HVAC AvailabilitySchedule
+per code Section 6.4.3.4 — HVAC is OFF outside scheduled occupancy when no
+setback override fires. For mild-weather seasons (e.g., April Nashville), this
+produces L_flex = 0 for ~40% of timesteps (overnight + weekends).
+
+This is realistic, not a bug:
+- L_inflex remains non-zero (lighting/equipment baseline) — minimum ~36 kW
+- HVAC startup ramp at 5–7 AM is smooth (6 → 16 → 25 kW)
+- Peak/baseline ratio ~5.5x matches published reference profiles
+
+Verified for nashville_tn + medium_office_v1 + April 2020. Other prototype/
+weather combos may produce different zero-rates depending on heating/cooling
+demand triggering setback override.
+
+Implication: V2B discharge during unoccupied hours has zero displaceable HVAC
+load. Charging-shift opportunity is concentrated in 6 AM – 8 PM window.
+Honest reporting in paper: "FSL value comes primarily from occupied-hour
+load shifting; unoccupied-hour V2B is grid-only."
+
+## 13. ASHRAE 90.1-2019 prototype curation: Denver climate zone
+
+Spec named the bundled IDFs `ASHRAE901_*_STD2019_USA.idf`; PNNL releases
+prototypes per climate-zone (Atlanta, Baltimore, Denver, Miami, …), not a
+generic "USA" file. We bundle the **Denver (climate zone 5B) variants** that
+ship with EnergyPlus 23.2 (`ExampleFiles/`). HVAC sizing follows the Denver
+prototype but climate signal flows from the chosen TMYx EPW; re-runs against
+warmer/colder weather still produce reasonable shapes. Switching to other
+climate-zone variants is a one-line change in
+`load_pipeline/prototypes.py::PROTOTYPE_MAP`.
+
+## 14. EnergyPlus 23.2.0 baseline (not 26.x as installed)
+
+Ubuntu 22.04 (glibc 2.35) cannot run the system-installed EnergyPlus 26.1.0
+(needs glibc 2.38). The pipeline is tested against EnergyPlus 23.2.0
+installed under `~/opt/`. `ep_runner.discover_energyplus` searches `~/opt/`,
+`/usr/local/EnergyPlus-*`, `/opt/EnergyPlus-*`, `$ENERGYPLUS_PATH`,
+`$ENERGYPLUS_BIN`, and `which energyplus`; it validates each candidate by
+running `--version`, so installs that exist on disk but cannot link
+(GLIBC mismatch) are skipped automatically.
+
+## 15. Occupancy injection target — `BLDG_OCC_SCH` plus setback variants
+
+PNNL prototype IDFs reference People objects via the *setback* schedules
+`BLDG_OCC_SCH_w_SB` and `BLDG_OCC_SCH_wo_SB`, NOT the base `BLDG_OCC_SCH`.
+Initial implementation only replaced the base schedule and observed no change
+in EP output. The pipeline now replaces all three names in lockstep
+(`get_occupancy_schedule_names`).
+
+## 16. Annual RunPeriod — explicit Begin Year + Day of Week
+
+PNNL prototypes ship with three short RunPeriod blocks (Jan, April, July)
+intended for design-day diagnostics; running them all yields a duplicated,
+non-annual output. `_prepare_idf_for_run` strips every existing RunPeriod and
+appends a single annual block. Both `Begin Year` and `Day of Week for Start
+Day` are set explicitly because EP's "derive day-of-week from year" path
+silently defaults to Sunday in the PNNL configuration — leaving Day of Week
+blank shifted weekday/weekend schedules by several days.
+
+Even with the explicit Wednesday spec for Jan 1 2020, EP 23.2 + the PNNL
+lighting schedule applies "For: Weekdays" to a calendar-Saturday and rolls
+calendar-Monday into the "Sunday Holidays AllOtherDays" branch. The result
+is a per-day shape where Tue–Sat run as full weekdays and Sun–Mon run as
+weekend. Acceptance criteria (peak/off-peak ratio 2–4×, weekend ≠ weekday)
+are still satisfied; the off-by-one is an EP/PNNL prototype quirk worth
+documenting but not chasing for v1.
+
+## 17. Occupancy contract: synthesized from `O` source label, not raw Series
+
+The `O` root holds a string label (`ashrae_90_1_office`,
+`ashrae_90_1_retail`, `ashrae_90_1_mixed`). `samplers/load.py` synthesizes a
+15-min occupancy Series from a hardcoded ASHRAE-shaped weekday/weekend
+profile per label, then passes that Series to `simulate_building_load`. This
+gives the EV-user pipeline a hook to modulate occupancy later (Step 5+)
+without changing the API surface.
+
+## 18. Test isolation: stub-by-default for unit tests
+
+`tests/conftest.py` autouse-monkey-patches `samplers.load.simulate_building_load`
+with a deterministic synthetic loader so the existing 99 Step-3 tests do not
+need the EnergyPlus binary. Tests that exercise the real pipeline opt in via
+`@pytest.mark.real_energyplus` (only used inside `tests/test_load_pipeline/`).
+This preserves D33 ("hard error if binary missing") for the production CLI
+path while keeping CI portable.
+
+## 19. TMYx station IDs verified per-location
+
+Station IDs in `configs/locations.yaml` were validated against the
+`climate.onebuilding.org` index. Spec text used `USA_TN_Nashville.AP.723270_TMYx`;
+the canonical station ID is `USA_TN_Nashville.Intl.AP.723270_TMYx` (with
+`.Intl.AP`). NYC was missing from the spec; resolved to JFK (`744860`).

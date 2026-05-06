@@ -154,8 +154,14 @@ building_load:
     type: int
     range: [1990, 2024]
     default: 2020
-    description: "TMY year for NASAPower pull"
+    description: "Anchor year used for sim window indexing. AMY support is a stub (D37)."
     affects_csv: [building_load.csv, dr_events.csv]
+
+  tmyx_station:
+    type: path
+    default: "USA_TN_Nashville.Intl.AP.723270_TMYx"
+    description: "TMYx station ID (climate.onebuilding.org). Drives EnergyPlus weather. D37."
+    affects_csv: [building_load.csv]
 
   archetype:
     type: categorical

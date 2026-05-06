@@ -1,7 +1,8 @@
 # locations.yaml — Location descriptor library
 #
 # Each entry resolves into knobs:
-#   building_load.climate, building_load.weather_lat, weather_lon, weather_year
+#   building_load.climate, building_load.weather_lat, weather_lon, weather_year,
+#     tmyx_station
 #   utility_rate.tariff_type, energy_price_offpeak/peak, peak_window,
 #   demand_charge_per_kw, dr_program
 
@@ -12,6 +13,7 @@ nashville_tn:
     lat: 36.1627
     lon: -86.7816
     year: 2020
+  tmyx_station: "USA_TN_Nashville.Intl.AP.723270_TMYx"
   tariff:
     type: TOU
     energy_price_offpeak: 0.085
@@ -27,6 +29,7 @@ san_jose_ca:
     lat: 37.3382
     lon: -121.8863
     year: 2020
+  tmyx_station: "USA_CA_San.Jose-Mineta.Intl.AP.724945_TMYx"
   tariff:
     type: TOU
     energy_price_offpeak: 0.137
@@ -42,6 +45,7 @@ san_francisco_ca:
     lat: 37.7749
     lon: -122.4194
     year: 2020
+  tmyx_station: "USA_CA_San.Francisco.Intl.AP.724940_TMYx"
   tariff:
     type: demand_charge
     energy_price_offpeak: 0.140
@@ -57,6 +61,7 @@ minneapolis_mn:
     lat: 44.9778
     lon: -93.2650
     year: 2020
+  tmyx_station: "USA_MN_Minneapolis-St.Paul.Intl.AP.726580_TMYx"
   tariff:
     type: TOU
     energy_price_offpeak: 0.095
@@ -72,6 +77,7 @@ miami_fl:
     lat: 25.7617
     lon: -80.1918
     year: 2020
+  tmyx_station: "USA_FL_Miami.Natl.Hurricane.Center.722020_TMYx"
   tariff:
     type: DR
     energy_price_offpeak: 0.090
@@ -87,6 +93,7 @@ houston_tx:
     lat: 29.7604
     lon: -95.3698
     year: 2020
+  tmyx_station: "USA_TX_Houston-Bush.Intercontinental.AP.722430_TMYx"
   tariff:
     type: TOU
     energy_price_offpeak: 0.095
@@ -102,6 +109,7 @@ atlanta_ga:
     lat: 33.7490
     lon: -84.3880
     year: 2020
+  tmyx_station: "USA_GA_Atlanta-Hartsfield-Jackson.Intl.AP.722190_TMYx"
   tariff:
     type: TOU
     energy_price_offpeak: 0.090
@@ -109,3 +117,19 @@ atlanta_ga:
     peak_window: [14, 19]
     demand_charge_per_kw: 9.00
     dr_program: none
+
+new_york_ny:
+  description: "New York, NY — Con Edison commercial, temperate, summer-peaking, DR-active"
+  climate: temperate
+  weather:
+    lat: 40.7128
+    lon: -74.0060
+    year: 2020
+  tmyx_station: "USA_NY_New.York-LaGuardia.AP.725030_TMYx"
+  tariff:
+    type: DR
+    energy_price_offpeak: 0.180
+    energy_price_peak: 0.320
+    peak_window: [8, 22]
+    demand_charge_per_kw: 28.00
+    dr_program: CBP
