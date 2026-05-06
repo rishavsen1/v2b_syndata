@@ -83,3 +83,40 @@ capacity matters quantitatively.
 The renderer's required-SoC distribution remains the hardcoded
 `TruncNorm(85, 5)` in `renderers/sessions.py`. Step 5 calibrates
 arrival-SoC only. See DESIGN_NOTES.md item #22.
+
+## 9. First real ACN-Data calibration (2026-05-06)
+
+Run: `acn_data_2019_2021_20260506`. 42,451 sessions / 646 users post-filter.
+
+**Region match against `consent_default`:** 12/646 users assigned (98.1% unassigned).
+ACN-Data is overwhelmingly **low-frequency workplace charging** matching the
+`occasional_visitor` (878 sessions) and `erratic` (421 sessions) regions. The
+high-frequency `stable_commuter`/`flexible_local`/`irregular_distant` regions
+get effectively zero ACN coverage.
+
+**Implication:** the hand-specified `axes_distribution` for `consent_default`
+does not reflect ACN-Data reality. Two paths forward:
+- Re-anchor regions on the empirical (φ, κ) joint observed in ACN.
+- Treat ACN as one population (workplace) and source other populations
+  (residential, transit fleet) from different datasets.
+
+Deferred to **Step 5.5** with NHTS-anchored δ work.
+
+**B4 guard activations on this run** — fitter dropped 2 distributions whose
+MLE estimates fell outside `DIST_PARAM_RANGES`:
+- `occasional_visitor.arrival.sigma=6.45` (above `[0.01, 6.0]`)
+- `occasional_visitor.soc_arrival.{alpha=267, beta=53}` (above `[0.01, 50.0]`)
+
+The drops are warnings, not errors — generation continues using placeholder
+formulas for the dropped distributions. The capacity-fallback rate (33.3%)
+contributes to the soc_arrival pathology because many sessions cluster
+arrival_soc near 1.0 when `kWhRequested` is small relative to the 60 kWh
+default capacity assumption.
+
+**KS fit quality on retained distributions:**
+- `occasional_visitor.dwell.ks_fit_quality = 0.119` (Weibull marginal a stretch)
+- `erratic.arrival.ks_fit_quality = 0.557` (TruncNorm wrong family for this region)
+- Most others < 0.10.
+
+The parametric families chosen (TruncNorm/Weibull/Beta) don't always fit the
+empirical marginals; revisit family choice in Step 5.5.

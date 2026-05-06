@@ -20,11 +20,16 @@ consent_default:
   description: "Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes"
 
   axes_distribution:
-    - {name: stable_commuter,    freq: [0.85, 1.00], consist: [0.75, 1.00], dist_km: [40, 80],  weight: 0.35}
-    - {name: flexible_local,     freq: [0.70, 0.95], consist: [0.50, 0.80], dist_km: [5, 15],   weight: 0.25}
-    - {name: irregular_distant,  freq: [0.40, 0.70], consist: [0.20, 0.50], dist_km: [40, 100], weight: 0.20}
-    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [3, 50],   weight: 0.10}
-    - {name: erratic,            freq: [0.30, 0.70], consist: [0.05, 0.30], dist_km: [5, 80],   weight: 0.10}
+    - {name: stable_commuter, freq: [0.85, 1.00], consist: [0.75, 1.00], dist_km: [
+        40, 80], weight: 0.35}
+    - {name: flexible_local, freq: [0.70, 0.95], consist: [0.50, 0.80], dist_km: [
+        5, 15], weight: 0.25}
+    - {name: irregular_distant, freq: [0.40, 0.70], consist: [0.20, 0.50], 
+        dist_km: [40, 100], weight: 0.20}
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], 
+        dist_km: [3, 50], weight: 0.10}
+    - {name: erratic, freq: [0.30, 0.70], consist: [0.05, 0.30], dist_km: [5, 80],
+      weight: 0.10}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -38,13 +43,68 @@ consent_default:
 # ──────────────────────────────────────────────────────────────────────────
 # High-ψ extreme: stable, predictable office workforce
 # ──────────────────────────────────────────────────────────────────────────
+  region_distributions:
+    occasional_visitor:
+      dwell:
+        dist: weibull
+        k: 1.0403434160801859
+        lambda: 5.708502122269099
+        n_samples: 878
+        ks_fit_quality: 0.11894956461440609
+      soc_arrival:
+        dist: beta
+        alpha: 0.5378838561360592
+        beta: 0.8244987595528109
+        n_samples: 878
+        ks_fit_quality: 0.4308860204292778
+      copula:
+        rho_spearman: -0.04635081941976095
+        rho_gaussian: -0.048533699908677945
+        n_samples: 878
+    erratic:
+      arrival:
+        dist: truncnorm
+        mu: 6.000000005812993
+        sigma: 5.955113621269352
+        n_samples: 421
+        ks_fit_quality: 0.5569052296362169
+      dwell:
+        dist: weibull
+        k: 1.8080754737680644
+        lambda: 5.356312893945373
+        n_samples: 421
+        ks_fit_quality: 0.09031291638607031
+      copula:
+        rho_spearman: 0.17255046713720804
+        rho_gaussian: 0.180448703660511
+        n_samples: 421
+  calibration_metadata:
+    source: calibration:acn_data_2019_2021_20260506
+    dataset: ACN-Data
+    sites:
+      - caltech
+      - jpl
+      - office001
+    year_range:
+      - 2019
+      - 2021
+    calibration_date: '2026-05-06'
+    n_users_total: 646
+    n_sessions_total: 42451
+    n_users_assigned_in_population: 12
+    n_users_with_userinputs: 12
+    capacity_inference_fallback_rate: 0.3326894537231161
+    unassigned_user_rate: 0.9814241486068112
 stable_commuter_heavy:
   description: "Stable office workforce — high frequency, high consistency. High ψ."
 
   axes_distribution:
-    - {name: stable_commuter,    freq: [0.85, 1.00], consist: [0.80, 1.00], dist_km: [30, 70],  weight: 0.65}
-    - {name: flexible_local,     freq: [0.75, 0.95], consist: [0.60, 0.85], dist_km: [5, 20],   weight: 0.25}
-    - {name: irregular_distant,  freq: [0.50, 0.75], consist: [0.40, 0.65], dist_km: [40, 90],  weight: 0.10}
+    - {name: stable_commuter, freq: [0.85, 1.00], consist: [0.80, 1.00], dist_km: [
+        30, 70], weight: 0.65}
+    - {name: flexible_local, freq: [0.75, 0.95], consist: [0.60, 0.85], dist_km: [
+        5, 20], weight: 0.25}
+    - {name: irregular_distant, freq: [0.50, 0.75], consist: [0.40, 0.65], 
+        dist_km: [40, 90], weight: 0.10}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -59,13 +119,18 @@ stable_commuter_heavy:
 # Low-ψ extreme: visitor-heavy retail
 # ──────────────────────────────────────────────────────────────────────────
 visitor_heavy:
-  description: "Retail clientele — low frequency, low consistency, varied distance. Low ψ."
+  description: "Retail clientele — low frequency, low consistency, varied distance.
+    Low ψ."
 
   axes_distribution:
-    - {name: occasional_visitor, freq: [0.05, 0.25], consist: [0.05, 0.35], dist_km: [3, 30],   weight: 0.55}
-    - {name: erratic,            freq: [0.20, 0.50], consist: [0.05, 0.25], dist_km: [5, 50],   weight: 0.25}
-    - {name: flexible_local,     freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [3, 12],   weight: 0.15}
-    - {name: stable_commuter,    freq: [0.70, 0.90], consist: [0.65, 0.90], dist_km: [10, 30],  weight: 0.05}
+    - {name: occasional_visitor, freq: [0.05, 0.25], consist: [0.05, 0.35], 
+        dist_km: [3, 30], weight: 0.55}
+    - {name: erratic, freq: [0.20, 0.50], consist: [0.05, 0.25], dist_km: [5, 50],
+      weight: 0.25}
+    - {name: flexible_local, freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [
+        3, 12], weight: 0.15}
+    - {name: stable_commuter, freq: [0.70, 0.90], consist: [0.65, 0.90], dist_km: [
+        10, 30], weight: 0.05}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]

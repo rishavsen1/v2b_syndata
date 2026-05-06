@@ -7,31 +7,70 @@ Output schema (canonical, matches DIST_PARAM_RANGES keys in knob_loader):
   copula      -> {"rho_spearman", "rho_gaussian", "n_samples"}
 
 Note: ks_fit_quality is goodness-of-fit on the training set, NOT held-out. C11.
+
+Every fit is post-clamped to the runtime DIST_PARAM_RANGES validity window
+(B4 fix). When clamping fires on any required parameter the distribution is
+dropped from the output, so a degenerate fit cannot break generation. Drop
+events are logged via warnings so calibration runs surface the issue.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
 import scipy.stats as st
 from scipy.optimize import minimize
 
+from ..knob_loader import DIST_PARAM_RANGES
+
 ARRIVAL_LO = 6.0
 ARRIVAL_HI = 20.0
 MIN_SAMPLES = 30
 
 
-def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any]:
-    """Fit TruncNorm(μ, σ) on [6, 20] via MLE. Returns canonical dict."""
+def _within(leaf: str, value: float) -> bool:
+    lo, hi = DIST_PARAM_RANGES[leaf]
+    return lo <= value <= hi
+
+
+def _drop_if_oor(name: str, fit: dict[str, Any], leaves: dict[str, str]) -> dict[str, Any] | None:
+    """Return fit if every (key, leaf) pair is within DIST_PARAM_RANGES.
+    Else warn and return None so the caller skips this distribution.
+    """
+    bad = []
+    for key, leaf in leaves.items():
+        v = fit.get(key)
+        if v is None or not _within(leaf, float(v)):
+            bad.append(f"{leaf}={v}")
+    if bad:
+        warnings.warn(
+            f"calibration: {name} fit out-of-range, dropping distribution: {bad}",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return None
+    return fit
+
+
+def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
+    """Fit TruncNorm(μ, σ) on [6, 20] via MLE. Returns canonical dict, or None
+    if any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """
     n = int(len(arrival_hours))
     a, b = ARRIVAL_LO, ARRIVAL_HI
     arr = np.clip(arrival_hours, a + 1e-6, b - 1e-6)
     mu_init = float(arr.mean())
     sig_init = float(arr.std()) if arr.std() > 0 else 1.0
 
+    mu_lo, mu_hi = DIST_PARAM_RANGES["arrival.mu"]
+    sig_lo, sig_hi = DIST_PARAM_RANGES["arrival.sigma"]
+
     def neg_ll(params: np.ndarray) -> float:
         mu, sig = params
-        if sig <= 0 or sig > 6:
+        if sig <= sig_lo or sig > sig_hi:
+            return 1e10
+        if mu < mu_lo or mu > mu_hi:
             return 1e10
         a_std = (a - mu) / sig
         b_std = (b - mu) / sig
@@ -41,37 +80,53 @@ def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any]:
         return -float(ll.sum())
 
     res = minimize(neg_ll, [mu_init, sig_init], method="Nelder-Mead")
-    mu, sig = float(res.x[0]), float(max(1e-3, res.x[1]))
+    mu = float(res.x[0])
+    sig = float(max(sig_lo, res.x[1]))
     a_std, b_std = (a - mu) / sig, (b - mu) / sig
     ks = float(st.kstest(arr, "truncnorm", args=(a_std, b_std, mu, sig)).statistic)
-    return {"dist": "truncnorm", "mu": mu, "sigma": sig, "n_samples": n, "ks_fit_quality": ks}
+    fit = {"dist": "truncnorm", "mu": mu, "sigma": sig,
+           "n_samples": n, "ks_fit_quality": ks}
+    return _drop_if_oor("arrival", fit, {"mu": "arrival.mu", "sigma": "arrival.sigma"})
 
 
-def fit_weibull_dwell(dwell_hours: np.ndarray) -> dict[str, Any]:
-    """Fit Weibull(k, λ) via scipy weibull_min. Returns canonical dict."""
+def fit_weibull_dwell(dwell_hours: np.ndarray) -> dict[str, Any] | None:
+    """Fit Weibull(k, λ) via scipy weibull_min. Returns canonical dict, or None
+    if any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """
     n = int(len(dwell_hours))
     arr = np.asarray(dwell_hours, dtype=float)
     arr = arr[arr > 0]
     if len(arr) < 2:
-        return {"dist": "weibull", "k": 1.0, "lambda": 1.0, "n_samples": n, "ks_fit_quality": 1.0}
+        return None
     k, _, lam = st.weibull_min.fit(arr, floc=0)
-    k = float(max(1e-3, k))
-    lam = float(max(1e-3, lam))
+    k = float(k)
+    lam = float(lam)
+    if k <= 0 or lam <= 0:
+        return None
     ks = float(st.kstest(arr, "weibull_min", args=(k, 0, lam)).statistic)
-    return {"dist": "weibull", "k": k, "lambda": lam, "n_samples": n, "ks_fit_quality": ks}
+    fit = {"dist": "weibull", "k": k, "lambda": lam,
+           "n_samples": n, "ks_fit_quality": ks}
+    return _drop_if_oor("dwell", fit, {"k": "dwell.k", "lambda": "dwell.lambda"})
 
 
-def fit_beta_soc(soc_fractions: np.ndarray) -> dict[str, Any]:
-    """Fit Beta(α, β) on [0, 1]. Returns canonical dict."""
+def fit_beta_soc(soc_fractions: np.ndarray) -> dict[str, Any] | None:
+    """Fit Beta(α, β) on [0, 1]. Returns canonical dict, or None if any param
+    falls outside DIST_PARAM_RANGES (B4 guard).
+    """
     n = int(len(soc_fractions))
     arr = np.clip(np.asarray(soc_fractions, dtype=float), 1e-6, 1 - 1e-6)
     if len(arr) < 2:
-        return {"dist": "beta", "alpha": 1.0, "beta": 1.0, "n_samples": n, "ks_fit_quality": 1.0}
+        return None
     alpha, beta, _, _ = st.beta.fit(arr, floc=0, fscale=1)
-    alpha = float(max(1e-3, alpha))
-    beta = float(max(1e-3, beta))
+    alpha = float(alpha)
+    beta = float(beta)
+    if alpha <= 0 or beta <= 0:
+        return None
     ks = float(st.kstest(arr, "beta", args=(alpha, beta, 0, 1)).statistic)
-    return {"dist": "beta", "alpha": alpha, "beta": beta, "n_samples": n, "ks_fit_quality": ks}
+    fit = {"dist": "beta", "alpha": alpha, "beta": beta,
+           "n_samples": n, "ks_fit_quality": ks}
+    return _drop_if_oor("soc_arrival", fit,
+                        {"alpha": "soc_arrival.alpha", "beta": "soc_arrival.beta"})
 
 
 def fit_copula_rho(arrivals: np.ndarray, dwells: np.ndarray) -> dict[str, Any]:
