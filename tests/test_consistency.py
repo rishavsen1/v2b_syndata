@@ -242,4 +242,9 @@ def test_i4_all_knobs_in_manifest(baseline_dir):
     res = manifest["knob_resolution"]
     for path in all_knob_paths(reg):
         assert path in res
-        assert res[path]["source"] in ("explicit", "default") or res[path]["source"].startswith("descriptor:")
+        src = res[path]["source"]
+        assert (
+            src in ("explicit", "default")
+            or src.startswith("descriptor:")
+            or src.startswith("calibration:")
+        )

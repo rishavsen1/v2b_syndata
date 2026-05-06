@@ -84,3 +84,76 @@ def test_parse_overrides_yaml_value():
 def test_parse_overrides_rejects_malformed():
     with pytest.raises(KnobValidationError):
         parse_overrides(["badform"])
+
+
+# ---------- deep-channel (region_distributions) override tests ----------
+
+
+def test_deep_override_cli_resolves(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    cli = {"user_behavior.region_distributions.stable_commuter.dwell.lambda": 12.0}
+    resolved = resolve_knobs(reg, {}, {}, cli)
+    path = "user_behavior.region_distributions.stable_commuter.dwell.lambda"
+    assert resolved.get(path) == 12.0
+    assert resolved.source(path) == "explicit"
+
+
+def test_deep_override_scenario_resolves(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    sc = {"user_behavior.region_distributions.flexible_local.arrival.mu": 10.5}
+    resolved = resolve_knobs(reg, {}, sc, {})
+    path = "user_behavior.region_distributions.flexible_local.arrival.mu"
+    assert resolved.get(path) == 10.5
+    assert resolved.source(path) == "explicit"
+
+
+def test_deep_override_cli_beats_scenario(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    path = "user_behavior.region_distributions.stable_commuter.arrival.mu"
+    sc = {path: 10.0}
+    cli = {path: 11.0}
+    resolved = resolve_knobs(reg, {}, sc, cli)
+    assert resolved.get(path) == 11.0
+
+
+def test_deep_override_descriptor_calibration_source_propagates(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    desc = {
+        "user_behavior.region_distributions.stable_commuter.arrival.mu":
+            (8.7, "calibration:acn_data_2019_2021_20260506"),
+    }
+    resolved = resolve_knobs(reg, desc, {}, {})
+    path = "user_behavior.region_distributions.stable_commuter.arrival.mu"
+    assert resolved.get(path) == 8.7
+    assert resolved.source(path) == "calibration:acn_data_2019_2021_20260506"
+
+
+def test_deep_override_out_of_range_rejected(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    cli = {"user_behavior.region_distributions.stable_commuter.dwell.lambda": 999.0}
+    with pytest.raises(KnobValidationError, match="outside range"):
+        resolve_knobs(reg, {}, {}, cli)
+
+
+def test_deep_override_unknown_leaf_rejected(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    cli = {"user_behavior.region_distributions.stable_commuter.dwell.bogus": 1.0}
+    with pytest.raises(KnobValidationError):
+        resolve_knobs(reg, {}, {}, cli)
+
+
+def test_deep_override_too_short_path_rejected(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    cli = {"user_behavior.region_distributions.dwell.lambda": 5.0}
+    with pytest.raises(KnobValidationError):
+        resolve_knobs(reg, {}, {}, cli)
+
+
+def test_deep_override_explicit_beats_calibration(config_dir):
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    path = "user_behavior.region_distributions.stable_commuter.dwell.lambda"
+    desc = {path: (9.2, "calibration:acn_data_2019_2021_20260506")}
+    cli = {path: 12.0}
+    resolved = resolve_knobs(reg, desc, {}, cli)
+    assert resolved.get(path) == 12.0
+    assert resolved.source(path) == "explicit"

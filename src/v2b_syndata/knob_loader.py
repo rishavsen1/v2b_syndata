@@ -5,6 +5,13 @@ Resolution priority (highest to lowest):
   2. Scenario YAML overrides[knob_path]
   3. Descriptor expansion (Tier 0 library lookup)
   4. knobs.yaml default
+
+Two override channels:
+  - Registry channel: paths in knobs.yaml (e.g. "ev_fleet.ev_count").
+  - Deep channel: paths under a prefix in DEEP_OVERRIDE_PREFIXES (e.g.
+    "user_behavior.region_distributions.<region>.<dist>.<param>"). Validated
+    against per-prefix range table (DIST_PARAM_RANGES). Calibrated leaves
+    propagated by descriptor_loader carry source="calibration:<provenance>".
 """
 from __future__ import annotations
 
@@ -19,6 +26,64 @@ from .types import KnobValue, ResolvedKnobs
 
 class KnobValidationError(ValueError):
     pass
+
+
+# Per-distribution-parameter range table for deep-channel override validation.
+# Lives here (not in validate.py) to avoid circular import — validate.py
+# already imports from knob_loader.
+DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
+    "arrival.mu": (6.0, 20.0),
+    "arrival.sigma": (0.01, 6.0),
+    "dwell.k": (0.01, 5.0),
+    "dwell.lambda": (0.01, 24.0),
+    "soc_arrival.alpha": (0.01, 50.0),
+    "soc_arrival.beta": (0.01, 50.0),
+    "copula.rho_gaussian": (-0.99, 0.99),
+}
+
+# Prefix → range table. Add additional deep-override domains here as new
+# population-data sub-blocks become overridable.
+DEEP_OVERRIDE_PREFIXES: dict[str, dict[str, tuple[float, float]]] = {
+    "user_behavior.region_distributions": DIST_PARAM_RANGES,
+}
+
+
+def _match_deep_prefix(path: str) -> tuple[str, str] | None:
+    """If path matches a deep prefix, return (prefix, trailing). Else None.
+
+    Example: "user_behavior.region_distributions.stable_commuter.dwell.lambda"
+      → ("user_behavior.region_distributions", "dwell.lambda")
+    """
+    for prefix in DEEP_OVERRIDE_PREFIXES:
+        if path.startswith(prefix + "."):
+            tail = path[len(prefix) + 1:]
+            # tail = "<region>.<dist>.<param>" — last two segments are dist.param.
+            parts = tail.split(".")
+            if len(parts) < 3:
+                return None
+            leaf = ".".join(parts[-2:])
+            return prefix, leaf
+    return None
+
+
+def _check_deep_range(path: str, value: Any) -> None:
+    """Validate a deep-channel override value against its declared range."""
+    m = _match_deep_prefix(path)
+    if m is None:
+        raise KnobValidationError(f"{path}: not a recognized deep-override path")
+    prefix, leaf = m
+    ranges = DEEP_OVERRIDE_PREFIXES[prefix]
+    if leaf not in ranges:
+        raise KnobValidationError(
+            f"{path}: leaf {leaf!r} not in {prefix} range table; "
+            f"valid leaves: {sorted(ranges)}"
+        )
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise KnobValidationError(f"{path}: deep override expects numeric, got {type(value).__name__}")
+    lo, hi = ranges[leaf]
+    v = float(value)
+    if not (lo <= v <= hi):
+        raise KnobValidationError(f"{path}: {v} outside range [{lo}, {hi}]")
 
 
 def load_knob_registry(path: Path) -> dict[str, dict[str, Any]]:
@@ -119,6 +184,7 @@ def parse_override_value(raw: str) -> Any:
         return raw
 
 
+# Allow arbitrary depth: bucket.knob[.sub.sub...]=value
 _OVERRIDE_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)=(.*)$")
 
 
@@ -140,9 +206,12 @@ def resolve_knobs(
     scenario_overrides: dict[str, Any],
     cli_overrides: dict[str, Any],
 ) -> ResolvedKnobs:
-    """Apply resolution chain to every knob in registry. Validate each.
+    """Apply resolution chain to every knob in registry, plus deep-channel paths.
 
-    `descriptor_values[path] = (value, descriptor_name)` if the path was filled by a descriptor.
+    `descriptor_values[path] = (value, descriptor_name_or_calibration_source)`.
+    If the second tuple element starts with "calibration:" it is stamped as the
+    source verbatim (e.g. "calibration:acn_data_2019_2021_20260506"); else it
+    becomes "descriptor:<name>".
     """
     resolved = ResolvedKnobs()
     for path, spec in registry.items():
@@ -154,20 +223,44 @@ def resolve_knobs(
             src = "explicit"
         elif path in descriptor_values:
             v, name = descriptor_values[path]
-            src = f"descriptor:{name}"
+            src = name if name.startswith("calibration:") else f"descriptor:{name}"
         else:
             v = spec.get("default")
             src = "default"
-        # Normalize tuples / yaml sequences into lists of plain Python values
         v = _normalize(v)
         _check_type_and_range(path, v, spec)
         resolved.values[path] = KnobValue(value=v, source=src)
-    # Reject unknown override paths
+
+    # Deep-channel paths from descriptors (calibrated population leaves).
+    deep_paths_from_descriptors = {
+        p for p in descriptor_values if _match_deep_prefix(p) is not None
+    }
+    # Plus any deep-channel CLI/scenario overrides (allowed even if no descriptor leaf).
+    deep_paths_from_overrides = {
+        p for p in list(cli_overrides) + list(scenario_overrides)
+        if _match_deep_prefix(p) is not None
+    }
+    all_deep = sorted(deep_paths_from_descriptors | deep_paths_from_overrides)
+    for path in all_deep:
+        if path in cli_overrides:
+            v = cli_overrides[path]
+            src = "explicit"
+        elif path in scenario_overrides:
+            v = scenario_overrides[path]
+            src = "explicit"
+        else:
+            v, name = descriptor_values[path]
+            src = name if name.startswith("calibration:") else f"descriptor:{name}"
+        v = _normalize(v)
+        _check_deep_range(path, v)
+        resolved.values[path] = KnobValue(value=float(v), source=src)
+
+    # Reject unknown overrides — must be in registry OR match a deep prefix.
     for path in cli_overrides:
-        if path not in registry:
+        if path not in registry and _match_deep_prefix(path) is None:
             raise KnobValidationError(f"unknown knob in CLI override: {path}")
     for path in scenario_overrides:
-        if path not in registry:
+        if path not in registry and _match_deep_prefix(path) is None:
             raise KnobValidationError(f"unknown knob in scenario override: {path}")
     return resolved
 

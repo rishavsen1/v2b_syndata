@@ -271,3 +271,40 @@ Station IDs in `configs/locations.yaml` were validated against the
 `climate.onebuilding.org` index. Spec text used `USA_TN_Nashville.AP.723270_TMYx`;
 the canonical station ID is `USA_TN_Nashville.Intl.AP.723270_TMYx` (with
 `.Intl.AP`). NYC was missing from the spec; resolved to JFK (`744860`).
+
+## 20. Calibration writer schema rename: `copula_rho` → `copula.rho_gaussian`
+
+ACN_DATA_CALIBRATION.md spec wrote `copula_rho` per region; runtime renderer
+field is `dw_p["lam"]` and `dw_p["rho"]`; the user prompt for Step 5 asked
+for the canonical YAML/CLI/manifest path `copula.rho_gaussian` and
+`dwell.lambda`. The writer in `src/v2b_syndata/calibration/writer.py` emits
+the canonical names. The runtime mapping
+`(YAML lambda → runtime lam, YAML rho_gaussian → runtime rho)` lives in
+`samplers/sessions_dist.py` so the renderer is unchanged. This decouples
+external-facing names (used in overrides, manifest, KNOB_REFERENCE) from
+historical internal field names.
+
+## 21. Region-stable copula dispatch in renderers/sessions.py
+
+The session rejection retry loop can re-enter sampling many times per
+`(car_id, day)`. To preserve Step 4's frozen-hash bitwise reproducibility
+when no calibration is present (ρ=0 default), the renderer caches
+`use_copula = abs(rho) >= 1e-9` ONCE per car BEFORE entering the retry
+loop. The independent-sampling branch uses the same RNG draw order as
+Step 4 (`_sample_truncnorm` then `rng.weibull(k)`). The calibrated branch
+draws `_gaussian_copula_pair` (two normal draws) then applies inverse-CDF
+transforms — different RNG consumption, but only fires when fitted
+`rho_gaussian != 0`, which is new behavior with no prior baseline.
+
+Verification: 134 pre-Step-5 tests still pass without modification, including
+all golden-hash reproducibility tests in `tests/test_end_to_end.py`.
+
+## 22. Required-SoC distribution out of scope for Step 5
+
+Step 5 fits arrival-SoC only via Beta(α, β). Required-SoC at depart remains
+the hardcoded `TruncNorm(85, 5)` in `renderers/sessions.py:125`. D43 mentions
+`kWhRequested`-derived target SoC, but this conflates the user's stated
+target (the field) with the renderer's target (a free distribution). Splitting
+this requires a new `f_required_soc` distribution, copula linkage to arrival
+SoC, and re-fitting tests — deferred to Step 6. Documented in
+CALIBRATION_NOTES.md.

@@ -7,7 +7,32 @@ work.
 """
 from __future__ import annotations
 
-from ..types import RootBundle, ScenarioContext
+from ..types import ResolvedKnobs, RootBundle, ScenarioContext
+
+
+_REGION_DIST_PREFIX = "user_behavior.region_distributions."
+
+
+def _hydrate_region_distributions(k: ResolvedKnobs) -> dict:
+    """Reverse the deep-channel flattening from descriptor_loader: collect every
+    `user_behavior.region_distributions.<region>.<dist>.<param>` resolved leaf
+    into a nested {region: {dist: {param: value}}} dict.
+
+    Empty dict if no calibrated leaves present (placeholder fallback path).
+    """
+    out: dict[str, dict[str, dict[str, float]]] = {}
+    for path, kv in k.values.items():
+        if not path.startswith(_REGION_DIST_PREFIX):
+            continue
+        tail = path[len(_REGION_DIST_PREFIX):]
+        parts = tail.split(".")
+        if len(parts) < 3:
+            continue
+        region = parts[0]
+        dist = parts[1]
+        param = ".".join(parts[2:])
+        out.setdefault(region, {}).setdefault(dist, {})[param] = float(kv.value)
+    return out
 
 
 def _ensure_bundle(ctx: ScenarioContext) -> RootBundle:
@@ -41,6 +66,7 @@ def _ensure_bundle(ctx: ScenarioContext) -> RootBundle:
                 "min_depart_soc": k.get("user_behavior.min_depart_soc"),
                 "external_charge_cost": k.get("user_behavior.external_charge_cost"),
                 "menu_levels": k.get("user_behavior.menu_levels"),
+                "region_distributions": _hydrate_region_distributions(k),
             },
             F={
                 "ev_count": k.get("ev_fleet.ev_count"),

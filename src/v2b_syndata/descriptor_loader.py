@@ -2,6 +2,14 @@
 
 Each scenario names a Location, Building, Population, Equipment, and Noise
 descriptor. Each descriptor maps to a subset of knob paths via its library file.
+
+Population entries with a `region_distributions:` block AND a
+`calibration_metadata.source` carrying a `calibration:*` provenance string
+get their leaf parameters flattened into deep-channel paths
+(`user_behavior.region_distributions.<region>.<dist>.<param>`). The
+`calibration:*` source string flows through resolve_knobs and is stamped on
+the resolved knob verbatim. Per-region metadata fields (`n_samples`,
+`ks_fit_quality`, etc.) are filtered here so they never enter knob_resolution.
 """
 from __future__ import annotations
 
@@ -9,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from .knob_loader import DIST_PARAM_RANGES
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -73,6 +83,31 @@ def expand_descriptors(
     out["ev_fleet.ev_count"] = (int(pop["fleet"]["ev_count"]), pop_name)
     out["ev_fleet.battery_mix"] = (list(pop["fleet"]["battery_mix"]), pop_name)
     out["ev_fleet.battery_heterogeneity"] = (pop["fleet"]["battery_heterogeneity"], pop_name)
+
+    # Calibrated region_distributions overlay (Step 5 / D47, D51, C2).
+    # Only emit when both blocks present; source comes from calibration_metadata.
+    rd = pop.get("region_distributions")
+    cal_meta = pop.get("calibration_metadata")
+    if rd and isinstance(rd, dict) and cal_meta and isinstance(cal_meta, dict):
+        provenance = cal_meta.get("source")
+        if provenance and str(provenance).startswith("calibration:"):
+            for region_name, dist_blocks in rd.items():
+                if not isinstance(dist_blocks, dict):
+                    continue
+                for dist_name, params in dist_blocks.items():
+                    if not isinstance(params, dict):
+                        continue
+                    for param_name, value in params.items():
+                        leaf = f"{dist_name}.{param_name}"
+                        # Filter metadata fields (n_samples, ks_fit_quality, dist, ...);
+                        # only emit leaves declared in DIST_PARAM_RANGES.
+                        if leaf not in DIST_PARAM_RANGES:
+                            continue
+                        path = (
+                            f"user_behavior.region_distributions."
+                            f"{region_name}.{dist_name}.{param_name}"
+                        )
+                        out[path] = (float(value), provenance)
 
     eq_name = descriptors["equipment"]
     if eq_name not in eqpts:

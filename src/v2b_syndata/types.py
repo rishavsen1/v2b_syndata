@@ -10,7 +10,7 @@ from typing import Any
 class KnobValue:
     """A single resolved knob with its provenance."""
     value: Any
-    source: str  # "explicit" | "descriptor:<name>" | "default"
+    source: str  # "explicit" | "descriptor:<name>" | "calibration:<provenance>" | "default"
 
 
 @dataclass

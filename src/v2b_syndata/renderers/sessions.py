@@ -41,6 +41,28 @@ def _sample_truncnorm(rng: np.random.Generator, mu: float, sigma: float,
     return float(rv)
 
 
+def _gaussian_copula_pair(rng: np.random.Generator, rho: float) -> tuple[float, float]:
+    """Draw (u1, u2) ∈ [0,1]^2 with bivariate normal copula at correlation ρ."""
+    z = rng.standard_normal(2)
+    z2 = rho * z[0] + (1.0 - rho * rho) ** 0.5 * z[1]
+    u1 = float(stats.norm.cdf(z[0]))
+    u2 = float(stats.norm.cdf(z2))
+    return u1, u2
+
+
+def _truncnorm_ppf_u(u: float, mu: float, sigma: float, lo: float, hi: float) -> float:
+    if hi <= lo:
+        return lo
+    a = (lo - mu) / sigma
+    b = (hi - mu) / sigma
+    return float(stats.truncnorm.ppf(u, a, b, loc=mu, scale=sigma))
+
+
+def _weibull_ppf_u(u: float, k: float, lam: float) -> float:
+    """Weibull(k, λ) inverse CDF at u."""
+    return float(stats.weibull_min.ppf(u, k, scale=lam))
+
+
 def render(ctx: ScenarioContext) -> None:
     assert ctx.a_user is not None and ctx.a_fleet is not None
     f_arr = ctx.latents["f_arr"]
@@ -75,6 +97,15 @@ def render(ctx: ScenarioContext) -> None:
         dw_p = f_dwell[car_id]
         soc_p = f_soc[car_id]
 
+        # Region-stable copula dispatch (C4): decide once per car BEFORE entering
+        # the day/retry loops so RNG consumption is deterministic across retries.
+        # ρ ≈ 0 → independent sampling branch, RNG-equivalent to Step 4. Calibrated
+        # ρ → bivariate Gaussian copula. Region itself is fixed per car (set in
+        # sample_a_user), so this is naturally stable; caching here hardens against
+        # future refactors that might re-evaluate region inside the loop.
+        rho = float(dw_p.get("rho", 0.0))
+        use_copula = abs(rho) >= 1e-9
+
         prior_departure: pd.Timestamp | None = None
         prior_required_soc: float | None = None
 
@@ -90,11 +121,19 @@ def render(ctx: ScenarioContext) -> None:
 
             for _ in range(_MAX_RETRIES):
                 # 1. Sample arrival hour + dwell, build window.
-                arr_hour = _sample_truncnorm(
-                    rng, mu=arr_p["mu"], sigma=arr_p["sigma"],
-                    lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
-                )
-                dwell_hr = float(rng.weibull(dw_p["k"]) * dw_p["lam"])
+                if use_copula:
+                    u_arr, u_dwell = _gaussian_copula_pair(rng, rho)
+                    arr_hour = _truncnorm_ppf_u(
+                        u_arr, mu=arr_p["mu"], sigma=arr_p["sigma"],
+                        lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
+                    )
+                    dwell_hr = _weibull_ppf_u(u_dwell, k=dw_p["k"], lam=dw_p["lam"])
+                else:
+                    arr_hour = _sample_truncnorm(
+                        rng, mu=arr_p["mu"], sigma=arr_p["sigma"],
+                        lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
+                    )
+                    dwell_hr = float(rng.weibull(dw_p["k"]) * dw_p["lam"])
                 dwell_hr = max(dw_p["clip_lo"], min(dwell_hr, dw_p["clip_hi"]))
 
                 total_min = int(round(arr_hour * 60.0 / 15.0)) * 15

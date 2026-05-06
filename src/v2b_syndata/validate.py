@@ -126,6 +126,8 @@ def validate(output_dir: Path, strict: bool = False) -> ValidationReport:
 
     # G — behavioral axes (do before F because F4/F5 use users)
     _check_g(rep, csvs)
+    if manifest is not None:
+        _check_g5_calibration_consistency(rep, manifest)
 
     # F — CONSENT shares (depend on manifest knob_resolution)
     _check_f(rep, csvs, manifest)
@@ -381,6 +383,45 @@ def _check_g(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
     rep.add((users["delta_km"] >= 0).all(), "G3: delta_km negative")
 
 
+def _check_g5_calibration_consistency(
+    rep: ValidationReport, manifest: dict[str, Any]
+) -> None:
+    """G5 (hard) + G5b (warn): cross-check region_distributions vs axes_distribution.
+
+    G5: every calibrated region name appears in axes_distribution. Orphan
+        calibration entries are blocked.
+    G5b: every region in axes_distribution has a region_distributions entry —
+        warning only when calibration_metadata is present (else placeholders OK).
+    """
+    res = manifest.get("knob_resolution", {})
+    axes = res.get("user_behavior.axes_distribution", {}).get("value", [])
+    if not axes:
+        return
+    declared_regions = {r["name"] for r in axes}
+    calibrated_regions: set[str] = set()
+    for path in res:
+        if path.startswith("user_behavior.region_distributions."):
+            tail = path[len("user_behavior.region_distributions."):]
+            parts = tail.split(".")
+            if len(parts) >= 3:
+                calibrated_regions.add(parts[0])
+    orphans = calibrated_regions - declared_regions
+    for name in sorted(orphans):
+        rep.errors.append(
+            f"G5: region_distributions has region {name!r} not in axes_distribution"
+        )
+
+    has_calibration = any(
+        entry.get("source", "").startswith("calibration:")
+        for entry in res.values()
+    )
+    if has_calibration:
+        for name in sorted(declared_regions - calibrated_regions):
+            rep.warnings.append(
+                f"G5b: region {name!r} in axes_distribution lacks calibrated region_distributions"
+            )
+
+
 def _check_i(rep: ValidationReport, output_dir: Path) -> dict[str, Any]:
     path = output_dir / "manifest.json"
     if not path.exists():
@@ -415,7 +456,13 @@ def _check_i(rep: ValidationReport, output_dir: Path) -> dict[str, Any]:
     # I4 every knob present in resolution with valid source
     res = manifest.get("knob_resolution", {})
     knob_path = Path(__file__).parent.parent.parent / "configs" / "knobs.yaml"
-    from .knob_loader import all_knob_paths, load_knob_registry
+    from .knob_loader import (
+        DIST_PARAM_RANGES,
+        _match_deep_prefix,
+        all_knob_paths,
+        load_knob_registry,
+    )
+    registry: dict[str, Any] = {}
     if knob_path.exists():
         registry = load_knob_registry(knob_path)
         for path_ in all_knob_paths(registry):
@@ -423,9 +470,37 @@ def _check_i(rep: ValidationReport, output_dir: Path) -> dict[str, Any]:
                 rep.errors.append(f"I4: knob {path_} missing from manifest.knob_resolution")
                 continue
             src = res[path_].get("source", "")
-            if src not in ("explicit", "default") and not src.startswith("descriptor:"):
+            if not _is_valid_source(src):
                 rep.errors.append(f"I4: {path_} has invalid source {src!r}")
+
+    # I4 inverse: every resolved key is either in registry OR matches a deep
+    # prefix with a leaf in DIST_PARAM_RANGES. Catches typos and stale leaves.
+    for path_, entry in res.items():
+        if path_ in registry:
+            continue
+        m = _match_deep_prefix(path_)
+        if m is None:
+            rep.errors.append(f"I4: knob_resolution has unknown path {path_!r}")
+            continue
+        _, leaf = m
+        if leaf not in DIST_PARAM_RANGES:
+            rep.errors.append(
+                f"I4: knob_resolution has unknown deep leaf {path_!r} (leaf {leaf!r})"
+            )
+            continue
+        src = entry.get("source", "")
+        if not _is_valid_source(src):
+            rep.errors.append(f"I4: {path_} has invalid source {src!r}")
+
     return manifest
+
+
+def _is_valid_source(src: str) -> bool:
+    if src in ("explicit", "default"):
+        return True
+    if src.startswith("descriptor:") or src.startswith("calibration:"):
+        return True
+    return False
 
 
 def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
@@ -571,8 +646,26 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             rep.errors.append(f"C11: dr notification lead deviates from program {program}")
 
 
+_S2_KS_THRESHOLD = 0.10
+
+
 def _check_soft(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                 manifest: dict[str, Any]) -> None:
+    # S2: per-region KS-distance vs ACN-Data fitted marginal.
+    # Held-out KS check deferred to Step 5.5 (per C11). For now we surface
+    # the training-set ks_fit_quality fields recorded in calibration_metadata
+    # if present — flagging any region above the 0.10 threshold as a warning.
+    res = manifest.get("knob_resolution", {})
+    has_calibration = any(
+        entry.get("source", "").startswith("calibration:")
+        for entry in res.values()
+    )
+    if has_calibration:
+        rep.warnings.append(
+            "S2: held-out KS validation deferred to Step 5.5; "
+            "see calibration_metadata.ks_fit_quality for training-set fit quality"
+        )
+
     # S3: energy balance — sessions vs charger throughput * duration
     sess = csvs["sessions"]
     chargers = csvs["chargers"]

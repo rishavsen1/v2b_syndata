@@ -14,6 +14,7 @@ dependencies = [
     "eppy>=0.5.63",
     "pyarrow>=14.0",
     "requests>=2.31",
+    "ruamel.yaml>=0.18",
 ]
 
 [project.scripts]
