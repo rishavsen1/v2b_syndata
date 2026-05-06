@@ -5,11 +5,11 @@ Generator git SHA: cb82e85d4d675b9313e105a7050dfef2c05d7c45 (Step 5 commit)
 
 ## Summary
 
-- **Test count change:** before 164, after 213 (Δ +49). 212 pass, 0 fail, 1 xfail.
-- **Test result:** `212 passed, 1 xfailed in 45.74s`
-- **Audit verdict:** **ISSUES_FOUND** — 1 calibration-side bug + 2 pre-existing pipeline bugs surfaced.
-- **Blockers for Step 6:** B1 (calibration token-required even when cache hit). B2 + B3 are pre-existing bugs from Step 3/4 territory; not Step-5 regressions but should be fixed before Step 6 if possible.
-- **Non-blocking findings:** A2 lat/lon override is a no-op without `tmyx_station` (Step 4 design). Validate-on-noise is by-design opt-in.
+- **Test count change:** before 164, after 216 (Δ +52). 216 pass, 0 fail, 0 xfail.
+- **Test result:** `216 passed in 47.32s`
+- **Audit verdict:** **ISSUES_FOUND → ALL RESOLVED.** 4 bugs surfaced; 3 fixed (B1, B3, B4); 1 transient and not reproducible (B2).
+- **Blockers for Step 6:** **none.** All audit-surfaced bugs have been resolved or classified.
+- **Non-blocking findings:** A2 lat/lon override is a no-op without `tmyx_station` (Step 4 design). Validate-on-noise is by-design opt-in. Real-ACN calibration of `consent_default` only matched 2/5 regions (98.1% unassigned) — region grid mismatches ACN reality; deferred to Step 5.5 with NHTS-anchored δ work (CALIBRATION_NOTES.md item #9).
 
 ## Phase 1: Test Coverage Fill
 
@@ -182,11 +182,19 @@ Weather change (with proper `tmyx_station` override) produces different building
 
 | ID | Status | Notes |
 |---|---|---|
-| B1 | **FIXED** | `acn_fetcher.fetch_all_sessions`: cache check moved before token read; raises clear error when neither cache nor token present. xfail test promoted to passing. |
+| B1 | **FIXED** | `acn_fetcher.fetch_all_sessions`: cache check moved before token read; raises clear error when neither cache nor token present. xfail test promoted to passing. Commit `fe7793c`. |
 | B2 | **NOT REPRODUCIBLE** | Re-running A1 matrix clean: **42/42 PASS, 0 FAIL** (vs original 40/42). Likely transient EnergyPlus resource pressure during back-to-back composite (office+retail) runs. No code change required; tracked for future stability work. |
-| B3 | **FIXED** | `noise.py`: `arrival_soc` clamp upgraded from `[0, 100]` to per-car `[min_allowed_soc, max_allowed_soc]` via cars.csv lookup. New regression test file `tests/test_noise_d3_clamp.py` (3 tests) verifies validate passes under `light_noise` and `realistic_noise`. |
+| B3 | **FIXED** | `noise.py`: `arrival_soc` clamp upgraded from `[0, 100]` to per-car `[min_allowed_soc, max_allowed_soc]` via cars.csv lookup. New regression test file `tests/test_noise_d3_clamp.py` (3 tests) verifies validate passes under `light_noise` and `realistic_noise`. Commit `fe7793c`. |
+| B4 | **FIXED** | `distribution_fitter.py`: every fit (TruncNorm, Weibull, Beta) is post-validated against `DIST_PARAM_RANGES`. OOR fits are dropped with `RuntimeWarning`; generation falls back to placeholder formulas for dropped distributions. Surfaced during real ACN-Data calibration: occasional_visitor.arrival.sigma=6.45 (above [0.01, 6.0]) and occasional_visitor.soc_arrival.{alpha=267, beta=53} (above [0.01, 50.0]) were dropped cleanly. Commit `32cb1d9`. |
 
 Plus dotenv added: `python-dotenv` dep + `.env.example` template + auto-load at CLI entry. `.env` already in `.gitignore`.
+
+**First real ACN-Data calibration shipped (commit `32cb1d9`):**
+- Source: `calibration:acn_data_2019_2021_20260506`
+- 42,451 sessions / 646 users post-filter
+- `data/calibration/acn_per_user.csv` committed for diagnostic use
+- Only 2/5 regions matched in `consent_default` (98.1% unassigned) — ACN-Data is dominated by low-frequency workplace charging. Hand-specified `axes_distribution` does not reflect ACN reality. Region re-anchor deferred to Step 5.5 (CALIBRATION_NOTES.md item #9).
+- B4 guard fired cleanly on 2 OOR fits.
 
 ### Blockers (original)
 
