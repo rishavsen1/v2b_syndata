@@ -120,3 +120,36 @@ default capacity assumption.
 
 The parametric families chosen (TruncNorm/Weibull/Beta) don't always fit the
 empirical marginals; revisit family choice in Step 5.5.
+
+## 10. φ definition fix: per-user active window (Step 5.5 prep)
+
+The original `aggregate_user_features` (commit `cb82e85`) computed
+`φ = n_active_weekdays / n_weekdays_in_global_window`. Denominator was the
+entire 3-year calibration span, so a user with 22 sessions concentrated in
+a 6-month employment window got `φ ≈ 0.07` instead of `~0.7`. Result: 98%
+of ACN users fell outside every region in `consent_default` and only 2/5
+regions got any users.
+
+Fixed in distribution_fitter / feature_extractor (commit TBD): denominator
+is now the **per-user active window** `[first_session, last_session]`. Added
+a second filter: `n_weekdays_in_user_window >= 5` to drop users whose active
+span is too short for a stable estimate.
+
+Re-run results:
+- φ mean 0.074 → **0.201**
+- φ max 0.588 → **1.000** (full range reachable)
+- Users with φ >= 0.7: 0 → **18**
+- Per-region session counts now: stable_commuter=87, irregular_distant=344,
+  occasional_visitor=874, erratic=421. flexible_local still 0 (no users in
+  that φ × κ box).
+- Regions calibrated: 2/5 → **4/5**
+- Manifest deep-channel calibrated leaves: 11 → **26**
+- `unassigned_user_rate`: 0.981 → **0.952** (still high — see below).
+
+The remaining 95% unassigned rate is a separate issue: most ACN users have
+**high κ but low φ** (consistent arrival time, but only a few days per week).
+That combination does not match any existing region in `consent_default`,
+which pairs high κ only with high φ (stable_commuter) or pairs low φ only
+with low κ (occasional_visitor, erratic). Re-anchoring regions on the
+empirical (φ, κ) joint observed in ACN is the natural next step.
+Deferred to Step 5.5 region re-anchor work.

@@ -94,6 +94,17 @@ def _safe_float(x: Any) -> float | None:
         return None
 
 
+MIN_WEEKDAYS_IN_USER_WINDOW = 5  # filter out users with too short an active window
+
+
+def _count_weekdays(start: pd.Timestamp, end: pd.Timestamp) -> int:
+    """Count weekdays in inclusive [start, end] range."""
+    if end < start:
+        return 0
+    days = pd.date_range(start.normalize(), end.normalize(), freq="D", tz=start.tz)
+    return int((days.dayofweek < 5).sum())
+
+
 def aggregate_user_features(
     sessions: list[SessionFeatures],
     window_start: pd.Timestamp,
@@ -101,20 +112,36 @@ def aggregate_user_features(
 ) -> list[UserFeatures]:
     """Compute (φ, κ, δ_km) per user across sessions.
 
-    Filters users with < MIN_SESSIONS_PER_USER sessions.
+    φ uses a **per-user active window** [first_session, last_session] rather
+    than the global calibration window. A user with 22 sessions over 6 months
+    (4 weekdays/week) is recognized as high-frequency even if the global
+    calibration window spans 3 years; using the global denominator would
+    artificially crush φ to ~0.07.
+
+    Filters: users with < MIN_SESSIONS_PER_USER sessions OR < MIN_WEEKDAYS_IN_USER_WINDOW
+    weekdays in their active window (statistically noisy).
+
+    `window_start`/`window_end` are kept for backwards compatibility with
+    existing callers and recorded on UserFeatures.n_weekdays_total for
+    diagnostic purposes only.
     """
     if not sessions:
         return []
 
     df = pd.DataFrame([s.__dict__ for s in sessions])
-    weekday_dates = pd.date_range(window_start.normalize(), window_end.normalize(), freq="D", tz="UTC")
-    weekday_dates = weekday_dates[weekday_dates.dayofweek < 5]
-    n_weekdays_total = int(len(weekday_dates))
 
     out: list[UserFeatures] = []
     for uid, g in df.groupby("user_id"):
         n = len(g)
         if n < MIN_SESSIONS_PER_USER:
+            continue
+
+        # Per-user active window (Step 5.5 fix).
+        arrival_times = pd.to_datetime(g["arrival_time"])
+        user_first = arrival_times.min()
+        user_last = arrival_times.max()
+        n_weekdays_user = _count_weekdays(user_first, user_last)
+        if n_weekdays_user < MIN_WEEKDAYS_IN_USER_WINDOW:
             continue
 
         unique_weekdays = set()
@@ -123,7 +150,7 @@ def aggregate_user_features(
             if ts_pd.dayofweek < 5:
                 unique_weekdays.add(ts_pd.date())
         n_obs = len(unique_weekdays)
-        phi = (n_obs / n_weekdays_total) if n_weekdays_total > 0 else 0.0
+        phi = (n_obs / n_weekdays_user) if n_weekdays_user > 0 else 0.0
         phi = float(min(1.0, max(0.0, phi)))
 
         arr_hours = g["arrival_hour"].to_numpy()
@@ -143,7 +170,7 @@ def aggregate_user_features(
             user_id=str(uid),
             n_sessions=int(n),
             n_weekdays_observed=int(n_obs),
-            n_weekdays_total=n_weekdays_total,
+            n_weekdays_total=int(n_weekdays_user),  # per-user active window
             phi=phi,
             kappa=kappa,
             delta_km=delta_km,

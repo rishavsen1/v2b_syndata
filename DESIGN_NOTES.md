@@ -308,3 +308,16 @@ target (the field) with the renderer's target (a free distribution). Splitting
 this requires a new `f_required_soc` distribution, copula linkage to arrival
 SoC, and re-fitting tests — deferred to Step 6. Documented in
 CALIBRATION_NOTES.md.
+
+## 23. φ uses per-user active window (calibration)
+
+`src/v2b_syndata/calibration/feature_extractor.py::aggregate_user_features`
+computes `φ = n_active_weekdays / n_weekdays_in_user_active_window` where
+the active window is `[first_session, last_session]` per user. Original
+implementation used the global calibration window as denominator, which
+crushed φ for short-tenure users (typical of workplace-charging datasets
+where employment turnover means users appear for only a fraction of the
+multi-year window). Filter: drop users with `n_sessions < 5` OR with
+`< 5 weekdays in their active window` (statistically noisy).
+
+See CALIBRATION_NOTES.md item #10 for the empirical impact.

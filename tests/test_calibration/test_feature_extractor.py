@@ -94,3 +94,84 @@ def test_aggregate_user_features_phi_kappa(synthetic_sessions):
     assert u.kappa > 0.9
     # delta_km from 40 mi requested
     assert u.delta_km == pytest.approx(40 * 1.609344, abs=0.01)
+
+
+def test_phi_uses_per_user_active_window():
+    """Step 5.5 phi fix: a user concentrated in a short span gets a high phi
+    even when the global window is wide.
+    """
+    from v2b_syndata.calibration.feature_extractor import SessionFeatures
+    # 8 sessions over 2 weeks, all in early 2020. Calibration window = 3 years.
+    base = pd.Timestamp("2020-01-06", tz="UTC")  # Monday
+    sessions = []
+    for d in (0, 1, 2, 3, 7, 8, 9, 10):  # 4 weekdays in week 1, 4 in week 2
+        ts = base + pd.Timedelta(days=d)
+        sessions.append(SessionFeatures(
+            user_id="concentrated",
+            site="caltech",
+            arrival_time=ts + pd.Timedelta(hours=9),
+            arrival_hour=9.0,
+            dwell_hours=8.0,
+            kwh_delivered=10.0,
+            miles_requested=None,
+            wh_per_mile=None,
+            kwh_requested=None,
+            minutes_available=None,
+        ))
+    window_start = pd.Timestamp("2019-01-01", tz="UTC")
+    window_end = pd.Timestamp("2021-12-31", tz="UTC")  # 3-year wide window
+    users = aggregate_user_features(sessions, window_start, window_end)
+    assert len(users) == 1
+    u = users[0]
+    # Active window = 11 days = 9 weekdays. 8 unique observed → phi ~ 0.89.
+    assert u.phi > 0.8, f"per-user-window phi = {u.phi}, expected > 0.8"
+
+
+def test_phi_filter_short_active_window():
+    """Users with active windows shorter than 5 weekdays are dropped."""
+    from v2b_syndata.calibration.feature_extractor import SessionFeatures
+    # 5 sessions all on consecutive days within 4 weekdays
+    base = pd.Timestamp("2020-01-06", tz="UTC")
+    sessions = []
+    for d in range(5):
+        ts = base + pd.Timedelta(days=d, hours=d * 0.5)
+        sessions.append(SessionFeatures(
+            user_id="short_user",
+            site="caltech",
+            arrival_time=ts + pd.Timedelta(hours=9),
+            arrival_hour=9.0 + d * 0.5,
+            dwell_hours=4.0,
+            kwh_delivered=5.0,
+            miles_requested=None, wh_per_mile=None,
+            kwh_requested=None, minutes_available=None,
+        ))
+    window_start = pd.Timestamp("2020-01-01", tz="UTC")
+    window_end = pd.Timestamp("2020-12-31", tz="UTC")
+    users = aggregate_user_features(sessions, window_start, window_end)
+    # Active window Jan 6-10 = 5 calendar days = 5 weekdays. Boundary case
+    # passes the >= 5 filter. (Tested >= filter below.)
+    assert len(users) == 1
+
+
+def test_phi_filter_drops_3_weekday_window():
+    """Active window < 5 weekdays → dropped."""
+    from v2b_syndata.calibration.feature_extractor import SessionFeatures
+    base = pd.Timestamp("2020-01-06", tz="UTC")  # Monday
+    sessions = []
+    for d in range(5):  # 5 sessions all on Monday-Wednesday
+        ts = base + pd.Timedelta(days=d % 3, hours=d * 0.1)
+        sessions.append(SessionFeatures(
+            user_id="too_short",
+            site="caltech",
+            arrival_time=ts + pd.Timedelta(hours=9),
+            arrival_hour=9.0,
+            dwell_hours=4.0,
+            kwh_delivered=5.0,
+            miles_requested=None, wh_per_mile=None,
+            kwh_requested=None, minutes_available=None,
+        ))
+    window_start = pd.Timestamp("2020-01-01", tz="UTC")
+    window_end = pd.Timestamp("2020-12-31", tz="UTC")
+    users = aggregate_user_features(sessions, window_start, window_end)
+    # Active window = 3 weekdays < 5 → user dropped.
+    assert len(users) == 0

@@ -44,23 +44,75 @@ consent_default:
 # High-ψ extreme: stable, predictable office workforce
 # ──────────────────────────────────────────────────────────────────────────
   region_distributions:
-    occasional_visitor:
+    stable_commuter:
+      arrival:
+        dist: truncnorm
+        mu: 16.860501801070498
+        sigma: 2.6568519272317097
+        n_samples: 87
+        ks_fit_quality: 0.20452981997671854
       dwell:
         dist: weibull
-        k: 1.0403434160801859
-        lambda: 5.708502122269099
-        n_samples: 878
-        ks_fit_quality: 0.11894956461440609
+        k: 2.4293807308993838
+        lambda: 6.88437843006454
+        n_samples: 87
+        ks_fit_quality: 0.14623831606757742
       soc_arrival:
         dist: beta
-        alpha: 0.5378838561360592
-        beta: 0.8244987595528109
-        n_samples: 878
-        ks_fit_quality: 0.4308860204292778
+        alpha: 3.345761133952282
+        beta: 1.4557949560049532
+        n_samples: 87
+        ks_fit_quality: 0.42017550075114085
       copula:
-        rho_spearman: -0.04635081941976095
-        rho_gaussian: -0.048533699908677945
-        n_samples: 878
+        rho_spearman: -0.5440511773711452
+        rho_gaussian: -0.5620548873451174
+        n_samples: 87
+    irregular_distant:
+      arrival:
+        dist: truncnorm
+        mu: 19.29545596751408
+        sigma: 5.999999999932445
+        n_samples: 344
+        ks_fit_quality: 0.49363580052167944
+      dwell:
+        dist: weibull
+        k: 1.6229461780007153
+        lambda: 3.6344293890688286
+        n_samples: 344
+        ks_fit_quality: 0.12899823332978527
+      soc_arrival:
+        dist: beta
+        alpha: 2.6283981893082395
+        beta: 3.2689653506369463
+        n_samples: 344
+        ks_fit_quality: 0.5009446001869235
+      copula:
+        rho_spearman: -0.024107266957737305
+        rho_gaussian: -0.025244400553392984
+        n_samples: 344
+    occasional_visitor:
+      arrival:
+        dist: truncnorm
+        mu: 10.229162679069947
+        sigma: 5.999999999478955
+        n_samples: 874
+        ks_fit_quality: 0.4667174466904162
+      dwell:
+        dist: weibull
+        k: 0.8832927708127565
+        lambda: 4.025737647070586
+        n_samples: 874
+        ks_fit_quality: 0.1186710514229159
+      soc_arrival:
+        dist: beta
+        alpha: 0.5577700292293442
+        beta: 0.983250847996368
+        n_samples: 874
+        ks_fit_quality: 0.46832874799310853
+      copula:
+        rho_spearman: 0.026157355786948513
+        rho_gaussian: 0.027391062574380457
+        n_samples: 874
     erratic:
       arrival:
         dist: truncnorm
@@ -91,10 +143,10 @@ consent_default:
     calibration_date: '2026-05-06'
     n_users_total: 646
     n_sessions_total: 42451
-    n_users_assigned_in_population: 12
-    n_users_with_userinputs: 12
+    n_users_assigned_in_population: 31
+    n_users_with_userinputs: 31
     capacity_inference_fallback_rate: 0.3326894537231161
-    unassigned_user_rate: 0.9814241486068112
+    unassigned_user_rate: 0.9520123839009288
 stable_commuter_heavy:
   description: "Stable office workforce — high frequency, high consistency. High ψ."
 
