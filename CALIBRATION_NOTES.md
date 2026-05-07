@@ -153,3 +153,50 @@ which pairs high κ only with high φ (stable_commuter) or pairs low φ only
 with low κ (occasional_visitor, erratic). Re-anchoring regions on the
 empirical (φ, κ) joint observed in ACN is the natural next step.
 Deferred to Step 5.5 region re-anchor work.
+
+## 11. Step 5.5: per-population calibration policy
+
+ACN-Data calibration is no longer universal. Each population in
+`configs/populations.yaml` declares `calibration_policy`:
+
+- `acn_data` — ACN-Data fitted via `v2b-syndata calibrate`; region grid is
+  ACN-anchored. Manifest source: `calibration:<provenance>`.
+- `synthetic` — hand-authored `region_distributions`; no real-data fit.
+  Manifest source: `hand_specified:<population_name>`. `v2b-syndata calibrate`
+  skips with an informative log line.
+
+Future calibration sources (NHTS for δ, EVI-Pro/EVWatts for high-φ commuters)
+extend the policy enum without breaking the generator.
+
+### Population assignments
+
+| population | policy | provenance |
+|---|---|---|
+| `consent_default` | synthetic | hand-authored, domain-informed |
+| `acn_workplace_baseline` | acn_data | calibration:acn_data_2019_2021_<date> |
+| `stable_commuter_heavy` | synthetic | (region_distributions still TODO) |
+| `visitor_heavy` | synthetic | (region_distributions still TODO) |
+
+### Real-ACN run on `acn_workplace_baseline`
+
+`acn_data_2019_2021_20260506`. 42,451 sessions / 646 users post-filter.
+
+| metric | acn_workplace_baseline | (vs old consent_default attempt) |
+|---|---|---|
+| regions calibrated | **5/5** | 4/5 |
+| n_users assigned | **634** | 31 |
+| unassigned_user_rate | **0.019** | 0.952 |
+| capacity fallback | 0.333 | 0.333 |
+
+Per-region n_samples: rare_consistent 3,848; rare_inconsistent 1,424;
+occasional_consistent 15,607; regular_charger 17,857; erratic 1,805.
+
+KS fit quality varies (0.07–0.52); arrival fits are weakest. Family choice
+(TruncNorm/Weibull/Beta) revisit deferred. soc_arrival fits are uniformly
+high (~0.4); related to capacity-inference fallback rate.
+
+### Manifest stamps after Step 5.5
+
+S01 (consent_default) generation produces 35 deep-channel leaves all
+stamped `hand_specified:consent_default`. Generation against
+`acn_workplace_baseline` stamps the calibration provenance instead.

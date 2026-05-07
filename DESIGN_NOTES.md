@@ -321,3 +321,19 @@ multi-year window). Filter: drop users with `n_sessions < 5` OR with
 `< 5 weekdays in their active window` (statistically noisy).
 
 See CALIBRATION_NOTES.md item #10 for the empirical impact.
+
+## 24. Per-population calibration policy (Step 5.5)
+
+`configs/populations.yaml` entries declare `calibration_policy: acn_data | synthetic`.
+`v2b-syndata calibrate` filters populations by policy BEFORE doing any fetch,
+so calling `calibrate --population <synthetic>` short-circuits without
+requiring `ACN_API_TOKEN`. Two new manifest source categories:
+
+- `calibration:<provenance>` — acn_data populations after a calibration run.
+- `hand_specified:<population_name>` — synthetic populations.
+
+Resolution chain in `descriptor_loader.expand_descriptors` stamps the source
+based on policy. `knob_loader.resolve_knobs` accepts both prefixes verbatim
+when seen in the descriptor-supplied tuple. `validate.py::_is_valid_source`
+extended to accept `hand_specified:*`. New soft check G5c warns if a
+synthetic population emits hand_specified leaves for some regions but not all.

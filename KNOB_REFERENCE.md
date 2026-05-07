@@ -144,14 +144,43 @@ Every leaf in `manifest.json::knob_resolution` carries one of:
 
 - `explicit` — set on the command line or scenario YAML.
 - `descriptor:<name>` — supplied by Tier 0 descriptor expansion.
-- `calibration:acn_data_<years>_<date>` — from a calibration run; e.g.
-  `calibration:acn_data_2019_2021_20260506`. Provenance string is recorded
-  on the population's `calibration_metadata.source` and propagates to every
-  fitted leaf.
-- `default` — `knobs.yaml::default` fallback.
+- `calibration:acn_data_<years>_<date>` — from a calibration run on a
+  population with `calibration_policy: acn_data`. Provenance string is
+  recorded on the population's `calibration_metadata.source` and propagates
+  to every fitted leaf. Example: `calibration:acn_data_2019_2021_20260506`.
+- `hand_specified:<population_name>` — from hand-authored `region_distributions`
+  on a population with `calibration_policy: synthetic`. Example:
+  `hand_specified:consent_default`.
+- `default` — `knobs.yaml::default` fallback. Should be RARE for
+  `region_distributions.*` paths; means the population's hand-authored
+  block is missing the leaf and the sampler will use a placeholder formula.
 
 Use `python -c "import json; m = json.load(open('out/manifest.json')); ..."` to
 audit which leaves were calibrated vs explicitly overridden.
+
+## Calibration policy
+
+Each population in `configs/populations.yaml` declares `calibration_policy`:
+
+| policy | meaning | who fills `region_distributions` |
+|---|---|---|
+| `acn_data` | ACN-Data fitted; region grid is ACN-anchored | `v2b-syndata calibrate` |
+| `synthetic` | hand-authored region distributions | the YAML author |
+
+`v2b-syndata calibrate` honors the policy and only fits `acn_data`
+populations. Synthetic populations are reported as skipped — no fetch.
+
+### Example overrides per policy
+
+```bash
+# Override a calibrated leaf — replaces calibration:* with explicit.
+v2b-syndata generate --scenario S_acn --seed 42 --output-dir /tmp/o \
+    --override 'user_behavior.region_distributions.regular_charger.dwell.lambda=12.0'
+
+# Override a hand-authored leaf — replaces hand_specified:* with explicit.
+v2b-syndata generate --scenario S01 --seed 42 --output-dir /tmp/o \
+    --override 'user_behavior.region_distributions.stable_commuter.arrival.mu=8.0'
+```
 
 ## Reproducibility contract
 

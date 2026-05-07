@@ -84,13 +84,29 @@ def expand_descriptors(
     out["ev_fleet.battery_mix"] = (list(pop["fleet"]["battery_mix"]), pop_name)
     out["ev_fleet.battery_heterogeneity"] = (pop["fleet"]["battery_heterogeneity"], pop_name)
 
-    # Calibrated region_distributions overlay (Step 5 / D47, D51, C2).
-    # Only emit when both blocks present; source comes from calibration_metadata.
+    # region_distributions overlay (Step 5 / D47, D51, C2; Step 5.5 policy split).
+    # Per-population calibration_policy controls source stamping:
+    #   acn_data  → source = calibration_metadata.source ("calibration:<provenance>")
+    #   synthetic → source = "hand_specified:<population_name>"
+    # Defaults to acn_data when calibration_metadata.source present (legacy path),
+    # else synthetic. Metadata leaves (n_samples, ks_fit_quality, dist, etc.)
+    # are filtered — only DIST_PARAM_RANGES leaves propagate.
     rd = pop.get("region_distributions")
-    cal_meta = pop.get("calibration_metadata")
-    if rd and isinstance(rd, dict) and cal_meta and isinstance(cal_meta, dict):
-        provenance = cal_meta.get("source")
-        if provenance and str(provenance).startswith("calibration:"):
+    if rd and isinstance(rd, dict):
+        policy = pop.get("calibration_policy")
+        cal_meta = pop.get("calibration_metadata") or {}
+        if policy == "acn_data":
+            provenance = cal_meta.get("source")
+            if not provenance or not str(provenance).startswith("calibration:"):
+                provenance = None  # not yet calibrated; skip the overlay
+        elif policy == "synthetic":
+            provenance = f"hand_specified:{pop_name}"
+        else:
+            # Legacy fallback: pre-Step-5.5 entries used calibration_metadata.source directly.
+            provenance = cal_meta.get("source")
+            if provenance and not str(provenance).startswith("calibration:"):
+                provenance = None
+        if provenance is not None:
             for region_name, dist_blocks in rd.items():
                 if not isinstance(dist_blocks, dict):
                     continue
@@ -99,8 +115,6 @@ def expand_descriptors(
                         continue
                     for param_name, value in params.items():
                         leaf = f"{dist_name}.{param_name}"
-                        # Filter metadata fields (n_samples, ks_fit_quality, dist, ...);
-                        # only emit leaves declared in DIST_PARAM_RANGES.
                         if leaf not in DIST_PARAM_RANGES:
                             continue
                         path = (

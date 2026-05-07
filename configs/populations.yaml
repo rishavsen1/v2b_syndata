@@ -1,4 +1,4 @@
-# populations.yaml — Population descriptor library (post-D24, D28)
+# populations.yaml — Population descriptor library (Step 5.5 per-population policy)
 #
 # Each entry resolves into knobs:
 #   user_behavior.axes_distribution (region grid over (φ, κ, δ))
@@ -12,12 +12,23 @@
 #   3. negotiation_type ~ Categorical(negotiation_mix)
 #   4. (w1, w2) ~ Normal(cluster mean, cluster std) clipped ≥ 0; scaled by w_multiplier
 #   5. battery_class ~ Categorical(battery_mix)
+#
+# calibration_policy controls how region_distributions parameters are sourced:
+#   acn_data  — ACN-Data fitted; region grid is ACN-anchored.
+#               `v2b-syndata calibrate` writes region_distributions on this entry.
+#   synthetic — region_distributions hand-authored from domain knowledge.
+#               `v2b-syndata calibrate` skips this entry.
+# See CALIBRATION_NOTES.md item #11 for the policy split rationale.
 
 # ──────────────────────────────────────────────────────────────────────────
-# CONSENT-default mixed-flex baseline (S01, used in CONSENT validation)
+# CONSENT-default mixed-flex baseline (S01, used in CONSENT validation).
+# Hand-authored — domain knowledge, not data fit. The 5 region archetypes
+# are the canonical CONSENT axes; their distribution parameters are set
+# from typical-charging-pattern intuition.
 # ──────────────────────────────────────────────────────────────────────────
 consent_default:
   description: "Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes"
+  calibration_policy: synthetic
 
   axes_distribution:
     - {name: stable_commuter, freq: [0.85, 1.00], consist: [0.75, 1.00], dist_km: [
@@ -40,96 +51,194 @@ consent_default:
     battery_mix: [0.20, 0.30, 0.40, 0.10]
     battery_heterogeneity: mixed
 
+  region_distributions:
+    # stable_commuter: morning office arrivals, 8-9h workday, mid-low arrival SoC.
+    stable_commuter:
+      arrival: {mu: 8.5, sigma: 0.8}        # ~8:30 ± 30min, weekday office onset
+      dwell: {k: 2.2, lambda: 9.0}          # ~9h workday; k>2 → tight unimodal peak
+      soc_arrival: {alpha: 4.0, beta: 6.0}  # E≈0.40 — long commute, mid-discharge
+      copula: {rho_gaussian: -0.3}          # earlier arrivers stay slightly longer
+
+    # flexible_local: mid-morning arrivals, ~6h dwell, balanced arrival SoC.
+    flexible_local:
+      arrival: {mu: 9.5, sigma: 1.5}        # ~9:30 ± 1.5h, late office or part-day
+      dwell: {k: 1.8, lambda: 6.5}          # ~6h dwell; broader than commuters
+      soc_arrival: {alpha: 5.0, beta: 5.0}  # E≈0.50 — short commutes, less discharge
+      copula: {rho_gaussian: -0.2}
+
+    # irregular_distant: scattered arrivals, ~4h dwell, low arrival SoC (long range).
+    irregular_distant:
+      arrival: {mu: 10.0, sigma: 2.5}       # ~10:00 ± 2.5h, irregular
+      dwell: {k: 1.5, lambda: 4.0}          # ~4h dwell; long-range driver charges + leaves
+      soc_arrival: {alpha: 3.0, beta: 7.0}  # E≈0.30 — significant discharge
+      copula: {rho_gaussian: -0.1}
+
+    # occasional_visitor: midday peak, short stays, balanced SoC.
+    occasional_visitor:
+      arrival: {mu: 13.0, sigma: 3.0}       # ~13:00 ± 3h, lunchtime + afternoon
+      dwell: {k: 1.5, lambda: 2.0}          # ~2h dwell — quick top-up
+      soc_arrival: {alpha: 4.0, beta: 4.0}  # E≈0.50 — random
+      copula: {rho_gaussian: 0.0}
+
+    # erratic: very wide arrival, short dwell, mid SoC. Random walk-ins.
+    erratic:
+      arrival: {mu: 11.0, sigma: 4.0}       # broadest arrival window
+      dwell: {k: 1.2, lambda: 3.0}          # tail-heavy dwell
+      soc_arrival: {alpha: 3.0, beta: 5.0}  # E≈0.375
+      copula: {rho_gaussian: 0.0}
+
 # ──────────────────────────────────────────────────────────────────────────
-# High-ψ extreme: stable, predictable office workforce
+# ACN-anchored workplace baseline. Region grid matches where ACN-Data users
+# actually live in (φ, κ) space (after the per-user-window φ fix).
+# region_distributions populated by `v2b-syndata calibrate`.
+# ──────────────────────────────────────────────────────────────────────────
+acn_workplace_baseline:
+  description: "ACN-Data-anchored workplace charging baseline (Caltech/JPL/Office001
+    2019-2021)"
+  calibration_policy: acn_data
+
+  axes_distribution:
+    # Region bounds anchored on per-user-window φ histogram from the 646-user
+    # ACN cohort. See CALIBRATION_NOTES.md item #11 for the histogram.
+    # Initial weights: equal-share placeholder; tune from empirical user share
+    # after first calibration run reports per-region n_users.
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.40}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.20}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.20}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.15}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.05}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+
+  # region_distributions populated by `v2b-syndata calibrate --population acn_workplace_baseline`.
+
+# ──────────────────────────────────────────────────────────────────────────
+# High-ψ extreme: stable, predictable office workforce. Hand-authored
+# (synthetic). Step 5.5 gap: region_distributions not yet authored;
+# generation falls back to placeholder formulas (G5c warning expected).
 # ──────────────────────────────────────────────────────────────────────────
   region_distributions:
-    stable_commuter:
+    rare_consistent:
       arrival:
         dist: truncnorm
-        mu: 16.860501801070498
-        sigma: 2.6568519272317097
-        n_samples: 87
-        ks_fit_quality: 0.20452981997671854
+        mu: 19.999999688022584
+        sigma: 4.986264982522814
+        n_samples: 3848
+        ks_fit_quality: 0.21842107782980502
       dwell:
         dist: weibull
-        k: 2.4293807308993838
-        lambda: 6.88437843006454
-        n_samples: 87
-        ks_fit_quality: 0.14623831606757742
+        k: 1.3993092886964638
+        lambda: 6.021461767156862
+        n_samples: 3848
+        ks_fit_quality: 0.0770012464674491
       soc_arrival:
         dist: beta
-        alpha: 3.345761133952282
-        beta: 1.4557949560049532
-        n_samples: 87
-        ks_fit_quality: 0.42017550075114085
+        alpha: 1.427777282099292
+        beta: 1.5105374788148511
+        n_samples: 3848
+        ks_fit_quality: 0.393947601739658
       copula:
-        rho_spearman: -0.5440511773711452
-        rho_gaussian: -0.5620548873451174
-        n_samples: 87
-    irregular_distant:
+        rho_spearman: -0.360022218672144
+        rho_gaussian: -0.3747854843566052
+        n_samples: 3848
+    rare_inconsistent:
+      dwell:
+        dist: weibull
+        k: 0.7937346339374594
+        lambda: 3.4978375846747047
+        n_samples: 1424
+        ks_fit_quality: 0.13016710052796943
+      soc_arrival:
+        dist: beta
+        alpha: 0.8160417569225421
+        beta: 1.0244551941827835
+        n_samples: 1424
+        ks_fit_quality: 0.38266888543247557
+      copula:
+        rho_spearman: 0.054554509950221965
+        rho_gaussian: 0.05712158051729513
+        n_samples: 1424
+    occasional_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.29545596751408
-        sigma: 5.999999999932445
-        n_samples: 344
-        ks_fit_quality: 0.49363580052167944
+        mu: 19.999998056151334
+        sigma: 4.902344430908057
+        n_samples: 15607
+        ks_fit_quality: 0.17543393662588314
       dwell:
         dist: weibull
-        k: 1.6229461780007153
-        lambda: 3.6344293890688286
-        n_samples: 344
-        ks_fit_quality: 0.12899823332978527
+        k: 1.8275812151715911
+        lambda: 7.47481197419917
+        n_samples: 15607
+        ks_fit_quality: 0.10624137142295464
       soc_arrival:
         dist: beta
-        alpha: 2.6283981893082395
-        beta: 3.2689653506369463
-        n_samples: 344
-        ks_fit_quality: 0.5009446001869235
+        alpha: 1.3585955402846897
+        beta: 1.5401254181967678
+        n_samples: 15607
+        ks_fit_quality: 0.3847461435325952
       copula:
-        rho_spearman: -0.024107266957737305
-        rho_gaussian: -0.025244400553392984
-        n_samples: 344
-    occasional_visitor:
+        rho_spearman: -0.5043374283229921
+        rho_gaussian: -0.5220241260091277
+        n_samples: 15607
+    regular_charger:
       arrival:
         dist: truncnorm
-        mu: 10.229162679069947
-        sigma: 5.999999999478955
-        n_samples: 874
-        ks_fit_quality: 0.4667174466904162
+        mu: 18.045838026144345
+        sigma: 4.287997375401666
+        n_samples: 17857
+        ks_fit_quality: 0.14716905278814585
       dwell:
         dist: weibull
-        k: 0.8832927708127565
-        lambda: 4.025737647070586
-        n_samples: 874
-        ks_fit_quality: 0.1186710514229159
+        k: 2.051300651028199
+        lambda: 7.86574949364447
+        n_samples: 17857
+        ks_fit_quality: 0.12386391183766238
       soc_arrival:
         dist: beta
-        alpha: 0.5577700292293442
-        beta: 0.983250847996368
-        n_samples: 874
-        ks_fit_quality: 0.46832874799310853
+        alpha: 0.8349570475160377
+        beta: 0.991104534948279
+        n_samples: 17857
+        ks_fit_quality: 0.3660783374308552
       copula:
-        rho_spearman: 0.026157355786948513
-        rho_gaussian: 0.027391062574380457
-        n_samples: 874
+        rho_spearman: -0.4534433714369331
+        rho_gaussian: -0.4703962260774919
+        n_samples: 17857
     erratic:
       arrival:
         dist: truncnorm
-        mu: 6.000000005812993
-        sigma: 5.955113621269352
-        n_samples: 421
-        ks_fit_quality: 0.5569052296362169
+        mu: 8.443386353577619
+        sigma: 5.999999999341096
+        n_samples: 1805
+        ks_fit_quality: 0.5167358599569813
       dwell:
         dist: weibull
-        k: 1.8080754737680644
-        lambda: 5.356312893945373
-        n_samples: 421
-        ks_fit_quality: 0.09031291638607031
+        k: 1.0186497607613911
+        lambda: 5.215875623917329
+        n_samples: 1805
+        ks_fit_quality: 0.0727888354105416
+      soc_arrival:
+        dist: beta
+        alpha: 0.7970941787062007
+        beta: 0.8112670123244302
+        n_samples: 1805
+        ks_fit_quality: 0.32393978656646855
       copula:
-        rho_spearman: 0.17255046713720804
-        rho_gaussian: 0.180448703660511
-        n_samples: 421
+        rho_spearman: 0.031520231223341404
+        rho_gaussian: 0.033006410518777084
+        n_samples: 1805
   calibration_metadata:
     source: calibration:acn_data_2019_2021_20260506
     dataset: ACN-Data
@@ -143,12 +252,13 @@ consent_default:
     calibration_date: '2026-05-06'
     n_users_total: 646
     n_sessions_total: 42451
-    n_users_assigned_in_population: 31
-    n_users_with_userinputs: 31
+    n_users_assigned_in_population: 634
+    n_users_with_userinputs: 634
     capacity_inference_fallback_rate: 0.3326894537231161
-    unassigned_user_rate: 0.9520123839009288
+    unassigned_user_rate: 0.018575851393188854
 stable_commuter_heavy:
   description: "Stable office workforce — high frequency, high consistency. High ψ."
+  calibration_policy: synthetic
 
   axes_distribution:
     - {name: stable_commuter, freq: [0.85, 1.00], consist: [0.80, 1.00], dist_km: [
@@ -168,11 +278,13 @@ stable_commuter_heavy:
     battery_heterogeneity: mixed
 
 # ──────────────────────────────────────────────────────────────────────────
-# Low-ψ extreme: visitor-heavy retail
+# Low-ψ extreme: visitor-heavy retail. Hand-authored (synthetic).
+# Step 5.5 gap: region_distributions not yet authored.
 # ──────────────────────────────────────────────────────────────────────────
 visitor_heavy:
   description: "Retail clientele — low frequency, low consistency, varied distance.
     Low ψ."
+  calibration_policy: synthetic
 
   axes_distribution:
     - {name: occasional_visitor, freq: [0.05, 0.25], consist: [0.05, 0.35], 

@@ -58,7 +58,7 @@ def test_summary_dict_keys(tmp_pops, tmp_path, monkeypatch):
     from v2b_syndata.calibration import calibrate_populations
     summary = calibrate_populations(
         populations_yaml_path=tmp_pops,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         cache_dir=cache, artifact_dir=tmp_path / "art",
         year_start=2019, year_end=2021, write_yaml=False,
     )
@@ -66,8 +66,8 @@ def test_summary_dict_keys(tmp_pops, tmp_path, monkeypatch):
                 "capacity_inference_fallback_rate", "provenance",
                 "populations"}
     assert expected.issubset(summary.keys())
-    assert "consent_default" in summary["populations"]
-    pop_sum = summary["populations"]["consent_default"]
+    assert "acn_workplace_baseline" in summary["populations"]
+    pop_sum = summary["populations"]["acn_workplace_baseline"]
     assert "regions" in pop_sum
     assert "unassigned_user_rate" in pop_sum
     assert "metadata" in pop_sum
@@ -82,7 +82,7 @@ def test_zero_sessions_year_window_raises(tmp_pops, tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="no sessions extracted"):
         calibrate_populations(
             populations_yaml_path=tmp_pops,
-            population_names=["consent_default"],
+            population_names=["acn_workplace_baseline"],
             cache_dir=cache, artifact_dir=tmp_path / "art",
             year_start=2019, year_end=2021, write_yaml=False,
         )
@@ -103,7 +103,7 @@ def test_default_population_names_inferred_from_yaml(tmp_pops, tmp_path, monkeyp
     # populations.yaml has at least: consent_default, stable_commuter_heavy,
     # occasional_visitor_dominant
     assert len(summary["populations"]) >= 1
-    assert "consent_default" in summary["populations"]
+    assert "acn_workplace_baseline" in summary["populations"]
 
 
 def test_artifact_csv_written(tmp_pops, tmp_path, monkeypatch):
@@ -114,7 +114,7 @@ def test_artifact_csv_written(tmp_pops, tmp_path, monkeypatch):
     from v2b_syndata.calibration import calibrate_populations
     calibrate_populations(
         populations_yaml_path=tmp_pops,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         cache_dir=cache, artifact_dir=art,
         year_start=2019, year_end=2021, write_yaml=False,
     )
@@ -132,7 +132,7 @@ def test_provenance_format(tmp_pops, tmp_path, monkeypatch):
     from v2b_syndata.calibration import calibrate_populations
     summary = calibrate_populations(
         populations_yaml_path=tmp_pops,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         cache_dir=cache, artifact_dir=tmp_path / "art",
         year_start=2019, year_end=2021, write_yaml=False,
     )

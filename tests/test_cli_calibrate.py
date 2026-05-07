@@ -54,7 +54,7 @@ def test_calibrate_subcommand_writes_populations_yaml(tmp_path, monkeypatch, cap
     rc = main([
         "--config-dir", str(cfg),
         "calibrate",
-        "--population", "consent_default",
+        "--population", "acn_workplace_baseline",
         "--year-start", "2019", "--year-end", "2021",
         "--cache-dir", str(cache),
         "--artifact-dir", str(artifacts),
@@ -62,11 +62,11 @@ def test_calibrate_subcommand_writes_populations_yaml(tmp_path, monkeypatch, cap
     assert rc == 0
     out = capsys.readouterr().out
     assert "calibration complete" in out
-    assert "consent_default" in out
+    assert "acn_workplace_baseline" in out
 
     data = pyyaml.safe_load((cfg / "populations.yaml").read_text())
-    assert "region_distributions" in data["consent_default"]
-    assert "calibration_metadata" in data["consent_default"]
+    assert "region_distributions" in data["acn_workplace_baseline"]
+    assert "calibration_metadata" in data["acn_workplace_baseline"]
 
 
 def test_docs_gen_subcommand_emits_full_reference(tmp_path, capsys):

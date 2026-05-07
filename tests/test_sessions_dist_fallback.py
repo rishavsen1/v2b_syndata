@@ -153,30 +153,49 @@ def test_override_on_calibrated_leaf_manifest_stamp(tmp_path: Path):
     }
     metadata = {"source": "calibration:acn_data_2019_2021_test"}
 
+    # Step 5.5 policy split: consent_default is now synthetic. To exercise the
+    # acn_data path we inject onto acn_workplace_baseline.
+    fits_acn = {
+        "regular_charger": {
+            "arrival": {"mu": 8.7, "sigma": 0.6, "n_samples": 100, "ks_fit_quality": 0.05},
+            "dwell": {"k": 2.1, "lambda": 9.2, "n_samples": 100, "ks_fit_quality": 0.06},
+        },
+    }
     try:
-        write_region_distributions(pops_path, "consent_default", fits, metadata)
+        write_region_distributions(pops_path, "acn_workplace_baseline", fits_acn, metadata)
 
-        from v2b_syndata.runner import generate
-        out_dir = tmp_path / "out"
-        manifest = generate(
-            scenario_id="S01", seed=42,
-            output_dir=out_dir,
-            config_dir=Path(__file__).resolve().parent.parent / "configs",
-            cli_overrides={
-                "user_behavior.region_distributions.stable_commuter.dwell.lambda": 15.0,
-            },
-            noise_profile_override=None,
+        # Build an audit scenario that uses acn_workplace_baseline (S01 uses consent_default).
+        scen_path = pops_path.parent / "scenarios" / "audit_acn.yaml"
+        scen_path.write_text(
+            "scenario_id: audit_acn\n"
+            "description: audit\n"
+            "descriptors:\n"
+            "  location: nashville_tn\n"
+            "  building: medium_office_v1\n"
+            "  population: acn_workplace_baseline\n"
+            "  equipment: balanced_50pct\n"
+            "  noise: clean\n"
         )
-
-        res = manifest["knob_resolution"]
-        # The override leaf is explicit
-        ov_key = "user_behavior.region_distributions.stable_commuter.dwell.lambda"
-        assert res[ov_key]["value"] == 15.0
-        assert res[ov_key]["source"] == "explicit"
-
-        # Other calibrated leaves still carry calibration: source
-        cal_key = "user_behavior.region_distributions.stable_commuter.arrival.mu"
-        assert res[cal_key]["value"] == 8.7
-        assert res[cal_key]["source"] == "calibration:acn_data_2019_2021_test"
+        try:
+            from v2b_syndata.runner import generate
+            out_dir = tmp_path / "out"
+            manifest = generate(
+                scenario_id="audit_acn", seed=42,
+                output_dir=out_dir,
+                config_dir=Path(__file__).resolve().parent.parent / "configs",
+                cli_overrides={
+                    "user_behavior.region_distributions.regular_charger.dwell.lambda": 15.0,
+                },
+                noise_profile_override=None,
+            )
+            res = manifest["knob_resolution"]
+            ov_key = "user_behavior.region_distributions.regular_charger.dwell.lambda"
+            assert res[ov_key]["value"] == 15.0
+            assert res[ov_key]["source"] == "explicit"
+            cal_key = "user_behavior.region_distributions.regular_charger.arrival.mu"
+            assert res[cal_key]["value"] == 8.7
+            assert res[cal_key]["source"] == "calibration:acn_data_2019_2021_test"
+        finally:
+            scen_path.unlink(missing_ok=True)
     finally:
         pops_path.write_text(backup)

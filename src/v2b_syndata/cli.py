@@ -125,6 +125,8 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         regions = pop_summary.get("regions", [])
         print(f"  {pop_name}: {len(regions)} regions fit "
               f"unassigned_rate={pop_summary['unassigned_user_rate']:.3f}")
+    for skipped in summary.get("skipped_populations", []):
+        print(f"  skipped: {skipped}")
     return 0
 
 

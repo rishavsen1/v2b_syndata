@@ -41,6 +41,49 @@ def calibrate_populations(
     cache_dir.mkdir(parents=True, exist_ok=True)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
+    # 0. Filter target populations BEFORE doing any data work. This lets
+    # `calibrate --population <synthetic_one>` short-circuit cleanly without
+    # a network fetch or token requirement.
+    with populations_yaml_path.open() as _f:
+        pops_yaml = yaml.safe_load(_f)
+
+    if population_names is None:
+        population_names = [
+            n for n, v in pops_yaml.items()
+            if isinstance(v, dict)
+            and "axes_distribution" in v
+            and v.get("calibration_policy") == "acn_data"
+        ]
+
+    skipped: list[str] = []
+    eligible: list[str] = []
+    for pname in population_names:
+        entry = pops_yaml.get(pname)
+        if not isinstance(entry, dict) or "axes_distribution" not in entry:
+            skipped.append(f"{pname} (missing axes_distribution)")
+            continue
+        policy = entry.get("calibration_policy")
+        if policy != "acn_data":
+            skipped.append(f"{pname} (calibration_policy={policy!r}; nothing to fit)")
+            continue
+        eligible.append(pname)
+    population_names = eligible
+
+    today_iso = dt.date.today().isoformat()
+    today_compact = today_iso.replace("-", "")
+    provenance_pre = f"calibration:acn_data_{year_start}_{year_end}_{today_compact}"
+
+    if not eligible:
+        # Nothing to fit. Short-circuit before fetch — no token/network required.
+        return {
+            "skipped_populations": skipped,
+            "n_sessions_total": 0,
+            "n_users_total": 0,
+            "capacity_inference_fallback_rate": 0.0,
+            "provenance": provenance_pre,
+            "populations": {},
+        }
+
     # 1. Fetch all sessions across sites and years.
     raw_sessions: list[tuple[dict[str, Any], str]] = []
     for site in sites:
@@ -86,21 +129,11 @@ def calibrate_populations(
     for s in sessions:
         sessions_by_uid.setdefault(s.user_id, []).append(s)
 
-    # 6. Per-population processing.
-    with populations_yaml_path.open() as f:
-        pops_yaml = yaml.safe_load(f)
-
-    if population_names is None:
-        population_names = [
-            n for n, v in pops_yaml.items()
-            if isinstance(v, dict) and "axes_distribution" in v
-        ]
-
-    today_iso = dt.date.today().isoformat()
-    today_compact = today_iso.replace("-", "")
-    provenance = f"calibration:acn_data_{year_start}_{year_end}_{today_compact}"
+    # 6. Per-population processing (population_names already filtered at top).
+    provenance = provenance_pre
 
     summary: dict[str, Any] = {
+        "skipped_populations": skipped,
         "n_sessions_total": len(sessions),
         "n_users_total": len(users),
         "capacity_inference_fallback_rate": fallback_rate,

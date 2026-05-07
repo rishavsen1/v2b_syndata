@@ -91,7 +91,7 @@ def test_e2e_calibration_pipeline(populated_cache, tmp_populations_yaml, tmp_pat
 
     summary = calibrate_populations(
         populations_yaml_path=tmp_populations_yaml,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         sites=("caltech", "jpl", "office001"),
         year_start=2019,
         year_end=2021,
@@ -102,12 +102,12 @@ def test_e2e_calibration_pipeline(populated_cache, tmp_populations_yaml, tmp_pat
 
     assert summary["n_users_total"] > 0
     assert summary["n_sessions_total"] > 0
-    assert "consent_default" in summary["populations"]
+    assert "acn_workplace_baseline" in summary["populations"]
     assert summary["provenance"].startswith("calibration:acn_data_2019_2021_")
 
     # Verify populations.yaml got the new blocks
     data = pyyaml.safe_load(tmp_populations_yaml.read_text())
-    pop = data["consent_default"]
+    pop = data["acn_workplace_baseline"]
     assert "region_distributions" in pop
     assert "calibration_metadata" in pop
     assert pop["calibration_metadata"]["source"].startswith("calibration:acn_data_")
@@ -128,14 +128,14 @@ def test_e2e_calibration_writeback_preserves_existing_blocks(
     from v2b_syndata.calibration import calibrate_populations
 
     before = pyyaml.safe_load(tmp_populations_yaml.read_text())
-    pre = before["consent_default"]
+    pre = before["acn_workplace_baseline"]
     pre_axes = list(pre["axes_distribution"])
     pre_neg = dict(pre["negotiation"])
     pre_fleet = dict(pre["fleet"])
 
     calibrate_populations(
         populations_yaml_path=tmp_populations_yaml,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         sites=("caltech", "jpl", "office001"),
         year_start=2019, year_end=2021,
         cache_dir=populated_cache,
@@ -144,7 +144,7 @@ def test_e2e_calibration_writeback_preserves_existing_blocks(
     )
 
     after = pyyaml.safe_load(tmp_populations_yaml.read_text())
-    post = after["consent_default"]
+    post = after["acn_workplace_baseline"]
     assert post["axes_distribution"] == pre_axes
     assert post["negotiation"] == pre_neg
     assert post["fleet"] == pre_fleet
@@ -156,7 +156,7 @@ def test_e2e_calibration_metadata_block_format(populated_cache, tmp_populations_
 
     calibrate_populations(
         populations_yaml_path=tmp_populations_yaml,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         sites=("caltech", "jpl", "office001"),
         year_start=2019, year_end=2021,
         cache_dir=populated_cache,
@@ -165,7 +165,7 @@ def test_e2e_calibration_metadata_block_format(populated_cache, tmp_populations_
     )
 
     data = pyyaml.safe_load(tmp_populations_yaml.read_text())
-    meta = data["consent_default"]["calibration_metadata"]
+    meta = data["acn_workplace_baseline"]["calibration_metadata"]
     src = meta["source"]
     assert re.match(r"^calibration:acn_data_\d{4}_\d{4}_\d{8}$", src), src
     assert meta["dataset"] == "ACN-Data"
@@ -184,7 +184,7 @@ def test_e2e_calibration_handles_missing_token_with_cache(tmp_path, tmp_populati
     from v2b_syndata.calibration import calibrate_populations
     summary = calibrate_populations(
         populations_yaml_path=tmp_populations_yaml,
-        population_names=["consent_default"],
+        population_names=["acn_workplace_baseline"],
         sites=("caltech", "jpl", "office001"),
         year_start=2019, year_end=2021,
         cache_dir=cache,

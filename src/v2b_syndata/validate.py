@@ -415,10 +415,21 @@ def _check_g5_calibration_consistency(
         entry.get("source", "").startswith("calibration:")
         for entry in res.values()
     )
-    if has_calibration:
-        for name in sorted(declared_regions - calibrated_regions):
+    has_hand_specified = any(
+        entry.get("source", "").startswith("hand_specified:")
+        for entry in res.values()
+    )
+    missing = sorted(declared_regions - calibrated_regions)
+    if missing and has_calibration:
+        for name in missing:
             rep.warnings.append(
                 f"G5b: region {name!r} in axes_distribution lacks calibrated region_distributions"
+            )
+    if missing and has_hand_specified:
+        for name in missing:
+            rep.warnings.append(
+                f"G5c: region {name!r} in synthetic population lacks hand-authored "
+                f"region_distributions (will silently fall through to placeholder formulas)"
             )
 
 
@@ -498,7 +509,9 @@ def _check_i(rep: ValidationReport, output_dir: Path) -> dict[str, Any]:
 def _is_valid_source(src: str) -> bool:
     if src in ("explicit", "default"):
         return True
-    if src.startswith("descriptor:") or src.startswith("calibration:"):
+    if (src.startswith("descriptor:")
+            or src.startswith("calibration:")
+            or src.startswith("hand_specified:")):
         return True
     return False
 

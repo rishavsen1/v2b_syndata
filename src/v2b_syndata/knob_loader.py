@@ -223,7 +223,10 @@ def resolve_knobs(
             src = "explicit"
         elif path in descriptor_values:
             v, name = descriptor_values[path]
-            src = name if name.startswith("calibration:") else f"descriptor:{name}"
+            if name.startswith("calibration:") or name.startswith("hand_specified:"):
+                src = name
+            else:
+                src = f"descriptor:{name}"
         else:
             v = spec.get("default")
             src = "default"
@@ -250,7 +253,10 @@ def resolve_knobs(
             src = "explicit"
         else:
             v, name = descriptor_values[path]
-            src = name if name.startswith("calibration:") else f"descriptor:{name}"
+            if name.startswith("calibration:") or name.startswith("hand_specified:"):
+                src = name
+            else:
+                src = f"descriptor:{name}"
         v = _normalize(v)
         _check_deep_range(path, v)
         resolved.values[path] = KnobValue(value=float(v), source=src)

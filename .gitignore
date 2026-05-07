@@ -22,3 +22,4 @@ data/stations/
 .vscode/
 uv.lock
 graphify-out
+.claude
