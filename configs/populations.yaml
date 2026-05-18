@@ -360,3 +360,97 @@ visitor_heavy:
       dwell:       {k: 2.2, lambda: 8.0}        # ~8h workday
       soc_arrival: {alpha: 4.0, beta: 6.0}      # E≈0.40 — similar to office baseline
       copula:      {rho_gaussian: -0.2}
+
+# ──────────────────────────────────────────────────────────────────────────
+# Mid-low ψ: mixed-parking retail/office. Visitors + occasional employees
+# (1-2 days/week). Targets E[φ] ≈ 0.30. Bridges visitor_heavy and
+# consent_default.
+# ──────────────────────────────────────────────────────────────────────────
+occasional_commuter:
+  description: "Mixed parking — visitors + occasional employees (1-2 days/week)"
+  calibration_policy: synthetic
+
+  axes_distribution:
+    # Weighted-midpoint E[φ] = 0.20·0.125 + 0.75·0.35 + 0.05·0.20 = 0.298 ≈ 0.30 target.
+    # Concentration on irregular_employee drives the mid-low ψ aggregate.
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [3, 30],  weight: 0.20}
+    - {name: irregular_employee, freq: [0.20, 0.50], consist: [0.30, 0.70], dist_km: [10, 40], weight: 0.75}
+    - {name: erratic,            freq: [0.00, 0.40], consist: [0.00, 0.30], dist_km: [5, 50],  weight: 0.05}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]   # CONSENT survey baseline
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 30
+    battery_mix: [0.20, 0.30, 0.40, 0.10]       # [leaf_24, bolt_40, m3_75, rivian_100]
+    battery_heterogeneity: mixed
+
+  # Hand-authored region distributions.
+  region_distributions:
+    # occasional_visitor (weight 0.60): afternoon retail walk-ins.
+    occasional_visitor:
+      arrival:     {mu: 13.0, sigma: 3.0}       # afternoon-skewed visit times
+      dwell:       {k: 1.5, lambda: 2.0}        # short visits (~2h)
+      soc_arrival: {alpha: 5.0, beta: 4.0}      # E≈0.55 — less drained on arrival
+      copula:      {rho_gaussian: 0.0}
+    # irregular_employee (weight 0.35): part-time staff, 1-2 days/week.
+    irregular_employee:
+      arrival:     {mu: 10.0, sigma: 2.0}       # late-morning when they come
+      dwell:       {k: 1.8, lambda: 6.0}        # ~6h workday when present
+      soc_arrival: {alpha: 4.0, beta: 5.0}      # E≈0.44
+      copula:      {rho_gaussian: -0.15}
+    # erratic (weight 0.05): random walk-ins.
+    erratic:
+      arrival:     {mu: 11.0, sigma: 4.0}
+      dwell:       {k: 1.2, lambda: 3.0}
+      soc_arrival: {alpha: 3.0, beta: 5.0}
+      copula:      {rho_gaussian: 0.0}
+
+# ──────────────────────────────────────────────────────────────────────────
+# Mid-high ψ: hybrid post-2020 workforce. 2-3 days/week with moderate
+# arrival consistency. Targets E[φ] ≈ 0.55. Bridges consent_default and
+# stable_commuter_heavy.
+# ──────────────────────────────────────────────────────────────────────────
+flexible_workforce:
+  description: "Hybrid workforce (2-3 days/week with moderate timing consistency)"
+  calibration_policy: synthetic
+
+  axes_distribution:
+    # Weighted-midpoint E[φ] = 0.70·0.625 + 0.25·0.55 + 0.05·0.125 = 0.581 ≈ 0.55 target.
+    # hybrid_regular.freq upper bound nudged to 0.75 to lift the midpoint above
+    # the canonical 0.55 line; this is the small office contingent that comes
+    # in 3+ days/week in the hybrid model.
+    - {name: hybrid_regular,     freq: [0.50, 0.75], consist: [0.55, 0.85], dist_km: [10, 35], weight: 0.70}
+    - {name: hybrid_flexible,    freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [10, 40], weight: 0.25}
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [5, 25],  weight: 0.05}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 25
+    battery_mix: [0.10, 0.30, 0.45, 0.15]       # [leaf_24, bolt_40, m3_75, rivian_100] — premium-leaning
+    battery_heterogeneity: mixed
+
+  # Hand-authored region distributions.
+  region_distributions:
+    # hybrid_regular (weight 0.65): 2-3 days/week, tight 9 AM arrival, 8h day.
+    hybrid_regular:
+      arrival:     {mu: 9.0, sigma: 1.2}        # mid-morning, moderately tight
+      dwell:       {k: 2.0, lambda: 8.0}        # ~8h workday
+      soc_arrival: {alpha: 4.0, beta: 5.0}      # E≈0.44 — mid commute
+      copula:      {rho_gaussian: -0.25}        # early arrivers stay longer
+    # hybrid_flexible (weight 0.25): same days but variable arrival time.
+    hybrid_flexible:
+      arrival:     {mu: 10.0, sigma: 2.5}       # more spread, later average
+      dwell:       {k: 1.7, lambda: 7.0}        # ~7h, more variable
+      soc_arrival: {alpha: 4.0, beta: 5.0}
+      copula:      {rho_gaussian: -0.15}
+    # occasional_visitor (weight 0.10): non-employee floor.
+    occasional_visitor:
+      arrival:     {mu: 13.0, sigma: 3.0}
+      dwell:       {k: 1.5, lambda: 2.0}
+      soc_arrival: {alpha: 5.0, beta: 4.0}
+      copula:      {rho_gaussian: 0.0}

@@ -1,0 +1,13 @@
+# probe_occasional.yaml — verify occasional_commuter population
+scenario_id: probe_occasional
+description: "Probe: occasional_commuter mid-low ψ population"
+
+descriptors:
+  location:    nashville_tn
+  building:    medium_office_v1
+  population:  occasional_commuter
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  charging_infra.charger_count: 30   # ev_count=30

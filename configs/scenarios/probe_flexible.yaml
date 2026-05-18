@@ -1,0 +1,10 @@
+# probe_flexible.yaml — verify flexible_workforce population
+scenario_id: probe_flexible
+description: "Probe: flexible_workforce mid-high ψ population"
+
+descriptors:
+  location:    nashville_tn
+  building:    medium_office_v1
+  population:  flexible_workforce
+  equipment:   balanced_50pct
+  noise:       clean
