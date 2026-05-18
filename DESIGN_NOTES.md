@@ -337,3 +337,59 @@ based on policy. `knob_loader.resolve_knobs` accepts both prefixes verbatim
 when seen in the descriptor-supplied tuple. `validate.py::_is_valid_source`
 extended to accept `hand_specified:*`. New soft check G5c warns if a
 synthetic population emits hand_specified leaves for some regions but not all.
+
+## 25. Step 6: DR Poisson sampler implementation choices
+
+`samplers/dr_sampler.py` implements an inhomogeneous Poisson process via
+Lewis's thinning (D64). Calibration constants for CBP/BIP/ELRP are PG&E +
+CAISO-derived and hardcoded in the module (D70) — not loaded from external
+data files. Three judgement calls during implementation:
+
+1. **`_LAMBDA_FACTOR_MAX = 3.0`.** Upper-bound on the product of all four
+   per-factor multipliers (seasonal ≤ 1, dow ≤ 1, temp ≤ 3, tod ≤ 1).
+   Thinning needs an envelope; using the true max keeps acceptance rates
+   non-degenerate without inflating candidate density.
+
+2. **`_THINNING_FLOOR = 1e-6` events/hour.** When `lambda_base = 0` the
+   homogeneous candidate process would draw zero candidates and the sampler
+   would never terminate the gap-draw loop. Floor protects against that
+   without affecting retained events (rate at any actual instant still 0,
+   so the acceptance probability is exactly 0).
+
+3. **EPW weather pull on the renderer side.** `dr_events.py` calls
+   `get_weather_epw + parse_epw_temperatures` directly rather than reading
+   from a context cache. The EPW path is keyed off `building_load.tmyx_station`
+   which is already in the ctx via `ctx.knobs`. The DAG declares
+   `dr_events.csv` depends on `building_load.csv`, so by the time this
+   renderer fires the EPW is already in the local cache from the EnergyPlus
+   pipeline — no extra network fetch in real runs, no extra fetch for tests
+   on cached stations.
+
+## 26. Step 6: `dr_lambda_base` semantic + range change
+
+`utility_rate.dr_lambda_base` units corrected from events/day to events/hour
+(per D63: `λ_base × factors = events/hour`). Range widened from `[0, 1.0]`
+to `[0, 10.0]` so monthly-cap stress tests can drive λ_base above the
+canonical 0.05/hour without hitting the registry validator. Default 0.05
+unchanged (matches PG&E CBP empirical event density when factors=1).
+
+## 27. Step 6: `_NOTIF_LEAD_HOURS` ELRP correction
+
+The Step 3 stub had `ELRP=24` (matching CBP). D67 specifies ELRP=2h.
+Corrected in `renderers/dr_events.py::_NOTIF_LEAD_HOURS` and reflected
+in `PROGRAM_SPECS["ELRP"].notification_lead_hours`. Validate H8 now
+catches any deviation from the program-spec lead.
+
+## 28. Step 6: TMY year handling
+
+EPW files are typical-year (synthetic per-row year). `parse_epw_temperatures`
+overrides the EPW row year with the sim_window year so the returned index
+aligns with the sim window. Multi-year sim windows replicate the typical-year
+pattern shifted to each year. Documented in CALIBRATION_NOTES if a future
+DR sweep needs AMY weather (deferred to D37).
+
+## 29. Step 6: Sacramento TMYx ID correction
+
+Initial `configs/locations.yaml::sacramento_ca` had `tmyx_station:
+USA_CA_Sacramento.Intl.AP.724830_TMYx` (404 against climate.onebuilding.org).
+Correct ID is `_724839_` (Sacramento International airport WBAN). Fixed.

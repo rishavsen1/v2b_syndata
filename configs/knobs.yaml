@@ -245,9 +245,9 @@ utility_rate:
 
   dr_lambda_base:
     type: float
-    range: [0.0, 1.0]
+    range: [0.0, 10.0]
     default: 0.05
-    description: "Baseline daily Poisson rate (events/day) before seasonal/temp/dow modulation"
+    description: "Baseline Poisson rate (events/hour) before seasonal/temp/dow/tod modulation. Step 6: units corrected from events/day to events/hour per D63. Range widened to 10.0 to support sensitivity sweeps and cap-test scenarios."
     affects_csv: [dr_events.csv]
 
 # ──────────────────────────────────────────────────────────────────────────

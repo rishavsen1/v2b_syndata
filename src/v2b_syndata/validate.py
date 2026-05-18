@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 
 from .renderers.dr_events import _NOTIF_LEAD_HOURS
+from .samplers.dr_sampler import PROGRAM_SPECS
 
 # Schema reference — column name → expected dtype family.
 # Order is not enforced (per A2) but we validate columns are exactly these.
@@ -646,17 +647,44 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             rep.add(((dr["magnitude_kw"] >= mag_range[0]) & (dr["magnitude_kw"] <= mag_range[1])).all(),
                     f"H6: dr_events.magnitude_kw outside {mag_range}")
 
-    # C11: notification lead per program
+    # C11 / H8: notification lead per program
     if program in _NOTIF_LEAD_HOURS and len(dr) > 0:
         expected_lead = timedelta(hours=_NOTIF_LEAD_HOURS[program])
         starts = pd.to_datetime(dr["start"])
         notifs = pd.to_datetime(dr["notified_at"])
         leads = starts - notifs
-        # tolerance 1 minute
         tol = timedelta(minutes=1)
         bad = (leads - expected_lead).abs() > tol
         if bad.any():
-            rep.errors.append(f"C11: dr notification lead deviates from program {program}")
+            rep.errors.append(f"H8: dr notification lead deviates from program {program}")
+
+    # Step 6 H7: warn when DR is configured but produces zero events. Many
+    # combinations are legitimately zero (winter window for CBP/ELRP; cool TMY
+    # year for BIP). Soft warning only.
+    if program != "none" and program in PROGRAM_SPECS and len(dr) == 0:
+        sim_start = res.get("sim_window.start", {}).get("value")
+        rep.warnings.append(
+            f"H7: dr_program={program} but zero events. "
+            f"Check sim_window={sim_start!r} overlaps program season + has hot days."
+        )
+
+    # H9: per-month / per-season caps enforced.
+    if program in PROGRAM_SPECS and len(dr) > 0:
+        spec = PROGRAM_SPECS[program]
+        starts = pd.to_datetime(dr["start"])
+        per_month = starts.dt.to_period("M").value_counts()
+        over_monthly = per_month[per_month > spec.max_events_per_month]
+        for month, n in over_monthly.items():
+            rep.errors.append(
+                f"H9: program {program} month {month} has {n} events > cap {spec.max_events_per_month}"
+            )
+        if spec.max_events_per_season is not None:
+            per_year = starts.dt.year.value_counts()
+            over_seasonal = per_year[per_year > spec.max_events_per_season]
+            for year, n in over_seasonal.items():
+                rep.errors.append(
+                    f"H9: program {program} year {year} has {n} events > season cap {spec.max_events_per_season}"
+                )
 
 
 _S2_KS_THRESHOLD = 0.10

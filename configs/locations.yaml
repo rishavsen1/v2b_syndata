@@ -118,6 +118,22 @@ atlanta_ga:
     demand_charge_per_kw: 9.00
     dr_program: none
 
+sacramento_ca:
+  description: "Sacramento, CA — SMUD territory, hot summer, BIP-eligible"
+  climate: subtropical
+  weather:
+    lat: 38.5816
+    lon: -121.4944
+    year: 2020
+  tmyx_station: "USA_CA_Sacramento.Intl.AP.724839_TMYx"
+  tariff:
+    type: TOU
+    energy_price_offpeak: 0.120
+    energy_price_peak: 0.180
+    peak_window: [16, 21]
+    demand_charge_per_kw: 15.00
+    dr_program: BIP
+
 new_york_ny:
   description: "New York, NY — Con Edison commercial, temperate, summer-peaking, DR-active"
   climate: temperate

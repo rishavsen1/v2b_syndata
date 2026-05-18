@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
+import pandas as pd
 import requests
 
 from .exceptions import WeatherStationNotFound
@@ -125,3 +126,38 @@ def get_weather_epw(
     if cached.exists():
         return cached
     return _fetch_tmyx(tmyx_station, cached, fetcher=fetcher)
+
+
+def parse_epw_temperatures(
+    epw_path: Path, *, year: int = 2020,
+) -> pd.Series:
+    """Parse EPW dry-bulb temperature. Returns hourly °C series indexed by
+    datetime built from (month, day, hour) of each EPW row anchored to
+    `year` (TMY data has synthetic per-row years; we override for a stable index).
+
+    EPW format: 8 header lines, then 8760 hourly rows. Columns (0-indexed):
+      0:Year 1:Month 2:Day 3:Hour 4:Minute 5:Flags 6:DryBulb[°C] ...
+    Hour is 1-24 in EPW; remapped to 0-23 for pandas.
+    """
+    with Path(epw_path).open() as f:
+        for _ in range(8):
+            f.readline()  # skip headers
+        rows = []
+        for line in f:
+            parts = line.split(",")
+            if len(parts) < 7:
+                continue
+            try:
+                month = int(parts[1])
+                day = int(parts[2])
+                hour = int(parts[3]) - 1  # EPW 1-24 → 0-23
+                dry_bulb_c = float(parts[6])
+            except (ValueError, IndexError):
+                continue
+            rows.append((month, day, hour, dry_bulb_c))
+
+    df = pd.DataFrame(rows, columns=["month", "day", "hour", "temp_c"])
+    timestamps = pd.to_datetime(dict(
+        year=year, month=df["month"], day=df["day"], hour=df["hour"],
+    ))
+    return pd.Series(df["temp_c"].values, index=timestamps, name="dry_bulb_c")
