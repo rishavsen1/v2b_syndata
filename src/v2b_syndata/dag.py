@@ -17,7 +17,6 @@ from .types import ScenarioContext
 NODE_TOPOLOGY: list[tuple[str, list[str]]] = [
     # Tier 1 roots — exogenous bundles
     ("C", []),
-    ("W", []),
     ("A", []),
     ("S", []),
     ("O", []),
@@ -29,7 +28,7 @@ NODE_TOPOLOGY: list[tuple[str, list[str]]] = [
     ("A_user", ["U"]),
     ("A_fleet", ["F"]),
     # Tier 2 — latents
-    ("L_flex", ["A", "S", "W", "O"]),
+    ("L_flex", ["A", "S", "O"]),
     ("L_inflex", ["A", "S", "O"]),
     ("f_arr", ["A_user"]),
     ("f_dwell", ["A_user"]),
@@ -37,7 +36,7 @@ NODE_TOPOLOGY: list[tuple[str, list[str]]] = [
     # Tier 3 — renderers
     ("chargers.csv", ["X"]),
     ("grid_prices.csv", ["T"]),
-    ("dr_events.csv", ["T", "W", "C", "building_load.csv"]),
+    ("dr_events.csv", ["T", "C", "building_load.csv"]),
     ("users.csv", ["A_user"]),
     ("cars.csv", ["A_fleet"]),
     ("building_load.csv", ["L_flex", "L_inflex"]),

@@ -1,0 +1,23 @@
+# S_audit_baseline.yaml — high-capacity scenario for knob audit descriptor probing.
+#
+# Sized to accommodate every current population + equipment library entry:
+#   stable_commuter_heavy (40 EVs), consent_calibration_site (15 chargers),
+#   high_power_dcfc (8 chargers). charger_count is set well above the largest
+#   expected active-session peak so descriptor swaps don't trip E5 invariant.
+#
+# Used by tools/knob_audit.py for descriptor-swap probes that would otherwise
+# fail with "active_sessions > chargers" under S01's default 20 chargers.
+
+scenario_id: S_audit_baseline
+description: "High-capacity audit baseline: large office, 50 EVs, 60 chargers"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 50
+  charging_infra.charger_count: 60

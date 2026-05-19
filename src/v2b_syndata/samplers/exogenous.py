@@ -41,11 +41,6 @@ def _ensure_bundle(ctx: ScenarioContext) -> RootBundle:
         k = ctx.knobs
         ctx.roots = RootBundle(
             C=k.get("building_load.climate"),
-            W={
-                "lat": k.get("building_load.weather_lat"),
-                "lon": k.get("building_load.weather_lon"),
-                "year": k.get("building_load.weather_year"),
-            },
             A=k.get("building_load.archetype"),
             S=k.get("building_load.size"),
             O=k.get("building_load.occupancy_source"),
@@ -87,7 +82,6 @@ def _ensure_bundle(ctx: ScenarioContext) -> RootBundle:
 # topology requires a registered sampler per node, but Tier 1 roots are
 # deterministic packing only.
 def sample_C(ctx: ScenarioContext) -> None: _ensure_bundle(ctx)
-def sample_W(ctx: ScenarioContext) -> None: _ensure_bundle(ctx)
 def sample_A(ctx: ScenarioContext) -> None: _ensure_bundle(ctx)
 def sample_S(ctx: ScenarioContext) -> None: _ensure_bundle(ctx)
 def sample_O(ctx: ScenarioContext) -> None: _ensure_bundle(ctx)

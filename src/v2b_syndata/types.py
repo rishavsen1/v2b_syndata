@@ -35,7 +35,6 @@ class ResolvedKnobs:
 class RootBundle:
     """Tier 1 roots packed into a single struct."""
     C: str  # climate label
-    W: dict[str, Any]  # weather config (lat, lon, year)
     A: str  # archetype
     S: str  # size
     O: str  # occupancy_source  # noqa: E741

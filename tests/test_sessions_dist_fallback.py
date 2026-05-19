@@ -26,7 +26,6 @@ def _build_ctx(region_distributions: dict) -> ScenarioContext:
 
     roots = RootBundle(
         C="temperate",
-        W={"lat": 36.0, "lon": -86.0, "year": 2020},
         A="office", S="med", O="ashrae_90_1_office",
         T={"tariff_type": "TOU", "energy_price_offpeak": 0.137,
            "energy_price_peak": 0.178, "peak_window": [14, 19],

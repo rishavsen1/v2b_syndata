@@ -48,9 +48,6 @@ def expand_descriptors(
         raise KeyError(f"location descriptor {loc_name!r} not in locations.yaml")
     loc = locs[loc_name]
     out["building_load.climate"] = (loc["climate"], loc_name)
-    out["building_load.weather_lat"] = (loc["weather"]["lat"], loc_name)
-    out["building_load.weather_lon"] = (loc["weather"]["lon"], loc_name)
-    out["building_load.weather_year"] = (loc["weather"]["year"], loc_name)
     if "tmyx_station" in loc:
         out["building_load.tmyx_station"] = (loc["tmyx_station"], loc_name)
     t = loc["tariff"]

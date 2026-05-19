@@ -1,18 +1,13 @@
 # locations.yaml — Location descriptor library
 #
 # Each entry resolves into knobs:
-#   building_load.climate, building_load.weather_lat, weather_lon, weather_year,
-#     tmyx_station
+#   building_load.climate, building_load.tmyx_station
 #   utility_rate.tariff_type, energy_price_offpeak/peak, peak_window,
 #   demand_charge_per_kw, dr_program
 
 nashville_tn:
   description: "Nashville, TN — TVA territory, subtropical, low-cost commercial"
   climate: subtropical
-  weather:
-    lat: 36.1627
-    lon: -86.7816
-    year: 2020
   tmyx_station: "USA_TN_Nashville.Intl.AP.723270_TMYx"
   tariff:
     type: TOU
@@ -25,10 +20,6 @@ nashville_tn:
 san_jose_ca:
   description: "San Jose, CA — Silicon Valley Power, temperate, CONSENT calibration site"
   climate: temperate
-  weather:
-    lat: 37.3382
-    lon: -121.8863
-    year: 2020
   tmyx_station: "USA_CA_San.Jose-Mineta.Intl.AP.724945_TMYx"
   tariff:
     type: TOU
@@ -41,10 +32,6 @@ san_jose_ca:
 san_francisco_ca:
   description: "San Francisco, CA — PG&E commercial, temperate, CBP-eligible"
   climate: temperate
-  weather:
-    lat: 37.7749
-    lon: -122.4194
-    year: 2020
   tmyx_station: "USA_CA_San.Francisco.Intl.AP.724940_TMYx"
   tariff:
     type: demand_charge
@@ -57,10 +44,6 @@ san_francisco_ca:
 minneapolis_mn:
   description: "Minneapolis, MN — Xcel Energy, cold climate, winter-peaking"
   climate: cold
-  weather:
-    lat: 44.9778
-    lon: -93.2650
-    year: 2020
   tmyx_station: "USA_MN_Minneapolis-St.Paul.Intl.AP.726580_TMYx"
   tariff:
     type: TOU
@@ -73,10 +56,6 @@ minneapolis_mn:
 miami_fl:
   description: "Miami, FL — FPL, tropical, summer-peaking, DR-active utility"
   climate: tropical
-  weather:
-    lat: 25.7617
-    lon: -80.1918
-    year: 2020
   tmyx_station: "USA_FL_Miami.Natl.Hurricane.Center.722020_TMYx"
   tariff:
     type: DR
@@ -89,10 +68,6 @@ miami_fl:
 houston_tx:
   description: "Houston, TX — CenterPoint, subtropical, summer-peaking"
   climate: subtropical
-  weather:
-    lat: 29.7604
-    lon: -95.3698
-    year: 2020
   tmyx_station: "USA_TX_Houston-Bush.Intercontinental.AP.722430_TMYx"
   tariff:
     type: TOU
@@ -105,10 +80,6 @@ houston_tx:
 atlanta_ga:
   description: "Atlanta, GA — Georgia Power, temperate, mixed-season"
   climate: temperate
-  weather:
-    lat: 33.7490
-    lon: -84.3880
-    year: 2020
   tmyx_station: "USA_GA_Atlanta-Hartsfield-Jackson.Intl.AP.722190_TMYx"
   tariff:
     type: TOU
@@ -121,10 +92,6 @@ atlanta_ga:
 sacramento_ca:
   description: "Sacramento, CA — SMUD territory, hot summer, BIP-eligible"
   climate: subtropical
-  weather:
-    lat: 38.5816
-    lon: -121.4944
-    year: 2020
   tmyx_station: "USA_CA_Sacramento.Intl.AP.724839_TMYx"
   tariff:
     type: TOU
@@ -137,10 +104,6 @@ sacramento_ca:
 new_york_ny:
   description: "New York, NY — Con Edison commercial, temperate, summer-peaking, DR-active"
   climate: temperate
-  weather:
-    lat: 40.7128
-    lon: -74.0060
-    year: 2020
   tmyx_station: "USA_NY_New.York-LaGuardia.AP.725030_TMYx"
   tariff:
     type: DR

@@ -17,7 +17,6 @@ _BASE_LIBS = {
     "locations.yaml": """
 test_loc:
   climate: temperate
-  weather: {lat: 36.0, lon: -86.0, year: 2020}
   tariff:
     type: TOU
     energy_price_offpeak: 0.137

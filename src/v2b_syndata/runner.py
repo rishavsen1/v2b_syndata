@@ -35,7 +35,6 @@ DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. Se
 def build_registry() -> SamplerRegistry:
     reg = SamplerRegistry()
     reg.register("C", exogenous.sample_C)
-    reg.register("W", exogenous.sample_W)
     reg.register("A", exogenous.sample_A)
     reg.register("S", exogenous.sample_S)
     reg.register("O", exogenous.sample_O)

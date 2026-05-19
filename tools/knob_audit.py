@@ -46,7 +46,19 @@ DR_DEPENDENT_KNOBS = {
     "utility_rate.dr_program",
     "noise.dr_notification_dropout_prob",
     "noise.profile",  # dr-jitter / price-jitter only present in adversarial
+    "sim_window.mode",  # needs DR-enabled baseline to exercise dr_events.csv leg
 }
+
+# Multi-seed probe paths — DR-event dropout is probabilistic; single-seed probe
+# can miss legitimate effect. Union changed-CSVs across this many seeds.
+MULTI_SEED_PATHS = {
+    "noise.profile": 10,
+}
+
+# Baseline scenario for descriptor swap probes — high-capacity scenario so
+# stable_commuter_heavy / consent_calibration_site / high_power_dcfc don't
+# trip E5 against S01's default 20-charger headroom.
+DESCRIPTOR_BASELINE = "S_audit_baseline"
 
 # Categorical knobs whose alternates are environmentally heavy (e.g. building
 # rerun); we test only one alternate to keep S1 budget low.
@@ -161,7 +173,7 @@ def parse_deep_channel(populations_yaml: Path, region_source: str = "consent_def
     return out
 
 
-def parse_descriptors(config_dir: Path, base_scenario: str = DEFAULT_SCENARIO) -> list[KnobSpec]:
+def parse_descriptors(config_dir: Path, base_scenario: str = DESCRIPTOR_BASELINE) -> list[KnobSpec]:
     """Each non-default descriptor library entry becomes a descriptor-swap probe.
 
     Skip the descriptor that matches the base scenario's current value (would be
@@ -194,6 +206,7 @@ def parse_descriptors(config_dir: Path, base_scenario: str = DEFAULT_SCENARIO) -
                 affects_csv=[],  # no formal declaration; verdict via NO-DECLARATION path
                 is_descriptor=True,
                 descriptor_kind=kind,
+                baseline_scenario=base_scenario,
             ))
     return out
 
@@ -337,6 +350,7 @@ def run_scenario(
     overrides: dict[str, Any],
     out_dir: Path,
     config_dir: Path,
+    seed: int = DEFAULT_SEED,
 ) -> tuple[bool, str | None]:
     """Invoke runner.generate via subprocess so failures isolate cleanly."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -345,7 +359,7 @@ def run_scenario(
         "--config-dir", str(config_dir),
         "generate",
         "--scenario", scenario,
-        "--seed", str(DEFAULT_SEED),
+        "--seed", str(seed),
         "--output-dir", str(out_dir),
     ]
     for k, v in overrides.items():
@@ -454,7 +468,12 @@ def stage1(args: argparse.Namespace) -> int:
 
     # Baselines per scenario
     baselines: dict[str, dict[str, str]] = {}
-    for scen in {s.baseline_scenario for s in knobs_specs} | {DEFAULT_SCENARIO}:
+    needed_baselines = (
+        {s.baseline_scenario for s in knobs_specs}
+        | {s.baseline_scenario for s in desc_specs}
+        | {DEFAULT_SCENARIO}
+    )
+    for scen in needed_baselines:
         out = audit_root / f"baseline_{scen}"
         if out.exists():
             shutil.rmtree(out)
@@ -495,30 +514,54 @@ def stage1(args: argparse.Namespace) -> int:
                 shutil.rmtree(probe_dir)
             if spec.is_descriptor:
                 scen_id = make_descriptor_scenario(
-                    audit_cfg, DEFAULT_SCENARIO, spec.descriptor_kind, value
+                    audit_cfg, spec.baseline_scenario, spec.descriptor_kind, value
                 )
-                ok, err = run_scenario(scen_id, {}, probe_dir, audit_cfg)
+                ok, err = run_scenario(scen_id, {}, probe_dir, audit_cfg, seed=DEFAULT_SEED)
                 scen_used = scen_id
+                base_key = spec.baseline_scenario
             else:
                 ok, err = run_scenario(
-                    spec.baseline_scenario, {spec.path: value}, probe_dir, audit_cfg
+                    spec.baseline_scenario, {spec.path: value}, probe_dir, audit_cfg, seed=DEFAULT_SEED
                 )
                 scen_used = spec.baseline_scenario
+                base_key = spec.baseline_scenario
             elapsed = time.time() - t_probe
             if ok:
                 probe_hash = hash_outputs(probe_dir)
-                base_for_scen = baselines[scen_used] if scen_used in baselines else baselines[spec.baseline_scenario]
-                changed = diff_hashes(base_for_scen, probe_hash)
+                base_for_scen = baselines[base_key]
+                changed = set(diff_hashes(base_for_scen, probe_hash))
             else:
-                changed = []
+                changed = set()
+            # Free disk before next probe
+            if probe_dir.exists():
+                shutil.rmtree(probe_dir)
+            # Multi-seed union for probabilistic-effect knobs.
+            extra_seeds = MULTI_SEED_PATHS.get(spec.path, 1) - 1
+            for s_idx in range(extra_seeds):
+                seed_alt = DEFAULT_SEED + 1 + s_idx
+                probe_dir2 = audit_root / f"probe_{i}_{label}_s{seed_alt}"
+                if probe_dir2.exists():
+                    shutil.rmtree(probe_dir2)
+                # Multi-seed baseline (different seed → different baseline hash too)
+                # Use a per-seed baseline; reuse if cached.
+                base_seed_dir = audit_root / f"baseline_{base_key}_s{seed_alt}"
+                if not base_seed_dir.exists():
+                    run_scenario(base_key, {}, base_seed_dir, audit_cfg, seed=seed_alt)
+                base_seed_hash = hash_outputs(base_seed_dir)
+                if spec.is_descriptor:
+                    ok2, _ = run_scenario(scen_id, {}, probe_dir2, audit_cfg, seed=seed_alt)
+                else:
+                    ok2, _ = run_scenario(spec.baseline_scenario, {spec.path: value},
+                                          probe_dir2, audit_cfg, seed=seed_alt)
+                if ok2:
+                    changed |= set(diff_hashes(base_seed_hash, hash_outputs(probe_dir2)))
+                if probe_dir2.exists():
+                    shutil.rmtree(probe_dir2)
             probes.append(ProbeResult(
                 knob_path=spec.path, probe_label=label, probe_value=value,
                 scenario=scen_used, success=ok, error=err,
-                changed_csvs=changed, elapsed_s=elapsed,
+                changed_csvs=sorted(changed), elapsed_s=elapsed,
             ))
-            # Free disk
-            if probe_dir.exists():
-                shutil.rmtree(probe_dir)
 
         verdict, note = classify(spec, probes)
         union_changes = sorted({c for p in probes for c in p.changed_csvs})
@@ -629,55 +672,11 @@ def emit_stage1_report(verdicts: list[KnobVerdict], path: Path, elapsed: float) 
             note = v.note.replace("|", "/").replace("\n", " ")[:160]
             lines.append(f"| `{v.knob_path}` | {kind} | {decl} | {obs} | {note} |\n")
 
-    # Per-knob diagnosis for under-coupled findings (hand-curated).
-    UNDER_COUPLED_DIAGNOSIS = {
-        "building_load.climate":
-            "DECLARATION FIX. Description in knobs.yaml says 'Climate label (categorical, "
-            "used for indexing). Weather W carries actual signal.' → label-only knob; "
-            "set affects_csv: []. Current 'building_load.csv' declaration is aspirational, "
-            "not real.",
-        "building_load.weather_lat":
-            "PIPELINE LEGACY. NASAPower lat/lon predated TMYx pipeline (D37). EnergyPlus now "
-            "drives building_load.csv via `tmyx_station`. Either: (a) remove these three knobs, "
-            "or (b) re-declare affects_csv=[] and document as 'stub/future'. Currently dead.",
-        "building_load.weather_lon": "See weather_lat — same legacy issue.",
-        "building_load.weather_year":
-            "Same legacy issue. Anchor year is currently used only for sim window indexing "
-            "(sim_window picks April YYYY); EPW year is the TMYx file's own year.",
-        "building_load.occupancy_source":
-            "PARTIAL EFFECT. Occupancy schedule swap changes EnergyPlus output (✓ building_load) "
-            "but sessions.csv unchanged. Either: (a) sessions don't actually consume occupancy "
-            "signal (likely — occupancy modulates building load, not session arrival times), or "
-            "(b) modulation pathway dropped. Verify samplers/per_entity.py — if (a), update "
-            "affects_csv to [building_load.csv].",
-        "utility_rate.tariff_type":
-            "DECLARATION FIX. dr_events.csv is driven by `dr_program`, not `tariff_type`. Probe "
-            "TOU→flat changes grid_prices.csv (✓) but not DR events. Set affects_csv: "
-            "[grid_prices.csv] only.",
-        "sim_window.mode":
-            "EXPECTED MISS. Probe under S01 has dr_program=none so dr_events.csv is empty in "
-            "both baseline and probe; cannot observe sim_window effect on DR. The knob DOES "
-            "affect dr_events scheduling under any dr-enabled scenario (proven indirectly via "
-            "S_dr_cbp). Optional: re-probe sim_window.mode under S_dr_cbp for the dr_events "
-            "leg, OR drop dr_events.csv from affects_csv when no DR program is active "
-            "(but that's conditional — leave as-is).",
-        "noise.profile":
-            "PROBABILISTIC MISS. Probe is `adversarial` under S_dr_cbp baseline. "
-            "dr_notification_dropout_prob=0.10 may produce zero drops on a small event count "
-            "(P(0|n≈8) ≈ 0.43). Re-run with seed sweep to confirm coverage. Not a real bug.",
-    }
-    OVER_COUPLED_DIAGNOSIS = {
-        "ev_fleet.battery_mix":
-            "Expected coupling — sessions reference per-car capacity for SoC accounting. "
-            "Cross-effect on sessions.csv is physically correct. Update declaration to "
-            "[cars.csv, sessions.csv].",
-        "ev_fleet.battery_heterogeneity": "Same as battery_mix — declaration should include sessions.csv.",
-        "charging_infra.uni_rate_kw":
-            "Investigate: chargers.csv carries rate, but sessions.csv shouldn't reference it "
-            "directly. May be RNG-stream coupling (different charger order changes session "
-            "RNG draws). Verify in seeding.py.",
-        "charging_infra.bi_rate_kw": "Same as uni_rate_kw — investigate RNG coupling.",
-    }
+    # Per-knob diagnosis for findings the Stage 1 fix pass did not eliminate.
+    # Add entries here as new issues surface; leave empty when all findings are
+    # already resolved by knobs.yaml declarations or pipeline edits.
+    UNDER_COUPLED_DIAGNOSIS: dict[str, str] = {}
+    OVER_COUPLED_DIAGNOSIS: dict[str, str] = {}
 
     # Recommendations
     lines.append("\n## Recommendations\n")

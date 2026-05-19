@@ -239,3 +239,25 @@ sim_window months. For E8 analysis, separate ExteriorLights from
 InteriorLights+Equipment if isolating occupancy effect. Otherwise
 treat inflex as climate-coupled via daylight hours.
 
+
+## #12 (Step 7 audit) — D5 rejection couples battery/charger-rate → sessions
+
+`sessions.py:168-173` enforces D5 reachability (`required_kwh ≤ available_kwh`)
+via rejection sampling. Threshold uses `max(charger_rate)` and `car.capacity_kwh`,
+so changing either shifts the rejection rate, which shifts RNG consumption
+within the per-car sessions stream, which produces different session realizations.
+
+Per-node seeding (`seeding.seed_for_car`) prevents cross-renderer RNG bleed.
+Within-stream consumption shifts under different feasibility thresholds are
+inherent to the rejection scheme.
+
+Architectural by design. `affects_csv` declarations updated to include
+`sessions.csv` for:
+- `ev_fleet.battery_mix`
+- `ev_fleet.battery_heterogeneity`
+- `charging_infra.uni_rate_kw`
+- `charging_infra.bi_rate_kw`
+
+Implication for E4 experiments: when varying charger rates, sessions will
+differ. Aggregate over multiple seeds and treat session variation as
+within-condition noise.

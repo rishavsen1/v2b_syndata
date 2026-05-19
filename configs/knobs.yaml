@@ -30,14 +30,15 @@ ev_fleet:
     type: simplex
     components: [leaf_24, bolt_40, m3_75, rivian_100]
     default: [0.20, 0.30, 0.40, 0.10]
-    description: "Battery class distribution. Capacities: 24, 40, 75, 100 kWh."
-    affects_csv: [cars.csv]
+    description: "Battery class distribution. Capacities: 24, 40, 75, 100 kWh. Capacity flows to D5 reachability check at sessions.py:170 — couples to sessions.csv via rejection sampling."
+    affects_csv: [cars.csv, sessions.csv]
 
   battery_heterogeneity:
     type: categorical
     choices: [homog, mixed]
     default: mixed
-    affects_csv: [cars.csv]
+    description: "Per-car capacity variance mode. Couples to sessions via D5 rejection sampling (see battery_mix)."
+    affects_csv: [cars.csv, sessions.csv]
 
 # ──────────────────────────────────────────────────────────────────────────
 # Bucket 2: Charging Infrastructure
@@ -61,14 +62,15 @@ charging_infra:
     type: float
     range: [3.3, 350.0]
     default: 20.0
-    affects_csv: [chargers.csv]
+    description: "Max kW for unidirectional chargers. Gates D5 reachability at sessions.py:168-173 — couples to sessions.csv via rejection sampling."
+    affects_csv: [chargers.csv, sessions.csv]
 
   bi_rate_kw:
     type: float
     range: [3.3, 350.0]
     default: 20.0
-    description: "Symmetric ± rate for bidirectional chargers"
-    affects_csv: [chargers.csv]
+    description: "Symmetric ± rate for bidirectional chargers. Same D5 coupling as uni_rate_kw."
+    affects_csv: [chargers.csv, sessions.csv]
 
 # ──────────────────────────────────────────────────────────────────────────
 # Bucket 3: User Behavior (axis-based, per D24)
@@ -133,29 +135,8 @@ building_load:
     type: categorical
     choices: [temperate, cold, tropical, subtropical]
     default: temperate
-    description: "Climate label (categorical, used for indexing). Weather W carries actual signal."
-    affects_csv: [building_load.csv]
-
-  weather_lat:
-    type: float
-    range: [-90.0, 90.0]
-    default: 36.1627
-    description: "NASAPower weather latitude (default: Nashville, TN)"
-    affects_csv: [building_load.csv, dr_events.csv]
-
-  weather_lon:
-    type: float
-    range: [-180.0, 180.0]
-    default: -86.7816
-    description: "NASAPower weather longitude"
-    affects_csv: [building_load.csv, dr_events.csv]
-
-  weather_year:
-    type: int
-    range: [1990, 2024]
-    default: 2020
-    description: "Anchor year used for sim window indexing. AMY support is a stub (D37)."
-    affects_csv: [building_load.csv, dr_events.csv]
+    description: "Climate label (categorical, used for indexing only — no pipeline effect; tmyx_station drives weather)."
+    affects_csv: []
 
   tmyx_station:
     type: path
@@ -181,8 +162,8 @@ building_load:
     type: categorical
     choices: [ashrae_90_1_office, ashrae_90_1_retail, ashrae_90_1_mixed, custom_path]
     default: ashrae_90_1_office
-    description: "Base occupancy schedule. Modulated by EV-user pipeline downstream."
-    affects_csv: [building_load.csv, sessions.csv]
+    description: "Base occupancy schedule. Modulates EnergyPlus building load only; sessions are population-driven (D24)."
+    affects_csv: [building_load.csv]
 
   peak_kw:
     type: float
@@ -200,7 +181,8 @@ utility_rate:
     type: categorical
     choices: [flat, TOU, demand_charge, DR]
     default: TOU
-    affects_csv: [grid_prices.csv, dr_events.csv]
+    description: "Energy-tariff schema. DR events are gated by dr_program, not tariff_type."
+    affects_csv: [grid_prices.csv]
 
   energy_price_offpeak:
     type: float
