@@ -42,3 +42,12 @@ adversarial:
   dr_notification_dropout_prob: 0.10
   price_jitter_pct: 0.05
   occupancy_jitter_pct: 0.25
+
+custom:
+  description: "All-zero baseline; user supplies individual noise.* overrides explicitly. Matches knobs.yaml::noise.profile choice 'custom'."
+  building_load_jitter_pct: 0.0
+  arrival_time_jitter_min: 0.0
+  soc_arrival_jitter_pct: 0.0
+  dr_notification_dropout_prob: 0.0
+  price_jitter_pct: 0.0
+  occupancy_jitter_pct: 0.0

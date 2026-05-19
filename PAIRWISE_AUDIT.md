@@ -1,25 +1,29 @@
 # Pairwise Interaction Audit (V3)
-Generated: 2026-05-19T17:02:01
+Generated: 2026-05-19T17:20:31
 Pairs sampled: 50 (seeded random.seed=42)
-Total elapsed: 208.6s
+Total elapsed: 218.6s
 
 ## Summary
 | Verdict | Count |
 |---|---|
-| ✅ LINEAR | 42 |
+| ✅ LINEAR | 44 |
 | ⚠️ MILDLY_NONLINEAR | 1 |
-| ⚠️ MODERATELY_NONLINEAR | 1 |
+| ⚠️ MODERATELY_NONLINEAR | 2 |
 | ❌ STRONGLY_NONLINEAR | 0 |
 | 🔄 SIGN_FLIP | 0 |
 | 🟡 UNINFORMATIVE | 3 |
-| 💥 ERROR | 3 |
+| 💥 ERROR | 0 |
 | **TOTAL** | **50** |
 
-## ⚠️ MODERATELY_NONLINEAR (1 pairs)
+## ⚠️ MODERATELY_NONLINEAR (2 pairs)
 
 ### `building_load.peak_kw` × `noise.building_load_jitter_pct`
 - Scenario: `S01` · val_a=`5000.0` val_b=`0.5`
 - **building_load.csv** (flex_var) MODERATELY_NONLINEAR: d_a=245397.025401, d_b=760.593691, d_both=321456.394542, expected_linear=246157.619093, nonlinearity=0.3059
+
+### `utility_rate.dr_program` × `noise.dr_notification_dropout_prob`
+- Scenario: `S_dr_cbp` · val_a=`ELRP` val_b=`1.0`
+- **dr_events.csv** (lead_hr) MODERATELY_NONLINEAR: d_a=-22.0, d_b=-24.0, d_both=-24.0, expected_linear=-46.0, nonlinearity=0.4783
 
 ## ⚠️ MILDLY_NONLINEAR (1 pairs)
 
@@ -27,7 +31,7 @@ Total elapsed: 208.6s
 |---|---|---|
 | `ev_fleet.ev_count` × `noise.arrival_time_jitter_min` | S_audit_baseline | 0.181 (sessions.csv) |
 
-## ✅ LINEAR (42 pairs)
+## ✅ LINEAR (44 pairs)
 
 | pair | scenario | worst nonlinearity (csv) |
 |---|---|---|
@@ -36,6 +40,7 @@ Total elapsed: 208.6s
 | `utility_rate.peak_window` × `user_behavior.region_distributions.erratic.dwell.lambda` | S01 | 0.000 (grid_prices.csv) |
 | `utility_rate.energy_price_offpeak` × `user_behavior.region_distributions.stable_commuter.dwell.lambda` | S01 | 0.000 (grid_prices.csv) |
 | `building_load.peak_kw` × `user_behavior.region_distributions.flexible_local.copula.rho_gaussian` | S01 | 0.000 (building_load.csv) |
+| `user_behavior.w_multiplier` × `sim_window.mode` | S_dr_cbp | 0.000 (users.csv) |
 | `charging_infra.bi_rate_kw` × `user_behavior.region_distributions.flexible_local.copula.rho_gaussian` | S01 | 0.003 (sessions.csv) |
 | `charging_infra.uni_rate_kw` × `user_behavior.region_distributions.flexible_local.dwell.lambda` | S01 | 0.005 (sessions.csv) |
 | `user_behavior.region_distributions.stable_commuter.dwell.lambda` × `user_behavior.region_distributions.irregular_distant.dwell.lambda` | S01 | 0.000 (sessions.csv) |
@@ -53,6 +58,7 @@ Total elapsed: 208.6s
 | `user_behavior.region_distributions.stable_commuter.dwell.lambda` × `user_behavior.region_distributions.irregular_distant.copula.rho_gaussian` | S01 | 0.000 (sessions.csv) |
 | `noise.building_load_jitter_pct` × `noise.dr_notification_dropout_prob` | S_dr_cbp | 0.000 (building_load.csv) |
 | `building_load.occupancy_source` × `user_behavior.region_distributions.erratic.dwell.lambda` | S01 | 0.000 (building_load.csv) |
+| `noise.profile` × `user_behavior.region_distributions.occasional_visitor.arrival.sigma` | S_dr_cbp | 0.000 (building_load.csv) |
 | `charging_infra.bi_rate_kw` × `user_behavior.region_distributions.flexible_local.soc_arrival.beta` | S01 | 0.015 (sessions.csv) |
 | `charging_infra.uni_rate_kw` × `user_behavior.region_distributions.erratic.soc_arrival.beta` | S01 | 0.057 (sessions.csv) |
 | `noise.price_jitter_pct` × `user_behavior.region_distributions.flexible_local.dwell.lambda` | S01 | 0.000 (grid_prices.csv) |
@@ -82,14 +88,10 @@ Total elapsed: 208.6s
 | `user_behavior.min_depart_soc` × `user_behavior.region_distributions.stable_commuter.arrival.mu` | S01 | 0.000 (sessions.csv) |
 | `ev_fleet.battery_heterogeneity` × `user_behavior.region_distributions.occasional_visitor.copula.rho_gaussian` | S01 | 0.000 (cars.csv) |
 
-## 💥 ERROR (3 pairs)
-- `user_behavior.w_multiplier` × `sim_window.mode` (S_dr_cbp): generation failed
-- `utility_rate.dr_program` × `noise.dr_notification_dropout_prob` (S_dr_cbp): generation failed
-- `noise.profile` × `user_behavior.region_distributions.occasional_visitor.arrival.sigma` (S_dr_cbp): generation failed
-
 ## Top 10 nonlinear interactions (any CSV)
 | nonlinearity | knob_a | knob_b | csv | metric | verdict |
 |---|---|---|---|---|---|
+| 0.478 | `utility_rate.dr_program` | `noise.dr_notification_dropout_prob` | dr_events.csv | lead_hr | MODERATELY_NONLINEAR |
 | 0.306 | `building_load.peak_kw` | `noise.building_load_jitter_pct` | building_load.csv | flex_var | MODERATELY_NONLINEAR |
 | 0.181 | `ev_fleet.ev_count` | `noise.arrival_time_jitter_min` | sessions.csv | arr_var | MILDLY_NONLINEAR |
 | 0.088 | `ev_fleet.battery_mix` | `user_behavior.region_distributions.erratic.copula.rho_gaussian` | sessions.csv | erratic/copula.rho_gaussian | LINEAR |
@@ -99,7 +101,6 @@ Total elapsed: 208.6s
 | 0.015 | `charging_infra.bi_rate_kw` | `user_behavior.region_distributions.flexible_local.soc_arrival.beta` | sessions.csv | flexible_local/soc_arrival.beta | LINEAR |
 | 0.005 | `charging_infra.uni_rate_kw` | `user_behavior.region_distributions.flexible_local.dwell.lambda` | sessions.csv | flexible_local/dwell.lambda | LINEAR |
 | 0.003 | `building_load.peak_kw` | `noise.building_load_jitter_pct` | building_load.csv | flex_mean | LINEAR |
-| 0.003 | `charging_infra.bi_rate_kw` | `user_behavior.region_distributions.flexible_local.copula.rho_gaussian` | sessions.csv | flexible_local/copula.rho_gaussian | LINEAR |
 
 ## Verdict
 - ✅ No STRONGLY_NONLINEAR or SIGN_FLIP findings. Proceed to V4.

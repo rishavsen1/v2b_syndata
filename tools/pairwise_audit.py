@@ -195,15 +195,25 @@ class PairResult:
 
 
 def _generate_outputs(scenario: str, overrides: dict[str, Any],
-                      out_dir: Path, audit_cfg: Path) -> dict[str, Any] | None:
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    ok, err = knob_audit.run_scenario(scenario, overrides, out_dir, audit_cfg)
-    if not (out_dir / "sessions.csv").exists():
-        return None
-    dfs = knob_audit._load_outputs(out_dir)
-    shutil.rmtree(out_dir, ignore_errors=True)
-    return dfs
+                      out_dir: Path, audit_cfg: Path,
+                      retries: int = 2) -> tuple[dict[str, Any] | None, str | None]:
+    """Run scenario, load CSVs, clean up. Returns (dfs_or_None, error_or_None).
+
+    Retries once on subprocess failure — V3 hit non-deterministic flakes
+    under load (subprocess returned nonzero rc + missing sessions.csv even
+    though standalone reproduction succeeded 5/5 trials). Likely
+    EnergyPlus-cache / disk / signal noise from concurrent test runs."""
+    last_err: str | None = None
+    for attempt in range(retries + 1):
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
+        ok, err = knob_audit.run_scenario(scenario, overrides, out_dir, audit_cfg)
+        if (out_dir / "sessions.csv").exists():
+            dfs = knob_audit._load_outputs(out_dir)
+            shutil.rmtree(out_dir, ignore_errors=True)
+            return dfs, None
+        last_err = err or "sessions.csv missing"
+    return None, f"after {retries + 1} attempts: {last_err}"
 
 
 def main():
@@ -244,18 +254,28 @@ def main():
 
         try:
             if scen not in baseline_dfs:
-                baseline_dfs[scen] = _generate_outputs(scen, {**extras}, audit_root / f"base_{scen}", audit_cfg)
+                dfs_b, err_b = _generate_outputs(scen, {**extras},
+                                                 audit_root / f"base_{scen}", audit_cfg)
+                baseline_dfs[scen] = dfs_b
+                if dfs_b is None:
+                    raise RuntimeError(f"baseline {scen}: {err_b}")
             base = baseline_dfs[scen]
-            only_a = _generate_outputs(scen, {**extras, path_a: val_a},
-                                       audit_root / f"a_{i}", audit_cfg)
-            only_b = _generate_outputs(scen, {**extras, path_b: val_b},
-                                       audit_root / f"b_{i}", audit_cfg)
-            both = _generate_outputs(scen, {**extras, path_a: val_a, path_b: val_b},
-                                     audit_root / f"ab_{i}", audit_cfg)
-            if base is None or only_a is None or only_b is None or both is None:
+            only_a, err_a = _generate_outputs(
+                scen, {**extras, path_a: val_a}, audit_root / f"a_{i}", audit_cfg)
+            only_b, err_bb = _generate_outputs(
+                scen, {**extras, path_b: val_b}, audit_root / f"b_{i}", audit_cfg)
+            both, err_ab = _generate_outputs(
+                scen, {**extras, path_a: val_a, path_b: val_b},
+                audit_root / f"ab_{i}", audit_cfg)
+            fails = []
+            if only_a is None: fails.append(f"only-A: {err_a}")
+            if only_b is None: fails.append(f"only-B: {err_bb}")
+            if both is None: fails.append(f"both: {err_ab}")
+            if fails:
+                msg = "; ".join(fails)
                 results.append(PairResult(path_a, path_b, val_a, val_b, scen,
-                                          csv_results=[], error="generation failed"))
-                print(f"[{i+1}/{len(sample)}] {path_a} × {path_b}: GEN-FAIL")
+                                          csv_results=[], error=msg))
+                print(f"[{i+1}/{len(sample)}] {path_a} × {path_b}: GEN-FAIL {msg[:80]}")
                 continue
 
             csv_results = []
