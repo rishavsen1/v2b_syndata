@@ -1,0 +1,446 @@
+{
+  "csv_row_counts": {
+    "building_load": 2880,
+    "cars": 20,
+    "chargers": 20,
+    "dr_events": 0,
+    "grid_prices": 2880,
+    "sessions": 319,
+    "users": 20
+  },
+  "csv_sha256": {
+    "building_load": "718d65670d1704bbd63be3879930acd06d4387a49161212b26820a7cc4618cef",
+    "cars": "7a8c3e2ea392d4550cf03a1048cbce6f4e099f740aa32fb40c2291cd414efa41",
+    "chargers": "358213e771254b62d45439ce1f6b1919347caa5c5c2f8379ab43b76db6224735",
+    "dr_events": "7014a79d1b53db365d20de033893064ef19fd5b10a7ed2ac789ca62c8c5b57cd",
+    "grid_prices": "5227136b4e1fd1a27f21ac0369a76648aeed74cc7d9504a22681b39990adb062",
+    "sessions": "086e2c269a63740ca1d4ecaf43fba1bcce0bd5814b889b800aa866ca90043510",
+    "users": "6df4aabcc07eb62efffd5cc30f34c47cc77ed127840a9f147ad069226284a638"
+  },
+  "e5": {
+    "infeasible": false,
+    "infeasible_tick_count": 0,
+    "infeasible_tick_fraction": 0.0,
+    "n_chargers": 20,
+    "realized_max_concurrent": 16,
+    "total_tick_count": 2880
+  },
+  "generated_at": "2026-05-19T22:55:43.098719Z",
+  "generator_git_sha": "3dd97fc94b5c5f36ff0dc1da8f7167247f4cb03b",
+  "generator_version": "0.1.0",
+  "knob_overrides": {},
+  "knob_resolution": {
+    "building_load.archetype": {
+      "source": "descriptor:medium_office_v1",
+      "value": "office"
+    },
+    "building_load.climate": {
+      "source": "descriptor:nashville_tn",
+      "value": "subtropical"
+    },
+    "building_load.occupancy_source": {
+      "source": "descriptor:medium_office_v1",
+      "value": "ashrae_90_1_office"
+    },
+    "building_load.peak_kw": {
+      "source": "descriptor:medium_office_v1",
+      "value": 500.0
+    },
+    "building_load.size": {
+      "source": "descriptor:medium_office_v1",
+      "value": "med"
+    },
+    "building_load.tmyx_station": {
+      "source": "descriptor:nashville_tn",
+      "value": "USA_TN_Nashville.Intl.AP.723270_TMYx"
+    },
+    "charging_infra.bi_rate_kw": {
+      "source": "descriptor:balanced_50pct",
+      "value": 20.0
+    },
+    "charging_infra.charger_count": {
+      "source": "descriptor:balanced_50pct",
+      "value": 20
+    },
+    "charging_infra.directionality_frac": {
+      "source": "descriptor:balanced_50pct",
+      "value": 0.5
+    },
+    "charging_infra.uni_rate_kw": {
+      "source": "descriptor:balanced_50pct",
+      "value": 20.0
+    },
+    "ev_fleet.battery_heterogeneity": {
+      "source": "descriptor:consent_default",
+      "value": "mixed"
+    },
+    "ev_fleet.battery_mix": {
+      "source": "descriptor:consent_default",
+      "value": [
+        0.2,
+        0.3,
+        0.4,
+        0.1
+      ]
+    },
+    "ev_fleet.ev_count": {
+      "source": "descriptor:consent_default",
+      "value": 20
+    },
+    "noise.arrival_time_jitter_min": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "noise.building_load_jitter_pct": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "noise.dr_notification_dropout_prob": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "noise.occupancy_jitter_pct": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "noise.price_jitter_pct": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "noise.profile": {
+      "source": "descriptor:clean",
+      "value": "clean"
+    },
+    "noise.soc_arrival_jitter_pct": {
+      "source": "descriptor:clean",
+      "value": 0.0
+    },
+    "sim_window.custom_end": {
+      "source": "default",
+      "value": null
+    },
+    "sim_window.mode": {
+      "source": "default",
+      "value": "month"
+    },
+    "sim_window.start": {
+      "source": "default",
+      "value": null
+    },
+    "sim_window.weekdays_only": {
+      "source": "default",
+      "value": true
+    },
+    "user_behavior.axes_distribution": {
+      "source": "descriptor:consent_default",
+      "value": [
+        {
+          "consist": [
+            0.75,
+            1.0
+          ],
+          "dist_km": [
+            40,
+            80
+          ],
+          "freq": [
+            0.85,
+            1.0
+          ],
+          "name": "stable_commuter",
+          "weight": 0.35
+        },
+        {
+          "consist": [
+            0.5,
+            0.8
+          ],
+          "dist_km": [
+            5,
+            15
+          ],
+          "freq": [
+            0.7,
+            0.95
+          ],
+          "name": "flexible_local",
+          "weight": 0.25
+        },
+        {
+          "consist": [
+            0.2,
+            0.5
+          ],
+          "dist_km": [
+            40,
+            100
+          ],
+          "freq": [
+            0.4,
+            0.7
+          ],
+          "name": "irregular_distant",
+          "weight": 0.2
+        },
+        {
+          "consist": [
+            0.1,
+            0.4
+          ],
+          "dist_km": [
+            3,
+            50
+          ],
+          "freq": [
+            0.05,
+            0.2
+          ],
+          "name": "occasional_visitor",
+          "weight": 0.1
+        },
+        {
+          "consist": [
+            0.05,
+            0.3
+          ],
+          "dist_km": [
+            5,
+            80
+          ],
+          "freq": [
+            0.3,
+            0.7
+          ],
+          "name": "erratic",
+          "weight": 0.1
+        }
+      ]
+    },
+    "user_behavior.external_charge_cost": {
+      "source": "default",
+      "value": 0.3
+    },
+    "user_behavior.menu_levels": {
+      "source": "default",
+      "value": [
+        [
+          0.0,
+          0
+        ],
+        [
+          0.0625,
+          30
+        ],
+        [
+          0.1,
+          15
+        ],
+        [
+          0.2,
+          105
+        ]
+      ]
+    },
+    "user_behavior.min_depart_soc": {
+      "source": "default",
+      "value": 0.8
+    },
+    "user_behavior.negotiation_mix": {
+      "source": "descriptor:consent_default",
+      "value": [
+        0.107,
+        0.536,
+        0.321,
+        0.036
+      ]
+    },
+    "user_behavior.region_distributions.erratic.arrival.mu": {
+      "source": "hand_specified:consent_default",
+      "value": 11.0
+    },
+    "user_behavior.region_distributions.erratic.arrival.sigma": {
+      "source": "hand_specified:consent_default",
+      "value": 4.0
+    },
+    "user_behavior.region_distributions.erratic.copula.rho_gaussian": {
+      "source": "hand_specified:consent_default",
+      "value": 0.0
+    },
+    "user_behavior.region_distributions.erratic.dwell.k": {
+      "source": "hand_specified:consent_default",
+      "value": 1.2
+    },
+    "user_behavior.region_distributions.erratic.dwell.lambda": {
+      "source": "hand_specified:consent_default",
+      "value": 3.0
+    },
+    "user_behavior.region_distributions.erratic.soc_arrival.alpha": {
+      "source": "hand_specified:consent_default",
+      "value": 3.0
+    },
+    "user_behavior.region_distributions.erratic.soc_arrival.beta": {
+      "source": "hand_specified:consent_default",
+      "value": 5.0
+    },
+    "user_behavior.region_distributions.flexible_local.arrival.mu": {
+      "source": "hand_specified:consent_default",
+      "value": 9.5
+    },
+    "user_behavior.region_distributions.flexible_local.arrival.sigma": {
+      "source": "hand_specified:consent_default",
+      "value": 1.5
+    },
+    "user_behavior.region_distributions.flexible_local.copula.rho_gaussian": {
+      "source": "hand_specified:consent_default",
+      "value": -0.2
+    },
+    "user_behavior.region_distributions.flexible_local.dwell.k": {
+      "source": "hand_specified:consent_default",
+      "value": 1.8
+    },
+    "user_behavior.region_distributions.flexible_local.dwell.lambda": {
+      "source": "hand_specified:consent_default",
+      "value": 6.5
+    },
+    "user_behavior.region_distributions.flexible_local.soc_arrival.alpha": {
+      "source": "hand_specified:consent_default",
+      "value": 5.0
+    },
+    "user_behavior.region_distributions.flexible_local.soc_arrival.beta": {
+      "source": "hand_specified:consent_default",
+      "value": 5.0
+    },
+    "user_behavior.region_distributions.irregular_distant.arrival.mu": {
+      "source": "hand_specified:consent_default",
+      "value": 10.0
+    },
+    "user_behavior.region_distributions.irregular_distant.arrival.sigma": {
+      "source": "hand_specified:consent_default",
+      "value": 2.5
+    },
+    "user_behavior.region_distributions.irregular_distant.copula.rho_gaussian": {
+      "source": "hand_specified:consent_default",
+      "value": -0.1
+    },
+    "user_behavior.region_distributions.irregular_distant.dwell.k": {
+      "source": "hand_specified:consent_default",
+      "value": 1.5
+    },
+    "user_behavior.region_distributions.irregular_distant.dwell.lambda": {
+      "source": "hand_specified:consent_default",
+      "value": 4.0
+    },
+    "user_behavior.region_distributions.irregular_distant.soc_arrival.alpha": {
+      "source": "hand_specified:consent_default",
+      "value": 3.0
+    },
+    "user_behavior.region_distributions.irregular_distant.soc_arrival.beta": {
+      "source": "hand_specified:consent_default",
+      "value": 7.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.arrival.mu": {
+      "source": "hand_specified:consent_default",
+      "value": 13.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.arrival.sigma": {
+      "source": "hand_specified:consent_default",
+      "value": 3.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.copula.rho_gaussian": {
+      "source": "hand_specified:consent_default",
+      "value": 0.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.dwell.k": {
+      "source": "hand_specified:consent_default",
+      "value": 1.5
+    },
+    "user_behavior.region_distributions.occasional_visitor.dwell.lambda": {
+      "source": "hand_specified:consent_default",
+      "value": 2.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.soc_arrival.alpha": {
+      "source": "hand_specified:consent_default",
+      "value": 4.0
+    },
+    "user_behavior.region_distributions.occasional_visitor.soc_arrival.beta": {
+      "source": "hand_specified:consent_default",
+      "value": 4.0
+    },
+    "user_behavior.region_distributions.stable_commuter.arrival.mu": {
+      "source": "hand_specified:consent_default",
+      "value": 8.5
+    },
+    "user_behavior.region_distributions.stable_commuter.arrival.sigma": {
+      "source": "hand_specified:consent_default",
+      "value": 0.8
+    },
+    "user_behavior.region_distributions.stable_commuter.copula.rho_gaussian": {
+      "source": "hand_specified:consent_default",
+      "value": -0.3
+    },
+    "user_behavior.region_distributions.stable_commuter.dwell.k": {
+      "source": "hand_specified:consent_default",
+      "value": 2.2
+    },
+    "user_behavior.region_distributions.stable_commuter.dwell.lambda": {
+      "source": "hand_specified:consent_default",
+      "value": 9.0
+    },
+    "user_behavior.region_distributions.stable_commuter.soc_arrival.alpha": {
+      "source": "hand_specified:consent_default",
+      "value": 4.0
+    },
+    "user_behavior.region_distributions.stable_commuter.soc_arrival.beta": {
+      "source": "hand_specified:consent_default",
+      "value": 6.0
+    },
+    "user_behavior.w_multiplier": {
+      "source": "descriptor:consent_default",
+      "value": [
+        1.0,
+        1.0
+      ]
+    },
+    "utility_rate.demand_charge_per_kw": {
+      "source": "descriptor:nashville_tn",
+      "value": 8.5
+    },
+    "utility_rate.dr_lambda_base": {
+      "source": "default",
+      "value": 0.05
+    },
+    "utility_rate.dr_magnitude_kw_range": {
+      "source": "default",
+      "value": [
+        50.0,
+        200.0
+      ]
+    },
+    "utility_rate.dr_program": {
+      "source": "descriptor:nashville_tn",
+      "value": "none"
+    },
+    "utility_rate.energy_price_offpeak": {
+      "source": "descriptor:nashville_tn",
+      "value": 0.085
+    },
+    "utility_rate.energy_price_peak": {
+      "source": "descriptor:nashville_tn",
+      "value": 0.135
+    },
+    "utility_rate.peak_window": {
+      "source": "descriptor:nashville_tn",
+      "value": [
+        14,
+        19
+      ]
+    },
+    "utility_rate.tariff_type": {
+      "source": "descriptor:nashville_tn",
+      "value": "TOU"
+    }
+  },
+  "noise_profile": "clean",
+  "scenario_id": "S01",
+  "seed": 42
+}
