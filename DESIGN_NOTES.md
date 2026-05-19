@@ -393,3 +393,74 @@ DR sweep needs AMY weather (deferred to D37).
 Initial `configs/locations.yaml::sacramento_ca` had `tmyx_station:
 USA_CA_Sacramento.Intl.AP.724830_TMYx` (404 against climate.onebuilding.org).
 Correct ID is `_724839_` (Sacramento International airport WBAN). Fixed.
+
+## 30. E5 (concurrent active ≤ chargers) is a validator-only invariant
+
+Surfaced in V2 stress test: `S_audit_baseline` (50 EVs) + 1 charger
+produces 486 sessions; 1375 of 2852 15-min ticks have active > 1
+(max concurrent = 26). Sampler enforces D5 (energy reachability) only;
+sessions are sampled per-car independently with no concurrent-occupancy
+tracking.
+
+**Current contract:**
+- Sampler enforces: D-class (per-session physics, energy reachability).
+- Validator enforces: E5 (cross-session concurrency over rendered output).
+
+**Implication:** under-sized scenarios (fleet ≫ chargers) silently
+produce unphysical CSVs that fail validation. Users must size charger
+pools to match fleet.
+
+**Decision pending (Rishav):**
+- **Option B (current, recommended):** keep sampler per-car-independent;
+  validator surfaces E5 as scenario infeasibility. Cheap;
+  calibration-friendly; preserves D53 reproducibility.
+- **Option A:** add session-level rejection that tracks concurrent
+  occupancy. Realistic data but breaks per-car independence + adds
+  RNG-ordering coupling.
+- **Hybrid (preferred):** add `cli feasibility-check` that pre-warns
+  on (fleet:charger:rate) mismatches, plus a manifest field
+  `realized_max_concurrent` so users see the issue at generation time
+  rather than at validation. Sampler stays simple.
+
+See `EDGE_CASE_REPORT.md` for the quantified violation distribution.
+
+## 31. noise.py C4 + D6 jitter bound bugs (V2)
+
+Two real bugs surfaced in V2 deep-dive on `noise.py`:
+
+### C4 — arrival shift can exceed departure
+`noise.arrival_time_jitter_min=60.0` produces shifts that can push
+`new_arrival > departure` (departure stays fixed). Negative
+`duration_sec`. Violates C4 (arrival < departure).
+
+**Fix proposal:** clip per-row shift to `(departure − arrival − 60s)`:
+```python
+max_forward_shift = (deps - arrivals).dt.total_seconds().astype(int) - 60
+shifts_sec = np.minimum(shifts_sec, max_forward_shift)
+```
+
+### D6 — soc jitter can push arrival_soc past required_soc
+`noise.soc_arrival_jitter_pct=0.30` shifts arrival_soc additively
+followed by B3 per-car clamp to `[min_allowed_soc, max_allowed_soc]`.
+But no clamp against per-session `required_soc_at_depart`. Jittered
+`arrival_soc` can exceed `required_soc`, violating D6 (need > have).
+
+**Fix proposal:** after the B3 clamp, also clip arrival_soc to
+`required_soc - ε`:
+```python
+required = df["required_soc_at_depart"].to_numpy()
+df["arrival_soc"] = np.minimum(df["arrival_soc"].to_numpy(), required - 0.1)
+```
+
+### D5 (downstream of C4)
+D5 fires under arrival_time_jitter because shifted arrival changes
+overlap/energy window. Resolves once C4 fix bounds the shift.
+
+### H2 (price_jitter) — LEGITIMATE noise contract
+`noise.price_jitter_pct` perturbs grid prices → H2 (peak/offpeak
+match configured) fails. Validator's H2 is noiseless-contract;
+correct behavior. CLI auto-validate already skips when any jitter
+is non-zero (cli.py:38). No fix needed.
+
+Both noise bugs proposed in `EDGE_CASE_REPORT.md` "Pre-V3 deep-dive
+findings". **Not yet applied** — pending confirmation from Rishav.
