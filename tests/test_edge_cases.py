@@ -107,11 +107,16 @@ _EMPTY_CSV_OK: set[tuple] = {
 }
 
 _VALIDATION_MAY_FAIL: set[tuple] = {
-    _key("noise.soc_arrival_jitter_pct", 0.30),
-    _key("noise.arrival_time_jitter_min", 60.0),
-    _key("noise.building_load_jitter_pct", 0.50),
-    _key("noise.occupancy_jitter_pct", 0.30),
+    # Noise that perturbs configured-value invariants — design-time contract.
+    # price_jitter changes grid prices (H2 asserts they match configured peak/offpeak).
     _key("noise.price_jitter_pct", 0.30),
+    # arrival jitter can still create infeasible D5 conditions (changed
+    # overlap windows). C4 is preserved (DESIGN_NOTES #31 fix); D5 isn't.
+    _key("noise.arrival_time_jitter_min", 60.0),
+    # soc_arrival jitter no longer breaks D6 (DESIGN_NOTES #31 fix), but
+    # large additive noise on arrival_soc can still produce D5 (energy
+    # need > avail) when arrival_soc gets clamped down hard.
+    _key("noise.soc_arrival_jitter_pct", 0.30),
     # ev_count=1: single sample can't satisfy F4/F5 region/share invariants.
     _key("ev_fleet.ev_count", 1),
     # negotiation_mix collapsed to one type: F1/F2 type-share invariants fail.

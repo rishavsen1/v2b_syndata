@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
+from .e5_metrics import InfeasibilityError
 from .knob_loader import all_knob_paths, load_knob_registry, parse_overrides
 from .runner import generate
 from .validate import validate
@@ -22,14 +23,19 @@ load_dotenv(REPO_ROOT / ".env", override=False)
 
 def cmd_generate(args: argparse.Namespace) -> int:
     cli_overrides = parse_overrides(args.override or [])
-    manifest = generate(
-        scenario_id=args.scenario,
-        seed=args.seed,
-        output_dir=Path(args.output_dir),
-        config_dir=Path(args.config_dir),
-        cli_overrides=cli_overrides,
-        noise_profile_override=args.noise_profile,
-    )
+    try:
+        manifest = generate(
+            scenario_id=args.scenario,
+            seed=args.seed,
+            output_dir=Path(args.output_dir),
+            config_dir=Path(args.config_dir),
+            cli_overrides=cli_overrides,
+            noise_profile_override=args.noise_profile,
+            strict_e5=args.strict_e5,
+        )
+    except InfeasibilityError as e:
+        print(f"E5 STRICT ERROR: {e}", file=sys.stderr)
+        return 2
     print(f"generated {manifest['scenario_id']} seed={manifest['seed']} -> {args.output_dir}")
     # Auto-validate only when no perturbation was actually applied. Per-jitter
     # knobs are authoritative — checking profile name alone misses cases where
@@ -195,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="knob override 'bucket.knob=value' (repeatable). YAML-parsed.")
     g.add_argument("--noise-profile", default=None,
                    help="override scenario's noise descriptor")
+    g.add_argument("--strict-e5", action="store_true",
+                   help="Treat E5 infeasibility as an error (rc=2) rather than warning.")
     g.set_defaults(func=cmd_generate)
 
     v = sub.add_parser("validate", help="validate an output directory")

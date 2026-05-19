@@ -410,57 +410,68 @@ tracking.
 produce unphysical CSVs that fail validation. Users must size charger
 pools to match fleet.
 
-**Decision pending (Rishav):**
-- **Option B (current, recommended):** keep sampler per-car-independent;
-  validator surfaces E5 as scenario infeasibility. Cheap;
-  calibration-friendly; preserves D53 reproducibility.
-- **Option A:** add session-level rejection that tracks concurrent
-  occupancy. Realistic data but breaks per-car independence + adds
-  RNG-ordering coupling.
-- **Hybrid (preferred):** add `cli feasibility-check` that pre-warns
-  on (fleet:charger:rate) mismatches, plus a manifest field
-  `realized_max_concurrent` so users see the issue at generation time
-  rather than at validation. Sampler stays simple.
+**Decision (applied, V2-followup):** **Hybrid.** Sampler stays
+per-car-independent. `runner.generate()` now computes realized concurrency
+post-noise and emits:
 
-See `EDGE_CASE_REPORT.md` for the quantified violation distribution.
+1. `logging.WARNING` when `realized_max_concurrent > n_chargers`.
+2. `manifest["e5"]` block with fields `{realized_max_concurrent,
+   n_chargers, infeasible, infeasible_tick_count, total_tick_count,
+   infeasible_tick_fraction}`.
+3. `cli generate --strict-e5` flag promotes the warning to
+   `InfeasibilityError` (rc=2). CSVs + manifest are still written before
+   the raise so the failed scenario stays inspectable.
 
-## 31. noise.py C4 + D6 jitter bound bugs (V2)
+Implementation in `src/v2b_syndata/e5_metrics.py` (vectorized tick sweep
++ `E5Report` dataclass + `InfeasibilityError`). Sampler architecture and
+D53 reproducibility unchanged — metrics derive from rendered output, not
+from the RNG path.
 
-Two real bugs surfaced in V2 deep-dive on `noise.py`:
+See `EDGE_CASE_REPORT.md` for the quantified violation distribution that
+motivated this design.
 
-### C4 — arrival shift can exceed departure
-`noise.arrival_time_jitter_min=60.0` produces shifts that can push
-`new_arrival > departure` (departure stays fixed). Negative
-`duration_sec`. Violates C4 (arrival < departure).
+## 31. noise.py C4 + D6 jitter bound fixes (V2-followup, applied)
 
-**Fix proposal:** clip per-row shift to `(departure − arrival − 60s)`:
+Both V2 bugs are now fixed in `src/v2b_syndata/noise.py`:
+
+### C4 — bidirectional arrival-jitter bound
+At top of `noise.py`:
 ```python
-max_forward_shift = (deps - arrivals).dt.total_seconds().astype(int) - 60
-shifts_sec = np.minimum(shifts_sec, max_forward_shift)
+_MIN_SESSION_DURATION_SEC = 15 * 60  # one grid tick
 ```
+In the arrival-jitter block:
+```python
+max_forward = (deps - arrivals).dt.total_seconds().astype(int) - _MIN_SESSION_DURATION_SEC
+shifts_sec = np.minimum(shifts_sec, max_forward.to_numpy())
+min_backward = (sim_start_ts - arrivals).dt.total_seconds().astype(int)
+shifts_sec = np.maximum(shifts_sec, min_backward.to_numpy())
+```
+Forward bound preserves C4 (arrival < departure − 15 min). Backward bound
+keeps arrival within sim window. Test:
+`tests/test_noise_fixes.py::test_jitter_preserves_temporal_ordering` +
+`test_jitter_keeps_sessions_in_window`.
 
-### D6 — soc jitter can push arrival_soc past required_soc
-`noise.soc_arrival_jitter_pct=0.30` shifts arrival_soc additively
-followed by B3 per-car clamp to `[min_allowed_soc, max_allowed_soc]`.
-But no clamp against per-session `required_soc_at_depart`. Jittered
-`arrival_soc` can exceed `required_soc`, violating D6 (need > have).
-
-**Fix proposal:** after the B3 clamp, also clip arrival_soc to
-`required_soc - ε`:
+### D6 — soc jitter clamped against required + floor
+After existing B3 per-car SoC-range clamp:
 ```python
 required = df["required_soc_at_depart"].to_numpy()
-df["arrival_soc"] = np.minimum(df["arrival_soc"].to_numpy(), required - 0.1)
+cars = ctx.rendered["cars.csv"]
+min_floor_lookup = dict(zip(cars["car_id"].to_numpy(), cars["min_allowed_soc"].to_numpy()))
+min_floor = np.array([min_floor_lookup[c] for c in df["car_id"].to_numpy()])
+df["arrival_soc"] = np.maximum(
+    min_floor,
+    np.minimum(df["arrival_soc"].to_numpy(), required - 0.1),
+)
 ```
+The 0.1 SoC-percent gap keeps the strict `arrival_soc < required_soc`
+inequality demanded by D6. Test:
+`tests/test_noise_fixes.py::test_soc_jitter_preserves_d6`.
 
-### D5 (downstream of C4)
-D5 fires under arrival_time_jitter because shifted arrival changes
-overlap/energy window. Resolves once C4 fix bounds the shift.
+### D5 (arrival jitter side effect, accepted)
+Even with C4 fixed, shifted arrivals change per-car overlap windows and
+energy budgets. D5 (energy reachability) may still fire at max
+arrival_time_jitter. Documented in V2 boundary `_VALIDATION_MAY_FAIL`.
 
-### H2 (price_jitter) — LEGITIMATE noise contract
-`noise.price_jitter_pct` perturbs grid prices → H2 (peak/offpeak
-match configured) fails. Validator's H2 is noiseless-contract;
-correct behavior. CLI auto-validate already skips when any jitter
-is non-zero (cli.py:38). No fix needed.
-
-Both noise bugs proposed in `EDGE_CASE_REPORT.md` "Pre-V3 deep-dive
-findings". **Not yet applied** — pending confirmation from Rishav.
+### H2 (price_jitter, LEGITIMATE)
+Unchanged — H2 is the noiseless contract; CLI auto-validate already
+skips when any jitter > 0 (`cli.py:38`). No fix.

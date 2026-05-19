@@ -12,6 +12,8 @@ import pandas as pd
 from .seeding import rng_for_node
 from .types import ScenarioContext
 
+_MIN_SESSION_DURATION_SEC = 15 * 60  # 15 min — matches building_load grid resolution
+
 
 def _all_zero(d: dict[str, float]) -> bool:
     return all(float(v) == 0.0 for v in d.values())
@@ -63,10 +65,16 @@ def apply_noise(ctx: ScenarioContext) -> None:
                 # → C6 mismatch on validate.
                 shifts_sec = np.round(rng.normal(0.0, t_jit, size=len(df)) * 60.0).astype(int)
                 arrivals = pd.to_datetime(df["arrival"])
+                deps = pd.to_datetime(df["departure"])
+                # Forward bound — keep departure - new_arrival >= 15 minutes.
+                max_forward = (deps - arrivals).dt.total_seconds().astype(int) - _MIN_SESSION_DURATION_SEC
+                shifts_sec = np.minimum(shifts_sec, max_forward.to_numpy())
+                # Backward bound — keep new_arrival >= sim_window.start.
+                sim_start_ts = pd.Timestamp(ctx.sim_start)
+                min_backward = (sim_start_ts - arrivals).dt.total_seconds().astype(int)
+                shifts_sec = np.maximum(shifts_sec, min_backward.to_numpy())
                 new_arrivals = arrivals + pd.to_timedelta(shifts_sec, unit="s")
                 df["arrival"] = new_arrivals.dt.strftime("%Y-%m-%d %H:%M:%S")
-                # Departure stays fixed in seconds; duration_sec is the exact int delta.
-                deps = pd.to_datetime(df["departure"])
                 df["duration_sec"] = (deps - new_arrivals).dt.total_seconds().astype(int)
             if s_jit > 0:
                 additive = rng.normal(0.0, s_jit * 100.0, size=len(df))
@@ -82,6 +90,17 @@ def apply_noise(ctx: ScenarioContext) -> None:
                 lo = np.array([bounds[int(c)]["min_allowed_soc"] for c in car_ids])
                 hi = np.array([bounds[int(c)]["max_allowed_soc"] for c in car_ids])
                 df["arrival_soc"] = np.clip(jittered, lo, hi)
+                # D6 preservation: arrival_soc must stay strictly below required_soc_at_depart.
+                # Also re-enforce the per-car min_allowed_soc floor in case the B3 clamp was
+                # done before this knob's interaction. Use min_allowed_soc from cars.csv.
+                required = df["required_soc_at_depart"].to_numpy()
+                cars = ctx.rendered["cars.csv"]
+                min_floor_lookup = dict(zip(cars["car_id"].to_numpy(), cars["min_allowed_soc"].to_numpy()))
+                min_floor = np.array([min_floor_lookup[c] for c in df["car_id"].to_numpy()])
+                df["arrival_soc"] = np.maximum(
+                    min_floor,
+                    np.minimum(df["arrival_soc"].to_numpy(), required - 0.1),
+                )
         ctx.rendered["sessions.csv"] = df
 
     if float(n.get("dr_notification_dropout_prob", 0.0)) > 0:

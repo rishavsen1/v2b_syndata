@@ -7,6 +7,8 @@ manifest, and validates.
 from __future__ import annotations
 
 import calendar
+import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ import pandas as pd
 from . import noise as noise_mod
 from .dag import SamplerRegistry, build_graph
 from .descriptor_loader import expand_descriptors, load_scenario
+from .e5_metrics import InfeasibilityError, compute_concurrency
 from .knob_loader import _normalize, load_knob_registry, resolve_knobs
 from .manifest import CSV_NAMES, write_manifest
 from .renderers import building_load as r_building_load
@@ -28,6 +31,8 @@ from .renderers import users as r_users
 from .samplers import exogenous, per_entity, sessions_dist
 from .samplers import load as load_sampler
 from .types import ResolvedKnobs, ScenarioContext
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. See DESIGN_NOTES §1.
 
@@ -98,6 +103,7 @@ def generate(
     config_dir: Path,
     cli_overrides: dict[str, Any] | None = None,
     noise_profile_override: str | None = None,
+    strict_e5: bool = False,
 ) -> dict[str, Any]:
     """Run end-to-end generation. Returns the manifest dict."""
     # Normalize so direct-API callers can pass dates / tuples — keeps the
@@ -150,6 +156,23 @@ def generate(
 
     noise_mod.apply_noise(ctx)
 
+    # E5 hybrid enforcement: compute realized concurrency before writing CSVs
+    # so we can warn/error at generation time rather than waiting on validate.
+    e5 = compute_concurrency(
+        ctx.rendered["sessions.csv"],
+        ctx.sim_start, ctx.sim_end,
+        n_chargers=len(ctx.rendered["chargers.csv"]),
+    )
+    if e5.infeasible:
+        logger.warning(
+            "E5 infeasibility: realized max concurrent sessions %d > chargers %d. "
+            "%d/%d ticks affected (%.1f%%). Generation continues; resize fleet/chargers "
+            "for physical realism.",
+            e5.realized_max_concurrent, e5.n_chargers,
+            e5.infeasible_tick_count, e5.total_tick_count,
+            e5.infeasible_tick_fraction * 100,
+        )
+
     # Write CSVs in deterministic order.
     for name in CSV_NAMES:
         df = ctx.rendered[f"{name}.csv"]
@@ -164,4 +187,24 @@ def generate(
         cli_overrides=cli_overrides,
         noise_profile=ctx.noise_profile_name,
     )
+    # Augment manifest with E5 metrics + re-serialize.
+    manifest["e5"] = {
+        "realized_max_concurrent": e5.realized_max_concurrent,
+        "n_chargers": e5.n_chargers,
+        "infeasible": bool(e5.infeasible),
+        "infeasible_tick_count": e5.infeasible_tick_count,
+        "total_tick_count": e5.total_tick_count,
+        "infeasible_tick_fraction": e5.infeasible_tick_fraction,
+    }
+    (output_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    )
+
+    if strict_e5 and e5.infeasible:
+        raise InfeasibilityError(
+            f"E5 infeasibility: realized max concurrent sessions "
+            f"{e5.realized_max_concurrent} > chargers {e5.n_chargers} "
+            f"({e5.infeasible_tick_count}/{e5.total_tick_count} ticks affected)."
+        )
+
     return manifest

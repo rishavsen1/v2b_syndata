@@ -261,3 +261,55 @@ Architectural by design. `affects_csv` declarations updated to include
 Implication for E4 experiments: when varying charger rates, sessions will
 differ. Aggregate over multiple seeds and treat session variation as
 within-condition noise.
+
+## #13 — Noise jitter bounds preserve C4 + D6 invariants
+
+After V2 V2-followup, `noise.py` jitter implementations enforce
+physical-ordering invariants under any noise level:
+
+- **`arrival_time_jitter_min`**: per-row shift is bounded both ways. Forward
+  bound keeps `departure − new_arrival ≥ 15 min` (one grid tick). Backward
+  bound keeps `new_arrival ≥ sim_window.start`. Both preserved via
+  `np.maximum(np.minimum(...))` on the integer shift_sec array. C4 (arrival <
+  departure) cannot fail under this jitter.
+
+- **`soc_arrival_jitter_pct`**: after the B3 per-car SoC-range clamp, an
+  additional clamp enforces `min_allowed_soc ≤ arrival_soc ≤ required_soc -
+  0.1`. D6 (required > arrival) and the per-car physical floor are both
+  preserved.
+
+- **`price_jitter_pct`**: NOT bounded — H2 (peak/offpeak match configured)
+  is intentionally noise-breakable per D25. CLI auto-validate is skipped
+  when any jitter > 0 (`cli.py:38`), so the H2 fail mode never surfaces in
+  default workflows.
+
+- **D5 (arrival_time_jitter side effect)**: shifted arrival changes
+  per-car energy budget; D5 can still fire at max jitter. Documented as
+  noise contract, not a bug.
+
+See `EDGE_CASE_REPORT.md` "Pre-V3 deep-dive findings" + `DESIGN_NOTES.md
+#31` for the full diagnosis and patch.
+
+## #14 — E5 hybrid enforcement at generation time
+
+The sessions sampler enforces D5 (per-session reachability) only. E5
+(concurrent active ≤ chargers) is a fleet-level constraint that would
+couple per-car streams; the sampler stays per-car-independent.
+
+Per Step 7 V2-followup, generation now surfaces E5 infeasibility at
+generation time (before validation) via:
+
+- `src/v2b_syndata/e5_metrics.py::compute_concurrency()` — vectorized
+  15-min tick sweep over rendered sessions.
+- `runner.generate()` writes `manifest["e5"]` with fields
+  `{realized_max_concurrent, n_chargers, infeasible, infeasible_tick_count,
+  total_tick_count, infeasible_tick_fraction}`.
+- `runner.generate()` emits `logging.WARNING` when `infeasible=True`.
+- CLI `--strict-e5` promotes the warning to `InfeasibilityError`
+  (rc=2). CSVs + manifest are still written before the raise so the
+  failed scenario remains inspectable.
+
+Sampler architecture unchanged. Reproducibility (D53) unchanged — E5
+metrics are derived from rendered output, not from the RNG path.
+
+See `DESIGN_NOTES.md #30` for the architectural rationale.

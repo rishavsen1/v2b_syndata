@@ -226,14 +226,20 @@ Recommendation: **adopt Hybrid**. Keeps sampler simple; surfaces
 infeasibility at generation time rather than only at validation;
 allows users to opt out for stress-testing or calibration scenarios.
 
-## Recommendation for V3
+## V2-followup status (applied)
 
-Two real bugs surfaced: **C4 under arrival_time_jitter** and
-**D6 under soc_arrival_jitter**. Both are in `noise.py` and have
-proposed fixes (not yet applied). Holding for confirmation.
+Both jitter fixes and E5 hybrid enforcement landed; see DESIGN_NOTES
+#30 + #31 and CALIBRATION_NOTES #13 + #14.
 
-E5 question is architectural — needs decision from Rishav before V3.
+| Item | Status |
+|---|---|
+| C4 jitter bound (`noise.py`) | ✅ applied; 15-min forward + sim_start backward |
+| D6 jitter bound (`noise.py`) | ✅ applied; clamp arrival_soc to [min_floor, required−0.1] |
+| E5 hybrid: warning + manifest + --strict-e5 | ✅ applied; `e5_metrics.py` + runner + CLI |
+| D5 under arrival_jitter | ⚠️ unchanged (side effect of shifted overlap windows); kept in skip set |
+| H2 under price_jitter | ⚠️ LEGITIMATE (noise contract); kept in skip set |
 
-V3 (pairwise interactions) **does not depend on these fixes** (it
-tests knob superposition under nominal noise=0). Safe to proceed
-with V3 while jitter fixes pend.
+`tests/test_noise_fixes.py` (5 tests) + `tests/test_e5_hybrid.py` (6 tests)
++ V2 boundary skip set tightened.
+
+V3 (pairwise interactions) ready.
