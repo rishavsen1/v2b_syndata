@@ -715,13 +715,605 @@ def emit_stage1_report(verdicts: list[KnobVerdict], path: Path, elapsed: float) 
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Stage 2 (stub — implement after S1 triage)
+# Stage 2: direction + magnitude verification
 # ──────────────────────────────────────────────────────────────────────────
 
 
+def _read_csv(path: Path) -> Any:
+    import pandas as pd
+    return pd.read_csv(path)
+
+
+def _load_outputs(out_dir: Path) -> dict[str, Any]:
+    dfs: dict[str, Any] = {}
+    for f in CSV_FILES:
+        p = out_dir / f
+        if p.exists():
+            dfs[f] = _read_csv(p)
+    return dfs
+
+
+# Per-CSV default metrics — chosen for monotonic response to most knobs.
+def _m_building_flex(dfs):  return float(dfs["building_load.csv"]["power_flex_kw"].mean())
+def _m_building_inflex(dfs):return float(dfs["building_load.csv"]["power_inflex_kw"].mean())
+def _m_building_flex_var(dfs):return float(dfs["building_load.csv"]["power_flex_kw"].var())
+def _m_building_inflex_var(dfs):return float(dfs["building_load.csv"]["power_inflex_kw"].var())
+def _m_users_w1(dfs):    return float(dfs["users.csv"]["w1"].mean())
+def _m_users_w2(dfs):    return float(dfs["users.csv"]["w2"].mean())
+def _m_cars_count(dfs):     return float(len(dfs["cars.csv"]))
+def _m_cars_capacity(dfs):  return float(dfs["cars.csv"]["capacity_kwh"].mean())
+def _m_users_count(dfs):    return float(len(dfs["users.csv"]))
+def _m_users_phi(dfs):      return float(dfs["users.csv"]["phi"].mean())
+def _m_users_kappa(dfs):    return float(dfs["users.csv"]["kappa"].mean())
+def _m_chargers_count(dfs): return float(len(dfs["chargers.csv"]))
+def _m_chargers_bidir(dfs):
+    df = dfs["chargers.csv"]
+    return float((df["directionality"] == "bidirectional").mean()) if len(df) else 0.0
+def _m_chargers_rate(dfs):  return float(dfs["chargers.csv"]["max_rate_kw"].mean())
+def _m_sessions_count(dfs): return float(len(dfs["sessions.csv"]))
+def _m_sessions_arr_hour(dfs):
+    import pandas as pd
+    s = pd.to_datetime(dfs["sessions.csv"]["arrival"]).dt
+    return float((s.hour + s.minute / 60.0).mean())
+def _m_sessions_duration_hr(dfs):
+    return float((dfs["sessions.csv"]["duration_sec"] / 3600.0).mean())
+def _m_sessions_arr_soc(dfs):  return float(dfs["sessions.csv"]["arrival_soc"].mean())
+def _m_sessions_req_soc(dfs):  return float(dfs["sessions.csv"]["required_soc_at_depart"].mean())
+def _m_sessions_req_soc_min(dfs):return float(dfs["sessions.csv"]["required_soc_at_depart"].min())
+def _m_sessions_arr_var(dfs):
+    import pandas as pd
+    s = pd.to_datetime(dfs["sessions.csv"]["arrival"]).dt
+    return float((s.hour + s.minute / 60.0).var())
+def _m_sessions_soc_var(dfs):  return float(dfs["sessions.csv"]["arrival_soc"].var())
+def _m_grid_mean(dfs):    return float(dfs["grid_prices.csv"]["price_per_kwh"].mean())
+def _m_grid_var(dfs):     return float(dfs["grid_prices.csv"]["price_per_kwh"].var())
+def _m_grid_peak_ratio(dfs):
+    df = dfs["grid_prices.csv"]
+    if "type" not in df: return float("nan")
+    peak = df.loc[df["type"] == "peak", "price_per_kwh"].mean()
+    off = df.loc[df["type"] == "offpeak", "price_per_kwh"].mean()
+    if off == 0 or not off == off:  # nan check
+        return float("nan")
+    return float(peak / off) if off else float("nan")
+def _m_dr_count(dfs):      return float(len(dfs.get("dr_events.csv", [])))
+def _m_dr_magnitude(dfs):
+    df = dfs.get("dr_events.csv")
+    return float(df["magnitude_kw"].mean()) if df is not None and len(df) else 0.0
+def _m_dr_lead_hr(dfs):
+    import pandas as pd
+    df = dfs.get("dr_events.csv")
+    if df is None or len(df) == 0: return 0.0
+    leads = (pd.to_datetime(df["start"]) - pd.to_datetime(df["notified_at"])).dt.total_seconds() / 3600
+    return float(leads.mean())
+
+
+# Deep-channel metric: filter sessions by user region first.
+def _deep_metric(dist_name, param):
+    """Return a metric fn (dfs, region) → float specific to the deep-channel leaf."""
+    def fn(dfs, region):
+        users = dfs["users.csv"]
+        car_ids = set(users.loc[users["region"] == region, "car_id"].tolist())
+        sess = dfs["sessions.csv"]
+        sub = sess[sess["car_id"].isin(car_ids)]
+        if len(sub) == 0:
+            return float("nan")
+        if dist_name == "arrival" and param == "mu":
+            import pandas as pd
+            s = pd.to_datetime(sub["arrival"]).dt
+            return float((s.hour + s.minute / 60.0).mean())
+        if dist_name == "arrival" and param == "sigma":
+            import pandas as pd
+            s = pd.to_datetime(sub["arrival"]).dt
+            return float((s.hour + s.minute / 60.0).std())
+        if dist_name == "dwell" and param == "lambda":
+            return float((sub["duration_sec"] / 3600.0).mean())
+        if dist_name == "dwell" and param == "k":
+            return float((sub["duration_sec"] / 3600.0).std())
+        if dist_name == "soc_arrival" and param == "alpha":
+            return float(sub["arrival_soc"].mean())
+        if dist_name == "soc_arrival" and param == "beta":
+            return float(sub["arrival_soc"].mean())
+        if dist_name == "copula" and param == "rho_gaussian":
+            import pandas as pd
+            s = pd.to_datetime(sub["arrival"]).dt
+            arr_h = s.hour + s.minute / 60.0
+            dur_h = sub["duration_sec"] / 3600.0
+            if len(arr_h) < 3:
+                return float("nan")
+            return float(arr_h.corr(dur_h))
+        return float("nan")
+    return fn
+
+
+# Expected direction per knob — "↑" higher knob = higher metric, "↓" inverse,
+# "any" no direction claim (categorical / simplex / bool).
+# Format: knob_path → list[(csv, metric_fn, expected_dir, label)]
+# Metric fn signature: dfs → float
+KNOB_METRIC_OVERRIDES: dict[str, list[tuple[str, Any, str, str]]] = {
+    # Fleet
+    "ev_fleet.ev_count": [
+        ("cars.csv", _m_cars_count, "↑", "row_count"),
+        ("users.csv", _m_users_count, "↑", "row_count"),
+        ("sessions.csv", _m_sessions_count, "↑", "row_count"),
+    ],
+    "ev_fleet.battery_mix": [("cars.csv", _m_cars_capacity, "any", "capacity_mean")],
+    "ev_fleet.battery_heterogeneity": [("cars.csv", _m_cars_capacity, "any", "capacity_mean")],
+    # Infra
+    "charging_infra.charger_count": [("chargers.csv", _m_chargers_count, "↑", "row_count")],
+    "charging_infra.directionality_frac": [("chargers.csv", _m_chargers_bidir, "↑", "frac_bidir")],
+    "charging_infra.uni_rate_kw": [("chargers.csv", _m_chargers_rate, "↑", "rate_mean")],
+    "charging_infra.bi_rate_kw": [("chargers.csv", _m_chargers_rate, "↑", "rate_mean")],
+    # User-behavior
+    "user_behavior.min_depart_soc": [("sessions.csv", _m_sessions_req_soc_min, "↑", "req_soc_min")],
+    "user_behavior.axes_distribution": [
+        ("users.csv", _m_users_phi, "any", "phi_mean"),
+        ("users.csv", _m_users_kappa, "any", "kappa_mean"),
+    ],
+    "user_behavior.negotiation_mix": [
+        ("users.csv", _m_users_w1, "any", "w1_mean"),
+        ("users.csv", _m_users_w2, "any", "w2_mean"),
+    ],
+    "user_behavior.w_multiplier": [
+        ("users.csv", _m_users_w1, "↑", "w1_mean"),
+        ("users.csv", _m_users_w2, "↑", "w2_mean"),
+    ],
+    # Building
+    "building_load.tmyx_station": [
+        ("building_load.csv", _m_building_flex, "any", "flex_mean"),
+        ("building_load.csv", _m_building_inflex, "any", "inflex_mean"),
+    ],
+    "building_load.archetype": [("building_load.csv", _m_building_flex, "any", "flex_mean")],
+    "building_load.size": [("building_load.csv", _m_building_flex, "any", "flex_mean")],
+    "building_load.occupancy_source": [("building_load.csv", _m_building_flex, "any", "flex_mean")],
+    "building_load.peak_kw": [("building_load.csv", _m_building_flex, "↑", "flex_mean")],
+    # Tariff
+    "utility_rate.tariff_type": [("grid_prices.csv", _m_grid_mean, "any", "price_mean")],
+    "utility_rate.energy_price_offpeak": [("grid_prices.csv", _m_grid_mean, "↑", "price_mean")],
+    "utility_rate.energy_price_peak": [("grid_prices.csv", _m_grid_mean, "↑", "price_mean")],
+    "utility_rate.peak_window": [("grid_prices.csv", _m_grid_mean, "any", "price_mean")],
+    "utility_rate.dr_program": [("dr_events.csv", _m_dr_lead_hr, "any", "lead_hr")],
+    "utility_rate.dr_magnitude_kw_range": [("dr_events.csv", _m_dr_magnitude, "↑", "magnitude_mean")],
+    "utility_rate.dr_lambda_base": [("dr_events.csv", _m_dr_count, "↑", "row_count")],
+    # Sim window
+    "sim_window.mode": [("sessions.csv", _m_sessions_count, "any", "row_count")],
+    "sim_window.weekdays_only": [("sessions.csv", _m_sessions_count, "↓", "row_count")],
+    # Noise — variance-based on jitter
+    "noise.profile": [
+        ("building_load.csv", _m_building_flex_var, "any", "flex_var"),
+        ("sessions.csv", _m_sessions_arr_var, "any", "arr_var"),
+    ],
+    "noise.building_load_jitter_pct": [("building_load.csv", _m_building_flex_var, "↑", "flex_var")],
+    "noise.arrival_time_jitter_min": [("sessions.csv", _m_sessions_arr_var, "↑", "arr_var")],
+    "noise.soc_arrival_jitter_pct": [("sessions.csv", _m_sessions_soc_var, "↑", "soc_var")],
+    "noise.dr_notification_dropout_prob": [("dr_events.csv", _m_dr_count, "↓", "row_count")],
+    "noise.price_jitter_pct": [("grid_prices.csv", _m_grid_var, "↑", "price_var")],
+    "noise.occupancy_jitter_pct": [("building_load.csv", _m_building_inflex_var, "↑", "inflex_var")],
+}
+
+
+# Probe selectors for Stage 2 (5 values).
+def select_5_probes(spec: KnobSpec) -> list[tuple[str, Any]] | None:
+    t = spec.knob_type
+    path = spec.path
+
+    if spec.is_deep_channel:
+        from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+        leaf = ".".join(path.rsplit(".", 2)[-2:])
+        lo, hi = DIST_PARAM_RANGES[leaf]
+        vals = [lo + i * (hi - lo) / 4 for i in range(5)]
+        return [(f"p{i+1}", round(v, 6)) for i, v in enumerate(vals)]
+
+    if t == "int":
+        lo, hi = spec.range_or_choices
+        vals = sorted({max(lo, min(hi, round(lo + i * (hi - lo) / 4))) for i in range(5)})
+        return [(f"p{i+1}", v) for i, v in enumerate(vals)]
+    if t == "float":
+        lo, hi = spec.range_or_choices
+        vals = [lo + i * (hi - lo) / 4 for i in range(5)]
+        return [(f"p{i+1}", round(v, 6)) for i, v in enumerate(vals)]
+    if t == "bool":
+        return [("p1", False), ("p2", True)]
+    if t == "categorical":
+        choices = list(spec.range_or_choices or [])
+        if not choices: return None
+        return [(c, c) for c in choices]
+    if t == "vec2":
+        if path == "utility_rate.peak_window":
+            return [("p1", [6, 18]), ("p2", [7, 20]), ("p3", [8, 22]),
+                    ("p4", [9, 23]), ("p5", [5, 15])]
+        if path == "utility_rate.dr_magnitude_kw_range":
+            return [("p1", [40, 60]), ("p2", [80, 120]), ("p3", [150, 200]),
+                    ("p4", [200, 400]), ("p5", [300, 600])]
+        if path == "user_behavior.w_multiplier":
+            return [("p1", [0.2, 0.2]), ("p2", [0.5, 0.5]), ("p3", [1.0, 1.0]),
+                    ("p4", [2.0, 2.0]), ("p5", [4.0, 4.0])]
+        return None
+    if t == "simplex":
+        if path == "ev_fleet.battery_mix":
+            return [("p1", [1.0, 0.0, 0.0, 0.0]), ("p2", [0.5, 0.5, 0.0, 0.0]),
+                    ("p3", [0.25, 0.25, 0.25, 0.25]), ("p4", [0.0, 0.0, 0.5, 0.5]),
+                    ("p5", [0.0, 0.0, 0.0, 1.0])]
+        if path == "user_behavior.negotiation_mix":
+            return [("p1", [1.0, 0.0, 0.0, 0.0]), ("p2", [0.0, 1.0, 0.0, 0.0]),
+                    ("p3", [0.0, 0.0, 1.0, 0.0]), ("p4", [0.0, 0.0, 0.0, 1.0]),
+                    ("p5", [0.25, 0.25, 0.25, 0.25])]
+        return None
+    if t == "path":
+        if path == "building_load.tmyx_station":
+            return [
+                ("nashville", "USA_TN_Nashville.Intl.AP.723270_TMYx"),
+                ("san_jose", "USA_CA_San.Jose-Mineta.Intl.AP.724945_TMYx"),
+                ("miami", "USA_FL_Miami.Natl.Hurricane.Center.722020_TMYx"),
+                ("minneapolis", "USA_MN_Minneapolis-St.Paul.Intl.AP.726580_TMYx"),
+                ("houston", "USA_TX_Houston-Bush.Intercontinental.AP.722430_TMYx"),
+            ]
+        return None
+    if t == "list[region]":
+        if path == "user_behavior.axes_distribution":
+            default = spec.default or []
+            if not default: return None
+            n = len(default)
+            probes = []
+            # 5 weight permutations: uniform, peak-at-i for each i (up to 5)
+            uniform = [dict(r, weight=1.0 / n) for r in default]
+            probes.append(("uniform", uniform))
+            for i in range(min(4, n)):
+                weights = [0.05] * n
+                weights[i] = 1 - 0.05 * (n - 1)
+                probes.append((f"peak_{default[i]['name']}",
+                               [dict(r, weight=w) for r, w in zip(default, weights)]))
+            while len(probes) < 5:
+                probes.append(("uniform_dup", uniform))
+            return probes[:5]
+        return None
+
+    return None
+
+
+def classify_monotonic(metric_vals: list[float], expected: str) -> tuple[str, str]:
+    """Return (verdict, note)."""
+    import math
+    if any(math.isnan(v) for v in metric_vals):
+        # Drop NaNs; if too few valid points, NO-EFFECT
+        valid = [v for v in metric_vals if not math.isnan(v)]
+        if len(valid) < 2:
+            return "NO-EFFECT", "insufficient valid metric points"
+        metric_vals = valid
+
+    rng = max(metric_vals) - min(metric_vals)
+    base = max(abs(metric_vals[0]), 1e-12)
+
+    if rng / base < 1e-6:
+        return "NO-EFFECT", f"metric flat across probes (range/base={rng/base:.2e})"
+
+    if expected == "any":
+        # Categorical / simplex / bool: any variation is success
+        return "MONOTONIC", f"responsive (range={rng:.4g})"
+
+    diffs = [b - a for a, b in zip(metric_vals, metric_vals[1:])]
+    all_up = all(d >= -1e-9 for d in diffs) and any(d > 1e-9 for d in diffs)
+    all_down = all(d <= 1e-9 for d in diffs) and any(d < -1e-9 for d in diffs)
+
+    if all_up:
+        actual = "↑"
+    elif all_down:
+        actual = "↓"
+    else:
+        return "NON-MONOTONIC", f"diffs={[round(d, 4) for d in diffs]}"
+
+    if actual != expected:
+        return "WRONG-DIRECTION", f"expected {expected}, got {actual}"
+
+    rng_pct = rng / base
+    if rng_pct < 0.05:
+        return "WEAK-EFFECT", f"range {rng_pct*100:.2f}% < 5% threshold"
+
+    return "MONOTONIC", f"{actual} range={rng:.4g} ({rng_pct*100:.1f}%)"
+
+
+@dataclass
+class S2ProbeResult:
+    knob_path: str
+    csv: str
+    metric_label: str
+    probe_values: list[Any]
+    metric_values: list[float]
+    expected_dir: str
+    verdict: str
+    note: str
+
+
+@dataclass
+class S2KnobVerdict:
+    knob_path: str
+    csv_results: list[S2ProbeResult]
+    overall_verdict: str
+    note: str
+    elapsed_s: float
+
+
+_VERDICT_RANK = {
+    "WRONG-DIRECTION": 0, "NO-EFFECT": 1, "NON-MONOTONIC": 2,
+    "WEAK-EFFECT": 3, "MONOTONIC": 4,
+}
+
+
+def _aggregate(csv_results: list[S2ProbeResult]) -> tuple[str, str]:
+    if not csv_results:
+        return "NO-EFFECT", "no CSV metric"
+    worst = min(csv_results, key=lambda r: _VERDICT_RANK.get(r.verdict, 99))
+    if all(r.verdict == "MONOTONIC" for r in csv_results):
+        return "MONOTONIC", ", ".join(f"{r.csv}/{r.metric_label}: {r.note}" for r in csv_results)
+    return worst.verdict, f"{worst.csv}/{worst.metric_label}: {worst.note}"
+
+
 def stage2(args: argparse.Namespace) -> int:
-    print("Stage 2 not yet implemented. Run --stage 1 first; triage with user.")
-    return 1
+    audit_root = Path(args.audit_dir)
+    audit_root.mkdir(parents=True, exist_ok=True)
+    audit_cfg = _audit_config_dir(audit_root)
+    for f in (audit_cfg / "scenarios").glob("_audit_*.yaml"):
+        f.unlink()
+
+    # Load Stage 1 metadata for admission list.
+    s1_meta_path = audit_root / "audit_metadata.json"
+    if not s1_meta_path.exists():
+        print(f"[s2] need {s1_meta_path} from a prior Stage 1 run")
+        return 1
+    with s1_meta_path.open() as f:
+        s1 = json.load(f)
+    admitted = [v["knob_path"] for v in s1["verdicts"]
+                if v["verdict"] in ("HONORED", "OVER-COUPLED")]
+    print(f"[s2] admitted: {len(admitted)} knobs")
+
+    # Re-enumerate specs so we have type/range/baseline/affects metadata.
+    knobs_specs = parse_knobs_yaml(audit_cfg / "knobs.yaml")
+    deep_specs = parse_deep_channel(audit_cfg / "populations.yaml")
+    spec_by_path = {s.path: s for s in knobs_specs + deep_specs}
+
+    # Pre-compute baselines per scenario.
+    baselines_dfs: dict[str, dict[str, Any]] = {}
+    for scen in {spec_by_path[p].baseline_scenario for p in admitted if p in spec_by_path}:
+        out = audit_root / f"s2_baseline_{scen}"
+        if out.exists():
+            shutil.rmtree(out)
+        ok, err = run_scenario(scen, {}, out, audit_cfg)
+        if not ok:
+            print(f"[s2] FATAL: baseline {scen}: {err}")
+            return 1
+        baselines_dfs[scen] = _load_outputs(out)
+        print(f"[s2] baseline {scen} loaded")
+
+    verdicts: list[S2KnobVerdict] = []
+    t_start = time.time()
+
+    for i, path in enumerate(admitted):
+        t0 = time.time()
+        if path not in spec_by_path:
+            verdicts.append(S2KnobVerdict(path, [], "NO-SPEC", "admitted but not in registry/deep", 0.0))
+            continue
+        spec = spec_by_path[path]
+        probes = select_5_probes(spec)
+        if probes is None:
+            verdicts.append(S2KnobVerdict(path, [], "UNTESTABLE", f"no probe selector for {spec.knob_type}", 0.0))
+            print(f"[{i+1}/{len(admitted)}] {path}: UNTESTABLE")
+            continue
+
+        # Determine which (csv, metric_fn, expected, label) tuples apply.
+        if spec.is_deep_channel:
+            region = path.split(".")[-3]
+            leaf_parts = path.rsplit(".", 2)
+            dist_name = leaf_parts[-2]
+            param = leaf_parts[-1]
+            expected = {
+                ("arrival", "mu"): "↑",
+                ("arrival", "sigma"): "↑",
+                ("dwell", "lambda"): "↑",
+                ("dwell", "k"): "↓",
+                ("soc_arrival", "alpha"): "↑",
+                ("soc_arrival", "beta"): "↓",
+                ("copula", "rho_gaussian"): "↑",
+            }.get((dist_name, param), "any")
+            label = f"{region}/{dist_name}.{param}"
+            csv_metrics = [("sessions.csv", _deep_metric(dist_name, param), expected, label, region)]
+        else:
+            csv_metrics = []
+            override = KNOB_METRIC_OVERRIDES.get(path)
+            if override:
+                csv_metrics = [(c, fn, ex, lab, None) for (c, fn, ex, lab) in override]
+            else:
+                # Fall back: pick a generic metric per declared CSV.
+                fallback = {
+                    "cars.csv": (_m_cars_capacity, "any", "capacity_mean"),
+                    "users.csv": (_m_users_phi, "any", "phi_mean"),
+                    "chargers.csv": (_m_chargers_rate, "any", "rate_mean"),
+                    "sessions.csv": (_m_sessions_count, "any", "row_count"),
+                    "building_load.csv": (_m_building_flex, "any", "flex_mean"),
+                    "grid_prices.csv": (_m_grid_mean, "any", "price_mean"),
+                    "dr_events.csv": (_m_dr_count, "any", "row_count"),
+                }
+                for c in spec.affects_csv:
+                    if c in fallback:
+                        fn, ex, lab = fallback[c]
+                        csv_metrics.append((c, fn, ex, lab, None))
+
+        # Generate scenario once per (knob, probe), reuse dfs across CSV metrics.
+        # Tolerate E5/E* validation failures: CSVs are still written before
+        # auto-validate runs, so we can measure metrics even when invariants trip.
+        per_probe_dfs: list[tuple[Any, dict[str, Any] | None]] = []
+        for plabel, val in probes:
+            probe_dir = audit_root / f"s2_probe_{i}_{plabel}"
+            if probe_dir.exists():
+                shutil.rmtree(probe_dir)
+            ok, err = run_scenario(spec.baseline_scenario, {path: val}, probe_dir, audit_cfg)
+            outputs_exist = (probe_dir / "sessions.csv").exists()
+            if outputs_exist:
+                per_probe_dfs.append((val, _load_outputs(probe_dir)))
+            else:
+                per_probe_dfs.append((val, None))
+            if probe_dir.exists():
+                shutil.rmtree(probe_dir)
+
+        csv_results: list[S2ProbeResult] = []
+        for csv, fn, expected, label, region in csv_metrics:
+            metric_vals: list[float] = []
+            probe_values_used: list[Any] = []
+            for val, dfs in per_probe_dfs:
+                if dfs is None:
+                    metric_vals.append(float("nan"))
+                else:
+                    try:
+                        m = fn(dfs, region) if region is not None else fn(dfs)
+                    except Exception:
+                        m = float("nan")
+                    metric_vals.append(m)
+                probe_values_used.append(val)
+            verdict, note = classify_monotonic(metric_vals, expected)
+            csv_results.append(S2ProbeResult(
+                knob_path=path, csv=csv, metric_label=label,
+                probe_values=probe_values_used,
+                metric_values=[round(v, 6) if v == v else float("nan") for v in metric_vals],
+                expected_dir=expected, verdict=verdict, note=note,
+            ))
+        overall, overall_note = _aggregate(csv_results)
+        dt = time.time() - t0
+        verdicts.append(S2KnobVerdict(
+            knob_path=path, csv_results=csv_results,
+            overall_verdict=overall, note=overall_note, elapsed_s=dt,
+        ))
+        print(f"[{i+1}/{len(admitted)}] {path}: {overall} ({dt:.1f}s) {overall_note[:80]}")
+
+    # Cleanup
+    for d in audit_root.glob("s2_baseline_*"):
+        if d.is_dir():
+            shutil.rmtree(d)
+    for f in (audit_cfg / "scenarios").glob("_audit_*.yaml"):
+        f.unlink()
+
+    total_elapsed = time.time() - t_start
+    print(f"\n[s2] total elapsed: {total_elapsed:.1f}s")
+
+    meta = {
+        "stage": 2,
+        "git_sha": _git_sha(),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "elapsed_s": total_elapsed,
+        "verdicts": [_s2_to_dict(v) for v in verdicts],
+    }
+    with (audit_root / "audit_s2_metadata.json").open("w") as f:
+        json.dump(meta, f, indent=2)
+
+    report_path = REPO / "KNOB_AUDIT_S2.md"
+    emit_stage2_report(verdicts, report_path, total_elapsed)
+    print(f"[s2] report → {report_path}")
+    return 0
+
+
+def _s2_to_dict(v: S2KnobVerdict) -> dict:
+    return {
+        "knob_path": v.knob_path,
+        "overall_verdict": v.overall_verdict,
+        "note": v.note,
+        "elapsed_s": v.elapsed_s,
+        "csv_results": [asdict(r) for r in v.csv_results],
+    }
+
+
+def emit_stage2_report(verdicts: list[S2KnobVerdict], path: Path, elapsed: float) -> None:
+    buckets: dict[str, list[S2KnobVerdict]] = {
+        "MONOTONIC": [], "NON-MONOTONIC": [], "WEAK-EFFECT": [],
+        "WRONG-DIRECTION": [], "NO-EFFECT": [], "UNTESTABLE": [], "NO-SPEC": [],
+    }
+    for v in verdicts:
+        buckets.setdefault(v.overall_verdict, []).append(v)
+
+    EMOJI = {
+        "MONOTONIC": "✅", "NON-MONOTONIC": "⚠️", "WEAK-EFFECT": "⚠️",
+        "WRONG-DIRECTION": "❌", "NO-EFFECT": "🟡",
+        "UNTESTABLE": "⏭️", "NO-SPEC": "❓",
+    }
+
+    lines = []
+    lines.append("# Knob Audit Stage 2: Direction + Magnitude\n")
+    lines.append(f"Generated: {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
+    lines.append(f"Git SHA: `{_git_sha()}`\n")
+    lines.append(f"Total elapsed: {elapsed:.1f}s\n")
+    lines.append(f"Knobs probed: {len(verdicts)}\n")
+
+    lines.append("\n## Summary\n")
+    lines.append("| Verdict | Count |\n|---|---|\n")
+    for name in ["MONOTONIC", "NON-MONOTONIC", "WEAK-EFFECT", "WRONG-DIRECTION",
+                 "NO-EFFECT", "UNTESTABLE", "NO-SPEC"]:
+        c = len(buckets.get(name, []))
+        if c == 0 and name in ("NO-SPEC", "UNTESTABLE"):
+            continue
+        lines.append(f"| {EMOJI[name]} {name} | {c} |\n")
+    lines.append(f"| **TOTAL** | **{len(verdicts)}** |\n")
+
+    # Interpretation guide for borderline categories.
+    lines.append("\n## Interpretation\n")
+    lines.append("- **NON-MONOTONIC at low Weibull k:** dwell.k probes start at k≈0.01 "
+                 "(range floor). Weibull at k≪1 collapses to a degenerate distribution "
+                 "(most mass near 0), so realized duration std is artificially low at the "
+                 "floor before rising at moderate k and decreasing again at high k. Not a "
+                 "pipeline bug — Weibull math.\n")
+    lines.append("- **NO-EFFECT for low-frequency regions:** S01 uses consent_default with "
+                 "small `occasional_visitor` weight (1 user out of 20 EVs). Single-user "
+                 "regions yield insufficient samples for std/corr metrics (returns NaN). "
+                 "Re-probe under S_audit_baseline (50 EVs) for proper coverage.\n")
+    lines.append("- **`any` direction verdicts:** categorical / simplex / bool / list[region] "
+                 "knobs have no ordinal probe order, so monotonicity isn't claimed. Verdict "
+                 "is RESPONSIVE-vs-NO-EFFECT only.\n")
+
+    # Per-bucket per-knob detail
+    for name in ["MONOTONIC", "NON-MONOTONIC", "WEAK-EFFECT", "WRONG-DIRECTION",
+                 "NO-EFFECT", "UNTESTABLE", "NO-SPEC"]:
+        bucket = buckets.get(name, [])
+        if not bucket:
+            continue
+        lines.append(f"\n## {EMOJI[name]} {name} ({len(bucket)} knobs)\n\n")
+        for v in bucket:
+            lines.append(f"### `{v.knob_path}`\n")
+            for r in v.csv_results:
+                pvs = [str(x)[:30] for x in r.probe_values]
+                mvs = [f"{x:.4g}" if x == x else "nan" for x in r.metric_values]
+                lines.append(f"- **{r.csv}** ({r.metric_label}, expect {r.expected_dir})\n")
+                lines.append(f"  - probes: `{pvs}`\n")
+                lines.append(f"  - metric: `{mvs}`\n")
+                lines.append(f"  - **{r.verdict}** — {r.note}\n")
+            if not v.csv_results:
+                lines.append(f"  - {v.note}\n")
+            lines.append("\n")
+
+    # Cross-knob summary
+    lines.append("## Cross-knob findings\n")
+    deep_results = [v for v in verdicts if "region_distributions" in v.knob_path]
+    deep_ok = sum(1 for v in deep_results if v.overall_verdict == "MONOTONIC")
+    lines.append(f"- Deep-channel: {deep_ok}/{len(deep_results)} MONOTONIC.\n")
+    noise_results = [v for v in verdicts if v.knob_path.startswith("noise.")]
+    noise_ok = sum(1 for v in noise_results if v.overall_verdict == "MONOTONIC")
+    lines.append(f"- noise.*: {noise_ok}/{len(noise_results)} MONOTONIC.\n")
+    dr_results = [v for v in verdicts if "dr_" in v.knob_path or v.knob_path == "utility_rate.dr_program"]
+    dr_ok = sum(1 for v in dr_results if v.overall_verdict == "MONOTONIC")
+    lines.append(f"- DR-related: {dr_ok}/{len(dr_results)} MONOTONIC.\n")
+
+    # Recommendations
+    if buckets.get("WRONG-DIRECTION") or buckets.get("NO-EFFECT"):
+        lines.append("\n## Recommendations\n")
+        if buckets.get("WRONG-DIRECTION"):
+            lines.append("### ❌ WRONG-DIRECTION (highest priority)\n")
+            for v in buckets["WRONG-DIRECTION"]:
+                lines.append(f"- `{v.knob_path}`: {v.note}\n")
+        if buckets.get("NO-EFFECT"):
+            lines.append("### 🟡 NO-EFFECT\n")
+            for v in buckets["NO-EFFECT"]:
+                lines.append(f"- `{v.knob_path}`: {v.note}\n")
+        if buckets.get("WEAK-EFFECT"):
+            lines.append("### ⚠️ WEAK-EFFECT (informational)\n")
+            for v in buckets["WEAK-EFFECT"]:
+                lines.append(f"- `{v.knob_path}`: {v.note}\n")
+
+    with path.open("w") as f:
+        f.write("".join(lines))
 
 
 # ──────────────────────────────────────────────────────────────────────────
