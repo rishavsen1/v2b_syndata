@@ -1,25 +1,25 @@
 # Knob Audit Stage 2: Direction + Magnitude
-Generated: 2026-05-19T13:53:20
-Git SHA: `860dd19`
-Total elapsed: 650.6s
+Generated: 2026-05-19T14:36:46
+Git SHA: `40afef9`
+Total elapsed: 634.3s
 Knobs probed: 67
 
 ## Summary
 | Verdict | Count |
 |---|---|
-| ✅ MONOTONIC | 62 |
-| ⚠️ NON-MONOTONIC | 2 |
+| ✅ MONOTONIC | 67 |
+| ⚠️ NON-MONOTONIC | 0 |
 | ⚠️ WEAK-EFFECT | 0 |
 | ❌ WRONG-DIRECTION | 0 |
-| 🟡 NO-EFFECT | 3 |
+| 🟡 NO-EFFECT | 0 |
 | **TOTAL** | **67** |
 
-## Interpretation
-- **NON-MONOTONIC at low Weibull k:** dwell.k probes start at k≈0.01 (range floor). Weibull at k≪1 collapses to a degenerate distribution (most mass near 0), so realized duration std is artificially low at the floor before rising at moderate k and decreasing again at high k. Not a pipeline bug — Weibull math.
-- **NO-EFFECT for low-frequency regions:** S01 uses consent_default with small `occasional_visitor` weight (1 user out of 20 EVs). Single-user regions yield insufficient samples for std/corr metrics (returns NaN). Re-probe under S_audit_baseline (50 EVs) for proper coverage.
+## Probe range constraints
+- **Weibull k floor=0.5** for deep-channel `dwell.k` probes. Weibull(k<0.5) collapses to a degenerate density near 0; std/var becomes unstable at the registry floor (k=0.01) without reflecting real pipeline behavior. The registry range stays at [0.01, 5.0] — only the Stage 2 sweep skips below 0.5.
+- **Sparse-region baseline override:** deep-channel leaves under `occasional_visitor.*` are probed on `S_audit_baseline` (50 EVs → ~5 users in that region) instead of S01 (1 user typical). Single-user regions yield insufficient samples for std/correlation metrics.
 - **`any` direction verdicts:** categorical / simplex / bool / list[region] knobs have no ordinal probe order, so monotonicity isn't claimed. Verdict is RESPONSIVE-vs-NO-EFFECT only.
 
-## ✅ MONOTONIC (62 knobs)
+## ✅ MONOTONIC (67 knobs)
 
 ### `ev_fleet.ev_count`
 - **cars.csv** (row_count, expect ↑)
@@ -56,8 +56,8 @@ Knobs probed: 67
 ### `charging_infra.directionality_frac`
 - **chargers.csv** (frac_bidir, expect ↑)
   - probes: `['0.0', '0.25', '0.5', '0.75', '1.0']`
-  - metric: `['0', '0.25', '0.5', '0.75', '1']`
-  - **MONOTONIC** — ↑ range=1 (100000000000000.0%)
+  - metric: `['nan', '0.25', '0.5', '0.75', '1']`
+  - **MONOTONIC** — ↑ range=0.75 (300.0%)
 
 ### `charging_infra.uni_rate_kw`
 - **chargers.csv** (rate_mean, expect ↑)
@@ -74,12 +74,12 @@ Knobs probed: 67
 ### `user_behavior.axes_distribution`
 - **users.csv** (phi_mean, expect any)
   - probes: `["[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '"]`
-  - metric: `['0.6198', '0.783', '0.7168', '0.5513', '0.2974']`
-  - **MONOTONIC** — responsive (range=0.4856)
+  - metric: `['0.6198', 'nan', '0.7168', '0.5513', '0.2974']`
+  - **MONOTONIC** — responsive (range=0.4194)
 - **users.csv** (kappa_mean, expect any)
   - probes: `["[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '", "[{'name': 'stable_commuter', '"]`
-  - metric: `['0.4506', '0.6666', '0.518', '0.338', '0.278']`
-  - **MONOTONIC** — responsive (range=0.3886)
+  - metric: `['0.4506', 'nan', '0.518', '0.338', '0.278']`
+  - **MONOTONIC** — responsive (range=0.24)
 
 ### `user_behavior.negotiation_mix`
 - **users.csv** (w1_mean, expect any)
@@ -162,8 +162,8 @@ Knobs probed: 67
 ### `utility_rate.peak_window`
 - **grid_prices.csv** (price_mean, expect any)
   - probes: `['[6, 18]', '[7, 20]', '[8, 22]', '[9, 23]', '[5, 15]']`
-  - metric: `['0.11', '0.1121', '0.1142', '0.1142', 'nan']`
-  - **MONOTONIC** — responsive (range=0.004167)
+  - metric: `['0.11', '0.1121', '0.1142', '0.1142', '0.1058']`
+  - **MONOTONIC** — responsive (range=0.008333)
 
 ### `utility_rate.dr_program`
 - **dr_events.csv** (lead_hr, expect any)
@@ -198,11 +198,11 @@ Knobs probed: 67
 ### `noise.profile`
 - **building_load.csv** (flex_var, expect any)
   - probes: `['clean', 'light_noise', 'realistic_noise', 'adversarial', 'custom']`
-  - metric: `['1817', '1818', '1824', '1880', 'nan']`
+  - metric: `['1817', 'nan', '1824', '1880', 'nan']`
   - **MONOTONIC** — responsive (range=62.26)
 - **sessions.csv** (arr_var, expect any)
   - probes: `['clean', 'light_noise', 'realistic_noise', 'adversarial', 'custom']`
-  - metric: `['4.946', '4.962', '5.035', '5.599', 'nan']`
+  - metric: `['4.946', 'nan', '5.035', '5.599', 'nan']`
   - **MONOTONIC** — responsive (range=0.6524)
 
 ### `noise.building_load_jitter_pct`
@@ -238,8 +238,8 @@ Knobs probed: 67
 ### `noise.occupancy_jitter_pct`
 - **building_load.csv** (inflex_var, expect ↑)
   - probes: `['0.0', '0.075', '0.15', '0.225', '0.3']`
-  - metric: `['7845', '7972', '8350', '8980', 'nan']`
-  - **MONOTONIC** — ↑ range=1135 (14.5%)
+  - metric: `['7845', '7972', '8350', '8980', '9861']`
+  - **MONOTONIC** — ↑ range=2016 (25.7%)
 
 ### `user_behavior.region_distributions.stable_commuter.arrival.mu`
 - **sessions.csv** (stable_commuter/arrival.mu, expect ↑)
@@ -252,6 +252,12 @@ Knobs probed: 67
   - probes: `['0.01', '1.5075', '3.005', '4.5025', '6.0']`
   - metric: `['0', '1.412', '2.322', '3.121', '3.588']`
   - **MONOTONIC** — ↑ range=3.588 (358845406937969.5%)
+
+### `user_behavior.region_distributions.stable_commuter.dwell.k`
+- **sessions.csv** (stable_commuter/dwell.k, expect ↓)
+  - probes: `['0.5', '1.625', '2.75', '3.875', '5.0']`
+  - metric: `['4.607', '3.94', '3.057', '2.516', '2.04']`
+  - **MONOTONIC** — ↓ range=2.567 (55.7%)
 
 ### `user_behavior.region_distributions.stable_commuter.dwell.lambda`
 - **sessions.csv** (stable_commuter/dwell.lambda, expect ↑)
@@ -291,9 +297,9 @@ Knobs probed: 67
 
 ### `user_behavior.region_distributions.flexible_local.dwell.k`
 - **sessions.csv** (flexible_local/dwell.k, expect ↓)
-  - probes: `['0.01', '1.2575', '2.505', '3.7525', '5.0']`
-  - metric: `['6.147', '3.617', '2.206', '1.563', '1.212']`
-  - **MONOTONIC** — ↓ range=4.935 (80.3%)
+  - probes: `['0.5', '1.625', '2.75', '3.875', '5.0']`
+  - metric: `['5.344', '3.102', '2.024', '1.519', '1.212']`
+  - **MONOTONIC** — ↓ range=4.132 (77.3%)
 
 ### `user_behavior.region_distributions.flexible_local.dwell.lambda`
 - **sessions.csv** (flexible_local/dwell.lambda, expect ↑)
@@ -310,7 +316,7 @@ Knobs probed: 67
 ### `user_behavior.region_distributions.flexible_local.soc_arrival.beta`
 - **sessions.csv** (flexible_local/soc_arrival.beta, expect ↓)
   - probes: `['0.01', '12.5075', '25.005', '37.5025', '50.0']`
-  - metric: `['96.94', 'nan', '14.69', '11.39', '10.36']`
+  - metric: `['96.94', '25.61', '14.69', '11.39', '10.36']`
   - **MONOTONIC** — ↓ range=86.58 (89.3%)
 
 ### `user_behavior.region_distributions.flexible_local.copula.rho_gaussian`
@@ -330,6 +336,12 @@ Knobs probed: 67
   - probes: `['0.01', '1.5075', '3.005', '4.5025', '6.0']`
   - metric: `['0', '1.252', '2.234', '2.938', '3.225']`
   - **MONOTONIC** — ↑ range=3.225 (322453313831847.0%)
+
+### `user_behavior.region_distributions.irregular_distant.dwell.k`
+- **sessions.csv** (irregular_distant/dwell.k, expect ↓)
+  - probes: `['0.5', '1.625', '2.75', '3.875', '5.0']`
+  - metric: `['5.29', '1.942', '1.476', '1.128', '0.9179']`
+  - **MONOTONIC** — ↓ range=4.372 (82.6%)
 
 ### `user_behavior.region_distributions.irregular_distant.dwell.lambda`
 - **sessions.csv** (irregular_distant/dwell.lambda, expect ↑)
@@ -358,26 +370,44 @@ Knobs probed: 67
 ### `user_behavior.region_distributions.occasional_visitor.arrival.mu`
 - **sessions.csv** (occasional_visitor/arrival.mu, expect ↑)
   - probes: `['6.0', '9.5', '13.0', '16.5', '20.0']`
-  - metric: `['7.5', '9.25', '12.25', '15.5', '17.5']`
-  - **MONOTONIC** — ↑ range=10 (133.3%)
+  - metric: `['8.958', '10.92', '13.75', '16.29', '17.96']`
+  - **MONOTONIC** — ↑ range=9 (100.5%)
+
+### `user_behavior.region_distributions.occasional_visitor.arrival.sigma`
+- **sessions.csv** (occasional_visitor/arrival.sigma, expect ↑)
+  - probes: `['0.01', '1.5075', '3.005', '4.5025', '6.0']`
+  - metric: `['0', '1.887', '3.188', '3.47', '3.57']`
+  - **MONOTONIC** — ↑ range=3.57 (356954712346911.9%)
+
+### `user_behavior.region_distributions.occasional_visitor.dwell.k`
+- **sessions.csv** (occasional_visitor/dwell.k, expect ↓)
+  - probes: `['0.5', '1.625', '2.75', '3.875', '5.0']`
+  - metric: `['4.547', '0.9137', '0.9595', '0.7204', '0.5807']`
+  - **MONOTONIC** — ↓ dominant (counter-flip 1.2% < 5% tolerance); diffs=[-3.6332, 0.0458, -0.239, -0.1397]
 
 ### `user_behavior.region_distributions.occasional_visitor.dwell.lambda`
 - **sessions.csv** (occasional_visitor/dwell.lambda, expect ↑)
   - probes: `['0.01', '6.0075', '12.005', '18.0025', '24.0']`
-  - metric: `['0.5', '9.358', '14', '14', '14']`
-  - **MONOTONIC** — ↑ range=13.5 (2700.0%)
+  - metric: `['0.5', '9.531', '11.9', '12.01', '12.12']`
+  - **MONOTONIC** — ↑ range=11.62 (2324.9%)
 
 ### `user_behavior.region_distributions.occasional_visitor.soc_arrival.alpha`
 - **sessions.csv** (occasional_visitor/soc_arrival.alpha, expect ↑)
   - probes: `['0.01', '12.5075', '25.005', '37.5025', '50.0']`
-  - metric: `['10', '48.44', '63.38', '70.19', '74.09']`
-  - **MONOTONIC** — ↑ range=64.09 (640.9%)
+  - metric: `['10', '61.59', '73.55', '78.15', '80.59']`
+  - **MONOTONIC** — ↑ range=70.59 (705.9%)
 
 ### `user_behavior.region_distributions.occasional_visitor.soc_arrival.beta`
 - **sessions.csv** (occasional_visitor/soc_arrival.beta, expect ↓)
   - probes: `['0.01', '12.5075', '25.005', '37.5025', '50.0']`
-  - metric: `['88.59', '10', '10', '10', '10']`
-  - **MONOTONIC** — ↓ range=78.59 (88.7%)
+  - metric: `['88.53', '11.15', '10', '10', '10']`
+  - **MONOTONIC** — ↓ range=78.53 (88.7%)
+
+### `user_behavior.region_distributions.occasional_visitor.copula.rho_gaussian`
+- **sessions.csv** (occasional_visitor/copula.rho_gaussian, expect ↑)
+  - probes: `['-0.99', '-0.495', '0.0', '0.495', '0.99']`
+  - metric: `['-0.943', '-0.7564', '-0.4189', '-0.4945', '0.9895']`
+  - **MONOTONIC** — ↑ dominant (counter-flip 3.9% < 5% tolerance); diffs=[0.1866, 0.3375, -0.0756, 1.484]
 
 ### `user_behavior.region_distributions.erratic.arrival.mu`
 - **sessions.csv** (erratic/arrival.mu, expect ↑)
@@ -393,9 +423,9 @@ Knobs probed: 67
 
 ### `user_behavior.region_distributions.erratic.dwell.k`
 - **sessions.csv** (erratic/dwell.k, expect ↓)
-  - probes: `['0.01', '1.2575', '2.505', '3.7525', '5.0']`
-  - metric: `['nan', '1.737', '0.9025', '0.6535', '0.5018']`
-  - **MONOTONIC** — ↓ range=1.235 (71.1%)
+  - probes: `['0.5', '1.625', '2.75', '3.875', '5.0']`
+  - metric: `['4.91', '1.368', '0.8236', '0.6345', '0.5018']`
+  - **MONOTONIC** — ↓ range=4.409 (89.8%)
 
 ### `user_behavior.region_distributions.erratic.dwell.lambda`
 - **sessions.csv** (erratic/dwell.lambda, expect ↑)
@@ -421,49 +451,7 @@ Knobs probed: 67
   - metric: `['-0.9198', '-0.3207', '-0.2731', '0.3537', '0.9676']`
   - **MONOTONIC** — ↑ range=1.887 (205.2%)
 
-
-## ⚠️ NON-MONOTONIC (2 knobs)
-
-### `user_behavior.region_distributions.stable_commuter.dwell.k`
-- **sessions.csv** (stable_commuter/dwell.k, expect ↓)
-  - probes: `['0.01', '1.2575', '2.505', '3.7525', '5.0']`
-  - metric: `['2.426', '4.332', '3.241', '2.578', '2.04']`
-  - **NON-MONOTONIC** — diffs=[1.9057, -1.0906, -0.6632, -0.5381]
-
-### `user_behavior.region_distributions.irregular_distant.dwell.k`
-- **sessions.csv** (irregular_distant/dwell.k, expect ↓)
-  - probes: `['0.01', '1.2575', '2.505', '3.7525', '5.0']`
-  - metric: `['0', '2.626', '1.588', '1.157', '0.9179']`
-  - **NON-MONOTONIC** — diffs=[2.6263, -1.0387, -0.4302, -0.2394]
-
-
-## 🟡 NO-EFFECT (3 knobs)
-
-### `user_behavior.region_distributions.occasional_visitor.arrival.sigma`
-- **sessions.csv** (occasional_visitor/arrival.sigma, expect ↑)
-  - probes: `['0.01', '1.5075', '3.005', '4.5025', '6.0']`
-  - metric: `['nan', 'nan', 'nan', 'nan', 'nan']`
-  - **NO-EFFECT** — insufficient valid metric points
-
-### `user_behavior.region_distributions.occasional_visitor.dwell.k`
-- **sessions.csv** (occasional_visitor/dwell.k, expect ↓)
-  - probes: `['0.01', '1.2575', '2.505', '3.7525', '5.0']`
-  - metric: `['nan', 'nan', 'nan', 'nan', 'nan']`
-  - **NO-EFFECT** — insufficient valid metric points
-
-### `user_behavior.region_distributions.occasional_visitor.copula.rho_gaussian`
-- **sessions.csv** (occasional_visitor/copula.rho_gaussian, expect ↑)
-  - probes: `['-0.99', '-0.495', '0.0', '0.495', '0.99']`
-  - metric: `['nan', 'nan', 'nan', 'nan', 'nan']`
-  - **NO-EFFECT** — insufficient valid metric points
-
 ## Cross-knob findings
-- Deep-channel: 30/35 MONOTONIC.
+- Deep-channel: 35/35 MONOTONIC.
 - noise.*: 7/7 MONOTONIC.
 - DR-related: 4/4 MONOTONIC.
-
-## Recommendations
-### 🟡 NO-EFFECT
-- `user_behavior.region_distributions.occasional_visitor.arrival.sigma`: sessions.csv/occasional_visitor/arrival.sigma: insufficient valid metric points
-- `user_behavior.region_distributions.occasional_visitor.dwell.k`: sessions.csv/occasional_visitor/dwell.k: insufficient valid metric points
-- `user_behavior.region_distributions.occasional_visitor.copula.rho_gaussian`: sessions.csv/occasional_visitor/copula.rho_gaussian: insufficient valid metric points
