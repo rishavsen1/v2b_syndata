@@ -35,3 +35,28 @@ def test_every_node_has_registered_sampler():
 def test_a_user_parents_include_u():
     g = build_graph()
     assert "U" in list(g.predecessors("A_user"))
+
+
+def test_sampler_registry_rejects_duplicate_register():
+    import pytest
+    from v2b_syndata.dag import SamplerRegistry
+    reg = SamplerRegistry()
+    reg.register("node_x", lambda ctx: None)
+    with pytest.raises(ValueError, match="already registered"):
+        reg.register("node_x", lambda ctx: None)
+
+
+def test_sampler_registry_get_raises_on_missing():
+    import pytest
+    from v2b_syndata.dag import SamplerRegistry
+    reg = SamplerRegistry()
+    with pytest.raises(KeyError, match="no sampler"):
+        reg.get("nonexistent")
+
+
+def test_sampler_registry_validate_raises_on_missing_node():
+    import pytest
+    from v2b_syndata.dag import SamplerRegistry, build_graph
+    reg = SamplerRegistry()  # empty
+    with pytest.raises(RuntimeError, match="without samplers"):
+        reg.validate(build_graph())

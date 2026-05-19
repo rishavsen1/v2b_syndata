@@ -157,3 +157,70 @@ def test_deep_override_explicit_beats_calibration(config_dir):
     resolved = resolve_knobs(reg, desc, {}, cli)
     assert resolved.get(path) == 12.0
     assert resolved.source(path) == "explicit"
+
+
+@pytest.mark.parametrize("knob_path,bad_value,error_substr", [
+    ("ev_fleet.ev_count", "not_an_int", "expected int"),
+    ("ev_fleet.ev_count", True, "expected int"),
+    ("ev_fleet.ev_count", -1, "outside range"),
+    ("ev_fleet.ev_count", 999, "outside range"),
+    ("user_behavior.min_depart_soc", 1.5, "outside range"),
+    ("user_behavior.min_depart_soc", "0.8", "expected float"),
+    ("user_behavior.min_depart_soc", True, "expected float"),
+    ("ev_fleet.battery_mix", [0.5, 0.5, 0.5, 0.5], "must sum to 1"),
+    ("ev_fleet.battery_mix", [1.0, 0.0, 0.0], "expected 4 components"),
+    ("ev_fleet.battery_mix", "not_a_list", "expected list"),
+    ("ev_fleet.battery_mix", [-0.1, 0.4, 0.4, 0.3], "non-negative"),
+    ("ev_fleet.battery_heterogeneity", "invalid", "not in"),
+    ("ev_fleet.battery_heterogeneity", 42, "not in"),
+    ("utility_rate.peak_window", [25, 30], "outside range"),
+    ("utility_rate.peak_window", "not_a_vec", "length-2"),
+    ("utility_rate.peak_window", [6], "length-2"),
+    ("sim_window.weekdays_only", "true", "expected bool"),
+    ("sim_window.weekdays_only", 1, "expected bool"),
+    ("building_load.tmyx_station", 42, "expected string path"),
+])
+def test_check_type_and_range_rejects_malformed(config_dir, knob_path, bad_value, error_substr):
+    """Single parametrized sweep covers every type-check branch of
+    ``_check_type_and_range`` (sub-85% line gap from COVERAGE_REPORT §6)."""
+    reg = load_knob_registry(config_dir / "knobs.yaml")
+    with pytest.raises(KnobValidationError, match=error_substr):
+        resolve_knobs(
+            registry=reg,
+            descriptor_values={},
+            scenario_overrides={knob_path: bad_value},
+            cli_overrides={},
+        )
+
+
+def test_deep_channel_rejects_non_numeric():
+    """Deep-override values must be numeric."""
+    from v2b_syndata.knob_loader import _check_deep_range
+    with pytest.raises(KnobValidationError, match="numeric"):
+        _check_deep_range(
+            "user_behavior.region_distributions.stable_commuter.dwell.lambda",
+            "not_a_float",
+        )
+
+
+def test_deep_channel_rejects_unknown_leaf():
+    from v2b_syndata.knob_loader import _check_deep_range
+    with pytest.raises(KnobValidationError, match="not in"):
+        _check_deep_range(
+            "user_behavior.region_distributions.stable_commuter.unknown.param",
+            0.5,
+        )
+
+
+def test_deep_channel_rejects_out_of_range():
+    from v2b_syndata.knob_loader import _check_deep_range
+    with pytest.raises(KnobValidationError, match="outside range"):
+        _check_deep_range(
+            "user_behavior.region_distributions.stable_commuter.dwell.lambda",
+            9999.0,
+        )
+
+
+def test_parse_overrides_rejects_malformed_string():
+    with pytest.raises(KnobValidationError, match="not in form"):
+        parse_overrides(["malformed_no_equals"])

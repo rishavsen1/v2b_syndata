@@ -624,14 +624,24 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                     "H2: peak prices != configured")
             rep.add((off_rows["price_per_kwh"] == off_p).all() if len(off_rows) else True,
                     "H2: offpeak prices != configured")
-        # Peak window check — every row in peak hours has type=peak
-        for _, row in gp.iterrows():
-            ts = pd.to_datetime(row["datetime"])
-            in_peak = (pw[0] <= ts.hour < pw[1]) if pw[0] <= pw[1] else (ts.hour >= pw[0] or ts.hour < pw[1])
-            expected = "peak" if in_peak else "off_peak"
-            if row["type"] != expected:
-                rep.errors.append(f"H2: row {row['datetime']} type {row['type']} != expected {expected}")
-                break
+        # Peak window check — every row in peak hours has type=peak.
+        # Vectorized parse outside the loop: per-row pd.to_datetime calls
+        # the C `_guess_datetime_format_for_array` path which segfaults
+        # intermittently under coverage instrumentation (pandas 2.x + py3.12).
+        ts_series = pd.to_datetime(gp["datetime"])
+        hours = ts_series.dt.hour
+        if pw[0] <= pw[1]:
+            in_peak = (hours >= pw[0]) & (hours < pw[1])
+        else:
+            in_peak = (hours >= pw[0]) | (hours < pw[1])
+        expected = in_peak.map({True: "peak", False: "off_peak"})
+        mismatch = gp["type"] != expected
+        if mismatch.any():
+            bad_idx = mismatch.idxmax()
+            rep.errors.append(
+                f"H2: row {gp.loc[bad_idx, 'datetime']} type {gp.loc[bad_idx, 'type']} "
+                f"!= expected {expected.loc[bad_idx]}"
+            )
 
     dr = csvs["dr_events"]
     if program == "none":

@@ -40,6 +40,17 @@ dev = [
 testpaths = ["tests"]
 addopts = "-ra"
 
+[tool.coverage.run]
+source = ["src/v2b_syndata"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
 [tool.ruff]
 line-length = 110
 target-version = "py311"
