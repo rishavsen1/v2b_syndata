@@ -331,9 +331,16 @@ def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
         )
 
     # D7: required_soc_at_depart >= min_depart_soc * 100 (knob from manifest).
+    # Skip when noise.d5_enforcement is present in manifest — session-jitter
+    # ran and intentionally truncated required_soc below the user's stated
+    # minimum (d7_relaxed_count tracks how many). The relaxation is a feature
+    # for studying real-world stress scenarios; treating it as an error would
+    # contradict the documented noise contract.
+    noise_block = manifest.get("noise", {})
+    d5_enforced = "d5_enforcement" in noise_block
     res = manifest.get("knob_resolution", {})
     mds_entry = res.get("user_behavior.min_depart_soc")
-    if mds_entry is not None:
+    if mds_entry is not None and not d5_enforced:
         mds_pct = float(mds_entry["value"]) * 100.0
         bad_d7 = sess[sess["required_soc_at_depart"] < mds_pct]
         if len(bad_d7) > 0:
@@ -342,6 +349,14 @@ def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                 f"D7: session {first['session_id']} car {first['car_id']} "
                 f"required_soc_at_depart={float(first['required_soc_at_depart']):.4f} "
                 f"< min_depart_soc * 100 = {mds_pct:.4f}"
+            )
+    elif mds_entry is not None and d5_enforced:
+        # Surface D7 relaxation count as a soft warning so users see the impact.
+        relaxed = noise_block["d5_enforcement"].get("d7_relaxed_count", 0)
+        if relaxed > 0:
+            rep.warnings.append(
+                f"D7 (warn): {relaxed} sessions had required_soc relaxed below "
+                f"min_depart_soc due to post-jitter D5 enforcement"
             )
 
 

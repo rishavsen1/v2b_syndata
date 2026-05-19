@@ -154,7 +154,7 @@ def generate(
     reg = build_registry()
     reg.run(ctx)
 
-    noise_mod.apply_noise(ctx)
+    noise_stats = noise_mod.apply_noise(ctx)
 
     # E5 hybrid enforcement: compute realized concurrency before writing CSVs
     # so we can warn/error at generation time rather than waiting on validate.
@@ -187,7 +187,7 @@ def generate(
         cli_overrides=cli_overrides,
         noise_profile=ctx.noise_profile_name,
     )
-    # Augment manifest with E5 metrics + re-serialize.
+    # Augment manifest with E5 metrics + noise post-render stats, re-serialize.
     manifest["e5"] = {
         "realized_max_concurrent": e5.realized_max_concurrent,
         "n_chargers": e5.n_chargers,
@@ -196,6 +196,8 @@ def generate(
         "total_tick_count": e5.total_tick_count,
         "infeasible_tick_fraction": e5.infeasible_tick_fraction,
     }
+    if noise_stats:
+        manifest["noise"] = noise_stats
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     )

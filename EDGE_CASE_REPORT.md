@@ -235,11 +235,12 @@ Both jitter fixes and E5 hybrid enforcement landed; see DESIGN_NOTES
 |---|---|
 | C4 jitter bound (`noise.py`) | ✅ applied; 15-min forward + sim_start backward |
 | D6 jitter bound (`noise.py`) | ✅ applied; clamp arrival_soc to [min_floor, required−0.1] |
+| D5 post-jitter truncation (`noise.py`) | ✅ applied; `_enforce_d5_post_jitter` + manifest stats |
 | E5 hybrid: warning + manifest + --strict-e5 | ✅ applied; `e5_metrics.py` + runner + CLI |
-| D5 under arrival_jitter | ⚠️ unchanged (side effect of shifted overlap windows); kept in skip set |
-| H2 under price_jitter | ⚠️ LEGITIMATE (noise contract); kept in skip set |
+| H2 under price_jitter | ⚠️ LEGITIMATE (noise contract); only remaining skip |
 
-`tests/test_noise_fixes.py` (5 tests) + `tests/test_e5_hybrid.py` (6 tests)
-+ V2 boundary skip set tightened.
+Test files: `tests/test_noise_fixes.py` (10 tests — 5 from C4/D6, 5 from D5)
++ `tests/test_e5_hybrid.py` (6 tests). V2 boundary skip set: down from
+3 to 1 (price_jitter only).
 
 V3 (pairwise interactions) ready.

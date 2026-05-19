@@ -6,6 +6,8 @@ unchanged.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -14,15 +16,92 @@ from .types import ScenarioContext
 
 _MIN_SESSION_DURATION_SEC = 15 * 60  # 15 min — matches building_load grid resolution
 
+# Sampler + validator both use 1.05 headroom for D5. Use a slightly tighter
+# factor for the post-jitter truncator so floating-point doesn't push the
+# rebuilt `required_soc` over validator's strict `need > avail * 1.05` check.
+_D5_HEADROOM = 1.04
+_D5_FLOOR_EPSILON = 0.01  # SoC-percent gap between arrival_soc and required_soc
+
+
+def _enforce_d5_post_jitter(
+    sessions: pd.DataFrame,
+    cars: pd.DataFrame,
+    chargers: pd.DataFrame,
+    min_depart_soc_pct: float,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Truncate required_soc_at_depart to enforce D5 reachability after
+    arrival/SoC jitter has potentially shrunk the feasibility budget.
+
+    Uses max(chargers.max_rate_kw) as the feasibility envelope — matches
+    sessions.py:170 sampler pre-check (simulator picks the best charger
+    available).
+
+    Returns (sessions_df_kept, stats_dict).
+    """
+    if len(sessions) == 0:
+        return sessions, {
+            "max_charger_rate_kw": float(chargers["max_rate_kw"].max()) if len(chargers) else 0.0,
+            "total_input_sessions": 0,
+            "truncated_count": 0,
+            "d7_relaxed_count": 0,
+            "dropped_count": 0,
+            "total_output_sessions": 0,
+        }
+
+    max_charger_rate = float(chargers["max_rate_kw"].max())
+    merged = sessions.merge(
+        cars[["car_id", "capacity_kwh"]],
+        on="car_id", how="left", suffixes=("", "_car"),
+    )
+    dwell_hr = (
+        pd.to_datetime(merged["departure"]) - pd.to_datetime(merged["arrival"])
+    ).dt.total_seconds() / 3600.0
+    available_kwh = max_charger_rate * dwell_hr * _D5_HEADROOM
+    max_delta_soc_pct = (available_kwh / merged["capacity_kwh"]) * 100.0
+    max_feasible_required = merged["arrival_soc"] + max_delta_soc_pct
+    original_required = merged["required_soc_at_depart"]
+    floor = merged["arrival_soc"] + _D5_FLOOR_EPSILON
+
+    drop_mask = (max_feasible_required < floor).to_numpy()
+    truncate_mask = (
+        (max_feasible_required < original_required) & ~pd.Series(drop_mask, index=merged.index)
+    ).to_numpy()
+
+    new_required = original_required.to_numpy().copy()
+    new_required = np.where(
+        truncate_mask, max_feasible_required.to_numpy(), new_required,
+    )
+    new_required = np.maximum(new_required, floor.to_numpy())
+
+    d7_relaxed_mask = truncate_mask & (new_required < min_depart_soc_pct)
+
+    keep = ~drop_mask
+    kept = sessions.loc[keep].copy()
+    kept["required_soc_at_depart"] = new_required[keep]
+
+    stats = {
+        "max_charger_rate_kw": max_charger_rate,
+        "total_input_sessions": int(len(sessions)),
+        "truncated_count": int(truncate_mask.sum()),
+        "d7_relaxed_count": int(d7_relaxed_mask.sum()),
+        "dropped_count": int(drop_mask.sum()),
+        "total_output_sessions": int(len(kept)),
+    }
+    return kept, stats
+
 
 def _all_zero(d: dict[str, float]) -> bool:
     return all(float(v) == 0.0 for v in d.values())
 
 
-def apply_noise(ctx: ScenarioContext) -> None:
+def apply_noise(ctx: ScenarioContext) -> dict[str, Any]:
+    """Apply post-render perturbations. Returns a stats dict (currently
+    ``{"d5_enforcement": {...}}`` when session jitter ran, else ``{}``)
+    that ``runner.generate()`` folds into ``manifest["noise"]``."""
+    stats: dict[str, Any] = {}
     n = ctx.noise
     if _all_zero(n):
-        return
+        return stats
 
     if float(n.get("building_load_jitter_pct", 0.0)) > 0 or \
        float(n.get("occupancy_jitter_pct", 0.0)) > 0:
@@ -103,6 +182,21 @@ def apply_noise(ctx: ScenarioContext) -> None:
                 )
         ctx.rendered["sessions.csv"] = df
 
+        # D5 post-jitter enforcement: arrival/SoC jitter can shrink the
+        # feasibility budget below the session's required_soc target. Truncate
+        # required_soc to the maximum feasible value (or drop if no valid
+        # top-up target). Sampler's pre-jitter D5 check used max_charger_rate
+        # — match it here.
+        min_depart_soc_pct = float(ctx.knobs.get("user_behavior.min_depart_soc")) * 100.0
+        kept, d5_stats = _enforce_d5_post_jitter(
+            ctx.rendered["sessions.csv"],
+            ctx.rendered["cars.csv"],
+            ctx.rendered["chargers.csv"],
+            min_depart_soc_pct,
+        )
+        ctx.rendered["sessions.csv"] = kept.reset_index(drop=True)
+        stats["d5_enforcement"] = d5_stats
+
     if float(n.get("dr_notification_dropout_prob", 0.0)) > 0:
         df = ctx.rendered["dr_events.csv"]
         if len(df) > 0:
@@ -110,3 +204,5 @@ def apply_noise(ctx: ScenarioContext) -> None:
             p = float(n["dr_notification_dropout_prob"])
             mask = rng.random(size=len(df)) >= p
             ctx.rendered["dr_events.csv"] = df.loc[mask].reset_index(drop=True)
+
+    return stats

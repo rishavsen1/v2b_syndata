@@ -313,3 +313,48 @@ Sampler architecture unchanged. Reproducibility (D53) unchanged — E5
 metrics are derived from rendered output, not from the RNG path.
 
 See `DESIGN_NOTES.md #30` for the architectural rationale.
+
+## #15 — D5 post-jitter enforcement via required_soc truncation
+
+After Step 7 V2.5: the noise pipeline truncates `required_soc_at_depart`
+to the max feasible value whenever arrival or SoC jitter shrinks the
+session feasibility budget. Implemented as `_enforce_d5_post_jitter()`
+in `noise.py`, invoked at the end of the session-jitter block (after
+both C4-bounded arrival jitter and D6-bounded SoC jitter have applied).
+
+Feasibility envelope matches the sampler's pre-jitter D5 check:
+```
+max_feasible_required = arrival_soc
+                      + (max(chargers.max_rate_kw) * dwell_hr * 1.04 / capacity_kwh) * 100
+```
+The post-jitter factor is 1.04 (vs sampler's 1.05) — one-percent
+safety margin so float arithmetic doesn't push the rebuilt required
+over validator's `need > avail * 1.05` strict threshold.
+
+Three outcomes tracked per session:
+- **Truncated**: `required_soc` lowered to `max_feasible` (user undercharges)
+- **D7 relaxed**: truncation pushed `required_soc < min_depart_soc` — recorded
+  as relaxation, not violation. Validator skips D7 when manifest carries
+  `noise.d5_enforcement` and emits a soft warning with the relaxed count.
+- **Dropped**: `max_feasible < arrival_soc + 0.01` — no valid top-up target;
+  session removed from output.
+
+Counts surfaced in `manifest["noise"]["d5_enforcement"]`:
+```
+{
+  "max_charger_rate_kw": 20.0,
+  "total_input_sessions": 319,
+  "truncated_count": 9,
+  "d7_relaxed_count": 6,
+  "dropped_count": 0,
+  "total_output_sessions": 319
+}
+```
+
+Under noise, sessions stay physically achievable. "Undercharged"
+(D7-relaxed) status is a feature for studying real-world stress
+scenarios — downstream simulators receive feasible-but-suboptimal
+targets rather than impossible ones.
+
+H2 (price tier consistency) under price_jitter remains a LEGITIMATE
+break per D25 — prices aren't physical-feasibility constrained.
