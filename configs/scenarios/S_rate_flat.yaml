@@ -1,0 +1,26 @@
+scenario_id: S_rate_flat
+description: |
+  E2 rate structure — flat tariff.
+  All other axes match the experimental backdrop. Tests whether
+  the FSL+CONSENT+Persistence stack provides marginal value when
+  there's no time-of-use signal to exploit.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+overrides:
+  utility_rate.tariff_type: flat
+  utility_rate.energy_price_offpeak: 0.150
+  utility_rate.energy_price_peak: 0.150
+  utility_rate.demand_charge_per_kw: 0.0
+
+# E2 plan:
+#   Pair with S01 (TOU), S_rate_demand, S_dr_cbp.
+#   Hypothesis: flat tariff → minimal stack value (no arbitrage signal).

@@ -1,0 +1,21 @@
+scenario_id: S_psi_025
+description: |
+  E1 toggle ablation — low-medium ψ (ψ_freq ≈ 0.27, ψ_consist ≈ 0.39).
+  Mixed parking: visitors + occasional employees (~1-2 days/week).
+  Tests the lower-middle of the monotonicity curve. Expect modest
+  stack value beginning to emerge as some users become predictable.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: occasional_commuter
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+# E1 experiment plan:
+#   Seeds: {1, 7, 42, 137, 999}
+#   Toggles: 2^3 cube (baseline, FSL, CONSENT, Persistence, pairs, full).
+#   Hypothesis: small but non-zero marginal value beginning to appear.

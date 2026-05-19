@@ -1,0 +1,11 @@
+scenario_id: S_clim_atlanta_spring
+description: |
+  E8 climate — subtropical (Atlanta).
+descriptors:
+  location: atlanta_ga
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month

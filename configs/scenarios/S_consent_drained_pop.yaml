@@ -1,0 +1,33 @@
+scenario_id: S_consent_drained_pop
+description: |
+  E5 extension — population shifted toward drained arrival SoC.
+  Overrides f_soc Beta parameters per region to push arrival_soc
+  distribution lower. Wider gap between arrival_soc and req_soc
+  exposes CONSENT negotiation surface more dramatically than the
+  baseline min_depart_soc-only experiment (S_consent_strict/relaxed).
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+overrides:
+  # Shift Beta(α, β) toward lower arrival SoC across all major regions.
+  # Current population E[arrival_soc] ≈ 0.34; this targets E ≈ 0.20.
+  # Beta(2.0, 8.0) has mean = 0.20 vs default ~Beta(4.0, 6.0) at 0.40.
+  user_behavior.region_distributions.stable_commuter.soc_arrival.alpha: 2.0
+  user_behavior.region_distributions.stable_commuter.soc_arrival.beta: 8.0
+  user_behavior.region_distributions.flexible_local.soc_arrival.alpha: 2.0
+  user_behavior.region_distributions.flexible_local.soc_arrival.beta: 8.0
+  user_behavior.region_distributions.irregular_distant.soc_arrival.alpha: 2.0
+  user_behavior.region_distributions.irregular_distant.soc_arrival.beta: 8.0
+
+# E5 extension plan:
+#   Tests CONSENT under maximally-drained fleet (deeper Δ between arrival
+#   and target SoC). Stack value should rise because there's more energy
+#   to negotiate over. Pair with S_consent_topped_pop for symmetric contrast.

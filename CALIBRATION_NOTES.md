@@ -200,3 +200,42 @@ high (~0.4); related to capacity-inference fallback rate.
 S01 (consent_default) generation produces 35 deep-channel leaves all
 stamped `hand_specified:consent_default`. Generation against
 `acn_workplace_baseline` stamps the calibration provenance instead.
+
+
+
+## Inflex (lights + equipment) is seasonally variable, not occupancy-static
+
+Initial assumption: power_inflex_kw should be invariant across seasons
+since occupancy schedules don't change. Empirical finding: 30-60% seasonal
+variation observed across all locations.
+
+Two ASHRAE 90.1 prototype mechanisms explain this:
+- Interior daylight-responsive lighting (ASHRAE 90.1 §9.4.1.1): interior 
+  lights dim when daylight sensors detect sufficient illumination. 
+  Winter = less daylight → higher midday interior lighting load.
+- Exterior lighting daylight controls (§9.4.1.4): exterior lights tied 
+  to astronomical dark hours. Winter = longer evening dark hours → 
+  higher dusk inflex.
+
+E8 analysis should expect:
+- flex (HVAC) varies primarily with outdoor temperature
+- inflex varies with daylight hours (both interior dimming + exterior on-time)
+- Total load = climate × season × daylight, not just climate × season.
+
+## Step 7 finding: ExteriorLights drives apparent inflex seasonal variation
+
+ASHRAE 90.1 MediumOffice prototype includes daylight-controlled exterior
+lighting (lights on when sun below horizon). This produces seasonal
+inflex variation even with identical occupancy schedules:
+
+Example (San Francisco, 18:00 hour):
+  Winter:  181 kW  (sun set by 17:30, lights on)
+  Spring:   85 kW  (longer daylight)
+  Summer:   73 kW  (sun until 20:00)
+  Fall:     93 kW
+
+Implication: power_inflex_kw is NOT occupancy-invariant under varying
+sim_window months. For E8 analysis, separate ExteriorLights from
+InteriorLights+Equipment if isolating occupancy effect. Otherwise
+treat inflex as climate-coupled via daylight hours.
+

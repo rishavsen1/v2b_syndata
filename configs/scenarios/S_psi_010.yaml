@@ -1,0 +1,25 @@
+scenario_id: S_psi_010
+description: |
+  E1 toggle ablation — low-ψ anchor (ψ_freq ≈ 0.14, ψ_consist ≈ 0.22).
+  Sporadic visitor-dominated population. Tests the floor of the
+  monotonicity claim: when arrivals are unpredictable, the
+  FSL+CONSENT+Persistence stack should provide minimal marginal value
+  over any single lever.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: visitor_heavy
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+# E1 experiment plan:
+#   Seeds: {1, 7, 42, 137, 999} — 5-seed ensemble for error bars.
+#   Toggle combinations (8 cells of the 2^3 cube):
+#     baseline | FSL | CONSENT | Persistence
+#     FSL+CONSENT | FSL+Persistence | CONSENT+Persistence
+#     full stack
+#   Hypothesis: marginal value of full stack ≈ baseline marginal at this ψ.

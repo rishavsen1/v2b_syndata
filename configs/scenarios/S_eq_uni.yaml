@@ -1,0 +1,11 @@
+scenario_id: S_eq_uni
+description: |
+  E4 equipment — unidirectional only.
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: uni_only
+sim_window:
+  start: 2020-04-01
+  mode: month

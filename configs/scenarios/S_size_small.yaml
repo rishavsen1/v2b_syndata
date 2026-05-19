@@ -1,0 +1,11 @@
+scenario_id: S_size_small
+description: |
+  E6 building scale — small office.
+descriptors:
+  location: san_jose_ca
+  building: small_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month

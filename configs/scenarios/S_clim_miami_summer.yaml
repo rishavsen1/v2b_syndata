@@ -1,0 +1,15 @@
+scenario_id: S_clim_miami_summer
+description: |
+  E8 climate — hot summer (Miami August).
+  Cooling-dominated regime. Pair with S_clim_cold_jan.
+
+descriptors:
+  location: miami_fl
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+overrides:
+  sim_window.mode: custom
+  sim_window.start: 2020-08-03
+  sim_window.custom_end: 2020-08-31

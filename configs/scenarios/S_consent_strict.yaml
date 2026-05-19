@@ -1,0 +1,13 @@
+scenario_id: S_consent_strict
+description: |
+  E5 CONSENT — strict min departure SoC (90%).
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month
+overrides:
+  user_behavior.min_depart_soc: 0.90

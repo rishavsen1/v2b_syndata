@@ -1,0 +1,32 @@
+scenario_id: S_consent_topped_pop
+description: |
+  E5 extension — population shifted toward high arrival SoC.
+  Symmetric counterpart to S_consent_drained_pop. Users arrive
+  well-charged → minimal energy requirement → narrow negotiation
+  surface for CONSENT.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+overrides:
+  # Beta(6.0, 3.0) has mean = 0.67. Default ~Beta(4, 6) at 0.40.
+  # Tests the high-arrival-SoC regime: minimal energy gap, CONSENT
+  # has little to negotiate over.
+  user_behavior.region_distributions.stable_commuter.soc_arrival.alpha: 6.0
+  user_behavior.region_distributions.stable_commuter.soc_arrival.beta: 3.0
+  user_behavior.region_distributions.flexible_local.soc_arrival.alpha: 6.0
+  user_behavior.region_distributions.flexible_local.soc_arrival.beta: 3.0
+  user_behavior.region_distributions.irregular_distant.soc_arrival.alpha: 6.0
+  user_behavior.region_distributions.irregular_distant.soc_arrival.beta: 3.0
+
+# E5 extension plan:
+#   Symmetric pair with S_consent_drained_pop.
+#   Hypothesis: CONSENT marginal value approaches zero when arrival
+#   SoC is already near target. Sets the floor on negotiation surface.

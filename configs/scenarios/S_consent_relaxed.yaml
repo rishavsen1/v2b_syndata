@@ -1,0 +1,13 @@
+scenario_id: S_consent_relaxed
+description: |
+  E5 CONSENT — relaxed min departure SoC (60%).
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month
+overrides:
+  user_behavior.min_depart_soc: 0.60

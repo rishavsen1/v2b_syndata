@@ -1,0 +1,27 @@
+scenario_id: S_rate_demand
+description: |
+  E2 rate structure — demand-charge tariff.
+  TOU energy rates plus a per-kW monthly demand charge based on peak
+  15-minute load. Tests whether the stack can shape load to avoid
+  demand spikes (large incentive for peak shaving via V2B).
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+overrides:
+  utility_rate.tariff_type: demand_charge
+  utility_rate.energy_price_offpeak: 0.120
+  utility_rate.energy_price_peak: 0.178
+  utility_rate.peak_window: [16, 21]
+  utility_rate.demand_charge_per_kw: 25.00
+
+# E2 plan:
+#   Hypothesis: demand-charge tariffs maximize V2B value — peak shaving
+#   is directly priced. Stack should dominate single levers most clearly.

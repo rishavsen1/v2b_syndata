@@ -1,0 +1,22 @@
+scenario_id: S_psi_075
+description: |
+  E1 toggle ablation — high-medium ψ (ψ_freq ≈ 0.71, ψ_consist ≈ 0.54).
+  Mixed-flex CONSENT-empirical baseline. Most users are regular
+  commuters with some flexibility. Stack value should be clearly
+  positive and increasing toward the high-ψ end.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+# E1 experiment plan:
+#   Seeds: {1, 7, 42, 137, 999}
+#   Toggles: 2^3 cube.
+#   Hypothesis: full stack clearly dominates singletons; pairwise
+#   combinations begin to lag full stack.

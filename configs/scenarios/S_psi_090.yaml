@@ -1,0 +1,32 @@
+scenario_id: S_psi_090
+description: |
+  E1 toggle ablation — high-ψ anchor (ψ_freq ≈ 0.86, ψ_consist ≈ 0.81).
+  Predictable daily commuters. Tests the ceiling of the monotonicity
+  claim: when the population is maximally predictable, the full
+  FSL+CONSENT+Persistence stack should provide its largest marginal
+  gain over any single lever.
+
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: stable_commuter_heavy
+  equipment: balanced_50pct
+
+sim_window:
+  start: 2020-04-01
+  mode: month
+
+# Capacity override: stable_commuter_heavy has fleet.ev_count=25, but
+# balanced_50pct provides 20 chargers. Without headroom, E5 invariant
+# fails at peak arrival (21+ concurrent sessions > 20 chargers).
+# Increase charger count for this scenario only; preserves 50% bidirectional
+# split. Confounds equipment slightly, but cleaner than reducing population
+# (which would defeat the "heavy fleet" purpose) or rewriting the population.
+overrides:
+  charging_infra.charger_count: 27
+
+# E1 experiment plan:
+#   Seeds: {1, 7, 42, 137, 999}
+#   Toggles: 2^3 cube.
+#   Hypothesis: full stack >> any single lever; large monotonicity gap
+#   relative to S_psi_010. This is the headline-figure delta.

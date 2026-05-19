@@ -1,0 +1,11 @@
+scenario_id: S_arch_retail
+description: |
+  E6 archetype — retail strip mall + visitor-heavy population.
+descriptors:
+  location: san_jose_ca
+  building: retail_strip_mall
+  population: visitor_heavy
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month

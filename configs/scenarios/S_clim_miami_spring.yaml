@@ -1,0 +1,11 @@
+scenario_id: S_clim_miami_spring
+description: |
+  E8 climate — hot/tropical (Miami).
+descriptors:
+  location: miami_fl
+  building: medium_office_v1
+  population: consent_default
+  equipment: balanced_50pct
+sim_window:
+  start: 2020-04-01
+  mode: month

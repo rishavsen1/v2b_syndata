@@ -1,0 +1,11 @@
+scenario_id: S_eq_bi
+description: |
+  E4 equipment — fully bidirectional.
+descriptors:
+  location: san_jose_ca
+  building: medium_office_v1
+  population: consent_default
+  equipment: bi_heavy
+sim_window:
+  start: 2020-04-01
+  mode: month
