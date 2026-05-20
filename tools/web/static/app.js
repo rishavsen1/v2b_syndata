@@ -580,18 +580,22 @@ function renderCsvPlot(divId, csvName, summary) {
     const cols = new Set(summary.columns);
 
     try {
-        if (csvName === "building_load.csv" && cols.has("timestamp") && cols.has("power_flex_kw")) {
-            Plotly.newPlot(divId, [
-                { x: head.map(r => r.timestamp), y: head.map(r => r.power_flex_kw), name: "flex", type: "scatter", mode: "lines" },
-                { x: head.map(r => r.timestamp), y: head.map(r => r.power_inflex_kw), name: "inflex", type: "scatter", mode: "lines" },
-            ], { title: "Building load (first 50 rows)", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "" }, yaxis: { title: "kW" } });
+        if (csvName === "building_load.csv" && cols.has("datetime") && cols.has("power_flex_kw")) {
+            const traces = [
+                { x: head.map(r => r.datetime), y: head.map(r => r.power_flex_kw), name: "flex", type: "scatter", mode: "lines" },
+                { x: head.map(r => r.datetime), y: head.map(r => r.power_inflex_kw), name: "inflex", type: "scatter", mode: "lines" },
+            ];
+            if (cols.has("power_kw")) {
+                traces.push({ x: head.map(r => r.datetime), y: head.map(r => r.power_kw), name: "total", type: "scatter", mode: "lines", line: { width: 2, dash: "dot" } });
+            }
+            Plotly.newPlot(divId, traces, { title: "Building load (first 50 rows)", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "" }, yaxis: { title: "kW" } });
             return;
         }
-        if (csvName === "grid_prices.csv" && cols.has("timestamp")) {
+        if (csvName === "grid_prices.csv" && cols.has("datetime")) {
             const priceCol = ["price_per_kwh", "price", "energy_price"].find(c => cols.has(c));
             if (priceCol) {
                 Plotly.newPlot(divId, [
-                    { x: head.map(r => r.timestamp), y: head.map(r => r[priceCol]), type: "scatter", mode: "lines+markers" },
+                    { x: head.map(r => r.datetime), y: head.map(r => r[priceCol]), type: "scatter", mode: "lines+markers" },
                 ], { title: `Grid prices (first 50 rows): ${priceCol}`, margin: { t: 30, l: 50, r: 10, b: 40 }, yaxis: { title: "$/kWh" } });
                 return;
             }

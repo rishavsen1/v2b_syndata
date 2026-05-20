@@ -21,7 +21,7 @@ from .samplers.dr_sampler import PROGRAM_SPECS
 # Schema reference — column name → expected dtype family.
 # Order is not enforced (per A2) but we validate columns are exactly these.
 _SCHEMAS: dict[str, list[str]] = {
-    "building_load": ["datetime", "power_flex_kw", "power_inflex_kw"],
+    "building_load": ["datetime", "power_flex_kw", "power_inflex_kw", "power_kw"],
     "cars": ["car_id", "capacity_kwh", "min_allowed_soc", "max_allowed_soc", "battery_class"],
     "users": ["car_id", "region", "phi", "kappa", "delta_km",
               "negotiation_type", "w1", "w2"],
@@ -148,7 +148,7 @@ def validate(output_dir: Path, strict: bool = False) -> ValidationReport:
 
 def _check_a3_a4(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
     numeric_cols = {
-        "building_load": ["power_flex_kw", "power_inflex_kw"],
+        "building_load": ["power_flex_kw", "power_inflex_kw", "power_kw"],
         "cars": ["car_id", "capacity_kwh", "min_allowed_soc", "max_allowed_soc"],
         "users": ["car_id", "phi", "kappa", "delta_km", "w1", "w2"],
         "chargers": ["charger_id", "min_rate_kw", "max_rate_kw"],

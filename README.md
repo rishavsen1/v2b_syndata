@@ -57,6 +57,22 @@ uv run python -m v2b_syndata.cli list-knobs
 uv run python -m v2b_syndata.cli list-scenarios
 ```
 
+## Web frontend
+
+Browser-based scenario configurator. Pick descriptors via dropdowns, tune
+individual knobs in the Advanced panel, generate, and preview CSVs +
+manifest inline.
+
+```bash
+pip install -r tools/web/requirements.txt
+python tools/web/app.py
+# → Running on http://127.0.0.1:5000
+```
+
+Local-only by default. See `tools/web/README.md` for LAN exposure and
+architecture details. Output runs land in `tools/web/runs/` (last 20
+kept, gitignored).
+
 ## Outputs
 
 Per scenario seed:

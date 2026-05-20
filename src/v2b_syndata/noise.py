@@ -117,6 +117,7 @@ def apply_noise(ctx: ScenarioContext) -> dict[str, Any]:
         if o_jit > 0:
             o_noise = rng.normal(1.0, o_jit, size=len(df))
             df["power_inflex_kw"] = np.clip(df["power_inflex_kw"].to_numpy() * o_noise, 0, None)
+        df["power_kw"] = df["power_flex_kw"].to_numpy() + df["power_inflex_kw"].to_numpy()
         ctx.rendered["building_load.csv"] = df
 
     if float(n.get("price_jitter_pct", 0.0)) > 0:
@@ -137,15 +138,16 @@ def apply_noise(ctx: ScenarioContext) -> dict[str, Any]:
             t_jit = float(n.get("arrival_time_jitter_min", 0.0))
             s_jit = float(n.get("soc_arrival_jitter_pct", 0.0))
             if t_jit > 0:
-                # Round shifts to whole seconds. CSV stores arrival at second
-                # precision (strftime '%H:%M:%S' truncates fractions); leaving
-                # microsecond-level shifts in the in-memory timestamp would
-                # make duration_sec disagree with (departure - reloaded_arrival)
-                # → C6 mismatch on validate.
-                shifts_sec = np.round(rng.normal(0.0, t_jit, size=len(df)) * 60.0).astype(int)
+                # Snap jitter to multiples of 15 minutes so arrival stays on
+                # the 15-min tick grid (matches renderer invariant: both
+                # arrival and departure live on 15-min boundaries, and
+                # duration_sec is a multiple of 900).
+                shifts_900 = np.round(rng.normal(0.0, t_jit, size=len(df)) / 15.0).astype(int)
+                shifts_sec = shifts_900 * 900
                 arrivals = pd.to_datetime(df["arrival"])
                 deps = pd.to_datetime(df["departure"])
-                # Forward bound — keep departure - new_arrival >= 15 minutes.
+                # Forward bound — keep departure - new_arrival >= 15 minutes
+                # (already a 900-multiple since both endpoints are on ticks).
                 max_forward = (deps - arrivals).dt.total_seconds().astype(int) - _MIN_SESSION_DURATION_SEC
                 shifts_sec = np.minimum(shifts_sec, max_forward.to_numpy())
                 # Backward bound — keep new_arrival >= sim_window.start.

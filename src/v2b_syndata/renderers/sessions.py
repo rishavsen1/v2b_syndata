@@ -138,7 +138,11 @@ def render(ctx: ScenarioContext) -> None:
 
                 total_min = int(round(arr_hour * 60.0 / 15.0)) * 15
                 arrival = day + pd.Timedelta(minutes=total_min)
-                duration_sec = int(round(dwell_hr * 3600.0))
+                # Floor dwell to 15-min grid so departure lands on a 15-min
+                # tick (arrival already snapped above). Enforces a min of 1
+                # tick (900s) so a dwell that rounds down to zero still
+                # produces a non-degenerate session.
+                duration_sec = max(900, int(dwell_hr * 3600.0) // 900 * 900)
                 departure = arrival + pd.Timedelta(seconds=duration_sec)
 
                 # 2. Inside sim window + non-overlap with prior session.

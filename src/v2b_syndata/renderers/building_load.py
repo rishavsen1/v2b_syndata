@@ -16,9 +16,12 @@ def render(ctx: ScenarioContext) -> None:
         scale = 1.0
     else:
         scale = target_peak / current_peak
+    flex_scaled = (flex * scale).to_numpy()
+    inflex_scaled = (inflex * scale).to_numpy()
     df = pd.DataFrame({
         "datetime": flex.index.strftime("%Y-%m-%d %H:%M:%S"),
-        "power_flex_kw": (flex * scale).to_numpy(),
-        "power_inflex_kw": (inflex * scale).to_numpy(),
+        "power_flex_kw": flex_scaled,
+        "power_inflex_kw": inflex_scaled,
+        "power_kw": flex_scaled + inflex_scaled,
     })
     ctx.rendered["building_load.csv"] = df
