@@ -367,3 +367,15 @@ pre {
 .source-descriptor { color: var(--primary); }
 .source-default { color: var(--text-muted); }
 .source-calibration { color: var(--valid); }
+
+.source-label {
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.knob .source-label.source-descriptor { color: var(--primary); font-weight: 600; }
+.knob .source-label.source-explicit   { color: var(--accent);  font-weight: 600; }
+.knob .source-label.source-default    { color: var(--text-muted); font-style: italic; }
+.knob .source-label.source-calibration { color: var(--valid); font-weight: 600; }

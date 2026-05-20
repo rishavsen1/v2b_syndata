@@ -14,6 +14,19 @@ const state = {
 let DESCRIPTORS = null;   // {location: [...], building: [...], ...}
 let KNOBS = null;         // {bucket: {knob: spec}}
 let SCENARIOS = null;     // [{id, description, descriptors, overrides}, ...]
+let RESOLVED = {};        // {path: {value, source}} — from /api/resolve
+
+function getEffectiveDefault(path, spec) {
+    if (RESOLVED && RESOLVED[path] && RESOLVED[path].value !== undefined) {
+        return RESOLVED[path].value;
+    }
+    return spec.default;
+}
+
+function getEffectiveSource(path) {
+    if (RESOLVED && RESOLVED[path]) return RESOLVED[path].source;
+    return "default";
+}
 
 async function init() {
     try {
@@ -33,6 +46,57 @@ async function init() {
     populateKnobBuckets();
     attachListeners();
     syncFromScenario(state.base_scenario);
+    await refreshResolvedDefaults();
+}
+
+async function refreshResolvedDefaults() {
+    try {
+        const resp = await fetch("/api/resolve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                base_scenario: state.base_scenario,
+                descriptors: state.descriptors,
+            }),
+        });
+        const data = await resp.json();
+        if (data.error) {
+            console.warn("resolve failed:", data.error);
+            return;
+        }
+        RESOLVED = data;
+    } catch (e) {
+        console.warn("resolve fetch failed:", e);
+        return;
+    }
+    document.querySelectorAll(".knob").forEach(widget => {
+        const path = widget.dataset.path;
+        if (!path) return;
+        const [bucket, knobName] = path.split(/\.(.+)/);
+        const spec = (KNOBS[bucket] || {})[knobName];
+        if (!spec) return;
+        if (!(path in state.overrides)) {
+            const resolvedVal = getEffectiveDefault(path, spec);
+            const input = widget.querySelector(".knob-input-row > :first-child");
+            if (input) resetWidgetValue(input, spec, resolvedVal);
+            widget.classList.remove("modified");
+        }
+        updateSourceLabel(widget, path);
+    });
+}
+
+function updateSourceLabel(widget, path) {
+    const src = (path in state.overrides) ? "explicit (you)" : getEffectiveSource(path);
+    const label = widget.querySelector(".source-label");
+    if (!label) return;
+    label.textContent = `from: ${src}`;
+    const head = src.split(":")[0];
+    const cls = (path in state.overrides) ? "source-explicit"
+              : head === "descriptor" ? "source-descriptor"
+              : head === "calibration" ? "source-calibration"
+              : head === "explicit" ? "source-explicit"
+              : "source-default";
+    label.className = `source-label ${cls}`;
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -48,9 +112,11 @@ function populateScenarioSelect() {
         sel.appendChild(opt);
     });
     sel.value = state.base_scenario;
-    sel.addEventListener("change", e => {
+    sel.addEventListener("change", async e => {
         state.base_scenario = e.target.value;
+        state.overrides = {};
         syncFromScenario(e.target.value);
+        await refreshResolvedDefaults();
     });
 }
 
@@ -69,10 +135,11 @@ function populateDescriptorSelects() {
             o.textContent = `${opt.id}${opt.description ? " — " + opt.description.slice(0, 70) : ""}`;
             sel.appendChild(o);
         });
-        sel.addEventListener("change", e => {
+        sel.addEventListener("change", async e => {
             if (e.target.value) state.descriptors[cat] = e.target.value;
             else delete state.descriptors[cat];
             renderOverrideSummary();
+            await refreshResolvedDefaults();
         });
     }
 }
@@ -181,26 +248,36 @@ function createKnobWidget(path, spec) {
     resetBtn.addEventListener("click", () => {
         delete state.overrides[path];
         wrapper.classList.remove("modified");
-        resetWidgetValue(input, spec);
+        resetWidgetValue(input, spec, getEffectiveDefault(path, spec));
+        updateSourceLabel(wrapper, path);
         renderOverrideSummary();
     });
     inputRow.appendChild(resetBtn);
 
     label.appendChild(inputRow);
+
+    const sourceLabel = document.createElement("div");
+    sourceLabel.className = "source-label source-default";
+    sourceLabel.textContent = "from: default";
+    label.appendChild(sourceLabel);
+
     wrapper.appendChild(label);
     return wrapper;
 }
 
 function createInputForType(path, spec, wrapper) {
+    const effDefault = getEffectiveDefault(path, spec);
     const onChange = (v, valid = true) => {
         if (!valid) return;
-        if (deepEqual(v, spec.default)) {
+        const baseline = getEffectiveDefault(path, spec);
+        if (deepEqual(v, baseline)) {
             delete state.overrides[path];
             wrapper.classList.remove("modified");
         } else {
             state.overrides[path] = v;
             wrapper.classList.add("modified");
         }
+        updateSourceLabel(wrapper, path);
         renderOverrideSummary();
     };
 
@@ -214,7 +291,7 @@ function createInputForType(path, spec, wrapper) {
                 inp.max = spec.range[1];
             }
             inp.step = spec.type === "int" ? "1" : "any";
-            inp.value = spec.default;
+            inp.value = effDefault;
             inp.addEventListener("change", e => {
                 const raw = e.target.value;
                 let v = spec.type === "int" ? parseInt(raw, 10) : parseFloat(raw);
@@ -235,7 +312,7 @@ function createInputForType(path, spec, wrapper) {
             const wrap = document.createElement("span");
             const cb = document.createElement("input");
             cb.type = "checkbox";
-            cb.checked = !!spec.default;
+            cb.checked = !!effDefault;
             cb.addEventListener("change", e => onChange(e.target.checked));
             wrap.appendChild(cb);
             wrap.appendChild(document.createTextNode(" enabled"));
@@ -248,7 +325,7 @@ function createInputForType(path, spec, wrapper) {
                 const opt = document.createElement("option");
                 opt.value = choice;
                 opt.textContent = choice;
-                if (choice === spec.default) opt.selected = true;
+                if (choice === effDefault) opt.selected = true;
                 sel.appendChild(opt);
             });
             sel.addEventListener("change", e => onChange(e.target.value));
@@ -268,7 +345,7 @@ function createInputForType(path, spec, wrapper) {
         default: {
             const ta = document.createElement("textarea");
             ta.rows = 2;
-            ta.value = JSON.stringify(spec.default);
+            ta.value = JSON.stringify(effDefault);
             ta.addEventListener("change", e => {
                 try {
                     const v = JSON.parse(e.target.value);
@@ -286,7 +363,8 @@ function createSimplexWidget(path, spec, wrapper, onChange) {
     const container = document.createElement("div");
     container.className = "simplex-widget";
 
-    const components = spec.components || spec.default.map((_, i) => `c${i}`);
+    const effDefault = getEffectiveDefault(path, spec);
+    const components = spec.components || effDefault.map((_, i) => `c${i}`);
     const inputs = components.map((name, i) => {
         const wrap = document.createElement("div");
         wrap.className = "component";
@@ -298,7 +376,7 @@ function createSimplexWidget(path, spec, wrapper, onChange) {
         inp.min = 0;
         inp.max = 1;
         inp.step = 0.01;
-        inp.value = spec.default[i];
+        inp.value = effDefault[i];
         wrap.appendChild(lbl);
         wrap.appendChild(inp);
         container.appendChild(wrap);
@@ -325,7 +403,7 @@ function createSimplexWidget(path, spec, wrapper, onChange) {
 function createVec2Widget(path, spec, onChange) {
     const container = document.createElement("div");
     container.className = "vec2-widget";
-    const [a, b] = spec.default;
+    const [a, b] = getEffectiveDefault(path, spec);
     const ia = document.createElement("input");
     const ib = document.createElement("input");
     [ia, ib].forEach(i => {
@@ -348,24 +426,24 @@ function createVec2Widget(path, spec, onChange) {
     return container;
 }
 
-function resetWidgetValue(input, spec) {
+function resetWidgetValue(input, spec, value) {
+    if (value === undefined) value = spec.default;
     if (spec.type === "bool" && input.tagName === "SPAN") {
-        input.querySelector("input").checked = !!spec.default;
+        input.querySelector("input").checked = !!value;
     } else if (spec.type === "simplex") {
         const inputs = input.querySelectorAll("input");
-        spec.default.forEach((v, i) => { if (inputs[i]) inputs[i].value = v; });
-        // re-trigger sum recompute
+        (value || []).forEach((v, i) => { if (inputs[i]) inputs[i].value = v; });
         if (inputs[0]) inputs[0].dispatchEvent(new Event("input"));
     } else if (spec.type === "vec2") {
         const inputs = input.querySelectorAll("input");
-        if (inputs[0]) inputs[0].value = spec.default[0];
-        if (inputs[1]) inputs[1].value = spec.default[1];
+        if (inputs[0]) inputs[0].value = value[0];
+        if (inputs[1]) inputs[1].value = value[1];
     } else if (spec.type === "categorical") {
-        input.value = spec.default;
+        input.value = value;
     } else if (input.tagName === "TEXTAREA") {
-        input.value = JSON.stringify(spec.default);
+        input.value = JSON.stringify(value);
     } else if (input.tagName === "INPUT") {
-        input.value = spec.default;
+        input.value = value;
     }
 }
 

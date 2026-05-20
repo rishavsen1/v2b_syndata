@@ -42,7 +42,7 @@ def test_each_tariff(tariff, fast_generate, assert_sanity):
     assert_sanity(out, manifest)
     gp = pd.read_csv(out / "grid_prices.csv")
     if tariff == "flat":
-        assert (gp["type"] == "off_peak").all()
+        assert (gp["type"] == "off-peak").all()
         assert gp["price_per_kwh"].nunique() == 1
     rep = validate(out)
     assert rep.passed, f"tariff={tariff}: {'; '.join(rep.errors)}"
@@ -101,7 +101,7 @@ def test_peak_window_wraparound(fast_generate, assert_sanity):
     expected_peak = (hours >= 22) | (hours < 6)
     assert (
         (gp["type"] == "peak") == expected_peak
-    ).all(), "peak/off_peak labels don't match wraparound peak_window=[22, 6]"
+    ).all(), "peak/off-peak labels don't match wraparound peak_window=[22, 6]"
     rep = validate(out)
     assert rep.passed, f"wraparound: {'; '.join(rep.errors)}"
 

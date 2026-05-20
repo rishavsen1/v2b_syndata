@@ -17,7 +17,7 @@ def render(ctx: ScenarioContext) -> None:
 
     if tariff == "flat":
         prices = [off_p] * len(idx)
-        types = ["off_peak"] * len(idx)
+        types = ["off-peak"] * len(idx)
     else:
         prices = []
         types = []
@@ -29,7 +29,7 @@ def render(ctx: ScenarioContext) -> None:
                 types.append("peak")
             else:
                 prices.append(off_p)
-                types.append("off_peak")
+                types.append("off-peak")
     df = pd.DataFrame({
         "datetime": idx.strftime("%Y-%m-%d %H:%M:%S"),
         "price_per_kwh": prices,

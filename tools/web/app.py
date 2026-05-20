@@ -177,6 +177,49 @@ def api_scenarios():
     return jsonify(load_scenarios())
 
 
+@app.route("/api/resolve", methods=["POST"])
+def api_resolve():
+    """Dry-run knob resolution: same chain the CLI uses, no rendering.
+
+    Returns `{knob_path: {value, source}}` reflecting what would land in
+    manifest.json if Generate were clicked now with the given base
+    scenario + descriptor picks (and no per-knob overrides). The frontend
+    uses this to display descriptor-resolved values instead of the
+    knobs.yaml defaults.
+    """
+    from v2b_syndata.descriptor_loader import expand_descriptors, load_scenario
+    from v2b_syndata.knob_loader import load_knob_registry, resolve_knobs
+
+    payload = request.get_json(force=True, silent=True) or {}
+    base_scenario = payload.get("base_scenario", "S01")
+    descriptor_overrides = payload.get("descriptors") or {}
+
+    try:
+        scenario_path = SCENARIOS_DIR / f"{base_scenario}.yaml"
+        scenario = load_scenario(scenario_path)
+        descriptors = dict(scenario.get("descriptors") or {})
+        for k, v in descriptor_overrides.items():
+            if v:
+                descriptors[k] = v
+        scenario_overrides = scenario.get("overrides") or {}
+
+        registry = load_knob_registry(CONFIGS / "knobs.yaml")
+        descriptor_values = expand_descriptors(descriptors, CONFIGS)
+        resolved = resolve_knobs(
+            registry=registry,
+            descriptor_values=descriptor_values,
+            scenario_overrides=scenario_overrides,
+            cli_overrides={},
+        )
+        out = {
+            path: {"value": kv.value, "source": kv.source}
+            for path, kv in resolved.values.items()
+        }
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     payload = request.get_json(force=True, silent=True) or {}

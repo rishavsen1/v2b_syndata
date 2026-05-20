@@ -358,3 +358,38 @@ targets rather than impossible ones.
 
 H2 (price tier consistency) under price_jitter remains a LEGITIMATE
 break per D25 — prices aren't physical-feasibility constrained.
+
+## #16 — grid_prices.csv type labels use hyphen
+
+The `type` column in `grid_prices.csv` uses:
+- `"off-peak"` (hyphenated)
+- `"peak"`
+
+Earlier code used `"off_peak"` (underscore), which drifted from the
+documented schema. Fixed across renderer, validators, tests, and the
+spec docs (`validate_spec.md`, `BAYES_NET.md`, `CLAUDE_CODE_PROMPT.md`).
+Code identifiers (e.g. the `is_offpeak()` helper, `_OFFPEAK_HOURS`
+constants) continue to use underscore — only the **data label** in the
+CSV's `type` column flips to hyphen.
+
+Knob-audit Stage 2 already measures the numeric `price_per_kwh` column,
+not the string label, so the relabel does not change its
+monotonicity diagnostics — `energy_price_offpeak` and
+`energy_price_peak` remain MONOTONIC.
+
+## #17 — Frontend surfaces descriptor-resolved knob values
+
+The web frontend at `tools/web/` calls `/api/resolve` on descriptor
+change (and on every base-scenario change) to display the **actual
+resolved value** for each knob — not the raw `knobs.yaml` default.
+
+`/api/resolve` runs the same descriptor expansion + scenario-override +
+default chain that `runner.generate()` runs, but stops short of any
+rendering. Returns `{knob_path: {value, source}}` where `source ∈
+{"explicit", "descriptor:<name>", "calibration:<provenance>",
+"default"}` — same shape as the manifest's `knob_resolution` block.
+
+Each knob widget shows a colour-coded "from:" label (descriptor /
+explicit (you) / calibration / default). Reset reverts the input to
+the descriptor-resolved value, not the raw `knobs.yaml` default — so
+the displayed value always matches what the run would emit.

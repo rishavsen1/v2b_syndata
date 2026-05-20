@@ -35,7 +35,7 @@ _SCHEMAS: dict[str, list[str]] = {
 
 _BATTERY_CLASSES = {"leaf_24", "bolt_40", "m3_75", "rivian_100"}
 _DIRECTIONALITY = {"unidirectional", "bidirectional"}
-_PRICE_TYPES = {"off_peak", "peak"}
+_PRICE_TYPES = {"off-peak", "peak"}
 _NEG_TYPES = {"type_i", "type_ii", "type_iii", "type_iv"}
 
 # F4/F5 share tolerance — n=20 is statistically tight at 0.05 (see DESIGN_NOTES §6).
@@ -621,14 +621,14 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
 
     gp = csvs["grid_prices"]
     if tariff == "flat":
-        rep.add((gp["type"] == "off_peak").all(), "H1: flat tariff with peak rows")
+        rep.add((gp["type"] == "off-peak").all(), "H1: flat tariff with peak rows")
         rep.add(gp["price_per_kwh"].nunique() == 1, "H1: flat tariff with varied prices")
     else:
         # Allow noise jitter — use approximate equality if noise profile is non-clean.
         noise_profile = manifest.get("noise_profile", "clean")
         approx = noise_profile != "clean"
         peak_rows = gp[gp["type"] == "peak"]
-        off_rows = gp[gp["type"] == "off_peak"]
+        off_rows = gp[gp["type"] == "off-peak"]
         if approx:
             rep.add(((peak_rows["price_per_kwh"] - peak_p).abs() <= 0.5).all() if len(peak_rows) else True,
                     "H2: peak prices off")
@@ -649,7 +649,7 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             in_peak = (hours >= pw[0]) & (hours < pw[1])
         else:
             in_peak = (hours >= pw[0]) | (hours < pw[1])
-        expected = in_peak.map({True: "peak", False: "off_peak"})
+        expected = in_peak.map({True: "peak", False: "off-peak"})
         mismatch = gp["type"] != expected
         if mismatch.any():
             bad_idx = mismatch.idxmax()

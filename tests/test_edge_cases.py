@@ -248,7 +248,7 @@ def test_inverted_tariff(tmp_path: Path):
     )
     prices = pd.read_csv(out / "grid_prices.csv")
     peak_rows = prices[prices["type"] == "peak"]
-    off_rows = prices[prices["type"] == "off_peak"]
+    off_rows = prices[prices["type"] == "off-peak"]
     assert peak_rows["price_per_kwh"].mean() < off_rows["price_per_kwh"].mean()
     rep = validate(out, strict=False)
     assert rep.passed, rep.errors[:3]
