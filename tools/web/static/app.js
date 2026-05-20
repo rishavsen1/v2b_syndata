@@ -16,6 +16,35 @@ let KNOBS = null;         // {bucket: {knob: spec}}
 let SCENARIOS = null;     // [{id, description, descriptors, overrides}, ...]
 let RESOLVED = {};        // {path: {value, source}} — from /api/resolve
 
+// Feature picker for distribution plots, per-CSV.
+const PLOT_FEATURES = {
+    "building_load.csv": [
+        { value: "power_kw",         label: "power_kw (total)" },
+        { value: "power_flex_kw",    label: "power_flex_kw (HVAC)" },
+        { value: "power_inflex_kw",  label: "power_inflex_kw (lights + plug)" },
+    ],
+    "sessions.csv": [
+        { value: "arrival_hour",                  label: "arrival hour" },
+        { value: "departure_hour",                label: "departure hour" },
+        { value: "duration_sec",                  label: "duration (sec)" },
+        { value: "arrival_soc",                   label: "arrival SoC" },
+        { value: "required_soc_at_depart",        label: "required SoC at depart" },
+        { value: "previous_day_external_use_soc", label: "previous-day external use SoC" },
+    ],
+    "cars.csv": [
+        { value: "capacity_kwh",     label: "capacity (kWh)" },
+        { value: "min_allowed_soc",  label: "min allowed SoC" },
+        { value: "max_allowed_soc",  label: "max allowed SoC" },
+        { value: "battery_class",    label: "battery class" },
+    ],
+};
+
+// Default fixed bin count for histogram overlays. Bin EDGES are computed
+// from the global min/max across all samples in a batch run so bars from
+// different samples align column-for-column.
+const HIST_BINS = 30;
+const HOUR_BINS = 24;
+
 function getEffectiveDefault(path, spec) {
     if (RESOLVED && RESOLVED[path] && RESOLVED[path].value !== undefined) {
         return RESOLVED[path].value;
@@ -605,7 +634,7 @@ function showBatchAnalysisPanel(batchId, manifest) {
         panel.id = "batch-analysis";
         panel.innerHTML = `
             <h2>Batch analysis</h2>
-            <p class="hint">Overlay all samples for a given month onto one plot. Building load over the chosen window.</p>
+            <p class="hint">Overlay all samples for a given month onto one plot. Pick CSV and feature.</p>
             <div class="batch-grid">
                 <label><span class="field-name">Month</span>
                     <select id="batch-analysis-month"></select>
@@ -614,9 +643,14 @@ function showBatchAnalysisPanel(batchId, manifest) {
                     <select id="batch-analysis-csv">
                         <option value="building_load.csv">building_load.csv</option>
                         <option value="grid_prices.csv">grid_prices.csv</option>
+                        <option value="sessions.csv">sessions.csv</option>
+                        <option value="cars.csv">cars.csv</option>
                     </select>
                 </label>
-                <label><span class="field-name">Window</span>
+                <label id="batch-analysis-feature-label"><span class="field-name">Feature</span>
+                    <select id="batch-analysis-feature"></select>
+                </label>
+                <label id="batch-analysis-window-label"><span class="field-name">Window</span>
                     <select id="batch-analysis-window">
                         <option value="1day">1 day</option>
                         <option value="month" selected>Whole month</option>
@@ -632,14 +666,40 @@ function showBatchAnalysisPanel(batchId, manifest) {
     const monthSel = document.getElementById("batch-analysis-month");
     const months = [...new Set((manifest.samples || []).filter(s => s.status === "succeeded").map(s => s.month))];
     monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join("");
+
+    const csvSel = document.getElementById("batch-analysis-csv");
+    const syncFeatureWindow = () => updateBatchAnalysisPickers(csvSel.value);
+    csvSel.onchange = syncFeatureWindow;
+    syncFeatureWindow();
+
     const runBtn = document.getElementById("batch-analysis-run");
     runBtn.onclick = () => runBatchAnalysis(batchId, manifest);
+}
+
+function updateBatchAnalysisPickers(csvName) {
+    const features = PLOT_FEATURES[csvName] || [];
+    const featLabel = document.getElementById("batch-analysis-feature-label");
+    const featSel = document.getElementById("batch-analysis-feature");
+    const winLabel = document.getElementById("batch-analysis-window-label");
+
+    if (features.length > 0) {
+        featSel.innerHTML = features.map(f => `<option value="${f.value}">${f.label}</option>`).join("");
+        featLabel.style.display = "";
+    } else {
+        featLabel.style.display = "none";
+    }
+    // Cars has no time axis — hide window picker.
+    winLabel.style.display = (csvName === "cars.csv") ? "none" : "";
 }
 
 async function runBatchAnalysis(batchId, manifest) {
     const month = document.getElementById("batch-analysis-month").value;
     const csvName = document.getElementById("batch-analysis-csv").value;
-    const win = document.getElementById("batch-analysis-window").value;
+    const winEl = document.getElementById("batch-analysis-window");
+    const featEl = document.getElementById("batch-analysis-feature");
+    const featLabelEl = document.getElementById("batch-analysis-feature-label");
+    const win = (csvName === "cars.csv") ? "month" : winEl.value;
+    const feature = (featLabelEl.style.display !== "none") ? featEl.value : null;
     const status = document.getElementById("batch-analysis-status");
     const plotDiv = document.getElementById("batch-analysis-plot");
 
@@ -650,7 +710,8 @@ async function runBatchAnalysis(batchId, manifest) {
     }
     status.innerHTML = `<span class="spinner"></span> fetching ${samples.length} samples…`;
 
-    const traces = [];
+    // Pass 1: fetch all samples, store filtered rows keyed by sample.
+    const sampleRows = [];
     let fetched = 0;
     for (const s of samples) {
         try {
@@ -658,55 +719,139 @@ async function runBatchAnalysis(batchId, manifest) {
                 `/api/batch/${batchId}/csv/${month}/${s.sample_idx}/${csvName}`
             );
             const filtered = filterByWindow(rows, win);
-            if (!filtered.length) continue;
-            traces.push(...buildOverlayTrace(csvName, filtered, s.sample_idx, s.seed));
+            if (filtered.length) sampleRows.push({ sample: s, rows: filtered });
             fetched++;
             status.innerHTML = `<span class="spinner"></span> fetched ${fetched}/${samples.length}`;
         } catch (e) {
             console.warn(`fetch failed for sample ${s.sample_idx}:`, e);
         }
     }
+    if (!sampleRows.length) {
+        status.textContent = "no plottable data";
+        return;
+    }
+
+    // Pass 2: derive shared bin spec for histogram-style plots, then build traces.
+    const isHistogram = histogramFeature(csvName, feature);
+    let binSpec = null;
+    if (isHistogram) {
+        const allValues = [];
+        for (const { rows } of sampleRows) {
+            allValues.push(...extractFeatureValues(rows, csvName, feature));
+        }
+        if (allValues.length) {
+            const lo = Math.min(...allValues);
+            const hi = Math.max(...allValues);
+            const nBins = (feature === "arrival_hour" || feature === "departure_hour") ? HOUR_BINS : HIST_BINS;
+            // Float ULP nudge so the hi-edge sample lands in the last bin, not orphaned.
+            const size = (hi - lo) / nBins || 1;
+            binSpec = { start: lo, end: hi + size * 1e-6, size };
+        }
+    }
+
+    const traces = [];
+    for (const { sample: s, rows } of sampleRows) {
+        traces.push(...buildOverlayTraces(csvName, rows, feature, s.sample_idx, s.seed, binSpec));
+    }
+
     if (!traces.length) {
         status.textContent = "no plottable data";
         return;
     }
     plotDiv.style.display = "";
-    const title = `${csvName} — ${month}, ${samples.length} samples (${win})`;
-    Plotly.newPlot("batch-analysis-plot", traces, {
-        title,
-        margin: { t: 40, l: 60, r: 10, b: 40 },
-        showlegend: samples.length <= 10,
-        xaxis: { title: "" },
-        yaxis: { title: csvName === "grid_prices.csv" ? "$/kWh" : "kW" },
-    });
-    status.textContent = `${samples.length} overlays plotted (${win} window)`;
+    const layout = batchPlotLayout(csvName, feature, month, sampleRows.length, win);
+    Plotly.newPlot("batch-analysis-plot", traces, layout);
+    const winNote = (csvName === "cars.csv") ? "" : ` (${win} window)`;
+    const binNote = binSpec ? ` · bins=${binSpec.size.toExponential(2)}` : "";
+    status.textContent = `${sampleRows.length} overlays plotted${winNote}${feature ? " · feature=" + feature : ""}${binNote}`;
 }
 
-function buildOverlayTrace(csvName, rows, sampleIdx, seed) {
+function histogramFeature(csvName, feature) {
+    if (csvName === "sessions.csv") return true;
+    if (csvName === "cars.csv" && feature !== "battery_class") return true;
+    return false;
+}
+
+function batchPlotLayout(csvName, feature, month, nSamples, win) {
+    const showLegend = nSamples <= 10;
+    const titleBase = feature
+        ? `${csvName} — ${feature} — ${month}, ${nSamples} samples`
+        : `${csvName} — ${month}, ${nSamples} samples (${win})`;
+    if (csvName === "building_load.csv") {
+        return { title: titleBase, margin: { t: 40, l: 60, r: 10, b: 40 }, showlegend: showLegend, yaxis: { title: "kW" } };
+    }
+    if (csvName === "grid_prices.csv") {
+        return { title: titleBase, margin: { t: 40, l: 60, r: 10, b: 40 }, showlegend: showLegend, yaxis: { title: "$/kWh" } };
+    }
+    if (csvName === "cars.csv" && feature === "battery_class") {
+        return { title: titleBase, margin: { t: 40, l: 60, r: 10, b: 50 }, showlegend: showLegend, barmode: "group", xaxis: { title: "battery class" }, yaxis: { title: "count" } };
+    }
+    // Numeric histogram overlay (sessions.csv features + cars numeric features).
+    return {
+        title: titleBase,
+        margin: { t: 40, l: 60, r: 10, b: 50 },
+        showlegend: showLegend,
+        barmode: "overlay",
+        xaxis: { title: feature || "" },
+        yaxis: { title: "count" },
+    };
+}
+
+function buildOverlayTraces(csvName, rows, feature, sampleIdx, seed, binSpec) {
     const cols = new Set(Object.keys(rows[0]));
-    if (csvName === "building_load.csv" && cols.has("power_kw")) {
+    const tag = `s${sampleIdx} (seed=${seed})`;
+
+    if (csvName === "building_load.csv") {
+        const yCol = feature || "power_kw";
+        if (!cols.has(yCol)) return [];
         return [{
-            x: rows.map(r => r.datetime),
-            y: rows.map(r => r.power_kw),
-            name: `s${sampleIdx} (seed=${seed})`,
-            type: "scatter",
-            mode: "lines",
-            opacity: 0.6,
-            line: { width: 1 },
+            x: rows.map(r => r.datetime), y: rows.map(r => r[yCol]),
+            name: tag, type: "scatter", mode: "lines",
+            opacity: 0.6, line: { width: 1 },
         }];
     }
     if (csvName === "grid_prices.csv" && cols.has("price_per_kwh")) {
         return [{
-            x: rows.map(r => r.datetime),
-            y: rows.map(r => r.price_per_kwh),
-            name: `s${sampleIdx}`,
-            type: "scatter",
-            mode: "lines",
-            opacity: 0.5,
-            line: { width: 1 },
+            x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
+            name: tag, type: "scatter", mode: "lines",
+            opacity: 0.5, line: { width: 1 },
         }];
     }
+    if (csvName === "sessions.csv") {
+        const values = extractFeatureValues(rows, csvName, feature);
+        if (!values.length) return [];
+        const t = { x: values, type: "histogram", name: tag, opacity: 0.4 };
+        if (binSpec) t.xbins = binSpec; else t.nbinsx = HIST_BINS;
+        return [t];
+    }
+    if (csvName === "cars.csv") {
+        if (feature === "battery_class") {
+            const counts = {};
+            rows.forEach(r => { counts[r.battery_class] = (counts[r.battery_class] || 0) + 1; });
+            const cats = Object.keys(counts).sort();
+            return [{
+                x: cats, y: cats.map(c => counts[c]),
+                type: "bar", name: tag, opacity: 0.85,
+            }];
+        }
+        const values = extractFeatureValues(rows, csvName, feature);
+        if (!values.length) return [];
+        const t = { x: values, type: "histogram", name: tag, opacity: 0.45 };
+        if (binSpec) t.xbins = binSpec; else t.nbinsx = HIST_BINS;
+        return [t];
+    }
     return [];
+}
+
+function extractFeatureValues(rows, csvName, feature) {
+    if (csvName === "sessions.csv" && (feature === "arrival_hour" || feature === "departure_hour")) {
+        const tsKey = feature === "arrival_hour" ? "arrival" : "departure";
+        return rows.map(r => {
+            const d = new Date(r[tsKey]);
+            return isNaN(d) ? null : d.getHours() + d.getMinutes() / 60;
+        }).filter(v => v !== null);
+    }
+    return rows.map(r => r[feature]).filter(v => typeof v === "number" && !isNaN(v));
 }
 
 function renderBatchStatus(data) {
@@ -903,17 +1048,30 @@ function activateTab(name, result) {
     info.innerHTML = `<p style="margin:0.5rem 0;font-size:0.9rem;">Rows: <b>${summary.row_count}</b> · Columns: ${summary.columns.length} (${summary.columns.slice(0, 6).join(", ")}${summary.columns.length > 6 ? "…" : ""})</p>`;
     panel.appendChild(info);
 
-    const plotable = ["building_load.csv", "grid_prices.csv", "sessions.csv", "dr_events.csv"].includes(name);
+    const plotable = ["building_load.csv", "grid_prices.csv", "sessions.csv", "dr_events.csv", "cars.csv"].includes(name);
     if (plotable && summary.head.length > 0) {
-        const ctrl = document.createElement("div");
-        ctrl.className = "analysis-controls";
-        ctrl.innerHTML = `
-            <label>Window:
+        const features = PLOT_FEATURES[name] || [];
+        const showWindow = ["building_load.csv", "grid_prices.csv", "sessions.csv", "dr_events.csv"].includes(name);
+        const featureSelect = features.length > 0
+            ? `<label>Feature:
+                <select class="analysis-feature">
+                    ${features.map(f => `<option value="${f.value}">${f.label}</option>`).join("")}
+                </select>
+               </label>`
+            : "";
+        const windowSelect = showWindow
+            ? `<label>Window:
                 <select class="analysis-window">
                     <option value="1day">1 day</option>
                     <option value="month" selected>Whole month</option>
                 </select>
-            </label>
+               </label>`
+            : "";
+        const ctrl = document.createElement("div");
+        ctrl.className = "analysis-controls";
+        ctrl.innerHTML = `
+            ${featureSelect}
+            ${windowSelect}
             <button type="button" class="analysis-run">Generate Analysis</button>
             <span class="analysis-status"></span>
         `;
@@ -933,7 +1091,10 @@ function activateTab(name, result) {
 }
 
 async function runSingleAnalysis(runId, csvName, plotId, ctrl) {
-    const win = ctrl.querySelector(".analysis-window").value;
+    const winEl = ctrl.querySelector(".analysis-window");
+    const featEl = ctrl.querySelector(".analysis-feature");
+    const win = winEl ? winEl.value : "month";
+    const feature = featEl ? featEl.value : null;
     const status = ctrl.querySelector(".analysis-status");
     status.innerHTML = '<span class="spinner"></span> fetching…';
     let rows;
@@ -944,9 +1105,10 @@ async function runSingleAnalysis(runId, csvName, plotId, ctrl) {
         return;
     }
     const filtered = filterByWindow(rows, win);
-    status.textContent = `${filtered.length} rows plotted (window=${win})`;
+    const featLabel = feature ? ` · feature=${feature}` : "";
+    status.textContent = `${filtered.length} rows plotted (window=${win}${featLabel})`;
     document.getElementById(plotId).style.display = "";
-    plotFullCsv(plotId, csvName, filtered);
+    plotFullCsv(plotId, csvName, filtered, feature);
 }
 
 async function fetchAndParseCsv(url) {
@@ -975,17 +1137,23 @@ function filterByWindow(rows, win) {
     return rows.filter(r => String(r[tsKey]).slice(0, 10) === firstDay);
 }
 
-function plotFullCsv(divId, csvName, rows) {
+function plotFullCsv(divId, csvName, rows, feature) {
     if (!rows.length) return;
     const cols = new Set(Object.keys(rows[0]));
     try {
         if (csvName === "building_load.csv" && cols.has("datetime") && cols.has("power_flex_kw")) {
-            const traces = [
-                { x: rows.map(r => r.datetime), y: rows.map(r => r.power_flex_kw), name: "flex", type: "scatter", mode: "lines" },
-                { x: rows.map(r => r.datetime), y: rows.map(r => r.power_inflex_kw), name: "inflex", type: "scatter", mode: "lines" },
-            ];
-            if (cols.has("power_kw")) {
-                traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.power_kw), name: "total", type: "scatter", mode: "lines", line: { width: 2, dash: "dot" } });
+            // If feature picked, plot only that series. Otherwise show all three (back-compat).
+            let traces;
+            if (feature && cols.has(feature)) {
+                traces = [{ x: rows.map(r => r.datetime), y: rows.map(r => r[feature]), name: feature, type: "scatter", mode: "lines" }];
+            } else {
+                traces = [
+                    { x: rows.map(r => r.datetime), y: rows.map(r => r.power_flex_kw), name: "flex", type: "scatter", mode: "lines" },
+                    { x: rows.map(r => r.datetime), y: rows.map(r => r.power_inflex_kw), name: "inflex", type: "scatter", mode: "lines" },
+                ];
+                if (cols.has("power_kw")) {
+                    traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.power_kw), name: "total", type: "scatter", mode: "lines", line: { width: 2, dash: "dot" } });
+                }
             }
             Plotly.newPlot(divId, traces, { title: "Building load", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "" }, yaxis: { title: "kW" } });
             return;
@@ -999,14 +1167,12 @@ function plotFullCsv(divId, csvName, rows) {
                 return;
             }
         }
-        if (csvName === "sessions.csv" && cols.has("arrival")) {
-            const arrHours = rows.map(r => {
-                const d = new Date(r.arrival);
-                return isNaN(d) ? null : d.getHours() + d.getMinutes() / 60;
-            }).filter(v => v !== null);
-            Plotly.newPlot(divId, [
-                { x: arrHours, type: "histogram", nbinsx: 24 },
-            ], { title: "Session arrival hour", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "hour of day" }, yaxis: { title: "count" } });
+        if (csvName === "sessions.csv") {
+            plotSessionsFeature(divId, rows, feature || "arrival_hour");
+            return;
+        }
+        if (csvName === "cars.csv") {
+            plotCarsFeature(divId, rows, feature || "capacity_kwh");
             return;
         }
         if (csvName === "dr_events.csv" && cols.has("event_start")) {
@@ -1017,6 +1183,77 @@ function plotFullCsv(divId, csvName, rows) {
     } catch (e) {
         console.warn("plot failed", e);
     }
+}
+
+function plotSessionsFeature(divId, rows, feature) {
+    let values;
+    let xLabel = feature;
+    let nBins = 30;
+    if (feature === "arrival_hour" || feature === "departure_hour") {
+        const tsKey = feature === "arrival_hour" ? "arrival" : "departure";
+        values = rows.map(r => {
+            const d = new Date(r[tsKey]);
+            return isNaN(d) ? null : d.getHours() + d.getMinutes() / 60;
+        }).filter(v => v !== null);
+        xLabel = `${feature.replace("_", " ")} (0-24)`;
+        nBins = 24;
+    } else {
+        values = rows.map(r => r[feature]).filter(v => typeof v === "number" && !isNaN(v));
+        if (feature === "duration_sec") xLabel = "duration (sec)";
+        else if (feature === "arrival_soc") xLabel = "arrival SoC";
+        else if (feature === "required_soc_at_depart") xLabel = "required SoC at depart";
+        else if (feature === "previous_day_external_use_soc") xLabel = "previous-day external use SoC";
+    }
+    if (!values.length) return;
+    Plotly.newPlot(divId, [
+        { x: values, type: "histogram", nbinsx: nBins, marker: { color: "#1f4e79" } },
+    ], {
+        title: `sessions.csv — ${xLabel} distribution (n=${values.length})`,
+        margin: { t: 40, l: 60, r: 10, b: 50 },
+        xaxis: { title: xLabel },
+        yaxis: { title: "count" },
+    });
+}
+
+function plotCarsFeature(divId, rows, feature) {
+    if (feature === "battery_class") {
+        const counts = {};
+        rows.forEach(r => {
+            const c = r.battery_class;
+            counts[c] = (counts[c] || 0) + 1;
+        });
+        const cats = Object.keys(counts).sort();
+        Plotly.newPlot(divId, [{
+            x: cats,
+            y: cats.map(c => counts[c]),
+            type: "bar",
+            marker: { color: "#d8853b" },
+        }], {
+            title: `cars.csv — battery_class distribution (n=${rows.length})`,
+            margin: { t: 40, l: 60, r: 10, b: 50 },
+            xaxis: { title: "battery class" },
+            yaxis: { title: "count" },
+        });
+        return;
+    }
+    const values = rows.map(r => r[feature]).filter(v => typeof v === "number" && !isNaN(v));
+    if (!values.length) return;
+    const labels = {
+        capacity_kwh: "capacity (kWh)",
+        min_allowed_soc: "min allowed SoC",
+        max_allowed_soc: "max allowed SoC",
+    };
+    Plotly.newPlot(divId, [{
+        x: values,
+        type: "histogram",
+        nbinsx: Math.min(20, new Set(values).size),
+        marker: { color: "#1f4e79" },
+    }], {
+        title: `cars.csv — ${labels[feature] || feature} distribution (n=${values.length})`,
+        margin: { t: 40, l: 60, r: 10, b: 50 },
+        xaxis: { title: labels[feature] || feature },
+        yaxis: { title: "count" },
+    });
 }
 
 function renderKnobResolution(panel, manifest) {
