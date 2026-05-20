@@ -47,8 +47,23 @@
                 <span class="field-name">Seed</span>
                 <input type="number" id="seed" value="42" step="1">
             </label>
+            <label>
+                <span class="field-name">Weather station (tmyx)</span>
+                <select id="tmyx-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Peak kW</span>
+                <input type="number" id="peak-kw" min="50" max="5000" step="10">
+            </label>
+            <label>
+                <span class="field-name">Peak kW scaling</span>
+                <span style="display:flex;align-items:center;gap:0.4rem">
+                    <input type="checkbox" id="peak-kw-scaling">
+                    <span class="small" style="font-style:italic;color:#666">on = lock max(power_kw) to peak_kw</span>
+                </span>
+            </label>
         </div>
-        <p class="hint">Pickers above reflect the base scenario. Change any to override that descriptor for this run.</p>
+        <p class="hint">Pickers above reflect the base scenario. Change any to override that descriptor for this run. Weather list comes from <code>configs/locations.yaml</code> — <a href="https://climate.onebuilding.org" target="_blank">browse TMYx</a> + add to that YAML for stations not listed.</p>
     </section>
 
     <section id="batch-config">

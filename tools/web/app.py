@@ -51,10 +51,18 @@ def load_descriptors() -> dict:
     ]:
         with open(CONFIGS / filename) as f:
             data = yaml.safe_load(f) or {}
-        out[category] = [
-            {"id": k, "description": (v.get("description") or "") if isinstance(v, dict) else ""}
-            for k, v in data.items()
-        ]
+        entries = []
+        for k, v in data.items():
+            entry = {
+                "id": k,
+                "description": (v.get("description") or "") if isinstance(v, dict) else "",
+            }
+            # location descriptors carry tmyx_station — surface it so the UI
+            # can populate the weather-station dropdown directly.
+            if category == "location" and isinstance(v, dict) and v.get("tmyx_station"):
+                entry["tmyx_station"] = v["tmyx_station"]
+            entries.append(entry)
+        out[category] = entries
     # noise descriptors are a simpler shape (noise_profiles.yaml)
     with open(CONFIGS / "noise_profiles.yaml") as f:
         nd = yaml.safe_load(f) or {}

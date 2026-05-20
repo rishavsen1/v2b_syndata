@@ -45,6 +45,16 @@ const PLOT_FEATURES = {
 const HIST_BINS = 30;
 const HOUR_BINS = 24;
 
+// Knobs promoted into the Scenario Descriptors section. They are still
+// regular knobs (override path + manifest source unchanged) — just
+// surfaced near the descriptors and hidden from the Advanced panel so
+// users don't see the same control twice.
+const SHORTCUT_KNOBS = new Set([
+    "building_load.tmyx_station",
+    "building_load.peak_kw",
+    "building_load.peak_kw_scaling",
+]);
+
 function getEffectiveDefault(path, spec) {
     if (RESOLVED && RESOLVED[path] && RESOLVED[path].value !== undefined) {
         return RESOLVED[path].value;
@@ -72,10 +82,57 @@ async function init() {
     populateScenarioSelect();
     populateDescriptorSelects();
     populateNoiseSelect();
+    populateTmyxSelect();
     populateKnobBuckets();
     attachListeners();
+    attachShortcutListeners();
     syncFromScenario(state.base_scenario);
     await refreshResolvedDefaults();
+}
+
+function populateTmyxSelect() {
+    const sel = document.getElementById("tmyx-select");
+    if (!sel) return;
+    sel.innerHTML = "";
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "(use base scenario)";
+    sel.appendChild(blank);
+    // Pull from location descriptors — only those carrying a tmyx_station.
+    (DESCRIPTORS.location || []).forEach(loc => {
+        if (!loc.tmyx_station) return;
+        const opt = document.createElement("option");
+        opt.value = loc.tmyx_station;
+        opt.textContent = `${loc.id} — ${loc.tmyx_station}`;
+        sel.appendChild(opt);
+    });
+}
+
+function attachShortcutListeners() {
+    const tmyxEl = document.getElementById("tmyx-select");
+    const peakEl = document.getElementById("peak-kw");
+    const scaleEl = document.getElementById("peak-kw-scaling");
+    if (tmyxEl) tmyxEl.addEventListener("change", e => {
+        setShortcutOverride("building_load.tmyx_station", e.target.value || null);
+    });
+    if (peakEl) peakEl.addEventListener("change", e => {
+        const v = parseFloat(e.target.value);
+        if (!isNaN(v)) setShortcutOverride("building_load.peak_kw", v);
+    });
+    if (scaleEl) scaleEl.addEventListener("change", e => {
+        setShortcutOverride("building_load.peak_kw_scaling", e.target.checked);
+    });
+}
+
+function setShortcutOverride(path, value) {
+    const resolved = (RESOLVED[path] || {}).value;
+    // Empty/null → drop the override (revert to descriptor-resolved value).
+    if (value === null || value === "" || deepEqual(value, resolved)) {
+        delete state.overrides[path];
+    } else {
+        state.overrides[path] = value;
+    }
+    renderOverrideSummary();
 }
 
 async function refreshResolvedDefaults() {
@@ -114,6 +171,7 @@ async function refreshResolvedDefaults() {
         }
         updateSourceLabel(widget, path);
     });
+    refreshShortcutWidgets();
 }
 
 function updateSourceLabel(widget, path) {
@@ -231,10 +289,40 @@ function populateKnobBuckets() {
 
         for (const [knobName, spec] of Object.entries(knobs)) {
             const path = `${bucket}.${knobName}`;
+            if (SHORTCUT_KNOBS.has(path)) continue;  // promoted to descriptor section
             const widget = createKnobWidget(path, spec);
             section.appendChild(widget);
         }
         container.appendChild(section);
+    }
+}
+
+function refreshShortcutWidgets() {
+    // Pull current resolved (or override) values into the descriptor-section widgets.
+    const tmyxEl = document.getElementById("tmyx-select");
+    const peakEl = document.getElementById("peak-kw");
+    const scaleEl = document.getElementById("peak-kw-scaling");
+    if (tmyxEl) {
+        const val = ("building_load.tmyx_station" in state.overrides)
+            ? state.overrides["building_load.tmyx_station"]
+            : (RESOLVED["building_load.tmyx_station"] || {}).value;
+        if (val !== undefined && val !== null) {
+            // If the value isn't in the dropdown, leave the "(use base)" blank selected.
+            const opt = Array.from(tmyxEl.options).find(o => o.value === val);
+            tmyxEl.value = opt ? val : "";
+        }
+    }
+    if (peakEl) {
+        const val = ("building_load.peak_kw" in state.overrides)
+            ? state.overrides["building_load.peak_kw"]
+            : (RESOLVED["building_load.peak_kw"] || {}).value;
+        if (val !== undefined && val !== null) peakEl.value = val;
+    }
+    if (scaleEl) {
+        const val = ("building_load.peak_kw_scaling" in state.overrides)
+            ? state.overrides["building_load.peak_kw_scaling"]
+            : (RESOLVED["building_load.peak_kw_scaling"] || {}).value;
+        if (val !== undefined && val !== null) scaleEl.checked = !!val;
     }
 }
 
