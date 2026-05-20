@@ -592,7 +592,121 @@ async function pollBatch() {
             status.className = "error";
             status.textContent = `Batch ${CURRENT_BATCH_ID} finished with rc=${data.exit_code}.`;
         }
+        if (data.manifest && (data.manifest.status === "succeeded" || data.manifest.status === "partial")) {
+            showBatchAnalysisPanel(CURRENT_BATCH_ID, data.manifest);
+        }
     }
+}
+
+function showBatchAnalysisPanel(batchId, manifest) {
+    let panel = document.getElementById("batch-analysis");
+    if (!panel) {
+        panel = document.createElement("section");
+        panel.id = "batch-analysis";
+        panel.innerHTML = `
+            <h2>Batch analysis</h2>
+            <p class="hint">Overlay all samples for a given month onto one plot. Building load over the chosen window.</p>
+            <div class="batch-grid">
+                <label><span class="field-name">Month</span>
+                    <select id="batch-analysis-month"></select>
+                </label>
+                <label><span class="field-name">CSV</span>
+                    <select id="batch-analysis-csv">
+                        <option value="building_load.csv">building_load.csv</option>
+                        <option value="grid_prices.csv">grid_prices.csv</option>
+                    </select>
+                </label>
+                <label><span class="field-name">Window</span>
+                    <select id="batch-analysis-window">
+                        <option value="1day">1 day</option>
+                        <option value="month" selected>Whole month</option>
+                    </select>
+                </label>
+            </div>
+            <button id="batch-analysis-run" type="button" style="margin-top:0.5rem">Generate Analysis</button>
+            <span id="batch-analysis-status" class="small" style="margin-left:0.5rem"></span>
+            <div id="batch-analysis-plot" style="height:420px;margin-top:0.5rem;display:none"></div>
+        `;
+        document.getElementById("batch-progress").after(panel);
+    }
+    const monthSel = document.getElementById("batch-analysis-month");
+    const months = [...new Set((manifest.samples || []).filter(s => s.status === "succeeded").map(s => s.month))];
+    monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join("");
+    const runBtn = document.getElementById("batch-analysis-run");
+    runBtn.onclick = () => runBatchAnalysis(batchId, manifest);
+}
+
+async function runBatchAnalysis(batchId, manifest) {
+    const month = document.getElementById("batch-analysis-month").value;
+    const csvName = document.getElementById("batch-analysis-csv").value;
+    const win = document.getElementById("batch-analysis-window").value;
+    const status = document.getElementById("batch-analysis-status");
+    const plotDiv = document.getElementById("batch-analysis-plot");
+
+    const samples = (manifest.samples || []).filter(s => s.month === month && s.status === "succeeded");
+    if (!samples.length) {
+        status.textContent = "no successful samples in this month";
+        return;
+    }
+    status.innerHTML = `<span class="spinner"></span> fetching ${samples.length} samples…`;
+
+    const traces = [];
+    let fetched = 0;
+    for (const s of samples) {
+        try {
+            const rows = await fetchAndParseCsv(
+                `/api/batch/${batchId}/csv/${month}/${s.sample_idx}/${csvName}`
+            );
+            const filtered = filterByWindow(rows, win);
+            if (!filtered.length) continue;
+            traces.push(...buildOverlayTrace(csvName, filtered, s.sample_idx, s.seed));
+            fetched++;
+            status.innerHTML = `<span class="spinner"></span> fetched ${fetched}/${samples.length}`;
+        } catch (e) {
+            console.warn(`fetch failed for sample ${s.sample_idx}:`, e);
+        }
+    }
+    if (!traces.length) {
+        status.textContent = "no plottable data";
+        return;
+    }
+    plotDiv.style.display = "";
+    const title = `${csvName} — ${month}, ${samples.length} samples (${win})`;
+    Plotly.newPlot("batch-analysis-plot", traces, {
+        title,
+        margin: { t: 40, l: 60, r: 10, b: 40 },
+        showlegend: samples.length <= 10,
+        xaxis: { title: "" },
+        yaxis: { title: csvName === "grid_prices.csv" ? "$/kWh" : "kW" },
+    });
+    status.textContent = `${samples.length} overlays plotted (${win} window)`;
+}
+
+function buildOverlayTrace(csvName, rows, sampleIdx, seed) {
+    const cols = new Set(Object.keys(rows[0]));
+    if (csvName === "building_load.csv" && cols.has("power_kw")) {
+        return [{
+            x: rows.map(r => r.datetime),
+            y: rows.map(r => r.power_kw),
+            name: `s${sampleIdx} (seed=${seed})`,
+            type: "scatter",
+            mode: "lines",
+            opacity: 0.6,
+            line: { width: 1 },
+        }];
+    }
+    if (csvName === "grid_prices.csv" && cols.has("price_per_kwh")) {
+        return [{
+            x: rows.map(r => r.datetime),
+            y: rows.map(r => r.price_per_kwh),
+            name: `s${sampleIdx}`,
+            type: "scatter",
+            mode: "lines",
+            opacity: 0.5,
+            line: { width: 1 },
+        }];
+    }
+    return [];
 }
 
 function renderBatchStatus(data) {
@@ -602,22 +716,28 @@ function renderBatchStatus(data) {
         txt.textContent = `elapsed ${data.elapsed_sec}s — manifest not yet written`;
         return;
     }
-    txt.innerHTML = `batch_id=${m.batch_id} · status=<strong>${m.status}</strong> · ${m.n_succeeded || 0}/${m.n_total || 0} done · elapsed ${data.elapsed_sec}s · profile=${m.noise_profile}`;
+    const nDone = (m.n_succeeded || 0) + (m.n_failed || 0);
+    txt.innerHTML = `batch_id=${m.batch_id} · status=<strong>${m.status}</strong> · ${nDone}/${m.n_total || 0} done (${m.n_succeeded || 0} ok, ${m.n_failed || 0} failed) · elapsed ${data.elapsed_sec}s · profile=${m.noise_profile}`;
 
+    // Only render rows for failures; succeeded samples just bump the counter.
     const tbl = document.getElementById("batch-month-table");
     tbl.innerHTML = "";
-    (m.samples || []).forEach(s => {
+    const failures = (m.samples || []).filter(s => s.status === "failed");
+    if (failures.length === 0) return;
+    const header = document.createElement("div");
+    header.className = "row";
+    header.style.fontWeight = "600";
+    header.innerHTML = `<span colspan="5">Failures (${failures.length}):</span>`;
+    tbl.appendChild(header);
+    failures.forEach(s => {
         const row = document.createElement("div");
         row.className = "row";
-        const sCls = s.status === "succeeded" ? "batch-status-succeeded"
-                   : s.status === "failed"    ? "batch-status-failed"
-                   : "batch-status-pending";
         row.innerHTML = `
             <span>${s.month}</span>
             <span>#${s.sample_idx}</span>
             <span>seed=${s.seed}</span>
-            <span class="${sCls}">${s.status}</span>
-            <span>${s.duration_sec || ""}s ${s.error ? "— " + escapeHtml(s.error.slice(0,80)) : ""}</span>
+            <span class="batch-status-failed">${s.status}</span>
+            <span>${s.duration_sec || ""}s ${s.error ? "— " + escapeHtml(s.error.slice(0,120)) : ""}</span>
         `;
         tbl.appendChild(row);
     });
@@ -783,15 +903,120 @@ function activateTab(name, result) {
     info.innerHTML = `<p style="margin:0.5rem 0;font-size:0.9rem;">Rows: <b>${summary.row_count}</b> · Columns: ${summary.columns.length} (${summary.columns.slice(0, 6).join(", ")}${summary.columns.length > 6 ? "…" : ""})</p>`;
     panel.appendChild(info);
 
-    if (summary.head.length > 0) {
+    const plotable = ["building_load.csv", "grid_prices.csv", "sessions.csv", "dr_events.csv"].includes(name);
+    if (plotable && summary.head.length > 0) {
+        const ctrl = document.createElement("div");
+        ctrl.className = "analysis-controls";
+        ctrl.innerHTML = `
+            <label>Window:
+                <select class="analysis-window">
+                    <option value="1day">1 day</option>
+                    <option value="month" selected>Whole month</option>
+                </select>
+            </label>
+            <button type="button" class="analysis-run">Generate Analysis</button>
+            <span class="analysis-status"></span>
+        `;
+        panel.appendChild(ctrl);
+        const plotId = `plot-${name.replace(/\W/g, "_")}`;
         const plotDiv = document.createElement("div");
-        plotDiv.id = `plot-${name.replace(/\W/g, "_")}`;
+        plotDiv.id = plotId;
         plotDiv.style.height = "360px";
+        plotDiv.style.display = "none";
         panel.appendChild(plotDiv);
-        renderCsvPlot(plotDiv.id, name, summary);
+        ctrl.querySelector(".analysis-run").addEventListener("click", () =>
+            runSingleAnalysis(result.run_id, name, plotId, ctrl)
+        );
     }
 
     panel.appendChild(buildTable(summary.head, summary.columns));
+}
+
+async function runSingleAnalysis(runId, csvName, plotId, ctrl) {
+    const win = ctrl.querySelector(".analysis-window").value;
+    const status = ctrl.querySelector(".analysis-status");
+    status.innerHTML = '<span class="spinner"></span> fetching…';
+    let rows;
+    try {
+        rows = await fetchAndParseCsv(`/api/output/${runId}/${csvName}`);
+    } catch (e) {
+        status.textContent = "fetch failed: " + e.message;
+        return;
+    }
+    const filtered = filterByWindow(rows, win);
+    status.textContent = `${filtered.length} rows plotted (window=${win})`;
+    document.getElementById(plotId).style.display = "";
+    plotFullCsv(plotId, csvName, filtered);
+}
+
+async function fetchAndParseCsv(url) {
+    const txt = await fetch(url).then(r => r.text());
+    const lines = txt.trim().split("\n");
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",");
+    return lines.slice(1).map(line => {
+        const vals = line.split(",");
+        const row = {};
+        headers.forEach((h, i) => {
+            const raw = vals[i];
+            const num = parseFloat(raw);
+            row[h] = (!isNaN(num) && raw !== "" && /^-?[\d.]+(e[+-]?\d+)?$/i.test(raw)) ? num : raw;
+        });
+        return row;
+    });
+}
+
+function filterByWindow(rows, win) {
+    if (win === "month" || rows.length === 0) return rows;
+    // 1day: pick rows where datetime/arrival falls on first day present
+    const tsKey = ["datetime", "arrival", "event_start", "start"].find(k => k in rows[0]);
+    if (!tsKey) return rows.slice(0, 96);  // fallback: first 96 rows (15-min × 24h)
+    const firstDay = String(rows[0][tsKey]).slice(0, 10);
+    return rows.filter(r => String(r[tsKey]).slice(0, 10) === firstDay);
+}
+
+function plotFullCsv(divId, csvName, rows) {
+    if (!rows.length) return;
+    const cols = new Set(Object.keys(rows[0]));
+    try {
+        if (csvName === "building_load.csv" && cols.has("datetime") && cols.has("power_flex_kw")) {
+            const traces = [
+                { x: rows.map(r => r.datetime), y: rows.map(r => r.power_flex_kw), name: "flex", type: "scatter", mode: "lines" },
+                { x: rows.map(r => r.datetime), y: rows.map(r => r.power_inflex_kw), name: "inflex", type: "scatter", mode: "lines" },
+            ];
+            if (cols.has("power_kw")) {
+                traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.power_kw), name: "total", type: "scatter", mode: "lines", line: { width: 2, dash: "dot" } });
+            }
+            Plotly.newPlot(divId, traces, { title: "Building load", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "" }, yaxis: { title: "kW" } });
+            return;
+        }
+        if (csvName === "grid_prices.csv" && cols.has("datetime")) {
+            const priceCol = ["price_per_kwh", "price", "energy_price"].find(c => cols.has(c));
+            if (priceCol) {
+                Plotly.newPlot(divId, [
+                    { x: rows.map(r => r.datetime), y: rows.map(r => r[priceCol]), type: "scatter", mode: "lines" },
+                ], { title: `Grid prices: ${priceCol}`, margin: { t: 30, l: 50, r: 10, b: 40 }, yaxis: { title: "$/kWh" } });
+                return;
+            }
+        }
+        if (csvName === "sessions.csv" && cols.has("arrival")) {
+            const arrHours = rows.map(r => {
+                const d = new Date(r.arrival);
+                return isNaN(d) ? null : d.getHours() + d.getMinutes() / 60;
+            }).filter(v => v !== null);
+            Plotly.newPlot(divId, [
+                { x: arrHours, type: "histogram", nbinsx: 24 },
+            ], { title: "Session arrival hour", margin: { t: 30, l: 50, r: 10, b: 40 }, xaxis: { title: "hour of day" }, yaxis: { title: "count" } });
+            return;
+        }
+        if (csvName === "dr_events.csv" && cols.has("event_start")) {
+            Plotly.newPlot(divId, [
+                { x: rows.map(r => r.event_start), y: rows.map((_, i) => i + 1), type: "scatter", mode: "markers" },
+            ], { title: "DR events", margin: { t: 30, l: 50, r: 10, b: 40 } });
+        }
+    } catch (e) {
+        console.warn("plot failed", e);
+    }
 }
 
 function renderKnobResolution(panel, manifest) {

@@ -422,6 +422,30 @@ def api_batch_status(batch_id: str):
     })
 
 
+@app.route("/api/batch/<batch_id>/csv/<month>/<idx>/<csv_name>")
+def api_batch_csv(batch_id: str, month: str, idx: str, csv_name: str):
+    """Serve a CSV from a batch sample directory.
+    Path: <output_path>/<scenario_id>/<MONTH>/<idx>/<csv>"""
+    if batch_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown batch"}), 404
+    for part in (month, idx, csv_name):
+        if "/" in part or ".." in part:
+            return jsonify({"error": "invalid path"}), 400
+    out = Path(BATCH_JOBS[batch_id]["output_path"])
+    # scenario_id is the single child directory under output_path
+    children = [p for p in out.iterdir() if p.is_dir()]
+    if not children:
+        return jsonify({"error": "no scenario dir under output"}), 404
+    scenario_dir = children[0]
+    fpath = scenario_dir / month / idx / csv_name
+    if not fpath.exists():
+        return jsonify({"error": f"not found: {fpath}"}), 404
+    return Response(
+        fpath.read_bytes(), mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={csv_name}"},
+    )
+
+
 @app.route("/api/batch/<batch_id>/cancel", methods=["POST"])
 def api_batch_cancel(batch_id: str):
     if batch_id not in BATCH_JOBS:

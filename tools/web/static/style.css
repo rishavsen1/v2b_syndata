@@ -409,3 +409,24 @@ pre {
 .batch-status-succeeded { color: var(--valid); }
 .batch-status-failed    { color: var(--invalid); }
 .batch-status-pending   { color: var(--text-muted); font-style: italic; }
+
+.analysis-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0;
+    margin: 0.3rem 0;
+    font-size: 0.85rem;
+    border-bottom: 1px dashed var(--border);
+}
+.analysis-controls label { color: var(--text-muted); }
+.analysis-controls select { padding: 0.2rem 0.4rem; }
+.analysis-controls button {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+}
+.analysis-status {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
