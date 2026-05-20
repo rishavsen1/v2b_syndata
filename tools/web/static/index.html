@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V2B Synthetic Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+<header>
+    <h1>V2B Synthetic Dataset Generator</h1>
+    <p class="subtitle">Configure scenario descriptors and individual knobs, then generate a reproducible run.</p>
+</header>
+
+<main>
+    <section id="base-scenario">
+        <h2>Base scenario</h2>
+        <select id="base-scenario-select"></select>
+        <p class="hint">Start from a pre-built scenario. Modifications below override these defaults.</p>
+    </section>
+
+    <section id="descriptors">
+        <h2>Scenario descriptors</h2>
+        <div class="descriptor-grid">
+            <label>
+                <span class="field-name">Location</span>
+                <select id="location-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Building</span>
+                <select id="building-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Population</span>
+                <select id="population-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Equipment</span>
+                <select id="equipment-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Noise profile</span>
+                <select id="noise-select"></select>
+            </label>
+            <label>
+                <span class="field-name">Seed</span>
+                <input type="number" id="seed" value="42" step="1">
+            </label>
+        </div>
+        <p class="hint">Pickers above reflect the base scenario. Change any to override that descriptor for this run.</p>
+    </section>
+
+    <section id="advanced">
+        <details id="advanced-details">
+            <summary>Advanced — direct knob overrides</summary>
+            <p class="hint">Modify individual knobs. Values are bounded by the declared ranges in <code>configs/knobs.yaml</code>. Knob overrides take precedence over descriptors.</p>
+            <div id="knob-buckets"></div>
+        </details>
+    </section>
+
+    <section id="action">
+        <button id="generate-btn" type="button">Generate scenario</button>
+        <label class="inline-flag"><input type="checkbox" id="strict-e5"> strict E5 (fail on concurrency overflow)</label>
+        <span id="status"></span>
+    </section>
+
+    <section id="override-summary" style="display:none">
+        <h2>Pending overrides</h2>
+        <pre id="override-pre"></pre>
+    </section>
+
+    <section id="output" style="display:none">
+        <h2>Generated output</h2>
+        <div id="output-meta"></div>
+        <div id="output-tabs"></div>
+        <div id="output-panel"></div>
+        <div id="downloads"></div>
+        <details>
+            <summary>stdout / stderr / command</summary>
+            <pre id="run-log"></pre>
+        </details>
+    </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
