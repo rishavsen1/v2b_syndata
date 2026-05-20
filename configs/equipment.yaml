@@ -17,6 +17,13 @@ uni_only:
   uni_rate_kw: 20.0
   bi_rate_kw: 20.0   # unused
 
+bi_only:
+  description: "All bidirectional. Full V2B deployment."
+  charger_count: 20
+  directionality_frac: 1.0
+  uni_rate_kw: 20.0   # unused
+  bi_rate_kw: 20.0
+
 bi_heavy:
   description: "Mostly bidirectional (CONSENT-style fleet pilot)"
   charger_count: 20
