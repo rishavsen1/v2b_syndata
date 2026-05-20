@@ -3,8 +3,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..seeding import rng_for_car
+from ..seeding import rng_for_car, rng_for_node
 from ..types import FleetAttrs, ScenarioContext, UserAttrs
+
+# Above this threshold the Dirichlet draw is skipped entirely (no RNG
+# consumption) so the default-alpha path preserves bitwise reproducibility
+# with pre-Dirichlet code.
+_DIRICHLET_OFF_THRESHOLD = 1e6 - 1
 
 # CONSENT k-means cluster parameters (n=28 survey).
 CONSENT_CLUSTERS: dict[str, dict[str, float]] = {
@@ -36,6 +41,18 @@ def sample_a_user(ctx: ScenarioContext) -> None:
     region_names = [r["name"] for r in axes]
     region_weights = np.array([float(r["weight"]) for r in axes], dtype=float)
     region_weights = region_weights / region_weights.sum()
+
+    # Dirichlet noise on region weights (per-sample, not per-car). Isolated
+    # RNG stream so existing per-car streams stay byte-identical.
+    alpha_axes = float(
+        ctx.knobs.get("user_behavior.axes_distribution_dirichlet_alpha")
+        if ctx.knobs.has("user_behavior.axes_distribution_dirichlet_alpha")
+        else 1e6
+    )
+    if alpha_axes < _DIRICHLET_OFF_THRESHOLD:
+        rng_d = rng_for_node(ctx.seed, "dirichlet:axes")
+        region_weights = rng_d.dirichlet(region_weights * alpha_axes)
+        ctx.realized_axes_weights = region_weights.tolist()
     neg_mix = np.array([float(p) for p in U["negotiation_mix"]], dtype=float)
     neg_mix = neg_mix / neg_mix.sum()
     alpha_w1, alpha_w2 = U["w_multiplier"]
@@ -72,6 +89,16 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
     ev_count = int(F["ev_count"])
     battery_mix = np.array([float(p) for p in F["battery_mix"]], dtype=float)
     battery_mix = battery_mix / battery_mix.sum()
+
+    alpha_bat = float(
+        ctx.knobs.get("ev_fleet.battery_mix_dirichlet_alpha")
+        if ctx.knobs.has("ev_fleet.battery_mix_dirichlet_alpha")
+        else 1e6
+    )
+    if alpha_bat < _DIRICHLET_OFF_THRESHOLD:
+        rng_d = rng_for_node(ctx.seed, "dirichlet:battery")
+        battery_mix = rng_d.dirichlet(battery_mix * alpha_bat)
+        ctx.realized_battery_mix = battery_mix.tolist()
     homog = (F["battery_heterogeneity"] == "homog")
     if homog:
         mode_class = BATTERY_CLASSES[int(np.argmax(battery_mix))]

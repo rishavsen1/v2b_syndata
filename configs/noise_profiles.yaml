@@ -43,6 +43,15 @@ adversarial:
   price_jitter_pct: 0.05
   occupancy_jitter_pct: 0.25
 
+tmyx_stochastic:
+  description: "Default for batch mode: bounded per-seed variation on building load + sessions; tariff deterministic."
+  building_load_jitter_pct: 0.05      # ±5% multiplicative on power_kw per 15-min tick
+  arrival_time_jitter_min: 5.0        # ±5 min, snapped to 15-min grid
+  soc_arrival_jitter_pct: 0.03        # ±3% on arrival SoC
+  dr_notification_dropout_prob: 0.0
+  price_jitter_pct: 0.0               # tariff is deterministic by definition
+  occupancy_jitter_pct: 0.08          # ±8% on inflex baseline (lights + plug)
+
 custom:
   description: "All-zero baseline; user supplies individual noise.* overrides explicitly. Matches knobs.yaml::noise.profile choice 'custom'."
   building_load_jitter_pct: 0.0

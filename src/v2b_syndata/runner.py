@@ -198,6 +198,11 @@ def generate(
     }
     if noise_stats:
         manifest["noise"] = noise_stats
+    if ctx.realized_axes_weights is not None or ctx.realized_battery_mix is not None:
+        manifest["realized_distributions"] = {
+            "axes_distribution_sampled": ctx.realized_axes_weights,
+            "battery_mix_sampled": ctx.realized_battery_mix,
+        }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     )

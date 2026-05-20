@@ -69,6 +69,8 @@ async function refreshResolvedDefaults() {
         console.warn("resolve fetch failed:", e);
         return;
     }
+    // For every knob widget, refresh displayed value (if user hasn't overridden)
+    // and refresh source label.
     document.querySelectorAll(".knob").forEach(widget => {
         const path = widget.dataset.path;
         if (!path) return;
@@ -427,6 +429,8 @@ function createVec2Widget(path, spec, onChange) {
 }
 
 function resetWidgetValue(input, spec, value) {
+    // `value` is the target restore value (may be the descriptor-resolved
+    // value, not spec.default). Falls back to spec.default if undefined.
     if (value === undefined) value = spec.default;
     if (spec.type === "bool" && input.tagName === "SPAN") {
         input.querySelector("input").checked = !!value;
@@ -459,7 +463,172 @@ function attachListeners() {
     document.getElementById("strict-e5").addEventListener("change", e => {
         state.strict_e5 = e.target.checked;
     });
-    document.getElementById("generate-btn").addEventListener("click", generate);
+    document.getElementById("generate-btn").addEventListener("click", onGenerateClick);
+
+    // Batch listeners — recompute estimate on every change.
+    ["batch-start-month", "batch-end-month", "batch-samples", "batch-workers"]
+        .forEach(id => document.getElementById(id).addEventListener("input", updateBatchEstimate));
+    document.getElementById("batch-cancel").addEventListener("click", cancelBatch);
+    updateBatchEstimate();
+}
+
+function batchTotal() {
+    const start = document.getElementById("batch-start-month").value;
+    const end = document.getElementById("batch-end-month").value;
+    const samples = parseInt(document.getElementById("batch-samples").value, 10) || 1;
+    if (!start || !end) return { months: 1, samples, total: samples };
+    const sd = new Date(start + "-01");
+    const ed = new Date(end + "-01");
+    const months = (ed.getFullYear() - sd.getFullYear()) * 12 + (ed.getMonth() - sd.getMonth()) + 1;
+    return { months: Math.max(1, months), samples, total: Math.max(1, months) * samples };
+}
+
+function updateBatchEstimate() {
+    const { months, samples, total } = batchTotal();
+    const workers = parseInt(document.getElementById("batch-workers").value, 10) || 4;
+    const el = document.getElementById("batch-estimate");
+    const btn = document.getElementById("generate-btn");
+    if (total <= 1) {
+        el.textContent = "Single sample — uses /api/generate (current behavior).";
+        btn.textContent = "Generate scenario";
+    } else {
+        const serialMin = Math.max(1, Math.round(total * 13 / 60));
+        const parallelMin = Math.max(1, Math.round(serialMin / Math.max(1, workers)));
+        el.innerHTML = `Batch: <strong>${total} samples</strong> (${months} month${months>1?"s":""} × ${samples}/month). Est. ~${parallelMin} min with ${workers} workers.`;
+        btn.textContent = "Generate batch";
+    }
+}
+
+function onGenerateClick() {
+    const { total } = batchTotal();
+    if (total <= 1) {
+        generate();
+    } else {
+        startBatch();
+    }
+}
+
+let BATCH_POLL_ID = null;
+let CURRENT_BATCH_ID = null;
+
+async function startBatch() {
+    const outputPath = document.getElementById("batch-output-path").value.trim();
+    const startMonth = document.getElementById("batch-start-month").value;
+    const endMonth = document.getElementById("batch-end-month").value;
+    const samples = parseInt(document.getElementById("batch-samples").value, 10) || 1;
+    const workers = parseInt(document.getElementById("batch-workers").value, 10) || 4;
+    const force = document.getElementById("batch-force").checked;
+
+    if (!outputPath) {
+        alert("Output path required for batch mode.");
+        return;
+    }
+
+    const status = document.getElementById("status");
+    status.className = "";
+    status.innerHTML = '<span class="spinner"></span> Launching batch…';
+    document.getElementById("generate-btn").disabled = true;
+    document.getElementById("output").style.display = "none";
+
+    const payload = {
+        base_scenario: state.base_scenario,
+        output_path: outputPath,
+        start_month: startMonth,
+        end_month: endMonth,
+        samples,
+        workers,
+        force,
+        noise_profile: state.noise_profile || "tmyx_stochastic",
+        overrides: state.overrides,
+    };
+    let data;
+    try {
+        const resp = await fetch("/api/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        data = await resp.json();
+        if (!resp.ok) {
+            status.className = "error";
+            status.textContent = `Error: ${data.error || resp.statusText}`;
+            document.getElementById("generate-btn").disabled = false;
+            return;
+        }
+    } catch (e) {
+        status.className = "error";
+        status.textContent = "Batch launch failed: " + e.message;
+        document.getElementById("generate-btn").disabled = false;
+        return;
+    }
+
+    CURRENT_BATCH_ID = data.batch_id;
+    document.getElementById("batch-progress").style.display = "";
+    status.textContent = `Batch ${CURRENT_BATCH_ID} running…`;
+    pollBatch();
+}
+
+async function pollBatch() {
+    if (!CURRENT_BATCH_ID) return;
+    let data;
+    try {
+        const resp = await fetch(`/api/batch/${CURRENT_BATCH_ID}/status`);
+        data = await resp.json();
+    } catch (e) {
+        document.getElementById("batch-status-text").textContent = "poll failed: " + e.message;
+        BATCH_POLL_ID = setTimeout(pollBatch, 2000);
+        return;
+    }
+    renderBatchStatus(data);
+    if (data.running) {
+        BATCH_POLL_ID = setTimeout(pollBatch, 2000);
+    } else {
+        document.getElementById("generate-btn").disabled = false;
+        const status = document.getElementById("status");
+        if (data.exit_code === 0) {
+            status.className = "success";
+            status.textContent = `Batch ${CURRENT_BATCH_ID} complete (rc=${data.exit_code}).`;
+        } else {
+            status.className = "error";
+            status.textContent = `Batch ${CURRENT_BATCH_ID} finished with rc=${data.exit_code}.`;
+        }
+    }
+}
+
+function renderBatchStatus(data) {
+    const txt = document.getElementById("batch-status-text");
+    const m = data.manifest;
+    if (!m) {
+        txt.textContent = `elapsed ${data.elapsed_sec}s — manifest not yet written`;
+        return;
+    }
+    txt.innerHTML = `batch_id=${m.batch_id} · status=<strong>${m.status}</strong> · ${m.n_succeeded || 0}/${m.n_total || 0} done · elapsed ${data.elapsed_sec}s · profile=${m.noise_profile}`;
+
+    const tbl = document.getElementById("batch-month-table");
+    tbl.innerHTML = "";
+    (m.samples || []).forEach(s => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const sCls = s.status === "succeeded" ? "batch-status-succeeded"
+                   : s.status === "failed"    ? "batch-status-failed"
+                   : "batch-status-pending";
+        row.innerHTML = `
+            <span>${s.month}</span>
+            <span>#${s.sample_idx}</span>
+            <span>seed=${s.seed}</span>
+            <span class="${sCls}">${s.status}</span>
+            <span>${s.duration_sec || ""}s ${s.error ? "— " + escapeHtml(s.error.slice(0,80)) : ""}</span>
+        `;
+        tbl.appendChild(row);
+    });
+}
+
+async function cancelBatch() {
+    if (!CURRENT_BATCH_ID) return;
+    await fetch(`/api/batch/${CURRENT_BATCH_ID}/cancel`, { method: "POST" });
+    if (BATCH_POLL_ID) clearTimeout(BATCH_POLL_ID);
+    document.getElementById("status").textContent = `Batch ${CURRENT_BATCH_ID} cancelled.`;
+    document.getElementById("generate-btn").disabled = false;
 }
 
 function renderOverrideSummary() {

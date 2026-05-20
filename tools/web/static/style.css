@@ -379,3 +379,33 @@ pre {
 .knob .source-label.source-explicit   { color: var(--accent);  font-weight: 600; }
 .knob .source-label.source-default    { color: var(--text-muted); font-style: italic; }
 .knob .source-label.source-calibration { color: var(--valid); font-weight: 600; }
+
+.batch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.6rem;
+    align-items: end;
+}
+.batch-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+}
+.batch-grid input { width: 100%; }
+
+#batch-month-table {
+    margin-top: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+}
+#batch-month-table .row {
+    display: grid;
+    grid-template-columns: 80px 60px 80px 90px auto;
+    gap: 0.4rem;
+    padding: 0.15rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.batch-status-succeeded { color: var(--valid); }
+.batch-status-failed    { color: var(--invalid); }
+.batch-status-pending   { color: var(--text-muted); font-style: italic; }

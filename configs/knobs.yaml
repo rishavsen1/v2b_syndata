@@ -40,6 +40,13 @@ ev_fleet:
     description: "Per-car capacity variance mode. Couples to sessions via D5 rejection sampling (see battery_mix)."
     affects_csv: [cars.csv, sessions.csv]
 
+  battery_mix_dirichlet_alpha:
+    type: float
+    range: [1.0, 1000000.0]
+    default: 1000000.0
+    description: "Dirichlet concentration α for per-sample battery mix noise. Default 1e6 = effectively off (preserves bitwise reproducibility). Batch mode uses α=30 → std ~8% per component (declared p·α form). Set high to disable."
+    affects_csv: [cars.csv]
+
 # ──────────────────────────────────────────────────────────────────────────
 # Bucket 2: Charging Infrastructure
 # ──────────────────────────────────────────────────────────────────────────
@@ -108,6 +115,13 @@ user_behavior:
     default: 0.80
     description: "Floor on required_soc_at_depart"
     affects_csv: [sessions.csv]
+
+  axes_distribution_dirichlet_alpha:
+    type: float
+    range: [1.0, 1000000.0]
+    default: 1000000.0
+    description: "Dirichlet concentration α for per-sample region-weight noise on axes_distribution. Default 1e6 = effectively off (preserves bitwise reproducibility). Batch mode uses α=30 → std ~8% per region weight (Dirichlet(p·α) form). Set high to disable."
+    affects_csv: [users.csv, sessions.csv]
 
   external_charge_cost:
     type: float
@@ -268,9 +282,9 @@ noise:
 
   profile:
     type: categorical
-    choices: [clean, light_noise, realistic_noise, adversarial, custom]
+    choices: [clean, light_noise, tmyx_stochastic, realistic_noise, adversarial, custom]
     default: clean
-    description: "Named profile from configs/noise_profiles.yaml. 'custom' uses fields below."
+    description: "Named profile from configs/noise_profiles.yaml. 'tmyx_stochastic' adds bounded seed-driven variation for batch Monte Carlo evaluation; 'clean' is fully deterministic. 'custom' uses fields below."
     affects_csv: [building_load.csv, sessions.csv, grid_prices.csv, dr_events.csv]
 
   building_load_jitter_pct:

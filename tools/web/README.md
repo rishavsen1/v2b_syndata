@@ -61,6 +61,20 @@ runs the CLI against that, and deletes it after the subprocess exits.
 Any orphan `_web_*.yaml` from a previous crash is cleaned up on app
 startup.
 
+## Batch mode
+
+The configurator has a Batch generation section between Simulation
+Window and Advanced. Defaults (1 sample / 1 month) preserve the
+single-shot behavior. Set a date range + samples-per-month to fan out
+into `<output_path>/<scenario>/<MON><YYYY>/<idx>/`. Backed by
+`/api/batch` (POST) + `/api/batch/<id>/status` polling. Each batch
+sample runs as a CLI subprocess so the orchestrator is crash-isolated
+from individual sample failures.
+
+Batch defaults to `noise.profile=tmyx_stochastic` and Dirichlet α=30
+on population + battery mix — opt-in stochasticity for Monte Carlo
+evaluation. Override via the Advanced knob panel.
+
 ## Reproducibility check
 
 Same base + seed + (no overrides) → bitwise-identical CSVs to a direct CLI

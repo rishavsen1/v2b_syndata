@@ -51,6 +51,37 @@
         <p class="hint">Pickers above reflect the base scenario. Change any to override that descriptor for this run.</p>
     </section>
 
+    <section id="batch-config">
+        <h2>Batch generation (optional)</h2>
+        <p class="hint">Generate many samples across a date range. Leave the defaults (1 sample, single month) to keep current single-shot behavior.</p>
+        <div class="batch-grid">
+            <label>
+                <span class="field-name">Output path</span>
+                <input type="text" id="batch-output-path" placeholder="/tmp/batch_run">
+            </label>
+            <label>
+                <span class="field-name">Start month</span>
+                <input type="month" id="batch-start-month" value="2024-04">
+            </label>
+            <label>
+                <span class="field-name">End month</span>
+                <input type="month" id="batch-end-month" value="2024-04">
+            </label>
+            <label>
+                <span class="field-name">Samples / month</span>
+                <input type="number" id="batch-samples" min="1" max="100" value="1">
+            </label>
+            <label>
+                <span class="field-name">Workers</span>
+                <input type="number" id="batch-workers" min="1" max="16" value="4">
+            </label>
+            <label class="inline-flag" style="margin-left:0">
+                <input type="checkbox" id="batch-force"> overwrite if exists
+            </label>
+        </div>
+        <div id="batch-estimate" class="hint"></div>
+    </section>
+
     <section id="advanced">
         <details id="advanced-details">
             <summary>Advanced — direct knob overrides</summary>
@@ -63,6 +94,13 @@
         <button id="generate-btn" type="button">Generate scenario</button>
         <label class="inline-flag"><input type="checkbox" id="strict-e5"> strict E5 (fail on concurrency overflow)</label>
         <span id="status"></span>
+    </section>
+
+    <section id="batch-progress" style="display:none">
+        <h2>Batch progress</h2>
+        <div id="batch-status-text" class="small"></div>
+        <div id="batch-month-table"></div>
+        <button id="batch-cancel" type="button" style="margin-top:0.5rem">Cancel</button>
     </section>
 
     <section id="override-summary" style="display:none">

@@ -84,6 +84,11 @@ class ScenarioContext:
     # Noise resolved per profile
     noise: dict[str, float] = field(default_factory=dict)
     noise_profile_name: str = "clean"
+    # Realized per-sample Dirichlet draws (None when Dirichlet off → declared
+    # weights used verbatim). Populated by per_entity samplers; surfaced in
+    # manifest["realized_distributions"].
+    realized_axes_weights: list[float] | None = None
+    realized_battery_mix: list[float] | None = None
 
     def datetime_index(self):
         """15-minute datetime index over sim window."""

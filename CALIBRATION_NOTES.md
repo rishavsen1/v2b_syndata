@@ -339,6 +339,97 @@ Three outcomes tracked per session:
 - **Dropped**: `max_feasible < arrival_soc + 0.01` — no valid top-up target;
   session removed from output.
 
+## #16 — grid_prices.csv type labels use hyphen
+
+The `type` column in `grid_prices.csv` uses:
+- `"off-peak"` (hyphenated)
+- `"peak"`
+
+Earlier code used `"off_peak"` (underscore), which drifted from the
+documented schema. Fixed across renderer, validators, tests, and the
+spec docs (`validate_spec.md`, `BAYES_NET.md`). Code identifiers (e.g.
+the `is_offpeak()` helper, `_OFFPEAK_HOURS` constants) continue to use
+underscore — only the **data label** in the CSV's `type` column flips
+to hyphen.
+
+Knob-audit Stage 2 already measures the numeric `price_per_kwh` column,
+not the string label, so the relabel does not change its
+monotonicity diagnostics — `energy_price_offpeak` and
+`energy_price_peak` remain MONOTONIC.
+
+## #18 — Batch generation: tmyx_stochastic + Dirichlet (opt-in defaults)
+
+A new `batch` CLI subcommand and `/api/batch` web endpoint generate
+(months × samples-per-month) into a structured `<scenario>/<MON><YYYY>/<idx>/`
+tree with one top-level `batch_manifest.json`. Output is parallelized
+via `ProcessPoolExecutor`; falls back to serial if pool init fails.
+
+**Defaults intentionally split between single-shot and batch:**
+
+| Knob | Single-shot CLI default | Batch CLI default |
+|---|---|---|
+| `noise.profile` | `clean` | `tmyx_stochastic` |
+| `user_behavior.axes_distribution_dirichlet_alpha` | `1e6` (off) | `30` |
+| `ev_fleet.battery_mix_dirichlet_alpha` | `1e6` (off) | `30` |
+
+The single-shot defaults preserve the **`clean` profile bitwise
+reproducibility contract** — every existing test and every showcase
+snapshot keeps the same byte output. Batch mode opts into stochasticity
+because Monte Carlo across seeds is its raison d'être.
+
+**`tmyx_stochastic` profile** (added to `configs/noise_profiles.yaml`):
+- `building_load_jitter_pct: 0.05` — ±5% multiplicative on `power_kw`
+- `occupancy_jitter_pct: 0.08`     — ±8% on inflex baseline
+- `arrival_time_jitter_min: 5.0`   — ±5 min, snapped to 15-min grid
+- `soc_arrival_jitter_pct: 0.03`   — ±3% on arrival SoC
+- `price_jitter_pct: 0.0`          — tariff stays deterministic
+- `dr_notification_dropout_prob: 0.0`
+
+All bounds enforced post-hoc (C4, D5, D6 preserved). Note that
+`L_flex`/`L_inflex` samplers already carry ±5%/±3% structural seed
+noise per BAYES_NET — `tmyx_stochastic` layers post-render multiplicative
+noise on top.
+
+**Dirichlet RNG isolation.** New Dirichlet draws use
+`rng_for_node(seed, "dirichlet:axes")` and `rng_for_node(seed, "dirichlet:battery")`
+— separate sub-streams from per-car streams. This guarantees that turning
+α on or off does not shift any other RNG consumer. Default α=1e6 takes a
+short-circuit branch (no `rng.dirichlet(...)` call at all) so existing
+hashes are preserved byte-for-byte. The `realized_distributions` block
+in the manifest is **only emitted when Dirichlet actually runs** (α below
+the 1e6 threshold).
+
+**Dirichlet variance.** For `Dirichlet(p·α)` with α=30, component std
+≈ √(pᵢ(1−pᵢ)/(α+1)) → ~0.05–0.09 per region weight depending on p. The
+prior spec claim of "~±5%" was optimistic by ~1.7× at α=30; the
+description in `knobs.yaml` documents the actual relationship.
+
+**Audit re-verification.** `tools/knob_audit.py` has no `--knobs` filter
+flag, and a full Stage 2 re-run is ~30 minutes for two knobs. Skipped
+in favour of the test suite, which exercises:
+- `tests/test_dirichlet.py` — variance bounds, default-off determinism, same-seed bitwise
+- `tests/test_tmyx_stochastic.py` — shape preservation, mean/correlation bounds
+- `tests/test_batch.py` — tree layout, `--force`, parallel run
+
+389/389 tests pass.
+
+## #19 — Frontend surfaces descriptor-resolved knob values
+
+The web frontend at `tools/web/` calls `/api/resolve` on descriptor
+change (and on every base-scenario change) to display the **actual
+resolved value** for each knob — not the raw `knobs.yaml` default.
+
+`/api/resolve` runs the same descriptor expansion + scenario-override +
+default chain that `runner.generate()` runs, but stops short of any
+rendering. Returns `{knob_path: {value, source}}` where `source ∈
+{"explicit", "descriptor:<name>", "calibration:<provenance>",
+"default"}` — same shape as the manifest's `knob_resolution` block.
+
+Each knob widget shows a colour-coded "from:" label (descriptor /
+explicit (you) / calibration / default). Reset reverts the input to
+the descriptor-resolved value, not the raw `knobs.yaml` default — so
+the displayed value always matches what the run would emit.
+
 Counts surfaced in `manifest["noise"]["d5_enforcement"]`:
 ```
 {
@@ -358,38 +449,3 @@ targets rather than impossible ones.
 
 H2 (price tier consistency) under price_jitter remains a LEGITIMATE
 break per D25 — prices aren't physical-feasibility constrained.
-
-## #16 — grid_prices.csv type labels use hyphen
-
-The `type` column in `grid_prices.csv` uses:
-- `"off-peak"` (hyphenated)
-- `"peak"`
-
-Earlier code used `"off_peak"` (underscore), which drifted from the
-documented schema. Fixed across renderer, validators, tests, and the
-spec docs (`validate_spec.md`, `BAYES_NET.md`, `CLAUDE_CODE_PROMPT.md`).
-Code identifiers (e.g. the `is_offpeak()` helper, `_OFFPEAK_HOURS`
-constants) continue to use underscore — only the **data label** in the
-CSV's `type` column flips to hyphen.
-
-Knob-audit Stage 2 already measures the numeric `price_per_kwh` column,
-not the string label, so the relabel does not change its
-monotonicity diagnostics — `energy_price_offpeak` and
-`energy_price_peak` remain MONOTONIC.
-
-## #17 — Frontend surfaces descriptor-resolved knob values
-
-The web frontend at `tools/web/` calls `/api/resolve` on descriptor
-change (and on every base-scenario change) to display the **actual
-resolved value** for each knob — not the raw `knobs.yaml` default.
-
-`/api/resolve` runs the same descriptor expansion + scenario-override +
-default chain that `runner.generate()` runs, but stops short of any
-rendering. Returns `{knob_path: {value, source}}` where `source ∈
-{"explicit", "descriptor:<name>", "calibration:<provenance>",
-"default"}` — same shape as the manifest's `knob_resolution` block.
-
-Each knob widget shows a colour-coded "from:" label (descriptor /
-explicit (you) / calibration / default). Reset reverts the input to
-the descriptor-resolved value, not the raw `knobs.yaml` default — so
-the displayed value always matches what the run would emit.

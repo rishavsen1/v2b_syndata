@@ -136,6 +136,51 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_batch(args: argparse.Namespace) -> int:
+    from .batch import run_batch
+    extra: dict[str, object] = {}
+    for s in (args.override or []):
+        if "=" not in s:
+            raise SystemExit(f"invalid --override (need key=value): {s}")
+        k, v = s.split("=", 1)
+        extra[k.strip()] = parse_overrides([s])[k.strip()]
+    if args.axes_alpha is not None:
+        extra["user_behavior.axes_distribution_dirichlet_alpha"] = args.axes_alpha
+    if args.battery_alpha is not None:
+        extra["ev_fleet.battery_mix_dirichlet_alpha"] = args.battery_alpha
+
+    def _print_progress(res, m):
+        n_done = m["n_succeeded"] + m["n_failed"]
+        print(f"  [{n_done}/{m['n_total']}] {res.month}/{res.sample_idx} seed={res.seed} "
+              f"{res.status} ({res.duration_sec:.1f}s)", file=sys.stderr)
+
+    print(f"Batch: {args.scenario} — {args.start_month} → {args.end_month}, "
+          f"{args.samples_per_month}/month, {args.workers} workers", file=sys.stderr)
+    try:
+        manifest = run_batch(
+            scenario_id=args.scenario,
+            output_dir=Path(args.output_dir),
+            config_dir=Path(args.config_dir),
+            start_month=args.start_month,
+            end_month=args.end_month,
+            samples_per_month=args.samples_per_month,
+            workers=args.workers,
+            seed_base=args.seed_base,
+            noise_profile=args.noise_profile,
+            extra_overrides=extra,
+            force=args.force,
+            progress_callback=_print_progress,
+        )
+    except FileExistsError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Batch {manifest['batch_id']} {manifest['status']}: "
+          f"{manifest['n_succeeded']}/{manifest['n_total']} succeeded "
+          f"({manifest['n_failed']} failed)", file=sys.stderr)
+    return 0 if manifest["status"] in ("succeeded", "partial") else 2
+
+
 def cmd_docs_gen(args: argparse.Namespace) -> int:
     """Emit the auto-generated section of KNOB_REFERENCE.md to stdout."""
     from .knob_loader import (
@@ -227,6 +272,26 @@ def main(argv: list[str] | None = None) -> int:
     cal.add_argument("--cache-dir", default=str(REPO_ROOT / "data" / "calibration" / "acn_cache"))
     cal.add_argument("--artifact-dir", default=str(REPO_ROOT / "data" / "calibration"))
     cal.set_defaults(func=cmd_calibrate)
+
+    b = sub.add_parser("batch", help="generate (months × samples_per_month) into a tree")
+    b.add_argument("--scenario", required=True)
+    b.add_argument("--output-dir", required=True)
+    b.add_argument("--start-month", required=True, help="YYYY-MM (inclusive)")
+    b.add_argument("--end-month", required=True, help="YYYY-MM (inclusive)")
+    b.add_argument("--samples-per-month", type=int, required=True)
+    b.add_argument("--workers", type=int, default=4)
+    b.add_argument("--seed-base", type=int, default=0)
+    b.add_argument("--noise-profile", default="tmyx_stochastic",
+                   help="default tmyx_stochastic; pass clean for deterministic batch")
+    b.add_argument("--axes-alpha", type=float, default=None,
+                   help="user_behavior.axes_distribution_dirichlet_alpha (default 30 in batch)")
+    b.add_argument("--battery-alpha", type=float, default=None,
+                   help="ev_fleet.battery_mix_dirichlet_alpha (default 30 in batch)")
+    b.add_argument("--override", action="append", default=[],
+                   help="extra knob override 'path=value' (repeatable)")
+    b.add_argument("--force", action="store_true",
+                   help="overwrite output_dir if it exists")
+    b.set_defaults(func=cmd_batch)
 
     dg = sub.add_parser("docs-gen", help="emit auto-generated section of KNOB_REFERENCE.md")
     dg.set_defaults(func=cmd_docs_gen)

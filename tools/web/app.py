@@ -33,6 +33,9 @@ MAX_RUNS_KEPT = 20
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
+# In-memory batch job tracking. Keyed by batch_id → {process, output_path, started_at}.
+BATCH_JOBS: dict[str, dict] = {}
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Config loaders
@@ -337,6 +340,96 @@ def api_csv(run_id: str, csv_name: str):
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={csv_name}"},
     )
+
+
+@app.route("/api/batch", methods=["POST"])
+def api_batch():
+    """Spawn a batch CLI subprocess. Returns batch_id immediately; the client
+    polls /api/batch/<id>/status for progress."""
+    payload = request.get_json(force=True, silent=True) or {}
+    scenario = payload.get("base_scenario", "S01")
+    output_path = payload.get("output_path") or ""
+    start_month = payload.get("start_month")
+    end_month = payload.get("end_month")
+    samples = int(payload.get("samples", 1))
+    workers = int(payload.get("workers", 4))
+    force = bool(payload.get("force", False))
+    noise_profile = payload.get("noise_profile") or "tmyx_stochastic"
+
+    if not output_path or not start_month or not end_month:
+        return jsonify({"error": "output_path, start_month, end_month required"}), 400
+    output_path = str(Path(output_path).expanduser().resolve())
+
+    cmd = [
+        sys.executable, "-m", "v2b_syndata.cli",
+        "--config-dir", str(CONFIGS),
+        "batch",
+        "--scenario", scenario,
+        "--output-dir", output_path,
+        "--start-month", start_month,
+        "--end-month", end_month,
+        "--samples-per-month", str(samples),
+        "--workers", str(workers),
+        "--noise-profile", noise_profile,
+    ]
+    if force:
+        cmd.append("--force")
+    for path, value in (payload.get("overrides") or {}).items():
+        cmd += ["--override", f"{path}={_format_override_value(value)}"]
+
+    batch_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, cwd=str(REPO_ROOT),
+    )
+    BATCH_JOBS[batch_id] = {
+        "process": proc,
+        "output_path": output_path,
+        "started_at": time.time(),
+        "cmd": cmd,
+    }
+    return jsonify({
+        "batch_id": batch_id,
+        "output_path": output_path,
+        "command": " ".join(cmd),
+    })
+
+
+@app.route("/api/batch/<batch_id>/status")
+def api_batch_status(batch_id: str):
+    if batch_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown batch"}), 404
+    job = BATCH_JOBS[batch_id]
+    proc = job["process"]
+    retcode = proc.poll()
+    running = retcode is None
+
+    manifest = None
+    mpath = Path(job["output_path"]) / "batch_manifest.json"
+    if mpath.exists():
+        try:
+            manifest = json.loads(mpath.read_text())
+        except json.JSONDecodeError:
+            pass
+
+    return jsonify({
+        "batch_id": batch_id,
+        "running": running,
+        "exit_code": retcode,
+        "elapsed_sec": round(time.time() - job["started_at"], 1),
+        "manifest": manifest,
+        "output_path": job["output_path"],
+    })
+
+
+@app.route("/api/batch/<batch_id>/cancel", methods=["POST"])
+def api_batch_cancel(batch_id: str):
+    if batch_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown batch"}), 404
+    proc = BATCH_JOBS[batch_id]["process"]
+    if proc.poll() is None:
+        proc.terminate()
+    return jsonify({"status": "cancelled"})
 
 
 @app.route("/api/output/<run_id>/manifest")
