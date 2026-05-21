@@ -19,12 +19,23 @@ example outputs, and a static exploration notebook in one place.
 - **short_overview/deck.pdf** — any PDF viewer. PPTX export at `deck.pptx`.
 - **short_overview/walkthrough.html** — see next section.
 
-## How to launch the interactive walkthrough (`walkthrough.html`)
+## How to launch the interactive cars & sessions generation walkthrough (`walkthrough.html`)
 
-Single self-contained HTML page. Drag sliders for φ, κ, δ, ρ, region preset,
-battery_mix simplex, Dirichlet α, CONSENT cluster — 8 Plotly panels and a
-worked-day text trace update live. Loads Plotly 2.27.0 from CDN; everything
-else is in the file (no server needed).
+Single self-contained HTML page. Two tabs:
+
+- **Playground** — drag sliders for φ, κ, δ, ρ, region preset,
+  battery_mix simplex, Dirichlet α, CONSENT cluster. 10 Plotly panels
+  (attendance, D5 outcomes, arrival/dwell/SoC marginals, joint copula
+  scatter, required_soc, previous-day external use SoC, battery pie,
+  CONSENT cluster) + a worked-day text trace update live.
+- **Concepts & 2-car example** — short prose explainer of how the
+  behavioral axes relate to region marginals, plus an interactive 2-car
+  simulator: pick a region for each car, then drag their per-car
+  φ / κ / δ / ρ sliders and watch a 5/7/10-day session table re-derive
+  from the same "luck" snapshot.
+
+Loads Plotly 2.27.0 from CDN; everything else is in the file (no server
+needed).
 
 **Option A — open directly in browser (simplest)**
 
@@ -67,6 +78,67 @@ google-chrome --headless --disable-gpu --no-sandbox \
 ```
 
 Requires only Plotly's CDN to be reachable. CDN line: `<script src="https://cdn.plot.ly/plotly-2.27.0.min.js">`.
+
+### How to use it — recommended path for a new user
+
+If you've never seen the v2b_syndata generative model before, work through
+the tabs in this order:
+
+**1. Start in the *Concepts & 2-car example* tab.** Read the opening
+collapsible — it explains the two-layer hierarchy (a car belongs to a
+*region* that sets the typical shape, and has a *personality* (φ, κ, δ)
+that bends those shapes). Then scroll to the 2-car simulator below it.
+Try this sequence to build intuition:
+
+| Try | What to look for |
+|---|---|
+| Drag **Car A's φ** from 0.95 down to 0.20 | Car A's column loses rows (skips appear). κ, δ, ρ don't matter for skipped days. |
+| Drag **Car A's κ** from 0.90 down to 0.05 | The arrival times in Car A's column spread out across the day (σ_eff widens). |
+| Drag **Car A's δ** from 60 km up to 100 km | Car A's `arr_soc` column drops by roughly 10–30 points. Other columns unchanged. |
+| Drag **Car A's ρ** from 0 to −0.9 | The link between arrival time and dwell length tightens (look across many days — earliest arrivals get the longest dwells). |
+| Change **Car A's region** to `occasional_visitor` | All sliders jump to that region's midpoint, marginals update; trace re-derives. |
+| Click **Re-roll week** | New "luck" snapshot — same sliders, different uniform draws. Compare to see what was structural vs random. |
+
+The trick is that slider drags re-interpret the *same* random uniforms,
+so the change you see is the **causal** effect of that axis, not noise.
+
+**2. Switch to the *Playground* tab.** Use this to inspect the marginal
+shapes themselves under any (φ, κ, δ, ρ) and any direct override of the
+region marginals (μ, σ, k, λ, α, β, shift). Key things to do:
+
+- Pick a region preset (left panel) → all sliders + plot shapes snap to
+  defaults for that region.
+- Drag ρ around → the joint scatter tilts, but the arrival and dwell
+  histograms stay statistically identical (that's the copula
+  property; verifies the model is right).
+- Drag δ around → the arrival-SoC histogram shifts horizontally; its
+  shape doesn't change.
+- Edit the `battery_mix` simplex (4 sliders) and drop Dirichlet α to 1
+  → the pie chart varies wildly between re-samples; raise α to 1e6 →
+  it locks to declared.
+- Click **Re-sample** (bottom of the controls) → re-rolls 5000 draws
+  per plot. The worked-day trace at the bottom also re-rolls.
+
+**3. Cross-check with the source.** Each interactive piece mirrors a
+specific spot in the codebase — verify by reading these together:
+
+- Copula step → `src/v2b_syndata/renderers/sessions.py:44–50` (the
+  `_gaussian_copula_pair` function) and `:124–137` (sampling
+  dispatch).
+- Region marginal parameters → `configs/populations.yaml:54–88`
+  (consent_default region grid).
+- battery_mix override path → CLI: `python -m v2b_syndata.cli generate
+  --override 'ev_fleet.battery_mix=[0.2,0.3,0.4,0.1]'`. Web UI:
+  open `tools/web` and edit the simplex widget at the
+  `ev_fleet.battery_mix` knob.
+
+**4. To run the actual generator**, see [Generate](../README.md#generate)
+in the root README, or use the Flask web UI under `tools/web/`.
+
+> **No installation required to use this walkthrough.** It's just an
+> HTML file — internet access is needed only to load Plotly from the
+> CDN once. Everything else (samplers, region presets, copula math)
+> runs locally in the browser.
 
 ## How to re-render slides
 

@@ -112,6 +112,36 @@ Local-only by default. See `tools/web/README.md` for LAN exposure and
 architecture details. Output runs land in `tools/web/runs/` (last 20
 kept, gitignored).
 
+## Interactive walkthrough — no install needed
+
+`showcase/short_overview/walkthrough.html` is a self-contained, install-free
+page that explains how `users.csv → cars.csv → sessions.csv` are generated.
+Open it in any browser. Two tabs:
+
+- **Playground** — slide φ, κ, δ, ρ, region preset, battery_mix simplex,
+  Dirichlet α, CONSENT cluster; 10 live Plotly panels + a worked-day text
+  trace update on every drag.
+- **Concepts & 2-car example** — prose explainer of how the behavioral
+  axes relate to the region marginals, plus an interactive 2-car
+  week-long session simulator (per-car region + φ / κ / δ / ρ sliders;
+  deterministic luck so slider drags show the *causal* effect of each
+  axis).
+
+```bash
+# Linux
+xdg-open showcase/short_overview/walkthrough.html
+# macOS
+open    showcase/short_overview/walkthrough.html
+# WSL → Windows browser
+explorer.exe "$(wslpath -w showcase/short_overview/walkthrough.html)"
+# Headless / remote
+cd showcase/short_overview && python -m http.server 8080
+#   → http://localhost:8080/walkthrough.html
+```
+
+Full launch options + a recommended new-user usage path live in
+[`showcase/README.md`](showcase/README.md#how-to-launch-the-interactive-cars--sessions-generation-walkthrough-walkthroughhtml).
+
 ## Outputs
 
 Per scenario seed:
