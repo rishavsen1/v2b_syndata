@@ -1,12 +1,10 @@
 # V2B Synthetic Generator — Web Frontend
 
-Browser-based scenario configurator. Pick descriptors via dropdown, tweak
-individual knobs, generate, and preview CSVs + manifest inline.
+Browser-based scenario configurator. Pick descriptors via dropdown, tweak individual knobs, generate, and preview CSVs + manifest inline.
 
 ## Run
 
-Flask is part of the project's main `uv sync` install — no separate
-requirements step.
+Flask is part of the project's main `uv sync` install — no separate requirements step.
 
 ```bash
 uv run python tools/web/app.py
@@ -24,8 +22,7 @@ Edit the last line of `app.py`:
 app.run(host="0.0.0.0", port=5000, debug=False)
 ```
 
-Then any device on your LAN can reach `http://<your-ip>:5000`. **No auth** —
-do not expose to the internet.
+Then any device on your LAN can reach `http://<your-ip>:5000`. **No auth** — do not expose to the internet.
 
 ## Architecture
 
@@ -50,36 +47,21 @@ No frameworks, no build step. Plotly is loaded from CDN.
 
 ### Storage
 
-Generated outputs land in `tools/web/runs/<timestamp>_<uuid>/`. Last 20
-runs kept; older ones pruned on app startup and on each successful
-generate. The `runs/` dir is gitignored.
+Generated outputs land in `tools/web/runs/<timestamp>_<uuid>/`. Last 20 runs kept; older ones pruned on app startup and on each successful generate. The `runs/` dir is gitignored.
 
 ### Descriptor composition
 
-When the user picks descriptors that differ from the base scenario, the
-backend writes a temporary scenario YAML to `configs/scenarios/_web_<run_id>.yaml`,
-runs the CLI against that, and deletes it after the subprocess exits.
-Any orphan `_web_*.yaml` from a previous crash is cleaned up on app
-startup.
+When the user picks descriptors that differ from the base scenario, the backend writes a temporary scenario YAML to `configs/scenarios/_web_<run_id>.yaml`, runs the CLI against that, and deletes it after the subprocess exits. Any orphan `_web_*.yaml` from a previous crash is cleaned up on app startup.
 
 ## Batch mode
 
-The configurator has a Batch generation section between Simulation
-Window and Advanced. Defaults (1 sample / 1 month) preserve the
-single-shot behavior. Set a date range + samples-per-month to fan out
-into `<output_path>/<scenario>/<MON><YYYY>/<idx>/`. Backed by
-`/api/batch` (POST) + `/api/batch/<id>/status` polling. Each batch
-sample runs as a CLI subprocess so the orchestrator is crash-isolated
-from individual sample failures.
+The configurator has a Batch generation section between Simulation Window and Advanced. Defaults (1 sample / 1 month) preserve the single-shot behavior. Set a date range + samples-per-month to fan out into `<output_path>/<scenario>/<MON><YYYY>/<idx>/`. Backed by `/api/batch` (POST) + `/api/batch/<id>/status` polling. Each batch sample runs as a CLI subprocess so the orchestrator is crash-isolated from individual sample failures.
 
-Batch defaults to `noise.profile=tmyx_stochastic` and Dirichlet α=30
-on population + battery mix — opt-in stochasticity for Monte Carlo
-evaluation. Override via the Advanced knob panel.
+Batch defaults to `noise.profile=tmyx_stochastic` and Dirichlet α=30 on population + battery mix — opt-in stochasticity for Monte Carlo evaluation. Override via the Advanced knob panel.
 
 ## Reproducibility check
 
-Same base + seed + (no overrides) → bitwise-identical CSVs to a direct CLI
-invocation. To verify:
+Same base + seed + (no overrides) → bitwise-identical CSVs to a direct CLI invocation. To verify:
 
 ```bash
 # UI: select S01, seed=42, no overrides, generate

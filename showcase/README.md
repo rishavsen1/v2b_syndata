@@ -1,14 +1,10 @@
 # v2b_syndata showcase
 
-A self-contained presentation of what `v2b_syndata` produces, how it is
-structured, how it is audited, and what comes out of three working example
-scenarios.
+A self-contained presentation of what `v2b_syndata` produces, how it is structured, how it is audited, and what comes out of three working example scenarios.
 
 ## Purpose
 
-This directory is the canonical entry point for anyone wanting to understand
-`v2b_syndata` without running it. It collects the narrative, slides, figures,
-example outputs, and a static exploration notebook in one place.
+This directory is the canonical entry point for anyone wanting to understand `v2b_syndata` without running it. It collects the narrative, slides, figures, example outputs, and a static exploration notebook in one place.
 
 ## How to view
 
@@ -34,8 +30,7 @@ Single self-contained HTML page. Two tabs:
   φ / κ / δ / ρ sliders and watch a 5/7/10-day session table re-derive
   from the same "luck" snapshot.
 
-Loads Plotly 2.27.0 from CDN; everything else is in the file (no server
-needed).
+Loads Plotly 2.27.0 from CDN; everything else is in the file (no server needed).
 
 **Option A — open directly in browser (simplest)**
 
@@ -50,8 +45,7 @@ open showcase/short_overview/walkthrough.html
 explorer.exe "$(wslpath -w showcase/short_overview/walkthrough.html)"
 ```
 
-Or paste the absolute path into the browser's address bar:
-`file:///home/.../v2b_syndata/showcase/short_overview/walkthrough.html`.
+Or paste the absolute path into the browser's address bar: `file:///home/.../v2b_syndata/showcase/short_overview/walkthrough.html`.
 
 **Option B — serve over HTTP (works headless, port-forwardable)**
 
@@ -81,14 +75,9 @@ Requires only Plotly's CDN to be reachable. CDN line: `<script src="https://cdn.
 
 ### How to use it — recommended path for a new user
 
-If you've never seen the v2b_syndata generative model before, work through
-the tabs in this order:
+If you've never seen the v2b_syndata generative model before, work through the tabs in this order:
 
-**1. Start in the *Concepts & 2-car example* tab.** Read the opening
-collapsible — it explains the two-layer hierarchy (a car belongs to a
-*region* that sets the typical shape, and has a *personality* (φ, κ, δ)
-that bends those shapes). Then scroll to the 2-car simulator below it.
-Try this sequence to build intuition:
+**1. Start in the *Concepts & 2-car example* tab.** Read the opening collapsible — it explains the two-layer hierarchy (a car belongs to a *region* that sets the typical shape, and has a *personality* (φ, κ, δ) that bends those shapes). Then scroll to the 2-car simulator below it. Try this sequence to build intuition:
 
 | Try | What to look for |
 |---|---|
@@ -99,12 +88,9 @@ Try this sequence to build intuition:
 | Change **Car A's region** to `occasional_visitor` | All sliders jump to that region's midpoint, marginals update; trace re-derives. |
 | Click **Re-roll week** | New "luck" snapshot — same sliders, different uniform draws. Compare to see what was structural vs random. |
 
-The trick is that slider drags re-interpret the *same* random uniforms,
-so the change you see is the **causal** effect of that axis, not noise.
+The trick is that slider drags re-interpret the *same* random uniforms, so the change you see is the **causal** effect of that axis, not noise.
 
-**2. Switch to the *Playground* tab.** Use this to inspect the marginal
-shapes themselves under any (φ, κ, δ, ρ) and any direct override of the
-region marginals (μ, σ, k, λ, α, β, shift). Key things to do:
+**2. Switch to the *Playground* tab.** Use this to inspect the marginal shapes themselves under any (φ, κ, δ, ρ) and any direct override of the region marginals (μ, σ, k, λ, α, β, shift). Key things to do:
 
 - Pick a region preset (left panel) → all sliders + plot shapes snap to
   defaults for that region.
@@ -119,8 +105,7 @@ region marginals (μ, σ, k, λ, α, β, shift). Key things to do:
 - Click **Re-sample** (bottom of the controls) → re-rolls 5000 draws
   per plot. The worked-day trace at the bottom also re-rolls.
 
-**3. Cross-check with the source.** Each interactive piece mirrors a
-specific spot in the codebase — verify by reading these together:
+**3. Cross-check with the source.** Each interactive piece mirrors a specific spot in the codebase — verify by reading these together:
 
 - Copula step → `src/v2b_syndata/renderers/sessions.py:44–50` (the
   `_gaussian_copula_pair` function) and `:124–137` (sampling
@@ -132,8 +117,7 @@ specific spot in the codebase — verify by reading these together:
   open `tools/web` and edit the simplex widget at the
   `ev_fleet.battery_mix` knob.
 
-**4. To run the actual generator**, see [Generate](../README.md#generate)
-in the root README, or use the Flask web UI under `tools/web/`.
+**4. To run the actual generator**, see [Generate](../README.md#generate) in the root README, or use the Flask web UI under `tools/web/`.
 
 > **No installation required to use this walkthrough.** It's just an
 > HTML file — internet access is needed only to load Plotly from the
@@ -147,8 +131,7 @@ cd showcase
 npx @marp-team/marp-cli@latest slides/overview.md --pdf --allow-local-files
 ```
 
-The `--allow-local-files` flag is required because slides reference figures
-under `../figures/`.
+The `--allow-local-files` flag is required because slides reference figures under `../figures/`.
 
 ## How to re-generate the three example scenarios
 
@@ -160,8 +143,7 @@ python -m v2b_syndata.runner --scenario configs/scenarios/S_clim_miami_summer.ya
 python -m v2b_syndata.runner --scenario configs/scenarios/S_eq_bi.yaml --out showcase/data/example_scenarios/S_eq_bi
 ```
 
-Each command emits the seven CSVs plus `manifest.json` into the target
-directory. Identical seeds reproduce identical outputs (verified by V4).
+Each command emits the seven CSVs plus `manifest.json` into the target directory. Identical seeds reproduce identical outputs (verified by V4).
 
 ## How to re-generate the figures
 
@@ -179,8 +161,7 @@ python showcase/build_figures.py
 python showcase/figures/_build_figures.py
 ```
 
-Both scripts write into `showcase/figures/` with the canonical
-`NN_short_name.png` filename pattern.
+Both scripts write into `showcase/figures/` with the canonical `NN_short_name.png` filename pattern.
 
 ## How to re-render the short overview (doc + deck + figures)
 

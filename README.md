@@ -6,9 +6,7 @@ Forward-sampling generative model: scenario YAML + seed → bitwise-identical CS
 
 ## Quickstart with Claude Code (no manual setup)
 
-If you have [Claude Code](https://claude.com/claude-code) installed, the
-entire toolchain — `uv`, Python deps, and EnergyPlus — installs in one shot
-with zero manual downloads.
+If you have [Claude Code](https://claude.com/claude-code) installed, the entire toolchain — `uv`, Python deps, and EnergyPlus — installs in one shot with zero manual downloads.
 
 ```bash
 git clone <this-repo> v2b_syndata
@@ -22,8 +20,7 @@ Then inside Claude Code, run:
 /setup
 ```
 
-That slash command is defined in `.claude/commands/setup.md`. Claude Code
-will:
+That slash command is defined in `.claude/commands/setup.md`. Claude Code will:
 
 1. install `uv` if missing,
 2. `uv sync` the Python environment,
@@ -34,10 +31,7 @@ will:
    CSVs + `manifest.json` land on disk,
 6. print a status table — every row must read `OK`.
 
-If `/setup` exits with all-OK, skip the rest of this README and jump to
-[Generate](#generate). If a step fails, the command prints the next manual
-action for that specific failure — follow it and re-run `/setup`; it is
-idempotent.
+If `/setup` exits with all-OK, skip the rest of this README and jump to [Generate](#generate). If a step fails, the command prints the next manual action for that specific failure — follow it and re-run `/setup`; it is idempotent.
 
 > No Claude Code? Follow the manual install path below.
 
@@ -45,9 +39,7 @@ idempotent.
 
 ### Prerequisites
 
-Building load is simulated through EnergyPlus (23.x or newer). Install once
-per machine; the package's `load_pipeline.ep_runner.discover_energyplus`
-searches the standard locations.
+Building load is simulated through EnergyPlus (23.x or newer). Install once per machine; the package's `load_pipeline.ep_runner.discover_energyplus` searches the standard locations.
 
 ### Linux
 
@@ -60,8 +52,7 @@ searches the standard locations.
 
 ### macOS / Windows
 
-Same downloader. Default install paths (`/Applications/EnergyPlus-*`,
-`C:\EnergyPlusV*`) are auto-discovered.
+Same downloader. Default install paths (`/Applications/EnergyPlus-*`, `C:\EnergyPlusV*`) are auto-discovered.
 
 ### Verify
 
@@ -69,8 +60,7 @@ Same downloader. Default install paths (`/Applications/EnergyPlus-*`,
 uv run python -c "from v2b_syndata.load_pipeline.ep_runner import discover_energyplus; print(discover_energyplus())"
 ```
 
-A missing binary raises `EnergyPlusBinaryNotFound` — generation halts hard;
-no silent fallback to a stub.
+A missing binary raises `EnergyPlusBinaryNotFound` — generation halts hard; no silent fallback to a stub.
 
 ### Install
 
@@ -98,24 +88,20 @@ uv run python -m v2b_syndata.cli list-scenarios
 
 ## Web frontend
 
+Browser-based scenario configurator. Pick descriptors via dropdowns, tune individual knobs in the Advanced panel, generate, and preview CSVs + manifest inline.
 
-
-Flask is bundled in the main `uv sync` install — no extra `pip install` step needed.
+Flask is bundled in the main `uv sync` install — no extra `pip install`step needed.
 
 ```bash
 uv run python tools/web/app.py
 # → Running on http://127.0.0.1:5000
 ```
 
-Local-only by default. See `tools/web/README.md` for LAN exposure and
-architecture details. Output runs land in `tools/web/runs/` (last 20
-kept, gitignored).
+Local-only by default. See `tools/web/README.md` for LAN exposure and architecture details. Output runs land in `tools/web/runs/` (last 20 kept, gitignored).
 
 ## Interactive walkthrough — no install needed
 
-`showcase/short_overview/walkthrough.html` is a self-contained, install-free
-page that explains how `users.csv → cars.csv → sessions.csv` are generated.
-Open it in any browser. Two tabs:
+`showcase/short_overview/walkthrough.html` is a self-contained, install-free page that explains how `users.csv → cars.csv → sessions.csv` are generated. Open it in any browser. Two tabs:
 
 - **Playground** — slide φ, κ, δ, ρ, region preset, battery_mix simplex,
   Dirichlet α, CONSENT cluster; 10 live Plotly panels + a worked-day text
@@ -138,8 +124,7 @@ cd showcase/short_overview && python -m http.server 8080
 #   → http://localhost:8080/walkthrough.html
 ```
 
-Full launch options + a recommended new-user usage path live in
-[`showcase/README.md`](showcase/README.md#how-to-launch-the-interactive-cars--sessions-generation-walkthrough-walkthroughhtml).
+Full launch options + a recommended new-user usage path live in [`showcase/README.md`](showcase/README.md#how-to-launch-the-interactive-cars--sessions-generation-walkthrough-walkthroughhtml).
 
 ## Outputs
 
@@ -161,9 +146,7 @@ Tier 0 descriptors → Tier 1 roots → Tier 1.5 per-entity → Tier 2 latents �
 
 ## Step 3 status
 
-This implementation uses **stubs** for EnergyPlus (sinusoid building load) and DR events
-(deterministic mock events). Real integrations land in Steps 4 and 6. See `docs/DESIGN_NOTES.md`
-for non-trivial implementation choices.
+This implementation uses **stubs** for EnergyPlus (sinusoid building load) and DR events (deterministic mock events). Real integrations land in Steps 4 and 6. See `docs/DESIGN_NOTES.md` for non-trivial implementation choices.
 
 ## Tests
 
