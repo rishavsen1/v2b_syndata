@@ -98,12 +98,9 @@ uv run python -m v2b_syndata.cli list-scenarios
 
 ## Web frontend
 
-Browser-based scenario configurator. Pick descriptors via dropdowns, tune
-individual knobs in the Advanced panel, generate, and preview CSVs +
-manifest inline.
 
-Flask is bundled in the main `uv sync` install — no extra `pip install`
-step needed.
+
+Flask is bundled in the main `uv sync` install — no extra `pip install` step needed.
 
 ```bash
 uv run python tools/web/app.py
