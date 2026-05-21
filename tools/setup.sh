@@ -59,9 +59,31 @@ ep_probe() {
     2>/dev/null
 }
 
+ep_version() {
+  # Print version string like "23.2.0" from a binary path, or empty on failure.
+  local bin="$1"
+  [[ -x "${bin}" ]] || { echo ""; return; }
+  "${bin}" --version 2>/dev/null \
+    | grep -oE "Version [0-9]+\.[0-9]+(\.[0-9]+)?" \
+    | head -1 \
+    | awk '{print $2}'
+}
+
+REQUIRED_EP_MAJOR_MINOR="23.2"
+PINNED_OK=0
+
 if EP_PATH="$(ep_probe)" && [[ -n "${EP_PATH}" ]]; then
-  echo "    discovered: ${EP_PATH}"
-else
+  EP_VER="$(ep_version "${EP_PATH}")"
+  echo "    discovered: ${EP_PATH}  (version: ${EP_VER:-unknown})"
+  if [[ "${EP_VER}" == ${REQUIRED_EP_MAJOR_MINOR}* ]]; then
+    PINNED_OK=1
+  else
+    echo "    version mismatch — project IDFs require ${REQUIRED_EP_MAJOR_MINOR}.x"
+    echo "    forcing install of ${EP_VERSION} to ${EP_DIR} and overriding ENERGYPLUS_PATH"
+  fi
+fi
+
+if [[ ${PINNED_OK} -eq 0 ]]; then
   if [[ ! -x "${EP_BIN}" ]]; then
     mkdir -p "${CACHE}" "${HOME}/opt"
     case "${OS}-${ARCH}" in
@@ -93,7 +115,14 @@ else
   export ENERGYPLUS_PATH="${EP_DIR}"
   EP_PATH="$(ep_probe)" \
     || fail "EnergyPlus installed at ${EP_DIR} but discover_energyplus() still fails. Add 'export ENERGYPLUS_PATH=${EP_DIR}' to your shell rc and re-run."
-  echo "    installed: ${EP_PATH}"
+  EP_VER="$(ep_version "${EP_PATH}")"
+  echo "    installed: ${EP_PATH}  (version: ${EP_VER:-unknown})"
+  echo
+  echo "    NOTE: this shell now has ENERGYPLUS_PATH=${EP_DIR}, but new shells"
+  echo "          will fall back to any system EnergyPlus on PATH. To make"
+  echo "          the pin permanent, add this to your ~/.bashrc or ~/.zshrc:"
+  echo "              export ENERGYPLUS_PATH=${EP_DIR}"
+  echo
 fi
 
 # ─── Phase 4: smoke generation ───────────────────────────────────────────
