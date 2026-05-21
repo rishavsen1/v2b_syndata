@@ -22,7 +22,10 @@ data/stations/
 .vscode/
 uv.lock
 graphify-out
-.claude
+.claude/*
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/setup.md
 showcase/*
 # Track the short-overview deliverable + its parent README inside the
 # otherwise-ignored showcase/ tree. `showcase/*` only excludes immediate
