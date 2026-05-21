@@ -102,9 +102,11 @@ Browser-based scenario configurator. Pick descriptors via dropdowns, tune
 individual knobs in the Advanced panel, generate, and preview CSVs +
 manifest inline.
 
+Flask is bundled in the main `uv sync` install — no extra `pip install`
+step needed.
+
 ```bash
-pip install -r tools/web/requirements.txt
-python tools/web/app.py
+uv run python tools/web/app.py
 # → Running on http://127.0.0.1:5000
 ```
 

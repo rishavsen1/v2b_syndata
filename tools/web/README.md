@@ -5,10 +5,11 @@ individual knobs, generate, and preview CSVs + manifest inline.
 
 ## Run
 
+Flask is part of the project's main `uv sync` install — no separate
+requirements step.
+
 ```bash
-cd tools/web/
-pip install -r requirements.txt
-python app.py
+uv run python tools/web/app.py
 ```
 
 Then open <http://127.0.0.1:5000>.
