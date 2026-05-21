@@ -61,7 +61,20 @@ A missing binary raises `EnergyPlusBinaryNotFound` — generation halts hard; no
 uv sync
 ```
 
-## Generate
+## Web frontend (recommended for first run)
+
+Browser-based scenario configurator. Pick descriptors via dropdowns, tune individual knobs in the Advanced panel, generate, and preview CSVs + manifest inline. Easiest way to drive the generator end-to-end without learning the CLI flags.
+
+Flask is bundled in the main `uv sync` install — no extra `pip install` step needed.
+
+```bash
+uv run python tools/web/app.py
+# → Running on http://127.0.0.1:5000
+```
+
+Local-only by default. See `tools/web/README.md` for LAN exposure and architecture details. Output runs land in `tools/web/runs/` (last 20 kept, gitignored).
+
+## Generate (CLI)
 
 ```bash
 uv run python -m v2b_syndata.cli generate \
@@ -78,19 +91,6 @@ uv run python -m v2b_syndata.cli validate data/output/dev/S01/seed42/
 uv run python -m v2b_syndata.cli list-knobs
 uv run python -m v2b_syndata.cli list-scenarios
 ```
-
-## Web frontend
-
-Browser-based scenario configurator. Pick descriptors via dropdowns, tune individual knobs in the Advanced panel, generate, and preview CSVs + manifest inline.
-
-Flask is bundled in the main `uv sync` install — no extra `pip install`step needed.
-
-```bash
-uv run python tools/web/app.py
-# → Running on http://127.0.0.1:5000
-```
-
-Local-only by default. See `tools/web/README.md` for LAN exposure and architecture details. Output runs land in `tools/web/runs/` (last 20 kept, gitignored).
 
 ## Interactive walkthrough — no install needed
 
