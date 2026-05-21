@@ -115,10 +115,22 @@ def run_energyplus(
         ) from exc
 
     if result.returncode != 0:
-        raise EnergyPlusRunFailed(
-            f"EnergyPlus failed (rc={result.returncode}). "
+        err_path = output_dir / "eplusout.err"
+        err_tail = ""
+        if err_path.exists():
+            try:
+                err_text = err_path.read_text(errors="replace")
+                err_tail = err_text[-2000:]
+            except OSError:
+                pass
+        msg = (
+            f"EnergyPlus failed (rc={result.returncode}).\n"
+            f"cmd: {' '.join(cmd)}\n"
             f"stderr (tail):\n{result.stderr[-1500:]}"
         )
+        if err_tail:
+            msg += f"\n\neplusout.err (tail, from {err_path}):\n{err_tail}"
+        raise EnergyPlusRunFailed(msg)
 
     meter_csv = output_dir / "eplusmtr.csv"
     out_csv = output_dir / "eplusout.csv"
