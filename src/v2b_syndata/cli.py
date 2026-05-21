@@ -182,7 +182,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
 
 def cmd_docs_gen(args: argparse.Namespace) -> int:
-    """Emit the auto-generated section of KNOB_REFERENCE.md to stdout."""
+    """Emit the auto-generated section of docs/KNOB_REFERENCE.md to stdout."""
     from .knob_loader import (
         DEEP_OVERRIDE_PREFIXES,
         DIST_PARAM_RANGES,
@@ -293,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
                    help="overwrite output_dir if it exists")
     b.set_defaults(func=cmd_batch)
 
-    dg = sub.add_parser("docs-gen", help="emit auto-generated section of KNOB_REFERENCE.md")
+    dg = sub.add_parser("docs-gen", help="emit auto-generated section of docs/KNOB_REFERENCE.md")
     dg.set_defaults(func=cmd_docs_gen)
 
     args = p.parse_args(argv)

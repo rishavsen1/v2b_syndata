@@ -133,7 +133,7 @@ Tier 0 descriptors → Tier 1 roots → Tier 1.5 per-entity → Tier 2 latents �
 ## Step 3 status
 
 This implementation uses **stubs** for EnergyPlus (sinusoid building load) and DR events
-(deterministic mock events). Real integrations land in Steps 4 and 6. See `DESIGN_NOTES.md`
+(deterministic mock events). Real integrations land in Steps 4 and 6. See `docs/DESIGN_NOTES.md`
 for non-trivial implementation choices.
 
 ## Tests

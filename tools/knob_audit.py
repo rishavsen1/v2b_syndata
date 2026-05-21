@@ -10,7 +10,7 @@ Run:
 
 Outputs:
     /tmp/knob_audit/audit_metadata.json
-    KNOB_AUDIT_S1.md  (or KNOB_AUDIT_S2.md)
+    docs/KNOB_AUDIT_S1.md  (or docs/KNOB_AUDIT_S2.md)
 """
 from __future__ import annotations
 
@@ -613,7 +613,7 @@ def stage1(args: argparse.Namespace) -> int:
     print(f"[audit] metadata → {meta_path}")
 
     # Emit report
-    report_path = REPO / "KNOB_AUDIT_S1.md"
+    report_path = REPO / "docs" / "KNOB_AUDIT_S1.md"
     emit_stage1_report(verdicts, report_path, total_elapsed)
     print(f"[audit] report → {report_path}")
     return 0
@@ -1240,7 +1240,7 @@ def stage2(args: argparse.Namespace) -> int:
     with (audit_root / "audit_s2_metadata.json").open("w") as f:
         json.dump(meta, f, indent=2)
 
-    report_path = REPO / "KNOB_AUDIT_S2.md"
+    report_path = REPO / "docs" / "KNOB_AUDIT_S2.md"
     emit_stage2_report(verdicts, report_path, total_elapsed)
     print(f"[s2] report → {report_path}")
     return 0

@@ -320,7 +320,7 @@ def main():
         }, f, indent=2)
     print(f"[pair] metadata → {meta_out}")
 
-    report = REPO / "PAIRWISE_AUDIT.md"
+    report = REPO / "docs" / "PAIRWISE_AUDIT.md"
     emit_report(results, report, elapsed)
     print(f"[pair] report → {report}")
 
