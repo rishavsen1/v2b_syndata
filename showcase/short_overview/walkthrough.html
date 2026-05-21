@@ -161,6 +161,127 @@
     background: #f5f5f5; padding: 6px 8px; border-radius: 4px;
     font-size: 0.8em; margin: 4px 0;
   }
+
+  /* Concepts collapsible panel */
+  details.concepts {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--orange);
+    border-radius: 6px;
+    padding: 0;
+    margin: 14px 0 16px 0;
+  }
+  details.concepts > summary {
+    cursor: pointer;
+    padding: 10px 16px;
+    color: var(--blue);
+    font-weight: 600;
+    font-size: 1.0em;
+    list-style: none;
+    user-select: none;
+  }
+  details.concepts > summary::before {
+    content: "▸ ";
+    color: var(--orange);
+    display: inline-block;
+  }
+  details.concepts[open] > summary::before { content: "▾ "; }
+  details.concepts > summary:hover { background: #fafafa; }
+
+  details.concepts .body { padding: 4px 18px 18px 18px; font-size: 0.92em; line-height: 1.5; }
+  details.concepts h4 {
+    color: var(--blue);
+    margin: 18px 0 8px 0;
+    font-size: 1.0em;
+  }
+  details.concepts p { margin: 8px 0; }
+
+  /* The "two layers" intro illustration */
+  .two-layers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 10px 0 4px 0;
+  }
+  .two-layers .layer {
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .two-layers .layer.region {
+    background: var(--blue-soft);
+    border-left: 4px solid var(--blue);
+  }
+  .two-layers .layer.car {
+    background: var(--orange-soft);
+    border-left: 4px solid var(--orange);
+  }
+  .two-layers .layer .head {
+    font-weight: 700;
+    margin-bottom: 4px;
+    font-size: 1.0em;
+  }
+  .two-layers .layer.region .head { color: var(--blue); }
+  .two-layers .layer.car    .head { color: #a85a14; }
+  .two-layers .layer .tag {
+    display: inline-block;
+    font-size: 0.72em;
+    background: rgba(255,255,255,0.6);
+    color: #444;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+    font-weight: 500;
+  }
+  .two-layers .layer ul { margin: 4px 0 0 16px; padding: 0; }
+  .two-layers .layer li { margin: 1px 0; font-size: 0.9em; }
+
+  /* "Four axes" card grid */
+  .axes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 6px 0 6px 0;
+  }
+  @media (max-width: 800px) { .axes-grid { grid-template-columns: 1fr; } }
+  .ax-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    border-top: 3px solid var(--blue);
+  }
+  .ax-card.copula { border-top-color: var(--orange); }
+  .ax-card .ax-name {
+    font-weight: 700;
+    color: var(--blue);
+    font-size: 1.05em;
+  }
+  .ax-card.copula .ax-name { color: #a85a14; }
+  .ax-card .ax-meaning { color: #444; font-size: 0.9em; margin-top: 1px; }
+  .ax-card .ax-does    { margin-top: 6px; font-size: 0.88em; }
+  .ax-card .ax-watch   {
+    margin-top: 6px;
+    font-size: 0.8em;
+    color: #555;
+    background: #f5f5f5;
+    border-radius: 4px;
+    padding: 5px 7px;
+  }
+  .ax-card .ax-watch b { color: var(--orange); }
+
+  .key-invariant {
+    margin: 14px 0 4px 0;
+    background: var(--orange-soft);
+    border-left: 4px solid var(--orange);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+  .key-invariant b { color: #a85a14; }
+
+  .flow-list { margin: 4px 0 0 18px; padding: 0; }
+  .flow-list li { margin: 4px 0; font-size: 0.92em; }
+
 </style>
 </head>
 <body>
@@ -171,6 +292,86 @@
 </header>
 
 <div class="container">
+
+<details class="concepts">
+<summary>How φ, κ, δ, ρ relate to the region marginals &nbsp;<span style="color:#888;font-weight:400;font-size:0.88em">(click to expand)</span></summary>
+<div class="body">
+
+<p>Think of every car as belonging to a <b>group</b> (a region — say, <code>flexible_local</code>), and having its own <b>personality</b> within that group. The group sets the <i>typical</i> shape of arrival, dwell and SoC. The personality bends those typical shapes for <i>this specific car</i>.</p>
+
+<div class="two-layers">
+  <div class="layer region">
+    <div class="head">The region <span class="tag">shared by all cars in it</span></div>
+    Sets the <b>default shape</b> for how this group of drivers behaves:
+    <ul>
+      <li><b>arrival time</b>: when they show up (μ, σ)</li>
+      <li><b>dwell time</b>: how long they stay (k, λ)</li>
+      <li><b>arrival SoC</b>: how full the battery is when they arrive (α, β, shift)</li>
+      <li><b>ρ</b> — whether early arrivers stay longer</li>
+    </ul>
+  </div>
+  <div class="layer car">
+    <div class="head">The car's personality <span class="tag">one draw per car</span></div>
+    Three numbers, sampled once when the car is created, then stored in <code>users.csv</code>:
+    <ul>
+      <li><b>φ</b> — how often they come at all</li>
+      <li><b>κ</b> — how punctual they are</li>
+      <li><b>δ</b> — how far their commute is (in km)</li>
+    </ul>
+    Each is a uniform draw between region-defined bounds.
+  </div>
+</div>
+
+<p>Region presets in the panel above set the personality sliders to the <i>middle</i> of the region's bounds, and load the region's default shape. Drag any slider after that and the region selector flips to "custom" — meaning you've stepped outside any preset.</p>
+
+<h4>What each axis actually does</h4>
+
+<div class="axes-grid">
+  <div class="ax-card">
+    <div class="ax-name">φ &nbsp; frequency</div>
+    <div class="ax-meaning">Probability of showing up on any given weekday.</div>
+    <div class="ax-does">Bernoulli gate. Doesn't change <i>how</i> they arrive when they do — only <i>whether</i>.</div>
+    <div class="ax-watch"><b>Drag it:</b> attendance bar moves; D5 panel gains "skipped" days. Histograms below don't change.</div>
+  </div>
+
+  <div class="ax-card">
+    <div class="ax-name">κ &nbsp; consistency</div>
+    <div class="ax-meaning">How tight the arrival time is around the regional mean.</div>
+    <div class="ax-does">Shrinks the arrival spread: σ_eff = σ × (1 − κ × 0.5). High κ ⇒ tight; low κ ⇒ spread.</div>
+    <div class="ax-watch"><b>Drag it:</b> arrival histogram narrows or widens around μ. Dwell and SoC don't move.</div>
+  </div>
+
+  <div class="ax-card">
+    <div class="ax-name">δ &nbsp; commute (km)</div>
+    <div class="ax-meaning">One-way commute distance, used as a proxy for "how depleted" the arriving battery is.</div>
+    <div class="ax-does">Shifts the arrival-SoC distribution lower: shift_eff = shift_region − 0.003 × δ. Doesn't change its shape.</div>
+    <div class="ax-watch"><b>Drag it:</b> SoC histogram slides left or right; its shape (skew, spread) stays the same.</div>
+  </div>
+
+  <div class="ax-card copula">
+    <div class="ax-name">ρ &nbsp; copula correlation</div>
+    <div class="ax-meaning">Region-level (not personality). Couples arrival time with dwell length.</div>
+    <div class="ax-does">Gaussian copula. Negative ρ ⇒ "early arrivers stay longer". Doesn't change either marginal — only their joint behaviour.</div>
+    <div class="ax-watch"><b>Drag it:</b> joint scatter tilts. Both arrival and dwell histograms stay statistically identical.</div>
+  </div>
+</div>
+
+<div class="key-invariant">
+  <b>Key idea:</b> the personality axes (φ, κ, δ) only ever <i>bend</i> the region's defaults at sample time — they never replace them. And ρ never touches the marginals at all: by construction, a copula couples without altering. That's how you can dial each axis independently and read off exactly which part of the picture it controls.
+</div>
+
+<h4>The per-car flow, in three steps</h4>
+<ol class="flow-list">
+  <li>Pick a region for the car (categorical draw over the 5 regions).</li>
+  <li>Draw the car's personality (φ, κ, δ) from the region's bounds; record the region's defaults (μ, σ, k, λ, α, β, shift, ρ) as the car's fixed reference shape. Both go into <code>users.csv</code> conceptually.</li>
+  <li>For every day in the sim window: φ decides if they show up. If yes, the copula at ρ draws a coupled (arrival, dwell); κ-shrunk σ shapes the arrival; δ-shifted Beta shapes the SoC. That row becomes one entry in <code>sessions.csv</code>.</li>
+</ol>
+
+<p style="font-size:0.82em;color:#666;margin-top:10px">Source: <code>src/v2b_syndata/renderers/sessions.py</code> (copula at line 44, sampling dispatch at line 124).</p>
+
+</div>
+</details>
+
 <div class="layout">
 
 <!-- ─────────────── LEFT CONTROL COLUMN ─────────────── -->

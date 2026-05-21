@@ -10,42 +10,11 @@ This directory is the canonical entry point for anyone wanting to understand
 `v2b_syndata` without running it. It collects the narrative, slides, figures,
 example outputs, and a static exploration notebook in one place.
 
-## Structure
-
-```
-showcase/
-  OVERVIEW.md                       — main narrative, sections 1-9
-  README.md                         — this file
-  build_figures.py                  — build script for conceptual figures
-  figures/
-    01_*.png … 19_*.png            — 19 figures referenced from OVERVIEW
-    _build_figures.py              — build script for data-driven figures
-  slides/
-    overview.md                    — Marp source
-    overview.pdf                   — rendered deck (npx marp-cli)
-  notebooks/
-    exploration.ipynb              — static walkthrough of the 3 examples
-  short_overview/
-    users_cars_sessions.docx       — 2-page Word doc (users / cars / sessions)
-    users_cars_sessions.md         — source markdown for the doc
-    deck.md  deck.pdf  deck.pptx   — 10-slide Marp deck
-    walkthrough.html               — interactive HTML page (sliders + Plotly)
-    figures/                       — 01_three_csvs_dag, 02_pipeline, 03_worked_example
-    _build_figures.py              — regen figures
-    _build_docx.py                 — regen .docx
-  data/
-    example_scenarios/
-      S01_baseline/                — Nashville, mid-season, default population
-      S_clim_miami_summer/         — same population, Miami / July
-      S_eq_bi/                     — baseline + bidirectional chargers
-```
-
 ## How to view
 
 - **OVERVIEW.md** — open on GitHub or any markdown renderer. Embedded figures
   resolve via relative paths to `figures/`.
-- **slides/overview.pdf** — any PDF viewer.
-- **notebooks/exploration.ipynb** — JupyterLab / VS Code / nbviewer.
+- **../notebooks/exploration.ipynb** — JupyterLab / VS Code / nbviewer.
 - **short_overview/users_cars_sessions.docx** — Word / Pages / LibreOffice.
 - **short_overview/deck.pdf** — any PDF viewer. PPTX export at `deck.pptx`.
 - **short_overview/walkthrough.html** — see next section.

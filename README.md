@@ -4,7 +4,46 @@ Configurable synthetic V2B (Vehicle-to-Building) dataset generator.
 
 Forward-sampling generative model: scenario YAML + seed → bitwise-identical CSVs.
 
-## Prerequisites
+## Quickstart with Claude Code (no manual setup)
+
+If you have [Claude Code](https://claude.com/claude-code) installed, the
+entire toolchain — `uv`, Python deps, and EnergyPlus — installs in one shot
+with zero manual downloads.
+
+```bash
+git clone <this-repo> v2b_syndata
+cd v2b_syndata
+claude   # opens Claude Code in this directory
+```
+
+Then inside Claude Code, run:
+
+```
+/setup
+```
+
+That slash command is defined in `.claude/commands/setup.md`. Claude Code
+will:
+
+1. install `uv` if missing,
+2. `uv sync` the Python environment,
+3. download and extract a user-local EnergyPlus 23.2.0 into `~/opt/` (no
+   sudo, no manual click-through),
+4. verify `discover_energyplus()` resolves the binary,
+5. run a deterministic smoke generation (`S01` seed=42) and assert all 7
+   CSVs + `manifest.json` land on disk,
+6. print a status table — every row must read `OK`.
+
+If `/setup` exits with all-OK, skip the rest of this README and jump to
+[Generate](#generate). If a step fails, the command prints the next manual
+action for that specific failure — follow it and re-run `/setup`; it is
+idempotent.
+
+> No Claude Code? Follow the manual install path below.
+
+## Manual install
+
+### Prerequisites
 
 Building load is simulated through EnergyPlus (23.x or newer). Install once
 per machine; the package's `load_pipeline.ep_runner.discover_energyplus`
@@ -33,7 +72,7 @@ uv run python -c "from v2b_syndata.load_pipeline.ep_runner import discover_energ
 A missing binary raises `EnergyPlusBinaryNotFound` — generation halts hard;
 no silent fallback to a stub.
 
-## Install
+### Install
 
 ```bash
 uv sync
