@@ -11,6 +11,26 @@ the failure only if a step errors in a way you cannot auto-recover.
 
 The repo is already cloned and you are running inside its root.
 
+### Fast path
+
+A deterministic shell-script equivalent of this command lives at
+`tools/setup.sh`. **Try it first**:
+
+```bash
+./tools/setup.sh
+```
+
+If it exits 0 with every row of the final status table reading `OK`, you are
+done — report the status table to the user and stop. The script and the
+phases below cover the same intent, so there is no value in re-running them
+both.
+
+If the script aborts (unknown platform, GitHub asset rename, missing `curl`,
+or anything else the deterministic path can't recover from), capture its
+error output and fall through to the manual phases below. You have more
+latitude than the script: you can list GitHub release assets, pick a
+different tarball, install missing tools, etc.
+
 ### Phase 0 — Sanity
 
 1. Confirm CWD contains `pyproject.toml` and `src/v2b_syndata/`. If not, abort

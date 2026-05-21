@@ -4,36 +4,30 @@ Configurable synthetic V2B (Vehicle-to-Building) dataset generator.
 
 Forward-sampling generative model: scenario YAML + seed → bitwise-identical CSVs.
 
-## Quickstart with Claude Code (no manual setup)
+## Quickstart — one command, any agent (or none)
 
-If you have [Claude Code](https://claude.com/claude-code) installed, the entire toolchain — `uv`, Python deps, and EnergyPlus — installs in one shot with zero manual downloads.
+`tools/setup.sh` installs the entire toolchain end-to-end: `uv`, Python deps, a user-local EnergyPlus 23.2.0 under `~/opt/`, and runs a smoke generation. Idempotent; safe to re-run.
 
 ```bash
 git clone <this-repo> v2b_syndata
 cd v2b_syndata
-claude   # opens Claude Code in this directory
+./tools/setup.sh
 ```
 
-Then inside Claude Code, run:
+It prints a final status table; every row must read `OK`. If any phase fails, the script aborts with the next manual step inline.
 
-```
-/setup
-```
+### Using an agentic CLI?
 
-That slash command is defined in `.claude/commands/setup.md`. Claude Code will:
+Any agent can run the script — it's just a shell command. If you'd rather have the agent drive the install interactively (so it can adapt to platform edge cases the script doesn't cover):
 
-1. install `uv` if missing,
-2. `uv sync` the Python environment,
-3. download and extract a user-local EnergyPlus 23.2.0 into `~/opt/` (no
-   sudo, no manual click-through),
-4. verify `discover_energyplus()` resolves the binary,
-5. run a deterministic smoke generation (`S01` seed=42) and assert all 7
-   CSVs + `manifest.json` land on disk,
-6. print a status table — every row must read `OK`.
+| Agent | How to invoke |
+|---|---|
+| **Claude Code** | open the repo with `claude`, then type `/setup` (defined at `.claude/commands/setup.md`) |
+| **Copilot CLI / Codex / Gemini CLI / Cursor / Aider / …** | tell the agent: *"run `tools/setup.sh`; if it errors, fall back to the steps in `.claude/commands/setup.md`"* |
 
-If `/setup` exits with all-OK, skip the rest of this README and jump to [Generate](#generate). If a step fails, the command prints the next manual action for that specific failure — follow it and re-run `/setup`; it is idempotent.
+The two paths are equivalent: the shell script is the deterministic fast path; the markdown command file gives an agent the same intent with room to improvise when something unusual happens (unknown distro, asset 404, missing curl, etc.).
 
-> No Claude Code? Follow the manual install path below.
+> No agent and no script — follow the manual install path below.
 
 ## Manual install
 
