@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>V2B Synthetic Data — Interactive Walkthrough</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --blue: #1f4e79;
+    --blue-dark: #163960;
+    --orange: #d8853b;
+    --orange-soft: #fff3e0;
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --border: #e0e0e0;
+    --text: #222222;
+    --muted: #666666;
+    --blue-soft: #eaf2fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Helvetica Neue', Calibri, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  header {
+    background: var(--blue);
+    color: #fff;
+    padding: 14px 24px;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  header p { margin: 0.2em 0 0 0; font-size: 0.9em; opacity: 0.85; }
+
+  .container { padding: 16px 22px 40px 22px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .panel h2 {
+    margin: 0 0 10px 0;
+    color: var(--blue);
+    font-size: 1.05em;
+  }
+  .panel h3 {
+    margin: 6px 0 4px 0;
+    color: var(--blue);
+    font-size: 0.95em;
+    font-weight: 600;
+  }
+  .panel-orange {
+    background: var(--orange-soft);
+    border-left: 3px solid var(--orange);
+  }
+  .panel-blue {
+    background: var(--blue-soft);
+    border-left: 3px solid var(--blue);
+  }
+
+  label.row {
+    display: flex; align-items: center; gap: 8px;
+    margin: 5px 0;
+    font-size: 0.85em;
+  }
+  label.row .name { width: 90px; color: var(--blue); font-weight: 600; }
+  label.row .val { width: 56px; text-align: right; font-family: monospace; color: var(--text); }
+  label.row input[type=range] { flex: 1; }
+
+  select, button {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+  }
+  select { width: 100%; }
+  button.primary {
+    background: var(--blue); color: #fff; border-color: var(--blue);
+    cursor: pointer; padding: 7px 12px;
+  }
+  button.primary:hover { background: var(--blue-dark); }
+
+  .radio-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio-row label {
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 0.85em;
+  }
+  .radio-row input[type=radio]:checked + span {
+    color: var(--orange);
+    font-weight: 600;
+  }
+
+  .plots-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 700px) { .plots-grid { grid-template-columns: 1fr; } }
+
+  .plot-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .plot-card .title {
+    font-weight: 600;
+    color: var(--blue);
+    font-size: 0.9em;
+    margin-bottom: 2px;
+  }
+  .plot-card .sub {
+    color: var(--muted);
+    font-size: 0.78em;
+    margin-bottom: 6px;
+  }
+
+  .trace {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.78em;
+    background: var(--blue-soft);
+    padding: 10px 12px;
+    border-left: 3px solid var(--blue);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    line-height: 1.45;
+  }
+  .trace .step { color: var(--blue); font-weight: 700; }
+  .trace .drop { color: #c0392b; font-weight: 700; }
+  .trace .emit { color: #1c7c34; font-weight: 700; }
+
+  .mini-dag { max-width: 100%; margin-top: 6px; border-radius: 4px; }
+
+  .legend-key {
+    color: var(--orange); font-weight: 600;
+  }
+  .muted { color: var(--muted); font-size: 0.85em; }
+
+  pre.formula {
+    background: #f5f5f5; padding: 6px 8px; border-radius: 4px;
+    font-size: 0.8em; margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>V2B Synthetic Data — Interactive Walkthrough</h1>
+  <p>users.csv → cars.csv → sessions.csv. Drag sliders, watch the distributions and the worked-day trace update live.</p>
+</header>
+
+<div class="container">
+<div class="layout">
+
+<!-- ─────────────── LEFT CONTROL COLUMN ─────────────── -->
+<div>
+
+  <div class="panel">
+    <h2>Region preset (consent_default)</h2>
+    <select id="region-preset">
+      <option value="custom">— custom —</option>
+      <option value="stable_commuter">stable_commuter (φ high, δ long)</option>
+      <option value="flexible_local" selected>flexible_local (default)</option>
+      <option value="irregular_distant">irregular_distant</option>
+      <option value="occasional_visitor">occasional_visitor (φ low)</option>
+      <option value="erratic">erratic (κ low)</option>
+    </select>
+    <p class="muted" style="margin-top:6px">Setting a preset fills the (φ, κ, δ, ρ) sliders and region marginals (μ, σ, k, λ, α, β, shift). After that, dragging a slider switches to "custom".</p>
+  </div>
+
+  <div class="panel">
+    <h2>Behavioral axes (users.csv)</h2>
+    <label class="row"><span class="name">φ (phi)</span><input id="phi" type="range" min="0" max="1" step="0.01" value="0.84"><span class="val" id="phi-v">0.84</span></label>
+    <label class="row"><span class="name">κ (kappa)</span><input id="kappa" type="range" min="0" max="1" step="0.01" value="0.62"><span class="val" id="kappa-v">0.62</span></label>
+    <label class="row"><span class="name">δ (km)</span><input id="delta" type="range" min="3" max="100" step="0.5" value="12.4"><span class="val" id="delta-v">12.4</span></label>
+    <label class="row"><span class="name">ρ (copula)</span><input id="rho" type="range" min="-0.95" max="0.95" step="0.05" value="-0.2"><span class="val" id="rho-v">−0.20</span></label>
+    <h3 style="margin-top:10px">Region marginals</h3>
+    <label class="row"><span class="name">arrival μ</span><input id="arr_mu" type="range" min="6" max="18" step="0.1" value="9.5"><span class="val" id="arr_mu-v">9.5</span></label>
+    <label class="row"><span class="name">arrival σ</span><input id="arr_sigma" type="range" min="0.3" max="4.0" step="0.1" value="1.5"><span class="val" id="arr_sigma-v">1.5</span></label>
+    <label class="row"><span class="name">dwell k</span><input id="dw_k" type="range" min="0.7" max="4.0" step="0.05" value="1.8"><span class="val" id="dw_k-v">1.8</span></label>
+    <label class="row"><span class="name">dwell λ</span><input id="dw_lam" type="range" min="2" max="12" step="0.1" value="6.5"><span class="val" id="dw_lam-v">6.5</span></label>
+    <label class="row"><span class="name">soc α</span><input id="soc_a" type="range" min="1" max="15" step="0.5" value="5"><span class="val" id="soc_a-v">5.0</span></label>
+    <label class="row"><span class="name">soc β</span><input id="soc_b" type="range" min="1" max="15" step="0.5" value="5"><span class="val" id="soc_b-v">5.0</span></label>
+    <label class="row"><span class="name">soc shift</span><input id="soc_shift" type="range" min="-0.3" max="0.3" step="0.01" value="0.0"><span class="val" id="soc_shift-v">0.00</span></label>
+  </div>
+
+  <div class="panel">
+    <h2>cars.csv</h2>
+    <label class="row"><span class="name">capacity (kWh)</span>
+      <select id="capacity">
+        <option value="24">24 — leaf_24</option>
+        <option value="40" selected>40 — bolt_40</option>
+        <option value="75">75 — m3_75</option>
+        <option value="100">100 — rivian_100</option>
+      </select>
+    </label>
+    <h3>battery_mix (declared simplex)</h3>
+    <label class="row"><span class="name">leaf_24</span><input id="mix0" type="range" min="0" max="1" step="0.01" value="0.20"><span class="val" id="mix0-v">0.20</span></label>
+    <label class="row"><span class="name">bolt_40</span><input id="mix1" type="range" min="0" max="1" step="0.01" value="0.30"><span class="val" id="mix1-v">0.30</span></label>
+    <label class="row"><span class="name">m3_75</span><input id="mix2" type="range" min="0" max="1" step="0.01" value="0.40"><span class="val" id="mix2-v">0.40</span></label>
+    <label class="row"><span class="name">rivian_100</span><input id="mix3" type="range" min="0" max="1" step="0.01" value="0.10"><span class="val" id="mix3-v">0.10</span></label>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px">
+      <div id="mix-sum" style="font-family:monospace;font-size:0.82em;color:#1c7c34;font-weight:600">Σ = 1.000</div>
+      <button id="mix-normalize" style="padding:3px 8px;font-size:0.78em;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:#fff">normalize</button>
+      <button id="mix-reset"     style="padding:3px 8px;font-size:0.78em;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:#fff">reset</button>
+    </div>
+    <p class="muted">Pie below uses these weights as <code>p</code>; α controls how tight realized_mix sticks to <code>p</code>.</p>
+    <h3 style="margin-top:10px">battery_mix Dirichlet α</h3>
+    <label class="row"><span class="name">log₁₀(α)</span><input id="alpha" type="range" min="0" max="6" step="0.1" value="6"><span class="val" id="alpha-v">1.0e+6</span></label>
+    <p class="muted">α large ⇒ realized_mix ≈ p (declared) every sample. α small ⇒ each draw dominated by ONE random component (mean across many redraws ≈ p). Hit <i>Re-sample</i> to redraw.</p>
+  </div>
+
+  <div class="panel">
+    <h2>users.csv — CONSENT cluster</h2>
+    <div class="radio-row" id="consent-row">
+      <label><input type="radio" name="consent" value="I" /><span>I — assertive</span></label>
+      <label><input type="radio" name="consent" value="II" checked /><span>II — balanced</span></label>
+      <label><input type="radio" name="consent" value="III" /><span>III — accommodating</span></label>
+      <label><input type="radio" name="consent" value="IV" /><span>IV — deferential</span></label>
+    </div>
+    <p class="muted" style="margin-top:6px">Each cluster has its own (w1, w2) ~ N(μ, σ), clipped ≥ 0. Selecting one moves the scatter to that archetype.</p>
+  </div>
+
+  <div class="panel">
+    <button class="primary" id="resample">↻ Re-sample (re-roll 5000 day-draws)</button>
+  </div>
+
+  <div class="panel panel-orange">
+    <h2>What the model is</h2>
+    <p style="margin:0 0 6px 0;font-size:0.85em">Step 3 of <code>sessions.csv</code> is a <b>bivariate Gaussian copula</b> on <code>(arrival_hour, dwell_hours)</code>:</p>
+    <pre class="formula">z1, z2 ~ N(0,1)
+z2' = ρ·z1 + √(1−ρ²)·z2
+u1 = Φ(z1),  u2 = Φ(z2')
+arrival = TruncNorm⁻¹(u1; μ, σ_eff, [lo, hi])
+dwell   = Weibull⁻¹(u2; k, λ)</pre>
+    <p style="margin:0;font-size:0.82em"><span class="legend-key">Why ρ matters:</span> ρ &lt; 0 ⇒ early arrivers stay longer. Implementation mirrors <code>src/v2b_syndata/renderers/sessions.py:44</code>.</p>
+  </div>
+
+  <div class="panel panel-blue">
+    <h2>users → cars → sessions</h2>
+    <img class="mini-dag" src="figures/01_three_csvs_dag.png" alt="DAG" />
+  </div>
+
+</div>
+
+<!-- ─────────────── RIGHT PLOTS COLUMN ─────────────── -->
+<div>
+
+  <div class="plots-grid">
+    <div class="plot-card">
+      <div class="title">Attendance &nbsp;<span class="muted">— step 2</span></div>
+      <div class="sub">Bernoulli(φ): P(show) and a 100-day draw histogram</div>
+      <div id="plot-attendance" style="height:230px"></div>
+    </div>
+    <div class="plot-card">
+      <div class="title">D5 reachability outcomes &nbsp;<span class="muted">— step 7</span></div>
+      <div class="sub">200-day simulation: emit / drop (D5 fail) / skip (attendance)</div>
+      <div id="plot-d5" style="height:230px"></div>
+    </div>
+
+    <div class="plot-card">
+      <div class="title">Arrival hour marginal &nbsp;<span class="muted">— step 3 (TruncNorm)</span></div>
+      <div class="sub">5000-sample histogram + density. σ_eff = σ · (1 − κ · 0.5)</div>
+      <div id="plot-arr" style="height:230px"></div>
+    </div>
+    <div class="plot-card">
+      <div class="title">Dwell hours marginal &nbsp;<span class="muted">— step 3 (Weibull)</span></div>
+      <div class="sub">5000-sample histogram + density. dwell ∈ [0.5, 14] h after clip</div>
+      <div id="plot-dwell" style="height:230px"></div>
+    </div>
+
+    <div class="plot-card">
+      <div class="title">Joint (arrival, dwell) — the copula</div>
+      <div class="sub">2000-point scatter; ρ controls correlation visually</div>
+      <div id="plot-joint" style="height:260px"></div>
+    </div>
+    <div class="plot-card">
+      <div class="title">Arrival SoC &nbsp;<span class="muted">— step 5 (Beta + shift)</span></div>
+      <div class="sub">shift_eff = shift_region − 0.003 · δ</div>
+      <div id="plot-soc" style="height:260px"></div>
+    </div>
+
+    <div class="plot-card">
+      <div class="title">battery_mix → realized_mix &nbsp;<span class="muted">— cars.csv</span></div>
+      <div class="sub">Dirichlet(battery_mix · α); declared mix shown as outer ring</div>
+      <div id="plot-battery" style="height:260px"></div>
+    </div>
+    <div class="plot-card">
+      <div class="title">CONSENT (w1, w2) cluster</div>
+      <div class="sub">N(cluster_μ, cluster_σ) clipped ≥ 0; 600 sample points</div>
+      <div id="plot-consent" style="height:260px"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <h2>Worked single-day trace</h2>
+    <p class="muted" style="margin:0 0 8px 0">One sampled day for the current sliders. Re-runs every time anything changes.</p>
+    <div class="trace" id="trace">(loading)</div>
+  </div>
+
+</div>
+
+</div> <!-- /layout -->
+</div> <!-- /container -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────
+   Pure-JS samplers mirroring src/v2b_syndata/renderers/sessions.py
+   and src/v2b_syndata/samplers/sessions_dist.py
+   ───────────────────────────────────────────────────────────────────── */
+
+// Box-Muller standard normal
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// Standard normal CDF (Abramowitz & Stegun 26.2.17)
+function normCdf(x) {
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+  const t = 1.0 / (1.0 + p * x);
+  const y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1) * t * Math.exp(-x*x);
+  return 0.5 * (1.0 + sign * y);
+}
+
+// Inverse CDF for standard normal (Beasley-Springer-Moro)
+function normInv(p) {
+  if (p <= 0) return -10;
+  if (p >= 1) return 10;
+  const a = [-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+  const b = [-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+  const c = [-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+  const d = [7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const plow = 0.02425, phigh = 1 - plow;
+  if (p < plow) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  if (p <= phigh) {
+    const q = p - 0.5, r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  const q = Math.sqrt(-2 * Math.log(1 - p));
+  return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+
+// TruncNorm sample by inverse-CDF on the truncated CDF
+function truncNormSample(mu, sigma, lo, hi) {
+  const a = (lo - mu) / sigma;
+  const b = (hi - mu) / sigma;
+  const Fa = normCdf(a), Fb = normCdf(b);
+  const u = Math.random() * (Fb - Fa) + Fa;
+  return mu + sigma * normInv(u);
+}
+function truncNormPpf(u, mu, sigma, lo, hi) {
+  const a = (lo - mu) / sigma;
+  const b = (hi - mu) / sigma;
+  const Fa = normCdf(a), Fb = normCdf(b);
+  const p = Fa + u * (Fb - Fa);
+  return mu + sigma * normInv(p);
+}
+function truncNormPdf(x, mu, sigma, lo, hi) {
+  if (x < lo || x > hi) return 0;
+  const a = (lo - mu) / sigma;
+  const b = (hi - mu) / sigma;
+  const Z = normCdf(b) - normCdf(a);
+  const z = (x - mu) / sigma;
+  return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI) * Z);
+}
+
+// Weibull (shape k, scale λ)
+function weibullSample(k, lam) {
+  const u = Math.random();
+  return lam * Math.pow(-Math.log(1 - u), 1 / k);
+}
+function weibullPpf(u, k, lam) {
+  return lam * Math.pow(-Math.log(1 - u), 1 / k);
+}
+function weibullPdf(x, k, lam) {
+  if (x <= 0) return 0;
+  return (k / lam) * Math.pow(x / lam, k - 1) * Math.exp(-Math.pow(x / lam, k));
+}
+
+// Gamma sample (Marsaglia & Tsang 2000)
+function gammaSample(shape, scale) {
+  scale = scale || 1.0;
+  if (shape < 1) {
+    const u = Math.random();
+    return gammaSample(shape + 1, scale) * Math.pow(u, 1 / shape);
+  }
+  const d = shape - 1.0 / 3.0;
+  const c = 1.0 / Math.sqrt(9 * d);
+  while (true) {
+    let x, v;
+    do {
+      x = randn();
+      v = 1 + c * x;
+    } while (v <= 0);
+    v = v * v * v;
+    const u = Math.random();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v * scale;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v * scale;
+  }
+}
+
+function betaSample(alpha, beta) {
+  const x = gammaSample(alpha, 1.0);
+  const y = gammaSample(beta, 1.0);
+  return x / (x + y);
+}
+// Beta PDF (log-gamma based)
+function logGamma(z) {
+  const g = 7;
+  const p = [0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+             -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,
+             1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+  z -= 1;
+  let x = p[0];
+  for (let i = 1; i < g + 2; i++) x += p[i] / (z + i);
+  const t = z + g + 0.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+function betaPdf(x, a, b) {
+  if (x <= 0 || x >= 1) return 0;
+  const logB = logGamma(a) + logGamma(b) - logGamma(a + b);
+  return Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) - logB);
+}
+
+// Gaussian copula → (u1, u2) on [0,1]²
+function gaussianCopulaPair(rho) {
+  const z1 = randn(), z2 = randn();
+  const z2p = rho * z1 + Math.sqrt(1 - rho * rho) * z2;
+  return [normCdf(z1), normCdf(z2p)];
+}
+
+// Dirichlet sample given a simplex p and concentration α
+function dirichletSample(p, alpha) {
+  const xs = p.map(pi => gammaSample(pi * alpha, 1.0));
+  const s = xs.reduce((a, b) => a + b, 0);
+  return xs.map(v => v / s);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Region presets — mirrors configs/populations.yaml (consent_default)
+   ───────────────────────────────────────────────────────────────────── */
+const REGIONS = {
+  stable_commuter: {
+    phi:[0.85,1.00], kappa:[0.75,1.00], delta:[40,80],
+    arr:{mu:8.5, sigma:1.0}, dwell:{k:2.0, lam:8.5},
+    soc:{a:6, b:4, shift:0.05}, rho:-0.25,
+  },
+  flexible_local: {
+    phi:[0.70,0.95], kappa:[0.50,0.80], delta:[5,15],
+    arr:{mu:9.5, sigma:1.5}, dwell:{k:1.8, lam:6.5},
+    soc:{a:5, b:5, shift:0.0}, rho:-0.20,
+  },
+  irregular_distant: {
+    phi:[0.40,0.70], kappa:[0.20,0.50], delta:[40,100],
+    arr:{mu:10.5, sigma:2.2}, dwell:{k:1.6, lam:5.5},
+    soc:{a:3, b:5, shift:-0.05}, rho:-0.10,
+  },
+  occasional_visitor: {
+    phi:[0.05,0.20], kappa:[0.10,0.40], delta:[3,50],
+    arr:{mu:12.0, sigma:2.5}, dwell:{k:1.4, lam:3.5},
+    soc:{a:4, b:4, shift:0.10}, rho:0.0,
+  },
+  erratic: {
+    phi:[0.30,0.70], kappa:[0.05,0.30], delta:[5,80],
+    arr:{mu:11.0, sigma:3.0}, dwell:{k:1.3, lam:5.0},
+    soc:{a:3, b:6, shift:-0.05}, rho:0.05,
+  },
+};
+
+// CONSENT cluster archetypes (mock; actual μ/σ are private to the survey set)
+const CONSENT = {
+  I:   { mu:[0.85, 0.20], sigma:[0.10, 0.10], label:"I — assertive" },
+  II:  { mu:[0.55, 0.50], sigma:[0.10, 0.10], label:"II — balanced" },
+  III: { mu:[0.30, 0.65], sigma:[0.12, 0.10], label:"III — accommodating" },
+  IV:  { mu:[0.15, 0.85], sigma:[0.15, 0.10], label:"IV — deferential" },
+};
+
+// Default battery_mix — matches configs/knobs.yaml ev_fleet.battery_mix.default
+const BATTERY_MIX_DEFAULT = [0.20, 0.30, 0.40, 0.10];
+const BATTERY_LABELS = ["leaf_24", "bolt_40", "m3_75", "rivian_100"];
+
+/* ─────────────────────────────────────────────────────────────────────
+   State + DOM wiring
+   ───────────────────────────────────────────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  phi: 0.84, kappa: 0.62, delta: 12.4, rho: -0.2,
+  arr: { mu: 9.5, sigma: 1.5 },
+  dwell: { k: 1.8, lam: 6.5 },
+  soc: { a: 5, b: 5, shift: 0.0 },
+  capacity: 40,
+  alpha: 1e6,
+  batteryMix: BATTERY_MIX_DEFAULT.slice(),
+  consent: "II",
+};
+
+// link slider <-> state
+function bindRange(id, key, fmt = v => v.toFixed(2), onChange = null) {
+  const el = $(id), valEl = $(id + "-v");
+  el.addEventListener("input", () => {
+    setNested(key, parseFloat(el.value));
+    valEl.textContent = fmt(parseFloat(el.value));
+    $("region-preset").value = "custom";
+    renderAll();
+    if (onChange) onChange();
+  });
+}
+function setNested(path, v) {
+  const parts = path.split(".");
+  let o = state;
+  for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+  o[parts[parts.length - 1]] = v;
+}
+function getNested(path) {
+  const parts = path.split(".");
+  let o = state;
+  for (const p of parts) o = o[p];
+  return o;
+}
+function setSlider(id, val, fmt) {
+  $(id).value = val;
+  $(id + "-v").textContent = fmt(val);
+}
+function fmt2(v) { return v.toFixed(2); }
+function fmt1(v) { return v.toFixed(1); }
+
+bindRange("phi",     "phi",        fmt2);
+bindRange("kappa",   "kappa",      fmt2);
+bindRange("delta",   "delta",      fmt1);
+bindRange("rho",     "rho",        v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2));
+bindRange("arr_mu",  "arr.mu",     fmt1);
+bindRange("arr_sigma","arr.sigma", fmt1);
+bindRange("dw_k",    "dwell.k",    fmt2);
+bindRange("dw_lam",  "dwell.lam",  fmt1);
+bindRange("soc_a",   "soc.a",      fmt1);
+bindRange("soc_b",   "soc.b",      fmt1);
+bindRange("soc_shift","soc.shift", fmt2);
+
+$("capacity").addEventListener("change", () => {
+  state.capacity = parseFloat($("capacity").value);
+  renderAll();
+});
+
+function refreshMixSum() {
+  const s = state.batteryMix.reduce((a, b) => a + b, 0);
+  const ok = Math.abs(s - 1.0) < 1e-3;
+  const el = $("mix-sum");
+  el.textContent = `Σ = ${s.toFixed(3)}` + (ok ? "  ✓" : "  ✗ (knob loader requires 1.0)");
+  el.style.color = ok ? "#1c7c34" : "#c0392b";
+}
+for (let i = 0; i < 4; i++) {
+  $(`mix${i}`).addEventListener("input", () => {
+    state.batteryMix[i] = parseFloat($(`mix${i}`).value);
+    $(`mix${i}-v`).textContent = state.batteryMix[i].toFixed(2);
+    refreshMixSum();
+    renderAll();
+  });
+}
+$("mix-normalize").addEventListener("click", () => {
+  const s = state.batteryMix.reduce((a, b) => a + b, 0);
+  if (s <= 0) return;
+  state.batteryMix = state.batteryMix.map(v => v / s);
+  for (let i = 0; i < 4; i++) {
+    $(`mix${i}`).value = state.batteryMix[i];
+    $(`mix${i}-v`).textContent = state.batteryMix[i].toFixed(2);
+  }
+  refreshMixSum();
+  renderAll();
+});
+$("mix-reset").addEventListener("click", () => {
+  state.batteryMix = BATTERY_MIX_DEFAULT.slice();
+  for (let i = 0; i < 4; i++) {
+    $(`mix${i}`).value = state.batteryMix[i];
+    $(`mix${i}-v`).textContent = state.batteryMix[i].toFixed(2);
+  }
+  refreshMixSum();
+  renderAll();
+});
+$("alpha").addEventListener("input", () => {
+  const log10a = parseFloat($("alpha").value);
+  state.alpha = Math.pow(10, log10a);
+  $("alpha-v").textContent = (state.alpha >= 1e4)
+    ? state.alpha.toExponential(1)
+    : state.alpha.toFixed(1);
+  renderAll();
+});
+document.querySelectorAll("input[name=consent]").forEach(r => {
+  r.addEventListener("change", () => {
+    state.consent = r.value;
+    renderAll();
+  });
+});
+
+$("region-preset").addEventListener("change", () => {
+  const sel = $("region-preset").value;
+  if (sel === "custom") return;
+  const r = REGIONS[sel];
+  // pick mid-range for axes
+  state.phi   = (r.phi[0]   + r.phi[1])   / 2;
+  state.kappa = (r.kappa[0] + r.kappa[1]) / 2;
+  state.delta = (r.delta[0] + r.delta[1]) / 2;
+  state.rho   = r.rho;
+  state.arr   = { ...r.arr };
+  state.dwell = { ...r.dwell };
+  state.soc   = { ...r.soc };
+  // reflect in sliders
+  setSlider("phi", state.phi, fmt2);
+  setSlider("kappa", state.kappa, fmt2);
+  setSlider("delta", state.delta, fmt1);
+  setSlider("rho",   state.rho, v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2));
+  setSlider("arr_mu",    state.arr.mu, fmt1);
+  setSlider("arr_sigma", state.arr.sigma, fmt1);
+  setSlider("dw_k",      state.dwell.k, fmt2);
+  setSlider("dw_lam",    state.dwell.lam, fmt1);
+  setSlider("soc_a",     state.soc.a, fmt1);
+  setSlider("soc_b",     state.soc.b, fmt1);
+  setSlider("soc_shift", state.soc.shift, fmt2);
+  renderAll();
+});
+
+$("resample").addEventListener("click", renderAll);
+
+/* ─────────────────────────────────────────────────────────────────────
+   Plot functions
+   ───────────────────────────────────────────────────────────────────── */
+const BLUE = "#1f4e79";
+const ORANGE = "#d8853b";
+const GREY = "#888";
+const DROP_RED = "#c0392b";
+
+const COMMON_LAYOUT = {
+  margin: { l: 40, r: 12, t: 6, b: 36 },
+  font: { family: "Helvetica Neue, Arial, sans-serif", size: 11 },
+  paper_bgcolor: "white", plot_bgcolor: "white",
+};
+
+function linspace(a, b, n) {
+  const arr = []; const step = (b - a) / (n - 1);
+  for (let i = 0; i < n; i++) arr.push(a + step * i);
+  return arr;
+}
+
+function renderAttendance() {
+  // 100 day Bernoulli draws
+  const days = 100;
+  let attended = 0;
+  for (let i = 0; i < days; i++) if (Math.random() < state.phi) attended++;
+  const traces = [
+    {
+      x: ["show", "skip"],
+      y: [state.phi, 1 - state.phi],
+      type: "bar",
+      marker: { color: [BLUE, GREY] },
+      text: [state.phi.toFixed(2), (1 - state.phi).toFixed(2)],
+      textposition: "outside",
+      hoverinfo: "skip",
+    },
+  ];
+  Plotly.react("plot-attendance", traces, {
+    ...COMMON_LAYOUT,
+    yaxis: { range: [0, 1.15], title: "P" },
+    xaxis: { title: `100-day draw: attended ${attended} / skipped ${days - attended}` },
+    showlegend: false,
+  }, { displayModeBar: false });
+}
+
+function sigmaEff() {
+  return Math.max(state.arr.sigma * (1 - state.kappa * 0.5), 1e-3);
+}
+function shiftEff() {
+  return state.soc.shift - 0.003 * state.delta;
+}
+
+function renderArrival() {
+  const N = 5000;
+  const sig = sigmaEff();
+  const samples = [];
+  for (let i = 0; i < N; i++) samples.push(truncNormSample(state.arr.mu, sig, 6, 20));
+  const xs = linspace(6, 20, 200);
+  const pdf = xs.map(x => truncNormPdf(x, state.arr.mu, sig, 6, 20));
+  Plotly.react("plot-arr", [
+    { x: samples, type: "histogram", histnorm: "probability density",
+      marker: { color: BLUE, opacity: 0.5 }, nbinsx: 30, name: "samples", hoverinfo: "skip" },
+    { x: xs, y: pdf, type: "scatter", mode: "lines", line: { color: ORANGE, width: 2 }, name: "TruncNorm pdf" },
+  ], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `arrival_hour  (σ_eff = ${sig.toFixed(2)})`, range: [6, 20] },
+    yaxis: { title: "density" },
+    showlegend: false,
+    shapes: [{ type: "line", x0: state.arr.mu, x1: state.arr.mu, y0: 0, y1: 1, yref: "paper",
+               line: { color: ORANGE, dash: "dot", width: 1.5 } }],
+  }, { displayModeBar: false });
+}
+
+function renderDwell() {
+  const N = 5000;
+  const samples = [];
+  for (let i = 0; i < N; i++) {
+    let d = weibullSample(state.dwell.k, state.dwell.lam);
+    d = Math.max(0.5, Math.min(d, 14));
+    samples.push(d);
+  }
+  const xs = linspace(0.5, 14, 200);
+  const pdf = xs.map(x => weibullPdf(x, state.dwell.k, state.dwell.lam));
+  Plotly.react("plot-dwell", [
+    { x: samples, type: "histogram", histnorm: "probability density",
+      marker: { color: BLUE, opacity: 0.5 }, nbinsx: 30, name: "samples", hoverinfo: "skip" },
+    { x: xs, y: pdf, type: "scatter", mode: "lines", line: { color: ORANGE, width: 2 }, name: "Weibull pdf" },
+  ], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `dwell_hours  (k=${state.dwell.k.toFixed(2)}, λ=${state.dwell.lam.toFixed(2)})`, range: [0, 14] },
+    yaxis: { title: "density" },
+    showlegend: false,
+  }, { displayModeBar: false });
+}
+
+function renderJoint() {
+  const N = 2000;
+  const sig = sigmaEff();
+  const xs = [], ys = [], col = [];
+  for (let i = 0; i < N; i++) {
+    const [u1, u2] = gaussianCopulaPair(state.rho);
+    const arr = truncNormPpf(u1, state.arr.mu, sig, 6, 20);
+    let dw = weibullPpf(u2, state.dwell.k, state.dwell.lam);
+    dw = Math.max(0.5, Math.min(dw, 14));
+    xs.push(arr); ys.push(dw); col.push(arr + dw); // departure
+  }
+  Plotly.react("plot-joint", [{
+    x: xs, y: ys, type: "scatter", mode: "markers",
+    marker: { color: col, colorscale: "Viridis", size: 4, opacity: 0.6,
+              colorbar: { title: "depart h", thickness: 8, len: 0.8 } },
+    hovertemplate: "arr=%{x:.2f}<br>dwell=%{y:.2f}<extra></extra>",
+  }], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `arrival_hour   (ρ = ${state.rho.toFixed(2)})`, range: [6, 20] },
+    yaxis: { title: "dwell_hours", range: [0, 14] },
+    showlegend: false,
+  }, { displayModeBar: false });
+}
+
+function renderSoc() {
+  const N = 5000;
+  const shift = shiftEff();
+  const samples = [];
+  for (let i = 0; i < N; i++) {
+    samples.push(betaSample(state.soc.a, state.soc.b) + shift);
+  }
+  const xs = linspace(-0.4, 1.4, 200);
+  const pdf = xs.map(x => betaPdf(x - shift, state.soc.a, state.soc.b));
+  Plotly.react("plot-soc", [
+    { x: samples, type: "histogram", histnorm: "probability density",
+      marker: { color: BLUE, opacity: 0.5 }, nbinsx: 30, name: "samples", hoverinfo: "skip" },
+    { x: xs, y: pdf, type: "scatter", mode: "lines", line: { color: ORANGE, width: 2 }, name: "Beta + shift pdf" },
+  ], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `arrival_soc   (shift_eff = ${shift.toFixed(3)})`, range: [-0.2, 1.2] },
+    yaxis: { title: "density" },
+    showlegend: false,
+    shapes: [
+      { type: "line", x0: shift, x1: shift, y0: 0, y1: 1, yref: "paper",
+        line: { color: ORANGE, dash: "dot", width: 1.5 } },
+      { type: "line", x0: 0, x1: 0, y0: 0, y1: 1, yref: "paper",
+        line: { color: GREY, dash: "dot", width: 1 } },
+      { type: "line", x0: 1, x1: 1, y0: 0, y1: 1, yref: "paper",
+        line: { color: GREY, dash: "dot", width: 1 } },
+    ],
+  }, { displayModeBar: false });
+}
+
+function renderD5() {
+  const days = 200;
+  let attend = 0, drop = 0, emit = 0;
+  const sig = sigmaEff();
+  const shift = shiftEff();
+  const minDep = 0.80;
+  const rateKw = 20; // representative best charger rate
+  for (let d = 0; d < days; d++) {
+    if (Math.random() >= state.phi) continue;
+    attend++;
+    let ok = false;
+    for (let r = 0; r < 8; r++) {
+      const [u1, u2] = gaussianCopulaPair(state.rho);
+      const arr = truncNormPpf(u1, state.arr.mu, sig, 6, 20);
+      let dw = weibullPpf(u2, state.dwell.k, state.dwell.lam);
+      dw = Math.max(0.5, Math.min(dw, 14));
+      const arrSoc = Math.max(0, Math.min(1, betaSample(state.soc.a, state.soc.b) + shift));
+      const reqSoc = Math.max(minDep, arrSoc + 0.001) + Math.min(0.20, Math.max(0, randn() * 0.05));
+      const need = (Math.min(1, reqSoc) - arrSoc) * state.capacity;
+      const maxC = rateKw * dw * 0.96;
+      if (need <= maxC) { ok = true; break; }
+    }
+    if (ok) emit++; else drop++;
+  }
+  Plotly.react("plot-d5", [{
+    type: "bar",
+    x: ["emitted", "dropped (D5)", "skipped (φ)"],
+    y: [emit, drop, days - attend],
+    marker: { color: ["#1c7c34", DROP_RED, GREY] },
+    text: [emit, drop, days - attend].map(v => v + " days"),
+    textposition: "outside",
+    hoverinfo: "skip",
+  }], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `200 simulated days   capacity = ${state.capacity} kWh` },
+    yaxis: { title: "# days" },
+    showlegend: false,
+  }, { displayModeBar: false });
+}
+
+function renderBattery() {
+  // Realized mix per current α — driven by the editable state.batteryMix
+  const declared = state.batteryMix.slice();
+  // Guard: if user moved sliders to all-zero, treat as uniform to avoid Gamma(0)
+  const declSum = declared.reduce((a, b) => a + b, 0);
+  const p = (declSum > 0) ? declared.map(v => v / declSum) : [0.25, 0.25, 0.25, 0.25];
+  const mix = (state.alpha >= 1e6) ? p.slice() : dirichletSample(p, state.alpha);
+  Plotly.react("plot-battery", [
+    { type: "pie", labels: BATTERY_LABELS, values: mix, hole: 0.35,
+      marker: { colors: ["#a3c5e8", "#1f4e79", "#d8853b", "#a85a14"] },
+      textinfo: "label+percent", insidetextorientation: "radial" },
+  ], {
+    ...COMMON_LAYOUT,
+    margin: { l: 12, r: 12, t: 6, b: 6 },
+    showlegend: false,
+    annotations: [{ text: (state.alpha >= 1e6) ? "α≥1e6: declared mix" : `α=${state.alpha.toExponential(1)}<br>perturbed realized_mix`,
+                    x: 0.5, y: -0.05, xref: "paper", yref: "paper", showarrow: false,
+                    font: { size: 10, color: GREY } }],
+  }, { displayModeBar: false });
+}
+
+function renderConsent() {
+  const c = CONSENT[state.consent];
+  const N = 600;
+  const xs = [], ys = [];
+  for (let i = 0; i < N; i++) {
+    const w1 = Math.max(0, c.mu[0] + randn() * c.sigma[0]);
+    const w2 = Math.max(0, c.mu[1] + randn() * c.sigma[1]);
+    xs.push(w1); ys.push(w2);
+  }
+  Plotly.react("plot-consent", [
+    { x: xs, y: ys, type: "scatter", mode: "markers",
+      marker: { color: ORANGE, size: 4, opacity: 0.55 },
+      hovertemplate: "w1=%{x:.2f}<br>w2=%{y:.2f}<extra></extra>" },
+    { x: [c.mu[0]], y: [c.mu[1]], type: "scatter", mode: "markers",
+      marker: { color: BLUE, size: 14, symbol: "x", line: { width: 3 } },
+      name: "cluster μ", hoverinfo: "skip" },
+  ], {
+    ...COMMON_LAYOUT,
+    xaxis: { title: `w1  (${c.label})`, range: [0, 1.2] },
+    yaxis: { title: "w2", range: [0, 1.2] },
+    showlegend: false,
+  }, { displayModeBar: false });
+}
+
+function renderTrace() {
+  const sig = sigmaEff();
+  const shift = shiftEff();
+  const att = Math.random();
+  const t = [];
+  t.push(`${'1.'.padEnd(3)} Resolve region   custom (μ=${state.arr.mu.toFixed(1)}, σ=${state.arr.sigma.toFixed(1)}, ρ=${state.rho.toFixed(2)})`);
+  t.push(`<span class="step">2. Attendance</span>     draw=${att.toFixed(3)}  ${(att < state.phi) ? '< φ → continue' : '≥ φ → SKIP day'}`);
+  if (att >= state.phi) {
+    return $("trace").innerHTML = t.join("\n") + `\n\n<span class="drop">No session emitted.</span>`;
+  }
+  // try up to 8 times
+  let arrival, dwell, arrSoc, reqSoc, need, maxC;
+  const rateKw = 20, minDep = 0.80;
+  let retries = 0;
+  for (; retries < 8; retries++) {
+    const [u1, u2] = gaussianCopulaPair(state.rho);
+    arrival = truncNormPpf(u1, state.arr.mu, sig, 6, 20);
+    dwell = Math.max(0.5, Math.min(weibullPpf(u2, state.dwell.k, state.dwell.lam), 14));
+    arrSoc = Math.max(0, Math.min(1, betaSample(state.soc.a, state.soc.b) + shift));
+    reqSoc = Math.max(minDep, arrSoc + 0.001);
+    reqSoc = Math.max(reqSoc, Math.min(1.0, reqSoc + Math.min(0.15, Math.max(0, randn() * 0.05))));
+    reqSoc = Math.min(1.0, reqSoc);
+    need = (reqSoc - arrSoc) * state.capacity;
+    maxC = rateKw * dwell * 0.96;
+    if (need <= maxC) break;
+  }
+  const fail = need > maxC;
+  t.push(`<span class="step">3. Copula sample</span>  σ_eff = ${sig.toFixed(3)}`);
+  t.push(`                  arrival_hour = ${arrival.toFixed(2)}   dwell = ${dwell.toFixed(2)} h`);
+  const arrMinTotal = Math.round(arrival * 60 / 15) * 15;
+  const hh = Math.floor(arrMinTotal / 60), mm = arrMinTotal % 60;
+  t.push(`<span class="step">4. Snap to grid</span>   arrival = ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+  t.push(`<span class="step">5. Arrival SoC</span>    shift_eff = ${shift.toFixed(3)}   arrival_soc = ${(arrSoc*100).toFixed(1)}%`);
+  t.push(`<span class="step">6. Required SoC</span>   required_soc_at_depart = ${(reqSoc*100).toFixed(1)}%`);
+  t.push(`<span class="step">7. D5 check</span>       need = ${need.toFixed(2)} kWh,  max = ${maxC.toFixed(2)} kWh  ` +
+         (fail ? `<span class="drop">— FAIL after ${retries+1} retries</span>` : `— pass (retries used: ${retries})`));
+  if (fail) {
+    t.push("");
+    t.push(`<span class="drop">→ day dropped, no session row.</span>`);
+    return $("trace").innerHTML = t.join("\n");
+  }
+  const durSec = Math.floor(dwell * 4) / 4 * 3600;
+  const depTotalMin = arrMinTotal + Math.floor(dwell * 4) * 15;
+  const dhh = Math.floor(depTotalMin / 60) % 24, dmm = depTotalMin % 60;
+  t.push(`<span class="step">8. Floor duration</span> ${(Math.floor(dwell*4)/4).toFixed(2)} h = ${durSec.toFixed(0)} sec`);
+  t.push(`<span class="step">9. Non-overlap</span>    OK (first session of day)`);
+  t.push("");
+  t.push(`<span class="emit">→ sessions.csv row:</span>`);
+  t.push(`   arrival       = ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+  t.push(`   departure     = ${String(dhh).padStart(2,'0')}:${String(dmm).padStart(2,'0')}`);
+  t.push(`   duration_sec  = ${durSec.toFixed(0)}`);
+  t.push(`   arrival_soc   = ${(arrSoc*100).toFixed(1)}`);
+  t.push(`   required_soc  = ${(reqSoc*100).toFixed(1)}`);
+  $("trace").innerHTML = t.join("\n");
+}
+
+function renderAll() {
+  renderAttendance();
+  renderD5();
+  renderArrival();
+  renderDwell();
+  renderJoint();
+  renderSoc();
+  renderBattery();
+  renderConsent();
+  renderTrace();
+}
+
+renderAll();
+</script>
+</body>
+</html>

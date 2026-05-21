@@ -1,0 +1,12 @@
+*
+# Track the short-overview deliverable + this directory's README.
+# Whitelist the dir AND its contents recursively (the trailing `/**`
+# is required when the surrounding `*` pattern would otherwise
+# re-ignore descendants of an un-ignored directory).
+!README.md
+!.gitignore
+!short_overview/
+!short_overview/**
+# Don't track generated previews / pycaches inside the unignored subdir.
+short_overview/walkthrough_preview.png
+short_overview/__pycache__/

@@ -23,5 +23,13 @@ data/stations/
 uv.lock
 graphify-out
 .claude
-showcase/
+showcase/*
+# Track the short-overview deliverable + its parent README inside the
+# otherwise-ignored showcase/ tree. `showcase/*` only excludes immediate
+# children, so re-including a subdirectory below it is permitted.
+!showcase/README.md
+!showcase/short_overview/
+# Don't track generated previews / pycaches inside the unignored subdir.
+showcase/short_overview/walkthrough_preview.png
+showcase/short_overview/__pycache__/
 handoff/
