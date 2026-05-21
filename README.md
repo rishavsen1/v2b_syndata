@@ -9,7 +9,6 @@ Forward-sampling generative model: scenario YAML + seed → bitwise-identical CS
 `tools/setup.sh` installs the entire toolchain end-to-end: `uv`, Python deps, a user-local EnergyPlus 23.2.0 under `~/opt/`, and runs a smoke generation. Idempotent; safe to re-run.
 
 ```bash
-git clone <this-repo> v2b_syndata
 cd v2b_syndata
 ./tools/setup.sh
 ```
