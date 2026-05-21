@@ -34,6 +34,33 @@
   header h1 { margin: 0; font-size: 1.3em; }
   header p { margin: 0.2em 0 0 0; font-size: 0.9em; opacity: 0.85; }
 
+  /* Tabs */
+  .tabbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 2px;
+    padding: 0 22px;
+  }
+  .tabbar button {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 22px;
+    font-family: inherit;
+    font-size: 0.95em;
+    color: var(--muted);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .tabbar button.active {
+    color: var(--blue);
+    border-bottom-color: var(--orange);
+  }
+  .tabbar button:hover:not(.active) { background: #fafafa; color: var(--text); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
   .container { padding: 16px 22px 40px 22px; }
 
   .layout {
@@ -369,6 +396,56 @@
   }
   .insight b { color: #a85a14; }
 
+  /* Interactive 2-car control panels */
+  .twocar-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 8px 0 6px 0;
+  }
+  .twocar-controls .ctl-col {
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+  .twocar-controls .ctl-col.a {
+    background: var(--blue-soft);
+    border-left: 4px solid var(--blue);
+  }
+  .twocar-controls .ctl-col.b {
+    background: #fdebd3;
+    border-left: 4px solid var(--orange);
+  }
+  .twocar-controls .ctl-head {
+    font-weight: 700;
+    font-size: 1.0em;
+    margin-bottom: 6px;
+  }
+  .twocar-controls .ctl-col.a .ctl-head { color: var(--blue); }
+  .twocar-controls .ctl-col.b .ctl-head { color: #a85a14; }
+  .twocar-controls .row { margin: 3px 0; }
+  .twocar-controls .row .name { width: 70px; }
+  .twocar-controls .row .val { width: 50px; }
+  .twocar-controls .eff {
+    margin-top: 6px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.74em;
+    color: #444;
+    background: rgba(255,255,255,0.65);
+    padding: 5px 8px;
+    border-radius: 4px;
+    line-height: 1.4;
+  }
+  .twocar-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0 10px 0;
+    padding: 8px 12px;
+    background: #f8f8f8;
+    border-radius: 4px;
+  }
+  .twocar-toolbar select { padding: 3px 6px; }
+
 </style>
 </head>
 <body>
@@ -378,10 +455,17 @@
   <p>users.csv → cars.csv → sessions.csv. Drag sliders, watch the distributions and the worked-day trace update live.</p>
 </header>
 
+<nav class="tabbar">
+  <button class="tab-btn active" data-tab="playground">Playground</button>
+  <button class="tab-btn"        data-tab="concepts">Concepts &amp; 2-car example</button>
+</nav>
+
 <div class="container">
 
-<details class="concepts">
-<summary>How φ, κ, δ, ρ relate to the region marginals &nbsp;<span style="color:#888;font-weight:400;font-size:0.88em">(click to expand)</span></summary>
+<section id="tab-concepts" class="tab-pane">
+
+<details class="concepts" open>
+<summary>How φ, κ, δ, ρ relate to the region marginals &nbsp;<span style="color:#888;font-weight:400;font-size:0.88em">(click to collapse)</span></summary>
 <div class="body">
 
 <p>Think of every car as belonging to a <b>group</b> (a region — say, <code>flexible_local</code>), and having its own <b>personality</b> within that group. The group sets the <i>typical</i> shape of arrival, dwell and SoC. The personality bends those typical shapes for <i>this specific car</i>.</p>
@@ -459,140 +543,87 @@
 </div>
 </details>
 
-<details class="concepts">
-<summary>Worked example: 2 cars over a week &nbsp;<span style="color:#888;font-weight:400;font-size:0.88em">(click to expand)</span></summary>
-<div class="body">
+<h2 style="color:var(--blue);margin:18px 0 4px 0">Worked example: 2 cars over a week  <span style="color:#888;font-weight:400;font-size:0.65em">(interactive)</span></h2>
+<p style="margin:4px 0 12px 0;color:#444">Two cars from independent regions, sampled over the same week with shared randomness. Change either car's region or personality — the trace re-derives. Click <i>Re-roll week</i> to reseed the luck.</p>
 
-<p>Two cars are sampled from <i>different</i> regions. Same week, same charger, same sim_window. Watch how their personality + region shape every day.</p>
+<div class="twocar-controls">
+  <div class="ctl-col a">
+    <div class="ctl-head">Car A</div>
+    <label class="row"><span class="name">region</span>
+      <select id="A-region">
+        <option value="stable_commuter" selected>stable_commuter</option>
+        <option value="flexible_local">flexible_local</option>
+        <option value="irregular_distant">irregular_distant</option>
+        <option value="occasional_visitor">occasional_visitor</option>
+        <option value="erratic">erratic</option>
+      </select>
+    </label>
+    <label class="row"><span class="name">φ</span><input id="A-phi"   type="range" min="0" max="1" step="0.01" value="0.95"><span class="val" id="A-phi-v">0.95</span></label>
+    <label class="row"><span class="name">κ</span><input id="A-kappa" type="range" min="0" max="1" step="0.01" value="0.90"><span class="val" id="A-kappa-v">0.90</span></label>
+    <label class="row"><span class="name">δ (km)</span><input id="A-delta" type="range" min="3" max="100" step="0.5" value="60"><span class="val" id="A-delta-v">60.0</span></label>
+    <label class="row"><span class="name">ρ</span><input id="A-rho" type="range" min="-0.95" max="0.95" step="0.05" value="-0.25"><span class="val" id="A-rho-v">−0.25</span></label>
+    <div class="eff" id="A-eff"></div>
+  </div>
 
-<div class="twocar-head">
-  <div class="col a">
-    <div class="name">Car A &nbsp;— region: <code>stable_commuter</code></div>
-    <div class="vals">
-      <span class="label">personality</span>  φ = 0.95   κ = 0.90   δ = 60 km<br>
-      <span class="label">marginals</span>    arrival N(μ=8.5, σ=1.0)<br>
-      <span style="margin-left:5.2em">dwell Weibull(k=2.0, λ=8.5)</span><br>
-      <span style="margin-left:5.2em">soc Beta(6, 4) + shift=+0.05</span><br>
-      <span style="margin-left:5.2em">ρ = −0.25</span><br>
-      <span class="label">effective</span>    σ_eff = 1.0·(1−0.95·0.5) = <b>0.525</b><br>
-      <span style="margin-left:5.2em">shift_eff = 0.05 − 0.003·60 = <b>−0.13</b><br>
-    </div>
+  <div class="ctl-col b">
+    <div class="ctl-head">Car B</div>
+    <label class="row"><span class="name">region</span>
+      <select id="B-region">
+        <option value="stable_commuter">stable_commuter</option>
+        <option value="flexible_local">flexible_local</option>
+        <option value="irregular_distant">irregular_distant</option>
+        <option value="occasional_visitor">occasional_visitor</option>
+        <option value="erratic" selected>erratic</option>
+      </select>
+    </label>
+    <label class="row"><span class="name">φ</span><input id="B-phi"   type="range" min="0" max="1" step="0.01" value="0.50"><span class="val" id="B-phi-v">0.50</span></label>
+    <label class="row"><span class="name">κ</span><input id="B-kappa" type="range" min="0" max="1" step="0.01" value="0.15"><span class="val" id="B-kappa-v">0.15</span></label>
+    <label class="row"><span class="name">δ (km)</span><input id="B-delta" type="range" min="3" max="100" step="0.5" value="30"><span class="val" id="B-delta-v">30.0</span></label>
+    <label class="row"><span class="name">ρ</span><input id="B-rho" type="range" min="-0.95" max="0.95" step="0.05" value="0.05"><span class="val" id="B-rho-v">+0.05</span></label>
+    <div class="eff" id="B-eff"></div>
   </div>
-  <div class="col b">
-    <div class="name">Car B &nbsp;— region: <code>erratic</code></div>
-    <div class="vals">
-      <span class="label">personality</span>  φ = 0.50   κ = 0.15   δ = 30 km<br>
-      <span class="label">marginals</span>    arrival N(μ=11.0, σ=3.0)<br>
-      <span style="margin-left:5.2em">dwell Weibull(k=1.3, λ=5.0)</span><br>
-      <span style="margin-left:5.2em">soc Beta(3, 6) + shift=−0.05</span><br>
-      <span style="margin-left:5.2em">ρ = +0.05</span><br>
-      <span class="label">effective</span>    σ_eff = 3.0·(1−0.15·0.5) = <b>2.775</b><br>
-      <span style="margin-left:5.2em">shift_eff = −0.05 − 0.003·30 = <b>−0.14</b><br>
-    </div>
-  </div>
+</div>
+
+<div class="twocar-toolbar">
+  <label style="font-size:0.85em">days
+    <select id="tc-days">
+      <option value="5" selected>5 (Mon–Fri)</option>
+      <option value="7">7</option>
+      <option value="10">10</option>
+    </select>
+  </label>
+  <button id="tc-reroll" class="primary" style="padding:5px 12px;font-size:0.85em">↻ Re-roll week</button>
+  <span class="muted" id="tc-seed" style="font-size:0.78em"></span>
 </div>
 
 <table class="twocar">
 <thead>
 <tr>
   <th>Day</th>
-  <th>Car A &nbsp;<span style="font-weight:400;color:#888">(stable_commuter)</span></th>
-  <th>Car B &nbsp;<span style="font-weight:400;color:#888">(erratic)</span></th>
+  <th>Car A &nbsp;<span id="A-region-tag" style="font-weight:400;color:#888"></span></th>
+  <th>Car B &nbsp;<span id="B-region-tag" style="font-weight:400;color:#888"></span></th>
 </tr>
 </thead>
-<tbody>
-<tr>
-  <td class="day">Mon</td>
-  <td class="session">
-    φ-draw 0.21 &lt; 0.95 → attend<br>
-    arrival 08:30 &nbsp; dwell 9.2 h<br>
-    arr_soc 49% &nbsp; req_soc 87%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-  <td class="skip">
-    φ-draw 0.71 &gt; 0.50<br>SKIP day
-  </td>
-</tr>
-<tr>
-  <td class="day">Tue</td>
-  <td class="session">
-    φ-draw 0.05 &lt; 0.95 → attend<br>
-    arrival 08:15 &nbsp; dwell 8.8 h<br>
-    arr_soc 51% &nbsp; req_soc 86%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-  <td class="session">
-    φ-draw 0.42 &lt; 0.50 → attend<br>
-    arrival 10:45 &nbsp; dwell 4.1 h<br>
-    arr_soc 22% &nbsp; req_soc 84%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-</tr>
-<tr>
-  <td class="day">Wed</td>
-  <td class="session">
-    φ-draw 0.33 &lt; 0.95 → attend<br>
-    arrival 08:45 &nbsp; dwell 8.5 h<br>
-    arr_soc 47% &nbsp; req_soc 85%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-  <td class="skip">
-    φ-draw 0.88 &gt; 0.50<br>SKIP day
-  </td>
-</tr>
-<tr>
-  <td class="day">Thu</td>
-  <td class="session">
-    φ-draw 0.11 &lt; 0.95 → attend<br>
-    arrival 08:30 &nbsp; dwell 9.0 h<br>
-    arr_soc 50% &nbsp; req_soc 87%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-  <td class="session">
-    φ-draw 0.19 &lt; 0.50 → attend<br>
-    arrival 14:20 &nbsp; dwell 6.7 h <span style="color:#a85a14">(D5 retry ×1)</span><br>
-    arr_soc 18% &nbsp; req_soc 82%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-</tr>
-<tr>
-  <td class="day">Fri</td>
-  <td class="session">
-    φ-draw 0.62 &lt; 0.95 → attend<br>
-    arrival 08:35 &nbsp; dwell 9.5 h<br>
-    arr_soc 48% &nbsp; req_soc 88%<br>
-    <span style="color:#1c7c34;font-weight:600">emit</span>
-  </td>
-  <td class="skip">
-    φ-draw 0.55 &gt; 0.50<br>SKIP day
-  </td>
-</tr>
-</tbody>
-<tfoot>
-<tr>
-  <td class="totals">5 days</td>
-  <td class="totals" style="color:var(--blue)">5 sessions emitted &nbsp; arrival 08:15–08:45 (tight)</td>
-  <td class="totals" style="color:#a85a14">2 sessions emitted &nbsp; arrival 10:45 & 14:20 (spread)</td>
-</tr>
-</tfoot>
+<tbody id="twocar-tbody"></tbody>
+<tfoot id="twocar-tfoot"></tfoot>
 </table>
 
 <div class="insight">
   <b>Read the table this way:</b>
   <ul style="margin:6px 0 0 18px;padding:0">
-    <li><b>φ alone explains attendance.</b> Car A almost always shows up (0.95); Car B is a coin flip (0.50). Over the week: A=5, B=2.</li>
-    <li><b>κ alone explains arrival tightness.</b> Car A's σ_eff = 0.525 ⇒ all 5 arrivals fall inside a 30-minute window. Car B's σ_eff = 2.775 ⇒ the two arrivals are nearly four hours apart.</li>
-    <li><b>δ alone explains how depleted they arrive.</b> Both shift_eff land near −0.13, but the underlying Beta means differ (A: Beta(6,4)=0.6 → ~47%; B: Beta(3,6)=0.33 → ~20%). The Beta shape is the region's; δ only nudges it.</li>
-    <li><b>ρ is invisible at the cell level</b> — it lives in the joint pattern over many sessions. Car A's ρ=−0.25 means its earlier arrivals (08:15) tend to also have the longer dwells (8.8 h, 9.0 h); Car B's ρ=+0.05 means no such pull.</li>
-    <li><b>D5 is a sessions-level safeguard.</b> Car B's 14:20 arrival left only 6.7 h until close; the first sampled required_soc was too high for the available kWh, so step 7 retried once and accepted a relaxed required_soc.</li>
+    <li><b>φ alone explains attendance.</b> Drag a car's φ down — that car loses rows. Same luck (same φ-draws) is being compared against the new threshold.</li>
+    <li><b>κ alone explains arrival tightness.</b> Drag κ toward 1.0 on Car A — its σ_eff shrinks and the arrival column clusters into a narrow window. Drag toward 0 — arrivals spread across the day.</li>
+    <li><b>δ alone explains how depleted they arrive.</b> Drag δ to 100 — that car's arr_soc column drops by ~30 points. The Beta shape stays the same; only the location shifts.</li>
+    <li><b>ρ is invisible at the cell level</b> — it lives in the joint pattern. Drag ρ to −0.9 and look at the column over many days: earliest arrivals get the longest dwells.</li>
+    <li><b>D5 retries surface here when capacity is tight.</b> Late arrivals + low SoC + small battery may trigger retries (shown inline).</li>
   </ul>
 </div>
 
-<p style="font-size:0.82em;color:#666;margin-top:8px">Numbers above are hand-picked to illustrate the typical case; real outputs are random per seed. To see this play out live for any (φ, κ, δ, ρ) combo, use the worked-day trace at the bottom of this page and click <i>Re-sample</i>.</p>
+<p style="font-size:0.82em;color:#666;margin-top:8px">Each "luck" snapshot is a fixed seed driving a deterministic PRNG. Slider drags re-interpret the same uniform draws under the new (φ, κ, δ, ρ) — so changes you see are <i>causal</i>, not random. Use <i>Re-roll week</i> to pick a new luck snapshot. Default capacity_kwh = 40, charger rate = 20 kW (matches the playground tab's defaults).</p>
 
-</div>
-</details>
+</section>
 
+<section id="tab-playground" class="tab-pane active">
 <div class="layout">
 
 <!-- ─────────────── LEFT CONTROL COLUMN ─────────────── -->
@@ -756,6 +787,7 @@ dwell   = Weibull⁻¹(u2; k, λ)</pre>
 </div>
 
 </div> <!-- /layout -->
+</section> <!-- /tab-playground -->
 </div> <!-- /container -->
 
 <script>
@@ -1473,6 +1505,260 @@ function renderAll() {
 }
 
 renderAll();
+
+/* ─────────────────────────────────────────────────────────────────────
+   Tab toggle
+   ───────────────────────────────────────────────────────────────────── */
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "concepts") renderTwoCar();
+    if (btn.dataset.tab === "playground") {
+      // Plotly histograms drawn while hidden can have layout glitches; trigger a re-render
+      renderAll();
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   Interactive 2-car simulator
+   ───────────────────────────────────────────────────────────────────── */
+
+// Simple deterministic LCG keyed by an integer seed.
+function makeRng(seed) {
+  let s = (seed >>> 0) || 1;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+function rngStdNorm(rand) {
+  let u = 0, v = 0;
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function rngGamma(rand, shape) {
+  // Marsaglia & Tsang via injected uniform rng
+  if (shape < 1) return rngGamma(rand, shape + 1) * Math.pow(rand(), 1 / shape);
+  const d = shape - 1/3, c = 1 / Math.sqrt(9 * d);
+  while (true) {
+    let x, v;
+    do { x = rngStdNorm(rand); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v;
+    const u = rand();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+function rngBeta(rand, a, b) {
+  const x = rngGamma(rand, a), y = rngGamma(rand, b);
+  return x / (x + y);
+}
+
+const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Mon","Tue","Wed"];
+
+const twoCar = {
+  seed: 20240408,
+  days: 5,
+  A: { region: "stable_commuter", phi: 0.95, kappa: 0.90, delta: 60, rho: -0.25, capacity: 40 },
+  B: { region: "erratic",         phi: 0.50, kappa: 0.15, delta: 30, rho:  0.05, capacity: 40 },
+};
+
+function carEffective(car) {
+  const R = REGIONS[car.region];
+  const sig_eff   = Math.max(R.arr.sigma * (1 - car.kappa * 0.5), 1e-3);
+  const shift_eff = R.soc.shift - 0.003 * car.delta;
+  return { R, sig_eff, shift_eff };
+}
+
+function simulateDay(car, dayRng) {
+  const { R, sig_eff, shift_eff } = carEffective(car);
+  const phi_draw = dayRng();
+  if (phi_draw >= car.phi) {
+    return { skip: true, phi_draw };
+  }
+  // Copula via two std normals (using car.rho — overrides region's default)
+  const z1 = rngStdNorm(dayRng);
+  const z2 = rngStdNorm(dayRng);
+  const z2p = car.rho * z1 + Math.sqrt(1 - car.rho * car.rho) * z2;
+  const u_arr = normCdf(z1), u_dwell = normCdf(z2p);
+  const arr_hr = truncNormPpf(u_arr, R.arr.mu, sig_eff, 6, 20);
+  let dwell    = weibullPpf(u_dwell, R.dwell.k, R.dwell.lam);
+  dwell = Math.max(0.5, Math.min(dwell, 14));
+  // SoC
+  const arr_soc = Math.max(0, Math.min(1,
+    rngBeta(dayRng, R.soc.a, R.soc.b) + shift_eff)) * 100;
+  // Required SoC + D5 reachability retries
+  const minDep = 80, ceil = 100, rateKw = 20;
+  let req_soc = null, retries = 0, droppedD5 = false, droppedFloor = false;
+  const floor = Math.max(minDep, arr_soc + 0.1);
+  if (floor >= ceil) {
+    droppedFloor = true;
+  } else {
+    for (let r = 0; r < 8; r++) {
+      const u_req = dayRng();
+      const cand = truncNormPpf(u_req, 85, 5, floor, ceil);
+      const need = (cand - arr_soc) / 100 * car.capacity;
+      const max  = rateKw * dwell * 0.96;
+      if (need <= max) { req_soc = cand; retries = r; break; }
+    }
+    if (req_soc === null) droppedD5 = true;
+  }
+  return {
+    skip: false, phi_draw,
+    arr_hr, dwell, arr_soc, req_soc, retries,
+    droppedFloor, droppedD5,
+  };
+}
+
+function simulateWeek(car, baseSeed, days) {
+  // Use base seed mixed with car identity for independent streams
+  // Each day gets its own sub-rng so changes to car state don't shift downstream days
+  const out = [];
+  for (let d = 0; d < days; d++) {
+    const dayRng = makeRng((baseSeed ^ (d * 73856093)) >>> 0);
+    out.push(simulateDay(car, dayRng));
+  }
+  return out;
+}
+
+function fmtTime(hr) {
+  const total = Math.round(hr * 60 / 15) * 15;
+  const h = Math.floor(total / 60), m = total % 60;
+  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+}
+
+function renderCarCell(d) {
+  if (d.skip) {
+    return `<td class="skip">φ-draw ${d.phi_draw.toFixed(2)} &gt; φ<br>SKIP day</td>`;
+  }
+  if (d.droppedFloor) {
+    return `<td class="skip">arr_soc too high<br>floor ≥ ceil<br>DROP day</td>`;
+  }
+  if (d.droppedD5) {
+    return `<td class="skip">D5 failed all 8 retries<br>capacity too small<br>DROP day</td>`;
+  }
+  const retryNote = d.retries > 0
+    ? ` <span style="color:#a85a14">(D5 retry ×${d.retries})</span>`
+    : "";
+  return `<td class="session">
+    φ-draw ${d.phi_draw.toFixed(2)} → attend<br>
+    arrival ${fmtTime(d.arr_hr)} &nbsp; dwell ${d.dwell.toFixed(1)} h${retryNote}<br>
+    arr_soc ${d.arr_soc.toFixed(0)}% &nbsp; req_soc ${d.req_soc.toFixed(0)}%<br>
+    <span style="color:#1c7c34;font-weight:600">emit</span>
+  </td>`;
+}
+
+function summarize(rows) {
+  const emitted = rows.filter(r => !r.skip && !r.droppedFloor && !r.droppedD5);
+  if (emitted.length === 0) return { count: 0, arrText: "—", dwellText: "—", socText: "—" };
+  const arrs = emitted.map(r => r.arr_hr);
+  const aMin = Math.min(...arrs), aMax = Math.max(...arrs);
+  const aMean = arrs.reduce((a,b)=>a+b,0)/arrs.length;
+  const dMean = emitted.map(r=>r.dwell).reduce((a,b)=>a+b,0)/emitted.length;
+  const sMean = emitted.map(r=>r.arr_soc).reduce((a,b)=>a+b,0)/emitted.length;
+  return {
+    count: emitted.length,
+    arrText:  `${fmtTime(aMin)}–${fmtTime(aMax)} (μ ${fmtTime(aMean)})`,
+    dwellText: `μ ${dMean.toFixed(1)} h`,
+    socText:   `μ ${sMean.toFixed(0)}%`,
+  };
+}
+
+function renderTwoCar() {
+  // Mirror car state to slider labels + region tags
+  ["A","B"].forEach(k => {
+    const c = twoCar[k];
+    document.getElementById(`${k}-phi-v`).textContent   = c.phi.toFixed(2);
+    document.getElementById(`${k}-kappa-v`).textContent = c.kappa.toFixed(2);
+    document.getElementById(`${k}-delta-v`).textContent = c.delta.toFixed(1);
+    const r = c.rho;
+    document.getElementById(`${k}-rho-v`).textContent =
+      (r >= 0 ? "+" : "−") + Math.abs(r).toFixed(2);
+    document.getElementById(`${k}-region-tag`).textContent = `(${c.region})`;
+    const { R, sig_eff, shift_eff } = carEffective(c);
+    document.getElementById(`${k}-eff`).innerHTML =
+      `region marginals:  arrival N(μ=${R.arr.mu}, σ=${R.arr.sigma}) ` +
+      `· dwell Weibull(k=${R.dwell.k}, λ=${R.dwell.lam}) ` +
+      `· soc Beta(${R.soc.a}, ${R.soc.b})+shift=${R.soc.shift.toFixed(2)}<br>` +
+      `effective:  σ_eff = ${sig_eff.toFixed(3)},  shift_eff = ${shift_eff.toFixed(3)}`;
+  });
+  document.getElementById("tc-seed").textContent = `seed = ${twoCar.seed}`;
+
+  // Simulate
+  const A = simulateWeek(twoCar.A, twoCar.seed,                twoCar.days);
+  const B = simulateWeek(twoCar.B, twoCar.seed ^ 0x9E3779B9,   twoCar.days);
+
+  // Render tbody
+  const tbody = document.getElementById("twocar-tbody");
+  let html = "";
+  for (let d = 0; d < twoCar.days; d++) {
+    const dayName = DAY_NAMES[d % DAY_NAMES.length];
+    html += `<tr><td class="day">${dayName}</td>${renderCarCell(A[d])}${renderCarCell(B[d])}</tr>`;
+  }
+  tbody.innerHTML = html;
+
+  // Render tfoot
+  const sA = summarize(A), sB = summarize(B);
+  document.getElementById("twocar-tfoot").innerHTML = `
+    <tr>
+      <td class="totals">${twoCar.days} days</td>
+      <td class="totals" style="color:var(--blue)">${sA.count} emitted · arrival ${sA.arrText} · dwell ${sA.dwellText} · arr_soc ${sA.socText}</td>
+      <td class="totals" style="color:#a85a14">${sB.count} emitted · arrival ${sB.arrText} · dwell ${sB.dwellText} · arr_soc ${sB.socText}</td>
+    </tr>`;
+}
+
+// Wire up per-car controls
+function bindCarSlider(key, prop, parse, fmt) {
+  const el = document.getElementById(`${key}-${prop}`);
+  el.addEventListener("input", () => {
+    twoCar[key][prop === "delta" ? "delta" : prop] = parse(el.value);
+    renderTwoCar();
+  });
+}
+bindCarSlider("A", "phi",   parseFloat, v => v.toFixed(2));
+bindCarSlider("A", "kappa", parseFloat, v => v.toFixed(2));
+bindCarSlider("A", "delta", parseFloat, v => v.toFixed(1));
+bindCarSlider("A", "rho",   parseFloat, v => v.toFixed(2));
+bindCarSlider("B", "phi",   parseFloat, v => v.toFixed(2));
+bindCarSlider("B", "kappa", parseFloat, v => v.toFixed(2));
+bindCarSlider("B", "delta", parseFloat, v => v.toFixed(1));
+bindCarSlider("B", "rho",   parseFloat, v => v.toFixed(2));
+
+function applyRegionToCar(key) {
+  const region = document.getElementById(`${key}-region`).value;
+  twoCar[key].region = region;
+  const R = REGIONS[region];
+  // Pick midpoint of region bounds for each axis
+  twoCar[key].phi   = (R.phi[0]   + R.phi[1])   / 2;
+  twoCar[key].kappa = (R.kappa[0] + R.kappa[1]) / 2;
+  twoCar[key].delta = (R.delta[0] + R.delta[1]) / 2;
+  twoCar[key].rho   = R.rho;
+  // Reflect in sliders
+  document.getElementById(`${key}-phi`).value   = twoCar[key].phi;
+  document.getElementById(`${key}-kappa`).value = twoCar[key].kappa;
+  document.getElementById(`${key}-delta`).value = twoCar[key].delta;
+  document.getElementById(`${key}-rho`).value   = twoCar[key].rho;
+  renderTwoCar();
+}
+document.getElementById("A-region").addEventListener("change", () => applyRegionToCar("A"));
+document.getElementById("B-region").addEventListener("change", () => applyRegionToCar("B"));
+
+document.getElementById("tc-days").addEventListener("change", e => {
+  twoCar.days = parseInt(e.target.value, 10);
+  renderTwoCar();
+});
+document.getElementById("tc-reroll").addEventListener("click", () => {
+  twoCar.seed = (twoCar.seed * 1103515245 + 12345) >>> 0;
+  renderTwoCar();
+});
+
+// Initial render (table starts hidden but values prepped)
+renderTwoCar();
 </script>
 </body>
 </html>
