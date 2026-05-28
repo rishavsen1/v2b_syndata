@@ -286,22 +286,22 @@ stable_commuter_heavy:
     # stable_commuter (weight 0.65): tight 8:30 arrival, 9.5h workday,
     # mid-low SoC, strong negative arrival↔dwell coupling.
     stable_commuter:
-      arrival:     {mu: 8.5, sigma: 0.6}        # 8:30 ± 36min, sharp office onset
-      dwell:       {k: 2.5, lambda: 9.5}        # ~9.5h workday; k>2 = tight unimodal peak
+      arrival: {mu: 8.5, sigma: 0.6}            # 8:30 ± 36min, sharp office onset
+      dwell: {k: 2.5, lambda: 9.5}              # ~9.5h workday; k>2 = tight unimodal peak
       soc_arrival: {alpha: 4.0, beta: 6.0}      # E≈0.40 — long commute, mid-discharge
-      copula:      {rho_gaussian: -0.4}         # stronger than consent_default — disciplined fleet
+      copula: {rho_gaussian: -0.4}              # stronger than consent_default — disciplined fleet
     # flexible_local (weight 0.25): late morning, ~7h dwell, balanced SoC.
     flexible_local:
-      arrival:     {mu: 9.0, sigma: 1.0}        # 9:00 ± 1h, mid-morning
-      dwell:       {k: 2.0, lambda: 7.0}        # ~7h dwell — shorter than commuter
+      arrival: {mu: 9.0, sigma: 1.0}            # 9:00 ± 1h, mid-morning
+      dwell: {k: 2.0, lambda: 7.0}              # ~7h dwell — shorter than commuter
       soc_arrival: {alpha: 5.0, beta: 5.0}      # E≈0.50 — short commute, less discharge
-      copula:      {rho_gaussian: -0.3}
+      copula: {rho_gaussian: -0.3}
     # irregular_distant (weight 0.10): scattered morning, ~5h dwell, low SoC.
     irregular_distant:
-      arrival:     {mu: 9.5, sigma: 1.8}        # 9:30 ± 1.8h, spread morning
-      dwell:       {k: 1.7, lambda: 5.0}        # ~5h dwell — drops off mid-day
+      arrival: {mu: 9.5, sigma: 1.8}            # 9:30 ± 1.8h, spread morning
+      dwell: {k: 1.7, lambda: 5.0}              # ~5h dwell — drops off mid-day
       soc_arrival: {alpha: 3.0, beta: 6.5}      # E≈0.32 — long-range driver, significant discharge
-      copula:      {rho_gaussian: -0.2}
+      copula: {rho_gaussian: -0.2}
 
 # ──────────────────────────────────────────────────────────────────────────
 # Low-ψ extreme: visitor-heavy retail. Hand-authored (synthetic).
@@ -317,10 +317,14 @@ visitor_heavy:
     # 0.85·0.10 + 0.10·0.30 + 0.04·0.45 + 0.01·0.80 = 0.151. occasional_visitor.freq
     # upper bound shrunk from 0.25 → 0.15 (true walk-in pattern). Concentration
     # shifted heavily to occasional_visitor to preserve low-ψ character.
-    - {name: occasional_visitor, freq: [0.05, 0.15], consist: [0.05, 0.35], dist_km: [3, 30],  weight: 0.85}
-    - {name: erratic,            freq: [0.15, 0.45], consist: [0.05, 0.25], dist_km: [5, 50],  weight: 0.10}
-    - {name: flexible_local,     freq: [0.30, 0.60], consist: [0.30, 0.55], dist_km: [3, 12],  weight: 0.04}
-    - {name: stable_commuter,    freq: [0.70, 0.90], consist: [0.65, 0.90], dist_km: [10, 30], weight: 0.01}
+    - {name: occasional_visitor, freq: [0.05, 0.15], consist: [0.05, 0.35], 
+        dist_km: [3, 30], weight: 0.85}
+    - {name: erratic, freq: [0.15, 0.45], consist: [0.05, 0.25], dist_km: [5, 50],
+      weight: 0.10}
+    - {name: flexible_local, freq: [0.30, 0.60], consist: [0.30, 0.55], dist_km: [
+        3, 12], weight: 0.04}
+    - {name: stable_commuter, freq: [0.70, 0.90], consist: [0.65, 0.90], dist_km: [
+        10, 30], weight: 0.01}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -338,28 +342,28 @@ visitor_heavy:
     # occasional_visitor (weight 0.55): spread afternoon, very short dwell,
     # mean SoC ≈ 0.55 (less drained — short retail trips).
     occasional_visitor:
-      arrival:     {mu: 13.0, sigma: 3.5}       # 13:00 ± 3.5h, lunchtime + afternoon shopping
-      dwell:       {k: 1.3, lambda: 1.8}        # ~1.8h dwell — quick top-up; tail-heavy
+      arrival: {mu: 13.0, sigma: 3.5}           # 13:00 ± 3.5h, lunchtime + afternoon shopping
+      dwell: {k: 1.3, lambda: 1.8}              # ~1.8h dwell — quick top-up; tail-heavy
       soc_arrival: {alpha: 5.0, beta: 4.0}      # E≈0.55 — short trips, less drained
-      copula:      {rho_gaussian: 0.0}          # independent — walk-ins
+      copula: {rho_gaussian: 0.0}               # independent — walk-ins
     # erratic (weight 0.25): very wide arrival, very short dwell, mid SoC.
     erratic:
-      arrival:     {mu: 14.0, sigma: 4.0}       # broadest arrival window — random walk-ins
-      dwell:       {k: 1.1, lambda: 1.5}        # ~1.5h dwell; heavy left tail (quick stops)
+      arrival: {mu: 14.0, sigma: 4.0}           # broadest arrival window — random walk-ins
+      dwell: {k: 1.1, lambda: 1.5}              # ~1.5h dwell; heavy left tail (quick stops)
       soc_arrival: {alpha: 4.0, beta: 5.0}      # E≈0.44 — mid SoC
-      copula:      {rho_gaussian: 0.0}
+      copula: {rho_gaussian: 0.0}
     # flexible_local (weight 0.15): mid-morning to noon, ~2.5h dwell.
     flexible_local:
-      arrival:     {mu: 11.0, sigma: 2.5}       # 11:00 ± 2.5h, errand window
-      dwell:       {k: 1.5, lambda: 2.5}        # ~2.5h dwell — short errands
+      arrival: {mu: 11.0, sigma: 2.5}           # 11:00 ± 2.5h, errand window
+      dwell: {k: 1.5, lambda: 2.5}              # ~2.5h dwell — short errands
       soc_arrival: {alpha: 4.5, beta: 4.5}      # E≈0.50 — balanced
-      copula:      {rho_gaussian: -0.1}         # earlier arrivers stay slightly longer
+      copula: {rho_gaussian: -0.1}              # earlier arrivers stay slightly longer
     # stable_commuter (weight 0.05): rare in retail; tight 9 AM + 8h stay.
     stable_commuter:
-      arrival:     {mu: 9.0, sigma: 1.0}        # 9:00 ± 1h — small office worker contingent
-      dwell:       {k: 2.2, lambda: 8.0}        # ~8h workday
+      arrival: {mu: 9.0, sigma: 1.0}            # 9:00 ± 1h — small office worker contingent
+      dwell: {k: 2.2, lambda: 8.0}              # ~8h workday
       soc_arrival: {alpha: 4.0, beta: 6.0}      # E≈0.40 — similar to office baseline
-      copula:      {rho_gaussian: -0.2}
+      copula: {rho_gaussian: -0.2}
 
 # ──────────────────────────────────────────────────────────────────────────
 # Mid-low ψ: mixed-parking retail/office. Visitors + occasional employees
@@ -373,9 +377,12 @@ occasional_commuter:
   axes_distribution:
     # Weighted-midpoint E[φ] = 0.20·0.125 + 0.75·0.35 + 0.05·0.20 = 0.298 ≈ 0.30 target.
     # Concentration on irregular_employee drives the mid-low ψ aggregate.
-    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [3, 30],  weight: 0.20}
-    - {name: irregular_employee, freq: [0.20, 0.50], consist: [0.30, 0.70], dist_km: [10, 40], weight: 0.75}
-    - {name: erratic,            freq: [0.00, 0.40], consist: [0.00, 0.30], dist_km: [5, 50],  weight: 0.05}
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], 
+        dist_km: [3, 30], weight: 0.20}
+    - {name: irregular_employee, freq: [0.20, 0.50], consist: [0.30, 0.70], 
+        dist_km: [10, 40], weight: 0.75}
+    - {name: erratic, freq: [0.00, 0.40], consist: [0.00, 0.30], dist_km: [5, 50],
+      weight: 0.05}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]   # CONSENT survey baseline
@@ -390,22 +397,22 @@ occasional_commuter:
   region_distributions:
     # occasional_visitor (weight 0.60): afternoon retail walk-ins.
     occasional_visitor:
-      arrival:     {mu: 13.0, sigma: 3.0}       # afternoon-skewed visit times
-      dwell:       {k: 1.5, lambda: 2.0}        # short visits (~2h)
+      arrival: {mu: 13.0, sigma: 3.0}           # afternoon-skewed visit times
+      dwell: {k: 1.5, lambda: 2.0}              # short visits (~2h)
       soc_arrival: {alpha: 5.0, beta: 4.0}      # E≈0.55 — less drained on arrival
-      copula:      {rho_gaussian: 0.0}
+      copula: {rho_gaussian: 0.0}
     # irregular_employee (weight 0.35): part-time staff, 1-2 days/week.
     irregular_employee:
-      arrival:     {mu: 10.0, sigma: 2.0}       # late-morning when they come
-      dwell:       {k: 1.8, lambda: 6.0}        # ~6h workday when present
+      arrival: {mu: 10.0, sigma: 2.0}           # late-morning when they come
+      dwell: {k: 1.8, lambda: 6.0}              # ~6h workday when present
       soc_arrival: {alpha: 4.0, beta: 5.0}      # E≈0.44
-      copula:      {rho_gaussian: -0.15}
+      copula: {rho_gaussian: -0.15}
     # erratic (weight 0.05): random walk-ins.
     erratic:
-      arrival:     {mu: 11.0, sigma: 4.0}
-      dwell:       {k: 1.2, lambda: 3.0}
+      arrival: {mu: 11.0, sigma: 4.0}
+      dwell: {k: 1.2, lambda: 3.0}
       soc_arrival: {alpha: 3.0, beta: 5.0}
-      copula:      {rho_gaussian: 0.0}
+      copula: {rho_gaussian: 0.0}
 
 # ──────────────────────────────────────────────────────────────────────────
 # Mid-high ψ: hybrid post-2020 workforce. 2-3 days/week with moderate
@@ -421,9 +428,12 @@ flexible_workforce:
     # hybrid_regular.freq upper bound nudged to 0.75 to lift the midpoint above
     # the canonical 0.55 line; this is the small office contingent that comes
     # in 3+ days/week in the hybrid model.
-    - {name: hybrid_regular,     freq: [0.50, 0.75], consist: [0.55, 0.85], dist_km: [10, 35], weight: 0.70}
-    - {name: hybrid_flexible,    freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [10, 40], weight: 0.25}
-    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], dist_km: [5, 25],  weight: 0.05}
+    - {name: hybrid_regular, freq: [0.50, 0.75], consist: [0.55, 0.85], dist_km: [
+        10, 35], weight: 0.70}
+    - {name: hybrid_flexible, freq: [0.40, 0.70], consist: [0.30, 0.55], dist_km: [
+        10, 40], weight: 0.25}
+    - {name: occasional_visitor, freq: [0.05, 0.20], consist: [0.10, 0.40], 
+        dist_km: [5, 25], weight: 0.05}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -438,22 +448,22 @@ flexible_workforce:
   region_distributions:
     # hybrid_regular (weight 0.65): 2-3 days/week, tight 9 AM arrival, 8h day.
     hybrid_regular:
-      arrival:     {mu: 9.0, sigma: 1.2}        # mid-morning, moderately tight
-      dwell:       {k: 2.0, lambda: 8.0}        # ~8h workday
+      arrival: {mu: 9.0, sigma: 1.2}            # mid-morning, moderately tight
+      dwell: {k: 2.0, lambda: 8.0}              # ~8h workday
       soc_arrival: {alpha: 4.0, beta: 5.0}      # E≈0.44 — mid commute
-      copula:      {rho_gaussian: -0.25}        # early arrivers stay longer
+      copula: {rho_gaussian: -0.25}             # early arrivers stay longer
     # hybrid_flexible (weight 0.25): same days but variable arrival time.
     hybrid_flexible:
-      arrival:     {mu: 10.0, sigma: 2.5}       # more spread, later average
-      dwell:       {k: 1.7, lambda: 7.0}        # ~7h, more variable
+      arrival: {mu: 10.0, sigma: 2.5}           # more spread, later average
+      dwell: {k: 1.7, lambda: 7.0}              # ~7h, more variable
       soc_arrival: {alpha: 4.0, beta: 5.0}
-      copula:      {rho_gaussian: -0.15}
+      copula: {rho_gaussian: -0.15}
     # occasional_visitor (weight 0.10): non-employee floor.
     occasional_visitor:
-      arrival:     {mu: 13.0, sigma: 3.0}
-      dwell:       {k: 1.5, lambda: 2.0}
+      arrival: {mu: 13.0, sigma: 3.0}
+      dwell: {k: 1.5, lambda: 2.0}
       soc_arrival: {alpha: 5.0, beta: 4.0}
-      copula:      {rho_gaussian: 0.0}
+      copula: {rho_gaussian: 0.0}
 
 # ──────────────────────────────────────────────────────────────────────────
 # EV WATTS (DOE/EPRI livewire.energy.gov). Workplace + public L2 cohort,
@@ -525,3 +535,68 @@ evwatts_dcfc_public:
 
   # region_distributions + calibration_metadata populated by
   # `v2b-syndata calibrate --population evwatts_dcfc_public`.
+
+# ──────────────────────────────────────────────────────────────────────────
+# INL EV Project Phase 1 (2011–2013). Legacy 24 kWh Leaf/Volt fleet — do NOT
+# mix with modern-fleet scenarios; battery capacity assumptions diverge.
+# user_id = "inl:vin:<vehicle_id>" — Phase 1 release exposed pseudonymized
+# Vehicle IDs so true per-driver longitudinal identity is available. If a
+# row lacks vehicle_id, the extractor falls back to "inl:port:<evse_id>"
+# and flips calibration_metadata.user_id_strategy to "port_proxy".
+# Source-args:
+#   --source-arg inl:archive_tag=<tag> inl:venue_filter=residential
+# ──────────────────────────────────────────────────────────────────────────
+inl_residential_legacy:
+  description: "INL EV Project Phase 1 (2011-2013) legacy 24 kWh Leaf/Volt residential
+    cohort"
+  calibration_policy: inl_ev_project
+
+  axes_distribution:
+    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20,
+        60], weight: 0.5}
+    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 
+            50], weight: 0.3}
+    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], 
+        weight: 0.2}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    # Bias toward smaller-class batteries: Phase 1 fleet was ~24 kWh Leaf +
+    # ~16 kWh Volt range-extender. Battery classes are ordered small → large
+    # in knobs.yaml, so 60/40 over the two smallest classes matches the era.
+    battery_mix: [0.60, 0.40, 0.0, 0.0]
+    battery_heterogeneity: mixed
+
+  # region_distributions + calibration_metadata populated by
+  # `v2b-syndata calibrate --population inl_residential_legacy`.
+  region_distributions:
+    daily_commuter:
+      arrival:
+        dist: truncnorm
+        mu: 18.3375
+        sigma: 0.23551804601770965
+        n_samples: 64
+        ks_fit_quality: 0.12575359242795398
+      copula:
+        rho_spearman: 0.011727629252621276
+        rho_gaussian: 0.012281067454739284
+        n_samples: 64
+  calibration_metadata:
+    source: calibration:inl_ev_project_fixture_20260528
+    dataset: INL EV Project Phase 1
+    user_id_strategy: vin_proxy
+    archive_tag: fixture
+    venue_filter: residential
+    fleet_era: phase1_2011_2013
+    schema_version: v1
+    calibration_date: '2026-05-28'
+    n_users_total: 4
+    n_sessions_total: 65
+    n_users_assigned_in_population: 4
+    n_users_with_userinputs: 0
+    capacity_inference_fallback_rate: 1.0
+    unassigned_user_rate: 0.0

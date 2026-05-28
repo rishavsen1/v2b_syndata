@@ -132,12 +132,16 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     # Partition --source-arg by optional `policy:` prefix; unprefixed args
     # route to the policy of the targeted population (or acn_data when no
     # single population resolves — preserves legacy ACN-only behavior).
+    # Short aliases let users type the friendly name (e.g. `inl:`) instead
+    # of the registry key (`inl_ev_project:`).
+    _POLICY_ALIASES = {"inl": "inl_ev_project"}
     raw_by_policy: dict[str, list[str]] = {}
     unscoped: list[str] = []
     for kv in (args.source_arg or []):
         head, sep, rest = kv.partition(":")
-        if sep and "=" not in head and head in CALIBRATION_SOURCES:
-            raw_by_policy.setdefault(head, []).append(rest)
+        resolved = _POLICY_ALIASES.get(head, head)
+        if sep and "=" not in head and resolved in CALIBRATION_SOURCES:
+            raw_by_policy.setdefault(resolved, []).append(rest)
         else:
             unscoped.append(kv)
 

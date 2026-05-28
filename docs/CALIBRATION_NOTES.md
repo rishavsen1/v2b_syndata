@@ -177,8 +177,24 @@ consistency. Schema TODO: the column-name constants in
 end_time_utc, energy_kwh, evse_id, venue_type, rated_power_kw); confirm against
 the real livewire release and bump `SCHEMA_VERSION` when the mapping changes.
 
-Future calibration sources (NHTS for δ, INL EV Project for legacy residential)
-extend the policy enum without breaking the generator.
+Implemented: `inl_ev_project` policy adds INL EV Project Phase 1 (Idaho
+National Lab, avt.inl.gov, 2011–2013 ChargePoint+Blink fleet on ~24 kWh Leaf
+and Volt EVs) as a third real-data source. One descriptor ships today:
+`inl_residential_legacy`. Phase 1 release sheets exposed pseudonymized
+Vehicle IDs (e.g. `Veh001`), so the source synthesizes
+`user_id = "inl:vin:<vehicle_id>"` and stamps
+`calibration_metadata.user_id_strategy = "vin_proxy"` — true per-driver
+identity. Rows missing vehicle_id fall back to `inl:port:<evse_id>` and the
+metadata strategy flips to `port_proxy`. Caveat: this is a **legacy fleet**
+— do not mix with modern-battery scenarios (battery capacity assumptions
+diverge). Schema TODO: column-name constants in
+`calibration/sources/inl.py` (vehicle_id, start_time, end_time, energy_kwh,
+evse_id, venue, evse_power_kw) target a placeholder schema; confirm against
+the real avt.inl.gov Phase 1 release and bump `SCHEMA_VERSION` when the
+mapping changes.
+
+Future calibration sources (NHTS for δ) extend the policy enum without
+breaking the generator.
 
 ### Population assignments
 
