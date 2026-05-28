@@ -80,6 +80,20 @@ def calibrate_populations(
         "cache_dir": cache_dir,
     })
 
+    # Non-acn policies require explicit source_configs; drop populations whose
+    # policy has no config (auto-discovery path, e.g. evwatts without
+    # --source-arg). They appear in skipped with a clear reason.
+    for policy in list(eligible_by_policy.keys()):
+        if policy == "acn_data":
+            continue
+        if policy not in src_cfgs:
+            for pname in eligible_by_policy[policy]:
+                skipped.append(
+                    f"{pname} (calibration_policy={policy!r} requires "
+                    "--source-arg config; pass release_tag etc. to calibrate)"
+                )
+            del eligible_by_policy[policy]
+
     if not eligible_by_policy:
         # Nothing to fit. Short-circuit before fetch — no token/network required.
         # Provenance kept ACN-shaped for backwards-compat with existing callers.

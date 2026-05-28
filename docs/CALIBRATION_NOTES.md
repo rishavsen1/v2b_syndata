@@ -165,7 +165,19 @@ ACN-Data calibration is no longer universal. Each population in
   Manifest source: `hand_specified:<population_name>`. `v2b-syndata calibrate`
   skips with an informative log line.
 
-Future calibration sources (NHTS for δ, EVI-Pro/EVWatts for high-φ commuters)
+Implemented: `evwatts` policy adds EV WATTS (DOE/EPRI, livewire.energy.gov)
+as a second real-data source via the `CalibrationSource` protocol. Two
+descriptors ship today — `evwatts_workplace_public` and `evwatts_dcfc_public`.
+EV WATTS bulk releases historically lack stable per-driver IDs, so the source
+synthesizes `user_id = "evwatts:port:<evse_id>"` and stamps
+`calibration_metadata.user_id_strategy = "port_proxy"`. Consumers should read
+the resulting (φ, κ) as **per-port shift-consistency**, not individual-driver
+consistency. Schema TODO: the column-name constants in
+`calibration/sources/evwatts.py` target a placeholder schema (start_time_utc,
+end_time_utc, energy_kwh, evse_id, venue_type, rated_power_kw); confirm against
+the real livewire release and bump `SCHEMA_VERSION` when the mapping changes.
+
+Future calibration sources (NHTS for δ, INL EV Project for legacy residential)
 extend the policy enum without breaking the generator.
 
 ### Population assignments

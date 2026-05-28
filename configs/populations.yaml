@@ -454,3 +454,74 @@ flexible_workforce:
       dwell:       {k: 1.5, lambda: 2.0}
       soc_arrival: {alpha: 5.0, beta: 4.0}
       copula:      {rho_gaussian: 0.0}
+
+# ──────────────────────────────────────────────────────────────────────────
+# EV WATTS (DOE/EPRI livewire.energy.gov). Workplace + public L2 cohort,
+# residential excluded. user_id = "evwatts:port:<evse_id>" — port-as-proxy
+# strategy because the bulk release lacks stable per-driver IDs; (φ, κ)
+# describe per-port shift-consistency, not individual-driver consistency.
+# Region grid matches acn_workplace_baseline so cross-source comparisons
+# are direct. Initial weights: equal-share placeholder (see comment on
+# acn_workplace_baseline); calibrate will not edit weights.
+# Source-args to use:
+#   --source-arg evwatts:release_tag=<tag> evwatts:venue_filter=workplace_public
+# ──────────────────────────────────────────────────────────────────────────
+evwatts_workplace_public:
+  description: "EV WATTS-anchored workplace + public L2 cohort (residential excluded)"
+  calibration_policy: evwatts
+
+  axes_distribution:
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.40}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.20}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.20}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.15}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.05}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+
+  # region_distributions + calibration_metadata populated by
+  # `v2b-syndata calibrate --population evwatts_workplace_public`.
+
+# ──────────────────────────────────────────────────────────────────────────
+# EV WATTS public-DCFC cohort. 3 regions (transient, regular, power_user) —
+# DCFC dwell is short and the port-as-proxy identity is weak, so the 5-cell
+# workplace grid would over-partition. Filter rows with rated_power_kw ≥ 50.
+# Source-args:
+#   --source-arg evwatts:release_tag=<tag> evwatts:venue_filter=dcfc_public
+#   --source-arg evwatts:min_power_kw=50
+# ──────────────────────────────────────────────────────────────────────────
+evwatts_dcfc_public:
+  description: "EV WATTS-anchored public DCFC cohort (rated_power_kw ≥ 50)"
+  calibration_policy: evwatts
+
+  axes_distribution:
+    - {name: transient, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [5, 80], 
+        weight: 0.5}
+    - {name: regular, freq: [0.1, 0.4], consist: [0.3, 0.8], dist_km: [10, 100], 
+        weight: 0.3}
+    - {name: power_user, freq: [0.3, 1.0], consist: [0.3, 1.0], dist_km: [30, 
+            150], weight: 0.2}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+
+  # region_distributions + calibration_metadata populated by
+  # `v2b-syndata calibrate --population evwatts_dcfc_public`.

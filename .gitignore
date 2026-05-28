@@ -16,6 +16,8 @@ htmlcov/
 .DS_Store
 data/output/
 data/calibration/acn_cache/
+data/calibration/evwatts_cache/
+data/calibration/evwatts_per_user.csv
 data/load_pipeline_cache/
 data/stations/
 .idea/

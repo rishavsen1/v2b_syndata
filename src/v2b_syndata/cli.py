@@ -110,6 +110,7 @@ def cmd_list_scenarios(args: argparse.Namespace) -> int:
 
 def cmd_calibrate(args: argparse.Namespace) -> int:
     import warnings
+    import yaml as _yaml
     from .calibration import calibrate_populations
     from .calibration.sources import CALIBRATION_SOURCES
 
@@ -128,19 +129,48 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         )
     sites = tuple(args.site) if args.site else ("caltech", "jpl", "office001")
 
-    # Parse --source-arg into ACN config; ACN is the only registered source today.
+    # Partition --source-arg by optional `policy:` prefix; unprefixed args
+    # route to the policy of the targeted population (or acn_data when no
+    # single population resolves — preserves legacy ACN-only behavior).
+    raw_by_policy: dict[str, list[str]] = {}
+    unscoped: list[str] = []
+    for kv in (args.source_arg or []):
+        head, sep, rest = kv.partition(":")
+        if sep and "=" not in head and head in CALIBRATION_SOURCES:
+            raw_by_policy.setdefault(head, []).append(rest)
+        else:
+            unscoped.append(kv)
+
+    default_policy = "acn_data"
+    if pops:
+        try:
+            with pops_path.open() as fh:
+                _pops_doc = _yaml.safe_load(fh) or {}
+            _entry = _pops_doc.get(pops)
+            if isinstance(_entry, dict):
+                _pol = _entry.get("calibration_policy")
+                if _pol in CALIBRATION_SOURCES:
+                    default_policy = _pol
+        except OSError:
+            pass
+    if unscoped:
+        raw_by_policy.setdefault(default_policy, []).extend(unscoped)
+
     source_configs: dict[str, dict] = {}
-    if args.source_arg:
-        acn_cfg = CALIBRATION_SOURCES["acn_data"]().parse_args(args.source_arg)
-        # Source-args win over deprecated flags when both supplied.
-        merged = {
-            "sites": sites,
-            "year_start": args.year_start,
-            "year_end": args.year_end,
-            "cache_dir": Path(args.cache_dir),
-        }
-        merged.update(acn_cfg)
-        source_configs["acn_data"] = merged
+    for policy, raw_list in raw_by_policy.items():
+        cfg = CALIBRATION_SOURCES[policy]().parse_args(raw_list)
+        if policy == "acn_data":
+            merged = {
+                "sites": sites,
+                "year_start": args.year_start,
+                "year_end": args.year_end,
+                "cache_dir": Path(args.cache_dir),
+            }
+            merged.update(cfg)
+            source_configs["acn_data"] = merged
+        else:
+            cfg.setdefault("cache_dir", Path(args.cache_dir))
+            source_configs[policy] = cfg
 
     summary = calibrate_populations(
         populations_yaml_path=pops_path,
@@ -304,8 +334,10 @@ def main(argv: list[str] | None = None) -> int:
     cal.add_argument("--site", action="append", default=None,
                      help="DEPRECATED: use --source-arg site=... (repeatable)")
     cal.add_argument("--source-arg", action="append", default=None,
-                     help="per-source key=value arg (repeatable; ACN consumes site,"
-                          " year_start, year_end)")
+                     help="per-source [policy:]key=value (repeatable). Unprefixed "
+                          "args route to the targeted population's policy. "
+                          "Examples: site=caltech, evwatts:release_tag=fixture, "
+                          "evwatts:venue_filter=workplace_public.")
     cal.add_argument("--cache-dir", default=str(REPO_ROOT / "data" / "calibration" / "acn_cache"))
     cal.add_argument("--artifact-dir", default=str(REPO_ROOT / "data" / "calibration"))
     cal.set_defaults(func=cmd_calibrate)
