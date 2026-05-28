@@ -90,9 +90,10 @@ def expand_descriptors(
     # are filtered — only DIST_PARAM_RANGES leaves propagate.
     rd = pop.get("region_distributions")
     if rd and isinstance(rd, dict):
+        from .calibration.sources import CALIBRATION_SOURCES
         policy = pop.get("calibration_policy")
         cal_meta = pop.get("calibration_metadata") or {}
-        if policy == "acn_data":
+        if policy in CALIBRATION_SOURCES:
             provenance = cal_meta.get("source")
             if not provenance or not str(provenance).startswith("calibration:"):
                 provenance = None  # not yet calibrated; skip the overlay

@@ -109,12 +109,39 @@ def cmd_list_scenarios(args: argparse.Namespace) -> int:
 
 
 def cmd_calibrate(args: argparse.Namespace) -> int:
+    import warnings
     from .calibration import calibrate_populations
+    from .calibration.sources import CALIBRATION_SOURCES
 
     pops_path = Path(args.config_dir) / "populations.yaml"
     pops = args.population if args.population else None
     population_names = [pops] if pops else None
+
+    # Translate deprecated --site/--year-start/--year-end into ACN source-args.
+    legacy_used = bool(args.site) or args.year_start != 2019 or args.year_end != 2021
+    if legacy_used:
+        warnings.warn(
+            "--site / --year-start / --year-end are deprecated; "
+            "use --source-arg site=... --source-arg year_start=... --source-arg year_end=...",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     sites = tuple(args.site) if args.site else ("caltech", "jpl", "office001")
+
+    # Parse --source-arg into ACN config; ACN is the only registered source today.
+    source_configs: dict[str, dict] = {}
+    if args.source_arg:
+        acn_cfg = CALIBRATION_SOURCES["acn_data"]().parse_args(args.source_arg)
+        # Source-args win over deprecated flags when both supplied.
+        merged = {
+            "sites": sites,
+            "year_start": args.year_start,
+            "year_end": args.year_end,
+            "cache_dir": Path(args.cache_dir),
+        }
+        merged.update(acn_cfg)
+        source_configs["acn_data"] = merged
+
     summary = calibrate_populations(
         populations_yaml_path=pops_path,
         population_names=population_names,
@@ -123,6 +150,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         year_end=args.year_end,
         cache_dir=Path(args.cache_dir),
         artifact_dir=Path(args.artifact_dir),
+        source_configs=source_configs or None,
     )
     print(f"calibration complete: {summary['provenance']}")
     print(f"  n_users={summary['n_users_total']}  n_sessions={summary['n_sessions_total']}")
@@ -262,13 +290,22 @@ def main(argv: list[str] | None = None) -> int:
     ls = sub.add_parser("list-scenarios")
     ls.set_defaults(func=cmd_list_scenarios)
 
-    cal = sub.add_parser("calibrate", help="fit per-region distributions from ACN-Data")
+    cal = sub.add_parser(
+        "calibrate",
+        help="fit per-region distributions from a calibration source "
+             "(ACN-Data today; EV WATTS / INL after PR2 / PR4)",
+    )
     cal.add_argument("--population", default=None,
                      help="single population name to calibrate (default: all populations)")
-    cal.add_argument("--year-start", type=int, default=2019)
-    cal.add_argument("--year-end", type=int, default=2021)
+    cal.add_argument("--year-start", type=int, default=2019,
+                     help="DEPRECATED: use --source-arg year_start=...")
+    cal.add_argument("--year-end", type=int, default=2021,
+                     help="DEPRECATED: use --source-arg year_end=...")
     cal.add_argument("--site", action="append", default=None,
-                     help="ACN-Data site (repeatable; default: caltech jpl office001)")
+                     help="DEPRECATED: use --source-arg site=... (repeatable)")
+    cal.add_argument("--source-arg", action="append", default=None,
+                     help="per-source key=value arg (repeatable; ACN consumes site,"
+                          " year_start, year_end)")
     cal.add_argument("--cache-dir", default=str(REPO_ROOT / "data" / "calibration" / "acn_cache"))
     cal.add_argument("--artifact-dir", default=str(REPO_ROOT / "data" / "calibration"))
     cal.set_defaults(func=cmd_calibrate)
