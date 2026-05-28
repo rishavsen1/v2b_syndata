@@ -1,0 +1,19 @@
+# S_evwatts_workplace.yaml — EV WATTS (DOE/EPRI) workplace+public L2 anchor.
+# Population uses port-as-proxy user_id strategy: (phi, kappa) describe
+# per-port shift-consistency, NOT individual-driver consistency. See
+# evwatts_workplace_public in configs/populations.yaml.
+scenario_id: S_evwatts_workplace
+description: |
+  EV WATTS-anchored workplace + public L2 scenario. Mirrors S01 knob defaults;
+  swaps consent_default population for evwatts_workplace_public so generation
+  exercises the EV WATTS calibration block (region_distributions populated by
+  `v2b-syndata calibrate --population evwatts_workplace_public`).
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: evwatts_workplace_public
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month

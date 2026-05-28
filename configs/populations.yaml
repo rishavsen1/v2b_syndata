@@ -512,6 +512,38 @@ evwatts_workplace_public:
 #   --source-arg evwatts:release_tag=<tag> evwatts:venue_filter=dcfc_public
 #   --source-arg evwatts:min_power_kw=50
 # ──────────────────────────────────────────────────────────────────────────
+  region_distributions:
+    regular_charger:
+      arrival:
+        dist: truncnorm
+        mu: 9.420491818260155
+        sigma: 2.924548607445841
+        n_samples: 64
+        ks_fit_quality: 0.36200510610462355
+      dwell:
+        dist: weibull
+        k: 1.3102266556984286
+        lambda: 6.141017363645776
+        n_samples: 64
+        ks_fit_quality: 0.41481462935824487
+      copula:
+        rho_spearman: -0.42667622894968843
+        rho_gaussian: -0.4431067599883351
+        n_samples: 64
+  calibration_metadata:
+    source: calibration:evwatts_fixture_20260528
+    dataset: EV WATTS (DOE/EPRI)
+    user_id_strategy: port_proxy
+    release_tag: fixture
+    venue_filter: workplace_public
+    schema_version: v1
+    calibration_date: '2026-05-28'
+    n_users_total: 6
+    n_sessions_total: 64
+    n_users_assigned_in_population: 6
+    n_users_with_userinputs: 0
+    capacity_inference_fallback_rate: 1.0
+    unassigned_user_rate: 0.0
 evwatts_dcfc_public:
   description: "EV WATTS-anchored public DCFC cohort (rated_power_kw ≥ 50)"
   calibration_policy: evwatts
