@@ -1,0 +1,21 @@
+# S_inl_residential_legacy.yaml — INL EV Project Phase 1 residential anchor.
+# Population uses vin_proxy user_id strategy from a 2011-2013 legacy 24 kWh
+# Leaf/Volt cohort. See inl_residential_legacy in configs/populations.yaml.
+# sim_window matches S_evwatts_workplace (APR2020) for cross-source comparison
+# cleanliness; note this is ~7 years after the INL fleet data vintage, so the
+# building/weather context is anachronistic relative to the calibrated fleet.
+scenario_id: S_inl_residential_legacy
+description: |
+  INL EV Project Phase 1-anchored residential scenario. Mirrors S01 knob
+  defaults; swaps consent_default population for inl_residential_legacy so
+  generation exercises the INL calibration block (region_distributions
+  populated by `v2b-syndata calibrate --population inl_residential_legacy`).
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: inl_residential_legacy
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month
