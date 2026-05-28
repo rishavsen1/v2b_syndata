@@ -1,0 +1,17 @@
+# S_acn_workplace.yaml — ACN-Data workplace L2 anchor (Caltech/JPL/Office001).
+# Parallel to S_evwatts_workplace + S_inl_residential_legacy; same knob defaults,
+# only the population swaps so cross-source comparisons isolate the dataset axis.
+scenario_id: S_acn_workplace
+description: |
+  ACN-Data-anchored workplace scenario. Mirrors S01 knob defaults; swaps
+  consent_default population for acn_workplace_baseline so generation exercises
+  the ACN-Data calibration block.
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: acn_workplace_baseline
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month
