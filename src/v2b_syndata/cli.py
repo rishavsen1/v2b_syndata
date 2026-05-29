@@ -243,6 +243,31 @@ def cmd_batch(args: argparse.Namespace) -> int:
     return 0 if manifest["status"] in ("succeeded", "partial") else 2
 
 
+def cmd_bench(args: argparse.Namespace) -> int:
+    """Run an ACN-Sim scheduling baseline against a generated scenario."""
+    import json as _json
+    from .bench import available_algorithms, run_scenario
+
+    if args.algo not in available_algorithms():
+        print(f"unknown --algo {args.algo!r}. available: {available_algorithms()}",
+              file=sys.stderr)
+        return 2
+
+    result = run_scenario(
+        scenario_dir=Path(args.scenario_dir),
+        algorithm=args.algo,
+        period_min=args.period_min,
+    )
+    payload = result.to_dict()
+    text = _json.dumps(payload, indent=2)
+    if args.out:
+        Path(args.out).write_text(text + "\n")
+        print(f"wrote {args.out}", file=sys.stderr)
+    else:
+        print(text)
+    return 0
+
+
 def cmd_docs_gen(args: argparse.Namespace) -> int:
     """Emit the auto-generated section of docs/KNOB_REFERENCE.md to stdout."""
     from .knob_loader import (
@@ -369,6 +394,21 @@ def main(argv: list[str] | None = None) -> int:
 
     dg = sub.add_parser("docs-gen", help="emit auto-generated section of docs/KNOB_REFERENCE.md")
     dg.set_defaults(func=cmd_docs_gen)
+
+    bn = sub.add_parser(
+        "bench",
+        help="run an ACN-Sim scheduling baseline on a generated scenario output dir",
+    )
+    bn.add_argument("--scenario-dir", required=True,
+                    help="generate output directory containing the 7 CSVs + manifest.json")
+    bn.add_argument("--algo", required=True,
+                    help="scheduling algorithm name (one of: edf, llf, fcfs, lcfs, lrpt, "
+                         "round_robin, uncontrolled)")
+    bn.add_argument("--period-min", type=int, default=5,
+                    help="ACN-Sim tick length in minutes (default: 5)")
+    bn.add_argument("--out", default=None,
+                    help="path to write metrics JSON (default: stdout)")
+    bn.set_defaults(func=cmd_bench)
 
     args = p.parse_args(argv)
     return args.func(args)
