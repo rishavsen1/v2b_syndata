@@ -6,9 +6,18 @@ Schema mapping:
 - chargers.csv (max_rate_kw, min_rate_kw clipped to 0) → EVSE max_rate
 - building_load.csv → not fed to scheduler; aggregated post-hoc in metrics
 
-Assignment policy (v1): 1:1 car→station. station_id = "EVSE_<car_id>".
-Loses charger-pool assignment problem; honest simplification for v1
-benchmark demo. Documented in module docstring.
+Charger pool with FCFS admission control (v2):
+- The ChargingNetwork has exactly `n_chargers` EVSE objects (not n_cars).
+- On arrival, sessions are admitted FCFS into the earliest-free charger.
+  If no charger is free at the arrival tick, the session is REJECTED and
+  does not become a PluginEvent. Rejected sessions are reported as
+  `admission_rejection_rate` in the metrics; they never reach the
+  scheduler. Matches the standard "no queueing room" workplace policy.
+- Per-charger occupancy is non-overlapping by construction; ACN-Sim
+  natively handles sequential plug-ins at the same station_id.
+- The previous v1 adapter used a 1:1 car→EVSE mapping with only an
+  aggregate-kW cap, which let all sessions plug in to virtual slots and
+  under-counted target_miss in oversubscribed scenarios.
 """
 from __future__ import annotations
 
@@ -35,6 +44,17 @@ class ScenarioInputs:
 
 
 @dataclass
+class AdmissionStats:
+    n_offered: int
+    n_admitted: int
+    n_rejected: int
+
+    @property
+    def rejection_rate(self) -> float:
+        return self.n_rejected / self.n_offered if self.n_offered else 0.0
+
+
+@dataclass
 class AcnsimInputs:
     network: ChargingNetwork
     events: acnsim.EventQueue
@@ -45,6 +65,8 @@ class AcnsimInputs:
     sessions: pd.DataFrame   # passed-through for metrics
     cars: pd.DataFrame
     building_load: pd.DataFrame
+    admission: AdmissionStats
+    admitted_session_ids: set[str]
 
 
 def load_scenario(scenario_dir: Path) -> ScenarioInputs:
@@ -67,46 +89,104 @@ def load_scenario(scenario_dir: Path) -> ScenarioInputs:
     return ScenarioInputs(sessions, cars, chargers, building_load, sim_start, sim_end)
 
 
+def _fcfs_admit(
+    sessions: pd.DataFrame, n_chargers: int
+) -> tuple[pd.DataFrame, int]:
+    """Greedy FCFS admission into a finite charger pool.
+
+    For each session sorted by arrival, find the earliest-free charger
+    (the one whose last-admitted session departed earliest, provided
+    that departure is ≤ this session's arrival). If found, the session
+    is admitted onto that charger and the charger's last-departure
+    bookkeeping advances. If none is free at the session's arrival,
+    the session is REJECTED.
+
+    Returns: (admitted_df with `assigned_charger_idx` column, n_rejected)
+    """
+    if n_chargers <= 0:
+        return sessions.iloc[0:0].copy(), len(sessions)
+
+    sorted_s = sessions.sort_values("arrival").reset_index(drop=True)
+    # Each charger's currently-scheduled last departure timestamp.
+    charger_last_dep = [pd.Timestamp.min] * n_chargers
+    admitted_rows = []
+    n_rejected = 0
+
+    for _, row in sorted_s.iterrows():
+        # Find the charger with the earliest last_departure that's
+        # ≤ this session's arrival. Greedy "leave-newest-free-charger
+        # available for later sessions" not necessary — any-free works
+        # for FCFS correctness; we pick the earliest-free deterministically
+        # for stable assignment across reruns.
+        free_idx = -1
+        free_last_dep = pd.Timestamp.max
+        arr = row["arrival"]
+        for i, last_dep in enumerate(charger_last_dep):
+            if last_dep <= arr and last_dep < free_last_dep:
+                free_idx = i
+                free_last_dep = last_dep
+        if free_idx >= 0:
+            charger_last_dep[free_idx] = row["departure"]
+            r = row.copy()
+            r["assigned_charger_idx"] = free_idx
+            admitted_rows.append(r)
+        else:
+            n_rejected += 1
+
+    if admitted_rows:
+        admitted_df = pd.DataFrame(admitted_rows).reset_index(drop=True)
+    else:
+        admitted_df = sessions.iloc[0:0].copy()
+        admitted_df["assigned_charger_idx"] = pd.Series(dtype="int64")
+    return admitted_df, n_rejected
+
+
 def build_acnsim_inputs(
     inputs: ScenarioInputs,
     period_min: int = DEFAULT_PERIOD_MIN,
     voltage: float = DEFAULT_VOLTAGE,
 ) -> AcnsimInputs:
-    """Materialize ChargingNetwork + EventQueue from v2b scenario."""
-    # 1:1 car → EVSE
+    """Materialize ChargingNetwork + EventQueue from v2b scenario.
+
+    FCFS admission gates sessions onto the finite charger pool before
+    they reach the scheduler.
+    """
     network = ChargingNetwork()
     # V1G: clip negative min_rate to 0. Charger.max_rate_kw is in kW;
     # ACN-Sim EVSE max_rate is in amps. Convert via P = V·I → I = P/V.
     max_kw_per_evse = float(inputs.chargers["max_rate_kw"].max())
     max_amp = max_kw_per_evse * 1000.0 / voltage
+    n_chargers = len(inputs.chargers)
 
     station_ids: list[str] = []
-    for car_id in inputs.cars.index:
-        station_id = f"EVSE_{car_id}"
+    for charger_idx in range(n_chargers):
+        station_id = f"EVSE_{charger_idx:04d}"
         evse = acnsim.EVSE(station_id, max_rate=max_amp, min_rate=0.0)
         network.register_evse(evse, voltage=voltage, phase_angle=0)
         station_ids.append(station_id)
 
-    # Network-wide aggregate-current cap models the realistic
-    # infrastructure limit (transformer / feeder capacity). Keeping the
-    # 1:1 car→EVSE mapping but capping aggregate at
-    # `n_chargers × max_kw_per_charger` means the network supports at
-    # most n_chargers EVs at full rate simultaneously — exactly the
-    # contention point that surfaces scheduling-algorithm differentiation
-    # on oversubscribed scenarios (e.g. 100 cars × 30 chargers, see
-    # configs/scenarios/S_scale_100.yaml). For 1:1 non-oversubscribed
-    # scenarios (S01: 20 cars × 20 chargers) the constraint matches
-    # n_stations × max_amp and never binds.
-    n_chargers = len(inputs.chargers)
+    # Aggregate-current cap = n_chargers × max_amp. With one EVSE per
+    # physical charger this matches the per-station cap and only binds
+    # when something tries to violate it (e.g. UncontrolledCharging).
     agg = acnsim.Current({sid: 1.0 for sid in station_ids})
     network.add_constraint(agg, limit=max_amp * n_chargers, name="agg_current")
 
-    # Sessions → PluginEvents
+    # FCFS admission of sessions into the charger pool
+    n_offered = len(inputs.sessions)
+    admitted_df, n_rejected = _fcfs_admit(inputs.sessions, n_chargers)
+    admission = AdmissionStats(
+        n_offered=n_offered,
+        n_admitted=len(admitted_df),
+        n_rejected=n_rejected,
+    )
+
+    # Sessions → PluginEvents (only admitted sessions reach the scheduler)
     sim_start = inputs.sim_start
     period_sec = period_min * 60.0
     events = acnsim.EventQueue()
+    admitted_session_ids: set[str] = set()
 
-    for _, row in inputs.sessions.iterrows():
+    for _, row in admitted_df.iterrows():
         car_id = row["car_id"]
         if car_id not in inputs.cars.index:
             continue
@@ -132,16 +212,20 @@ def build_acnsim_inputs(
             init_charge=init_charge_kwh,
             max_power=max_kw_per_evse,
         )
+        charger_idx = int(row["assigned_charger_idx"])
+        station_id = station_ids[charger_idx]
+        session_id = str(row["session_id"])
         ev = acnsim.EV(
             arrival=arr_tick,
             departure=dep_tick,
             requested_energy=kwh_needed,
-            station_id=f"EVSE_{car_id}",
-            session_id=str(row["session_id"]),
+            station_id=station_id,
+            session_id=session_id,
             battery=battery,
             estimated_departure=dep_tick,
         )
         events.add_event(acnsim.PluginEvent(arr_tick, ev))
+        admitted_session_ids.add(session_id)
 
     sim_end_sec = (inputs.sim_end - sim_start).total_seconds()
     n_periods = int(sim_end_sec / period_sec) + 1
@@ -156,4 +240,6 @@ def build_acnsim_inputs(
         sessions=inputs.sessions,
         cars=inputs.cars,
         building_load=inputs.building_load,
+        admission=admission,
+        admitted_session_ids=admitted_session_ids,
     )

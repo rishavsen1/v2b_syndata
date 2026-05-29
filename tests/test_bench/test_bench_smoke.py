@@ -45,12 +45,31 @@ def test_adapter_builds_acnsim_inputs(fast_generate):
     scenario_dir, _ = fast_generate()
     inputs = load_scenario(scenario_dir)
     acn = build_acnsim_inputs(inputs)
-    # 1:1 mapping: one EVSE per car
-    assert len(acn.network.station_ids) == len(inputs.cars)
+    # n_chargers EVSEs (not n_cars). FCFS admission pre-stages PluginEvents.
+    assert len(acn.network.station_ids) == len(inputs.chargers)
     # At least one PluginEvent enqueued
     assert acn.events._queue, "no events enqueued"
-    # Permissive aggregate-current constraint registered
+    # Aggregate-current constraint registered
     assert acn.network.constraint_matrix is not None
+    # Admission stats are accounted for
+    assert acn.admission.n_offered == len(inputs.sessions)
+    assert acn.admission.n_admitted + acn.admission.n_rejected == acn.admission.n_offered
+
+
+def test_adapter_admission_no_overlap_at_same_charger(fast_generate):
+    """Two sessions admitted to the same charger must not overlap in time."""
+    from v2b_syndata.bench.adapter import _fcfs_admit
+    scenario_dir, _ = fast_generate()
+    inputs = load_scenario(scenario_dir)
+    admitted, _ = _fcfs_admit(inputs.sessions, n_chargers=len(inputs.chargers))
+    # For each assigned charger, verify the per-charger schedule is
+    # strictly non-overlapping when sorted by arrival.
+    for cidx, group in admitted.groupby("assigned_charger_idx"):
+        sg = group.sort_values("arrival").reset_index(drop=True)
+        prior_dep = sg["departure"].shift(1)
+        # arrival[i] must be >= departure[i-1]
+        violations = (sg["arrival"] < prior_dep).sum()
+        assert violations == 0, f"charger {cidx} has overlapping sessions"
 
 
 def test_run_scenario_edf_smoke(fast_generate):
@@ -58,9 +77,12 @@ def test_run_scenario_edf_smoke(fast_generate):
     result = run_scenario(scenario_dir=scenario_dir, algorithm="edf")
     assert isinstance(result, MetricsResult)
     assert result.algorithm == "edf"
-    assert result.n_sessions > 0
+    assert result.n_sessions_offered > 0
+    assert result.n_sessions_admitted + result.n_sessions_rejected == result.n_sessions_offered
+    assert 0.0 <= result.admission_rejection_rate <= 1.0
     assert 0.0 <= result.energy_fulfillment_rate <= 1.5  # uncontrolled can exceed 1
     assert 0.0 <= result.target_miss_rate <= 1.0
+    assert 0.0 <= result.e2e_miss_rate <= 1.0
     assert result.peak_charge_kw >= 0
     assert result.peak_net_kw >= 0
     assert result.runtime_sec > 0
@@ -71,7 +93,7 @@ def test_all_algorithms_run(fast_generate, algo):
     scenario_dir, _ = fast_generate()
     result = run_scenario(scenario_dir=scenario_dir, algorithm=algo)
     assert result.algorithm == algo
-    assert result.n_sessions > 0
+    assert result.n_sessions_offered > 0
     # Shape sanity — every algo must emit positive runtime + non-negative power.
     assert result.runtime_sec > 0
     assert result.peak_charge_kw >= 0
@@ -95,8 +117,10 @@ def test_bench_cli_returns_json(fast_generate, tmp_path, capsys):
     assert rc == 0
     payload = json.loads(out_path.read_text())
     assert payload["algorithm"] == "edf"
-    assert payload["n_sessions"] > 0
+    assert payload["n_sessions_offered"] > 0
     assert "peak_charge_kw" in payload
+    assert "admission_rejection_rate" in payload
+    assert "e2e_miss_rate" in payload
 
 
 def test_bench_cli_unknown_algo_rc2(fast_generate, capsys):

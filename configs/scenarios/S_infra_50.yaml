@@ -1,0 +1,18 @@
+# S_infra_50.yaml — Design 3 (constant fleet, varying infra):
+# 200 EVs / 50 chargers (4× oversubscribed).
+#
+# Paired with S_infra_{100,200} at fixed 200 EVs. Isolates infra-
+# adequacy sensitivity at fixed demand.
+scenario_id: S_infra_50
+description: "Fixed 200 EVs, 50 chargers (4× under-provisioned)"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 200
+  charging_infra.charger_count: 50

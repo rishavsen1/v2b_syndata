@@ -1,0 +1,18 @@
+# S_scale_const_100.yaml — Design 1 (constant ratio): 100 EVs / 33 chargers (3.03×).
+#
+# Paired with S_scale_const_{250,500} at the same ~3× ratio. Isolates
+# scale-invariance: do algorithm rankings hold when fleet AND infra
+# scale together at fixed contention level?
+scenario_id: S_scale_const_100
+description: "Constant-ratio scale 100 EVs / 33 chargers (~3× oversub)"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 100
+  charging_infra.charger_count: 33

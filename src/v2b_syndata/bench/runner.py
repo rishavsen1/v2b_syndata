@@ -68,6 +68,7 @@ def run_scenario(
         sessions=inputs.sessions,
         cars=inputs.cars,
         building_load=inputs.building_load,
+        admission=acn_inputs.admission,
         period_min=period_min,
         scenario_dir=scenario_dir,
     )
@@ -82,6 +83,7 @@ def _compute_metrics(
     sessions,
     cars,
     building_load,
+    admission,
     period_min: int,
     scenario_dir: Path,
 ) -> MetricsResult:
@@ -133,19 +135,30 @@ def _compute_metrics(
         per_session_fulfillment.append(ratio)
         if d >= req - _ENERGY_TOL_KWH:
             n_satisfied += 1
-    n_sessions = len(requested)
-    target_miss = 1.0 - (n_satisfied / n_sessions) if n_sessions else 0.0
+    n_admitted = len(requested)
+    target_miss = 1.0 - (n_satisfied / n_admitted) if n_admitted else 0.0
+
+    # End-to-end miss rate: admission-rejected sessions + admitted-but-missed
+    # sessions, over all offered sessions.
+    n_offered = admission.n_offered
+    n_rejected = admission.n_rejected
+    n_e2e_miss = n_rejected + (n_admitted - n_satisfied)
+    e2e_miss_rate = (n_e2e_miss / n_offered) if n_offered else 0.0
 
     return MetricsResult(
         algorithm=algorithm,
         scenario_id=scenario_id,
         seed=seed,
+        n_sessions_offered=n_offered,
+        n_sessions_admitted=n_admitted,
+        n_sessions_rejected=n_rejected,
+        admission_rejection_rate=admission.rejection_rate,
         total_kwh_requested=total_req,
         total_kwh_delivered=total_del,
         energy_fulfillment_rate=fulfillment_rate,
-        n_sessions=n_sessions,
         n_sessions_satisfied=n_satisfied,
         target_miss_rate=target_miss,
+        e2e_miss_rate=e2e_miss_rate,
         per_session_fulfillment=per_session_fulfillment,
         peak_charge_kw=float(agg_kw_per_tick.max()) if n_ticks else 0.0,
         peak_net_kw=float(net_kw.max()) if n_ticks else 0.0,

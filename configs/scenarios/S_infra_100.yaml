@@ -1,0 +1,15 @@
+# S_infra_100.yaml — Design 3 (constant fleet, varying infra):
+# 200 EVs / 100 chargers (2× oversubscribed).
+scenario_id: S_infra_100
+description: "Fixed 200 EVs, 100 chargers (2× moderately constrained)"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 200
+  charging_infra.charger_count: 100

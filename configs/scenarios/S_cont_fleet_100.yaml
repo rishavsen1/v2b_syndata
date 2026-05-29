@@ -1,0 +1,18 @@
+# S_cont_fleet_100.yaml — Design 2 (constant infra, varying fleet):
+# 100 EVs / 100 chargers (1× ratio, no contention).
+#
+# Paired with S_cont_fleet_{250,500} at same 100 chargers. Isolates
+# pure contention sweep at fixed infrastructure capacity.
+scenario_id: S_cont_fleet_100
+description: "Fixed 100 chargers, 100 EVs (1× ratio, no contention)"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 100
+  charging_infra.charger_count: 100

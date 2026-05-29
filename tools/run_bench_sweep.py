@@ -58,9 +58,18 @@ REPRESENTATIVE_SCENARIOS = [
     "S_psi_010",
     "S_psi_090",
     "S_dr_cbp",
-    "S_scale_100",
-    "S_scale_250",
-    "S_scale_500",
+    # Design 1: constant ratio (~3× oversubscribed at every scale)
+    "S_scale_const_100",
+    "S_scale_const_250",
+    "S_scale_const_500",
+    # Design 2: constant infrastructure, varying fleet (contention sweep)
+    "S_cont_fleet_100",
+    "S_cont_fleet_250",
+    "S_cont_fleet_500",
+    # Design 3: constant fleet, varying infrastructure (adequacy sensitivity)
+    "S_infra_50",
+    "S_infra_100",
+    "S_infra_200",
 ]
 
 

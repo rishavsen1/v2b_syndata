@@ -1,0 +1,14 @@
+# S_scale_const_250.yaml — Design 1 (constant ratio): 250 EVs / 83 chargers (3.01×).
+scenario_id: S_scale_const_250
+description: "Constant-ratio scale 250 EVs / 83 chargers (~3× oversub)"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 250
+  charging_infra.charger_count: 83
