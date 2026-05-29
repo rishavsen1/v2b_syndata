@@ -1,0 +1,24 @@
+# S_elaadnl_public_eu.yaml — ElaadNL Open Charging Transactions public anchor.
+# Population uses card_proxy user_id strategy from a 2020 NL/EU public +
+# semi_public + fastcharge cohort. See elaadnl_public_eu in
+# configs/populations.yaml. sim_window matches S_evwatts_workplace (APR2020)
+# for cross-source comparison cleanliness. TZ caveat: ElaadNL ships naive
+# Europe/Amsterdam timestamps treated as UTC (matches ACN/EV WATTS/INL
+# pattern; arrival_hour offset 1–2h vs. wall-clock). See
+# docs/CALIBRATION_NOTES.md.
+scenario_id: S_elaadnl_public_eu
+description: |
+  ElaadNL Open Charging Transactions-anchored EU public-charging scenario.
+  Mirrors S01 knob defaults; swaps consent_default population for
+  elaadnl_public_eu so generation exercises the ElaadNL calibration block
+  (region_distributions populated by
+  `v2b-syndata calibrate --population elaadnl_public_eu`).
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: elaadnl_public_eu
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month
