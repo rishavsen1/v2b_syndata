@@ -21,7 +21,7 @@ ev_fleet:
 
   ev_count:
     type: int
-    range: [1, 200]
+    range: [1, 1000]
     default: 20
     description: "Number of distinct EVs in fleet"
     affects_csv: [cars.csv, sessions.csv, users.csv]

@@ -87,16 +87,19 @@ def build_acnsim_inputs(
         network.register_evse(evse, voltage=voltage, phase_angle=0)
         station_ids.append(station_id)
 
-    # ACN-Sim requires at least one network-level constraint (constraint
-    # matrix) — even algorithms that don't need it call
-    # interface.infrastructure_info() which validates that the matrix is
-    # not None. Add a permissive aggregate-current cap: each station
-    # contributes a coefficient of 1 to one row, with limit = sum of all
-    # EVSE max-current. This never binds in practice (individual EVSE
-    # caps already enforce per-station limits) but satisfies acnsim's
-    # API contract.
+    # Network-wide aggregate-current cap models the realistic
+    # infrastructure limit (transformer / feeder capacity). Keeping the
+    # 1:1 car→EVSE mapping but capping aggregate at
+    # `n_chargers × max_kw_per_charger` means the network supports at
+    # most n_chargers EVs at full rate simultaneously — exactly the
+    # contention point that surfaces scheduling-algorithm differentiation
+    # on oversubscribed scenarios (e.g. 100 cars × 30 chargers, see
+    # configs/scenarios/S_scale_100.yaml). For 1:1 non-oversubscribed
+    # scenarios (S01: 20 cars × 20 chargers) the constraint matches
+    # n_stations × max_amp and never binds.
+    n_chargers = len(inputs.chargers)
     agg = acnsim.Current({sid: 1.0 for sid in station_ids})
-    network.add_constraint(agg, limit=max_amp * len(station_ids), name="agg_current")
+    network.add_constraint(agg, limit=max_amp * n_chargers, name="agg_current")
 
     # Sessions → PluginEvents
     sim_start = inputs.sim_start

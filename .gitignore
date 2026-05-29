@@ -22,6 +22,7 @@ data/calibration/inl_cache/
 data/calibration/inl_per_user.csv
 data/load_pipeline_cache/
 data/stations/
+data/sweep/
 .idea/
 .vscode/
 uv.lock

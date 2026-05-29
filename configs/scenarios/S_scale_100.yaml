@@ -1,0 +1,23 @@
+# S_scale_100.yaml — 100-EV oversubscribed workplace scenario.
+#
+# Designed for benchmark algorithm differentiation: fleet ≫ chargers
+# means EDF/LLF/FCFS/LCFS/LRPT diverge in scheduling decisions
+# (under S01's 20-EV / 20-charger 1:1 mapping they're identical).
+#
+# Charger ratio ~3.3x oversubscribed. E5 warnings expected; scheduler
+# algorithm's job is to allocate scarce charger time across competing
+# sessions. Manifest e5 block records realized concurrency.
+
+scenario_id: S_scale_100
+description: "100-EV oversubscribed workplace; 30 chargers; large office, SJ"
+
+descriptors:
+  location:    san_jose_ca
+  building:    large_office_v1
+  population:  consent_default
+  equipment:   balanced_50pct
+  noise:       clean
+
+overrides:
+  ev_fleet.ev_count: 100
+  charging_infra.charger_count: 30
