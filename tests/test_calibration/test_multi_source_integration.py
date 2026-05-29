@@ -18,6 +18,7 @@ from v2b_syndata.calibration.sources import (
     CALIBRATION_SOURCES,
     AcnSource,
     CalibrationSource,
+    ElaadNLSource,
     EvWattsSource,
     InlSource,
 )
@@ -39,8 +40,10 @@ def _block_sha(populations_yaml_text: str, pop_name: str) -> str:
 # ──────────────────────────────────────────────────────────────────────
 # Registry completeness
 # ──────────────────────────────────────────────────────────────────────
-def test_registry_contains_three_real_data_sources():
-    assert set(CALIBRATION_SOURCES) == {"acn_data", "evwatts", "inl_ev_project"}
+def test_registry_contains_four_real_data_sources():
+    assert set(CALIBRATION_SOURCES) == {
+        "acn_data", "evwatts", "inl_ev_project", "elaadnl_open_2020",
+    }
 
 
 def test_registry_values_are_calibration_sources():
@@ -78,6 +81,11 @@ def _seed_inl_cache(cache_dir: Path) -> None:
     shutil.copy(FIXTURE_DIR / "inl_fixture.csv", cache_dir / "inl_fixture.csv")
 
 
+def _seed_elaadnl_cache(cache_dir: Path) -> None:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(FIXTURE_DIR / "elaadnl_fixture.csv", cache_dir / "elaadnl_fixture.csv")
+
+
 def test_evwatts_calibrate_leaves_acn_block_untouched(tmp_path):
     pops_dst = tmp_path / "populations.yaml"
     shutil.copy(CONFIG_DIR / "populations.yaml", pops_dst)
@@ -109,6 +117,7 @@ def test_inl_calibrate_leaves_acn_and_evwatts_blocks_untouched(tmp_path):
     acn_sha_before = _block_sha(pops_dst.read_text(), "acn_workplace_baseline")
     ev_sha_before = _block_sha(pops_dst.read_text(), "evwatts_workplace_public")
     ev_dcfc_sha_before = _block_sha(pops_dst.read_text(), "evwatts_dcfc_public")
+    el_sha_before = _block_sha(pops_dst.read_text(), "elaadnl_public_eu")
 
     cache = tmp_path / "inl_cache"
     _seed_inl_cache(cache)
@@ -128,6 +137,34 @@ def test_inl_calibrate_leaves_acn_and_evwatts_blocks_untouched(tmp_path):
     assert _block_sha(pops_dst.read_text(), "acn_workplace_baseline") == acn_sha_before
     assert _block_sha(pops_dst.read_text(), "evwatts_workplace_public") == ev_sha_before
     assert _block_sha(pops_dst.read_text(), "evwatts_dcfc_public") == ev_dcfc_sha_before
+    assert _block_sha(pops_dst.read_text(), "elaadnl_public_eu") == el_sha_before
+
+
+def test_elaadnl_calibrate_leaves_other_blocks_untouched(tmp_path):
+    pops_dst = tmp_path / "populations.yaml"
+    shutil.copy(CONFIG_DIR / "populations.yaml", pops_dst)
+    acn_sha_before = _block_sha(pops_dst.read_text(), "acn_workplace_baseline")
+    ev_sha_before = _block_sha(pops_dst.read_text(), "evwatts_workplace_public")
+    inl_sha_before = _block_sha(pops_dst.read_text(), "inl_residential_legacy")
+
+    cache = tmp_path / "elaadnl_cache"
+    _seed_elaadnl_cache(cache)
+
+    calibrate_populations(
+        populations_yaml_path=pops_dst,
+        population_names=["elaadnl_public_eu"],
+        cache_dir=cache,
+        artifact_dir=tmp_path / "art",
+        source_configs={"elaadnl_open_2020": {
+            "archive_tag": "fixture",
+            "venue_filter": "public",
+            "cache_dir": cache,
+        }},
+    )
+
+    assert _block_sha(pops_dst.read_text(), "acn_workplace_baseline") == acn_sha_before
+    assert _block_sha(pops_dst.read_text(), "evwatts_workplace_public") == ev_sha_before
+    assert _block_sha(pops_dst.read_text(), "inl_residential_legacy") == inl_sha_before
 
 
 def test_evwatts_calibrate_writes_only_target_block(tmp_path):
@@ -207,6 +244,28 @@ def test_inl_alias_routes_to_inl_ev_project_policy(tmp_path):
     assert meta["dataset"] == "INL EV Project Phase 1"
     assert meta["fleet_era"] == "phase1_2011_2013"
     assert meta["user_id_strategy"] == "vin_proxy"
+
+
+def test_elaadnl_alias_routes_to_elaadnl_open_2020_policy(tmp_path):
+    """`elaadnl:` prefix is shorthand for the full `elaadnl_open_2020:` policy key."""
+    cfg = _populations_dir(tmp_path)
+    cache = tmp_path / "elaadnl_cache"
+    _seed_elaadnl_cache(cache)
+
+    rc = main([
+        "--config-dir", str(cfg), "calibrate",
+        "--population", "elaadnl_public_eu",
+        "--source-arg", "elaadnl:archive_tag=fixture",
+        "--source-arg", "elaadnl:venue_filter=public",
+        "--cache-dir", str(cache),
+        "--artifact-dir", str(tmp_path / "art"),
+    ])
+    assert rc == 0
+    data = pyyaml.safe_load((cfg / "populations.yaml").read_text())
+    meta = data["elaadnl_public_eu"]["calibration_metadata"]
+    assert meta["dataset"] == "ElaadNL Open Charging Transactions"
+    assert meta["geography"] == "NL_EU"
+    assert meta["user_id_strategy"] == "card_proxy"
 
 
 def test_unscoped_source_arg_routes_to_population_policy(tmp_path):
@@ -289,6 +348,36 @@ def test_descriptor_loader_emits_inl_calibration_source(tmp_path):
     assert deep, "inl_residential_legacy should expose calibrated region_distributions"
     sources = {v[1] for v in deep.values()}
     assert all(s.startswith("calibration:inl_ev_project_") for s in sources), sources
+
+
+def test_descriptor_loader_emits_elaadnl_calibration_source(tmp_path):
+    cfg = _populations_dir(tmp_path)
+    cache = tmp_path / "elaadnl_cache"
+    _seed_elaadnl_cache(cache)
+    main([
+        "--config-dir", str(cfg), "calibrate",
+        "--population", "elaadnl_public_eu",
+        "--source-arg", "elaadnl:archive_tag=fixture",
+        "--source-arg", "elaadnl:venue_filter=public",
+        "--cache-dir", str(cache),
+        "--artifact-dir", str(tmp_path / "art"),
+    ])
+
+    out = expand_descriptors(
+        descriptors={
+            "location": "nashville_tn",
+            "building": "medium_office_v1",
+            "population": "elaadnl_public_eu",
+            "equipment": "balanced_50pct",
+            "noise": "clean",
+        },
+        config_dir=cfg,
+    )
+    deep = {k: v for k, v in out.items()
+            if k.startswith("user_behavior.region_distributions.")}
+    assert deep, "elaadnl_public_eu should expose calibrated region_distributions"
+    sources = {v[1] for v in deep.values()}
+    assert all(s.startswith("calibration:elaadnl_open_2020_") for s in sources), sources
 
 
 # ──────────────────────────────────────────────────────────────────────

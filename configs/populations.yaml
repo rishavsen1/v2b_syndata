@@ -632,3 +632,71 @@ inl_residential_legacy:
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0
     unassigned_user_rate: 0.0
+
+# ──────────────────────────────────────────────────────────────────────────
+# ElaadNL Open Charging Transactions (open-data.elaad.io, CC BY 4.0).
+# Dutch public/semi-public/fastcharge EU L2+DCFC cohort. Adds geographic
+# diversity (EU vs. US-only ACN/EV WATTS/INL).
+# user_id = "elaadnl:card:<card_id>" — anonymized RFID per-session.
+# Caveat: drivers may hold multiple RFID cards and cards transfer between
+# drivers — longitudinal identity is weaker than INL's vin_proxy. If a row
+# lacks card_id the extractor falls back to "elaadnl:port:<evse_id>" and
+# flips calibration_metadata.user_id_strategy to "port_proxy".
+# TZ caveat: naive Europe/Amsterdam timestamps treated as UTC for
+# consistency with other sources; arrival_hour offset 1–2h vs wall-clock
+# (see docs/CALIBRATION_NOTES.md).
+# Source-args:
+#   --source-arg elaadnl:archive_tag=<tag> elaadnl:venue_filter=public
+# ──────────────────────────────────────────────────────────────────────────
+elaadnl_public_eu:
+  description: "ElaadNL Open Charging Transactions (NL/EU 2020) public L2+DCFC cohort"
+  calibration_policy: elaadnl_open_2020
+
+  axes_distribution:
+    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20,
+        60], weight: 0.5}
+    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10,
+        50], weight: 0.3}
+    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80],
+        weight: 0.2}
+
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+
+  fleet:
+    ev_count: 20
+    # Default modern-EV mix (no EU-specific override).
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+
+  # region_distributions + calibration_metadata populated by
+  # `v2b-syndata calibrate --population elaadnl_public_eu`.
+  region_distributions:
+    daily_commuter:
+      arrival:
+        dist: truncnorm
+        mu: 17.8125
+        sigma: 1.4827309853625812
+        n_samples: 74
+        ks_fit_quality: 0.10892431754109238
+      copula:
+        rho_spearman: 0.018372615493825174
+        rho_gaussian: 0.019034152830481732
+        n_samples: 74
+  calibration_metadata:
+    source: calibration:elaadnl_open_2020_fixture_20260528
+    dataset: ElaadNL Open Charging Transactions
+    user_id_strategy: card_proxy
+    archive_tag: fixture
+    venue_filter: public
+    dataset_release: open_2020
+    geography: NL_EU
+    schema_version: v1
+    calibration_date: '2026-05-28'
+    n_users_total: 6
+    n_sessions_total: 74
+    n_users_assigned_in_population: 6
+    n_users_with_userinputs: 0
+    capacity_inference_fallback_rate: 1.0
+    unassigned_user_rate: 0.0

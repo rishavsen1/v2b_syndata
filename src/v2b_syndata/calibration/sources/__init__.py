@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .acn import AcnSource
 from .base import CalibrationSource
+from .elaadnl import ElaadNLSource
 from .evwatts import EvWattsSource
 from .inl import InlSource
 
@@ -10,6 +11,7 @@ CALIBRATION_SOURCES: dict[str, type[CalibrationSource]] = {
     "acn_data": AcnSource,
     "evwatts": EvWattsSource,
     "inl_ev_project": InlSource,
+    "elaadnl_open_2020": ElaadNLSource,
 }
 
 __all__ = [
@@ -18,4 +20,5 @@ __all__ = [
     "AcnSource",
     "EvWattsSource",
     "InlSource",
+    "ElaadNLSource",
 ]

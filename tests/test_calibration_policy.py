@@ -154,7 +154,9 @@ def test_calibration_policy_field_required_in_yaml():
     for name, entry in pops.items():
         assert isinstance(entry, dict)
         assert "calibration_policy" in entry, f"{name} missing calibration_policy"
-        assert entry["calibration_policy"] in ("acn_data", "evwatts", "inl_ev_project", "synthetic"), \
+        assert entry["calibration_policy"] in (
+            "acn_data", "evwatts", "inl_ev_project", "elaadnl_open_2020", "synthetic"
+        ), \
             f"{name} has invalid policy {entry['calibration_policy']!r}"
 
 

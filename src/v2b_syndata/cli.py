@@ -134,7 +134,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     # single population resolves — preserves legacy ACN-only behavior).
     # Short aliases let users type the friendly name (e.g. `inl:`) instead
     # of the registry key (`inl_ev_project:`).
-    _POLICY_ALIASES = {"inl": "inl_ev_project"}
+    _POLICY_ALIASES = {"inl": "inl_ev_project", "elaadnl": "elaadnl_open_2020"}
     raw_by_policy: dict[str, list[str]] = {}
     unscoped: list[str] = []
     for kv in (args.source_arg or []):
@@ -327,7 +327,8 @@ def main(argv: list[str] | None = None) -> int:
     cal = sub.add_parser(
         "calibrate",
         help="fit per-region distributions from a calibration source "
-             "(ACN-Data today; EV WATTS / INL after PR2 / PR4)",
+             "(ACN-Data / EV WATTS / INL EV Project Phase 1 / ElaadNL "
+             "Open Charging Transactions)",
     )
     cal.add_argument("--population", default=None,
                      help="single population name to calibrate (default: all populations)")

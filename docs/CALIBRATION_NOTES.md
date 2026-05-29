@@ -193,6 +193,27 @@ evse_id, venue, evse_power_kw) target a placeholder schema; confirm against
 the real avt.inl.gov Phase 1 release and bump `SCHEMA_VERSION` when the
 mapping changes.
 
+Implemented: `elaadnl_open_2020` policy adds ElaadNL Open Charging
+Transactions (open-data.elaad.io, CC BY 4.0, 2020 NL/EU public + semi-public
++ fastcharge L2/DCFC cohort) as a fourth real-data source. Geographic axis:
+adds EU coverage alongside the three US-based sources. One descriptor ships
+today: `elaadnl_public_eu`. The source synthesizes
+`user_id = "elaadnl:card:<card_id>"` from anonymized per-session RFID card
+IDs and stamps `calibration_metadata.user_id_strategy = "card_proxy"`.
+**Caveat: longitudinal identity is weaker than INL's vin_proxy** — drivers
+may hold multiple RFID cards and cards transfer between drivers. Rows
+missing card_id fall back to `elaadnl:port:<evse_id>` and the metadata
+strategy flips to `port_proxy`. **TZ caveat:** ElaadNL CSVs ship naive
+Europe/Amsterdam timestamps; for consistency with ACN/EV WATTS/INL (which
+all treat naive timestamps as UTC) the source localizes naive timestamps
+to UTC without shifting. Result: per-session arrival_hour is offset by
+1–2h vs. wall-clock Amsterdam time. Documented limitation; downstream
+distribution fits inherit the offset uniformly. Schema TODO: column-name
+constants in `calibration/sources/elaadnl.py` (card_id, start_time,
+end_time, energy_kwh, evse_id, venue, evse_power_kw) target a placeholder
+schema; confirm against the real open-data.elaad.io Open Charging
+Transactions release and bump `SCHEMA_VERSION` when the mapping changes.
+
 Future calibration sources (NHTS for δ) extend the policy enum without
 breaking the generator.
 
