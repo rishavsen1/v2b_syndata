@@ -193,26 +193,68 @@ evse_id, venue, evse_power_kw) target a placeholder schema; confirm against
 the real avt.inl.gov Phase 1 release and bump `SCHEMA_VERSION` when the
 mapping changes.
 
-Implemented: `elaadnl_open_2020` policy adds ElaadNL Open Charging
-Transactions (open-data.elaad.io, CC BY 4.0, 2020 NL/EU public + semi-public
-+ fastcharge L2/DCFC cohort) as a fourth real-data source. Geographic axis:
-adds EU coverage alongside the three US-based sources. One descriptor ships
-today: `elaadnl_public_eu`. The source synthesizes
-`user_id = "elaadnl:card:<card_id>"` from anonymized per-session RFID card
-IDs and stamps `calibration_metadata.user_id_strategy = "card_proxy"`.
-**Caveat: longitudinal identity is weaker than INL's vin_proxy** — drivers
-may hold multiple RFID cards and cards transfer between drivers. Rows
-missing card_id fall back to `elaadnl:port:<evse_id>` and the metadata
-strategy flips to `port_proxy`. **TZ caveat:** ElaadNL CSVs ship naive
-Europe/Amsterdam timestamps; for consistency with ACN/EV WATTS/INL (which
-all treat naive timestamps as UTC) the source localizes naive timestamps
-to UTC without shifting. Result: per-session arrival_hour is offset by
-1–2h vs. wall-clock Amsterdam time. Documented limitation; downstream
-distribution fits inherit the offset uniformly. Schema TODO: column-name
-constants in `calibration/sources/elaadnl.py` (card_id, start_time,
-end_time, energy_kwh, evse_id, venue, evse_power_kw) target a placeholder
-schema; confirm against the real open-data.elaad.io Open Charging
-Transactions release and bump `SCHEMA_VERSION` when the mapping changes.
+Implemented: `elaadnl_open_2020` policy provides the fourth real-data
+source. Geographic axis: EU coverage alongside the three US-based
+sources. One descriptor ships today: `elaadnl_public_eu`.
+
+**Real-data source (v2, 2026-05-30):** SmoothEMS met GridShield dataset,
+"Electric Vehicle Charging Session Data of Large Office Parking Lot"
+(a.s.r. living lab, Utrecht NL, Aug 2020 – Oct 2024), published via
+4TU.ResearchData at
+https://data.4tu.nl/datasets/80ef3824-3f5d-4e45-8794-3b8791efbd13 under
+CC BY-NC-SA 4.0. Consortium output of ElaadNL + University of Twente +
+a.s.r. + MENNEKES + Kropman + Amperapark; ElaadNL operates the data
+API. 55,379 sessions / 3,409 pseudonymized EV identifiers / ~300
+charging points.
+
+**Why this dataset rather than the original ElaadNL Open Charging
+Transactions:** the historical `platform.elaad.io/download-data/`
+endpoint was retired; the current `data.elaad.nl` dashboard exposes
+data only via interactive UI without a direct bulk-download link. The
+4TU.nl Utrecht dataset is ElaadNL-collected charging data published
+with a stable citable DOI, making it the closest available real-data
+substitute. Loader file + class names + registry key + alias
+(`elaadnl_open_2020` / "elaadnl") are preserved for back-compat with
+the original PR (commit `6873127`).
+
+**Schema substitution:** the 4TU.nl CSV has columns
+`EV_id_x, start_datetime, end_datetime, total_energy, evse_uid, rail, channel,
+capacity_kwh, ...` (semicolon-separated, UTF-8 BOM). Our fetcher
+(`calibration/elaadnl_fetcher.py::_normalize_4tu_to_internal`) renames
+these to the internal session-row schema
+(`card_id, start_time, end_time, energy_kwh, evse_id, venue,
+evse_power_kw`) and synthesizes `venue = "workplace"` and
+`evse_power_kw = 11.0` (per README: 11 kW per plug, or 22 kW if single
+plug active). The fixture CSV (75 rows) uses the internal schema
+directly; the fetcher auto-detects which is in the cache.
+
+**user_id strategy:** synthesizes `user_id = "elaadnl:card:<EV_id_x>"`
+and stamps `calibration_metadata.user_id_strategy = "card_proxy"`.
+Caveat: longitudinal identity is weaker than INL's vin_proxy — README
+documents that a list of EV IDs were shared across drivers in the early
+roll-out phase. Rows missing EV_id_x fall back to
+`elaadnl:port:<evse_id>` and the metadata strategy flips to
+`port_proxy`. Workplace context: 300+ charging points; charging IDs
+identify a card/RFID, not a unique vehicle.
+
+**TZ caveat:** 4TU.nl source CSVs ship naive Europe/Amsterdam
+timestamps (UTC+1 winter / UTC+2 summer); for consistency with
+ACN/EV WATTS/INL (which all treat naive timestamps as UTC) the source
+localizes naive timestamps to UTC without shifting. Result:
+per-session arrival_hour is offset by 1–2h vs. wall-clock Amsterdam
+time. Distribution fits inherit the offset uniformly.
+
+**Acquisition path for reproducibility:** download
+`202410DatasetEVOfficeParking_v0.csv` from the 4TU.nl page
+(direct URL pattern:
+`https://data.4tu.nl/file/80ef3824-3f5d-4e45-8794-3b8791efbd13/<file-uid>`)
+and place at `data/calibration/elaadnl_cache/elaadnl_utrecht_4tu_2024.csv`.
+Then run:
+```
+v2b-syndata calibrate --population elaadnl_public_eu \
+    --source-arg elaadnl:archive_tag=utrecht_4tu_2024 \
+    --source-arg elaadnl:venue_filter=workplace
+```
 
 Future calibration sources (NHTS for δ) extend the policy enum without
 breaking the generator.

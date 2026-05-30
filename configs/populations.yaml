@@ -634,30 +634,36 @@ inl_residential_legacy:
     unassigned_user_rate: 0.0
 
 # ──────────────────────────────────────────────────────────────────────────
-# ElaadNL Open Charging Transactions (open-data.elaad.io, CC BY 4.0).
-# Dutch public/semi-public/fastcharge EU L2+DCFC cohort. Adds geographic
-# diversity (EU vs. US-only ACN/EV WATTS/INL).
-# user_id = "elaadnl:card:<card_id>" — anonymized RFID per-session.
-# Caveat: drivers may hold multiple RFID cards and cards transfer between
-# drivers — longitudinal identity is weaker than INL's vin_proxy. If a row
-# lacks card_id the extractor falls back to "elaadnl:port:<evse_id>" and
-# flips calibration_metadata.user_id_strategy to "port_proxy".
-# TZ caveat: naive Europe/Amsterdam timestamps treated as UTC for
-# consistency with other sources; arrival_hour offset 1–2h vs wall-clock
-# (see docs/CALIBRATION_NOTES.md).
+# ElaadNL slot — real-data v2 anchored at the SmoothEMS met GridShield
+# dataset (a.s.r. office parking lot, Utrecht NL, Aug 2020 – Oct 2024).
+# Consortium output of ElaadNL + University of Twente + a.s.r. + MENNEKES
+# + Kropman + Amperapark; ElaadNL operates the data API. Published via
+# 4TU.ResearchData under DOI 80ef3824-3f5d-4e45-8794-3b8791efbd13,
+# CC BY-NC-SA 4.0. 55,379 sessions / 3,409 pseudonymized EV identifiers.
+# user_id = "elaadnl:card:<EV_id_x>" — workplace charging IDs are
+# pseudonymized; some IDs are shared across drivers per README disclaimer,
+# so longitudinal identity is weaker than INL's vin_proxy. Fallback to
+# "elaadnl:port:<evse_id>" if card missing.
+# TZ caveat: naive Europe/Amsterdam timestamps (UTC+1 winter / +2 summer)
+# treated as UTC for consistency with other sources; arrival_hour offset
+# 1–2h vs wall-clock (see docs/CALIBRATION_NOTES.md).
+# Note: legacy fixture (75 rows) still ships at
+# tests/test_calibration/fixtures/elaadnl_fixture.csv for unit-test use;
+# fetcher auto-detects which schema is in the cache and renames columns.
 # Source-args:
-#   --source-arg elaadnl:archive_tag=<tag> elaadnl:venue_filter=public
+#   --source-arg elaadnl:archive_tag=utrecht_4tu_2024 \
+#                elaadnl:venue_filter=workplace
 # ──────────────────────────────────────────────────────────────────────────
 elaadnl_public_eu:
-  description: "ElaadNL Open Charging Transactions (NL/EU 2020) public L2+DCFC cohort"
+  description: "ElaadNL / 4TU Utrecht workplace EU cohort (2020–2024, 55k sessions, 3.4k EVs)"
   calibration_policy: elaadnl_open_2020
 
   axes_distribution:
     - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20,
         60], weight: 0.5}
-    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10,
-        50], weight: 0.3}
-    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80],
+    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 
+            50], weight: 0.3}
+    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], 
         weight: 0.2}
 
   negotiation:
@@ -676,27 +682,50 @@ elaadnl_public_eu:
     daily_commuter:
       arrival:
         dist: truncnorm
-        mu: 17.8125
-        sigma: 1.4827309853625812
-        n_samples: 74
-        ks_fit_quality: 0.10892431754109238
+        mu: 8.495872578727493
+        sigma: 2.043562979090281
+        n_samples: 8227
+        ks_fit_quality: 0.16154228251492087
+      dwell:
+        dist: weibull
+        k: 3.123791284891067
+        lambda: 8.09775713104019
+        n_samples: 8227
+        ks_fit_quality: 0.1259565983753166
       copula:
-        rho_spearman: 0.018372615493825174
-        rho_gaussian: 0.019034152830481732
-        n_samples: 74
+        rho_spearman: -0.5010947434342011
+        rho_gaussian: -0.5187453546853242
+        n_samples: 8227
+    weekday_only:
+      arrival:
+        dist: truncnorm
+        mu: 8.68303781868979
+        sigma: 2.129780848046814
+        n_samples: 19174
+        ks_fit_quality: 0.1404041233353195
+      dwell:
+        dist: weibull
+        k: 3.0663362738145574
+        lambda: 7.63479841494559
+        n_samples: 19174
+        ks_fit_quality: 0.10297846827092938
+      copula:
+        rho_spearman: -0.5176384374766079
+        rho_gaussian: -0.5354573079792402
+        n_samples: 19174
   calibration_metadata:
-    source: calibration:elaadnl_open_2020_fixture_20260528
-    dataset: ElaadNL Open Charging Transactions
+    source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260530
+    dataset: ElaadNL / 4TU Utrecht office parking (SmoothEMS met GridShield)
     user_id_strategy: card_proxy
-    archive_tag: fixture
-    venue_filter: public
+    archive_tag: utrecht_4tu_2024
+    venue_filter: workplace
     dataset_release: open_2020
     geography: NL_EU
     schema_version: v1
-    calibration_date: '2026-05-28'
-    n_users_total: 6
-    n_sessions_total: 74
-    n_users_assigned_in_population: 6
+    calibration_date: '2026-05-30'
+    n_users_total: 1236
+    n_sessions_total: 55379
+    n_users_assigned_in_population: 294
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0
-    unassigned_user_rate: 0.0
+    unassigned_user_rate: 0.7621359223300971

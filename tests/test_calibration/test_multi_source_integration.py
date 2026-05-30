@@ -263,7 +263,9 @@ def test_elaadnl_alias_routes_to_elaadnl_open_2020_policy(tmp_path):
     assert rc == 0
     data = pyyaml.safe_load((cfg / "populations.yaml").read_text())
     meta = data["elaadnl_public_eu"]["calibration_metadata"]
-    assert meta["dataset"] == "ElaadNL Open Charging Transactions"
+    # dataset name updated to reflect real-data source (4TU Utrecht), but
+    # the ElaadNL/4TU prefix is preserved for substring identification.
+    assert "ElaadNL" in meta["dataset"]
     assert meta["geography"] == "NL_EU"
     assert meta["user_id_strategy"] == "card_proxy"
 

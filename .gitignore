@@ -20,6 +20,8 @@ data/calibration/evwatts_cache/
 data/calibration/evwatts_per_user.csv
 data/calibration/inl_cache/
 data/calibration/inl_per_user.csv
+data/calibration/elaadnl_cache/
+data/calibration/elaadnl_per_user.csv
 data/load_pipeline_cache/
 data/stations/
 data/sweep/

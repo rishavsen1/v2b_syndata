@@ -74,7 +74,11 @@ class ElaadNLSource:
         return out
 
     def dataset_name(self) -> str:
-        return "ElaadNL Open Charging Transactions"
+        # Real-data v2: SmoothEMS met GridShield, Utrecht NL office parking
+        # lot (a.s.r. living lab, ElaadNL consortium). Published via
+        # 4TU.ResearchData under CC BY-NC-SA 4.0, DOI 80ef3824-...
+        # Fixture path also accepted via this same source class.
+        return "ElaadNL / 4TU Utrecht office parking (SmoothEMS met GridShield)"
 
     def provenance_prefix(self, config: dict[str, Any]) -> str:
         archive_tag = str(config["archive_tag"])
@@ -95,8 +99,11 @@ class ElaadNLSource:
 
     def token_help_message(self) -> str:
         return (
-            "verify ELAADNL_BULK_URL points to an open-data.elaad.io Open "
-            "Charging Transactions archive or pre-populate the cache directory"
+            "verify ELAADNL_BULK_URL points to a real EU workplace charging "
+            "archive (e.g. 4TU.ResearchData dataset "
+            "80ef3824-3f5d-4e45-8794-3b8791efbd13, 'Electric Vehicle Charging "
+            "Session Data of Large Office Parking Lot', CC BY-NC-SA 4.0) or "
+            "pre-populate the cache directory"
         )
 
     def parse_args(self, raw: list[str]) -> dict[str, Any]:
