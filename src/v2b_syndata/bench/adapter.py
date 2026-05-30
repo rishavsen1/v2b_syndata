@@ -31,6 +31,15 @@ from acnportal.acnsim.network.charging_network import ChargingNetwork
 
 DEFAULT_VOLTAGE = 208
 DEFAULT_PERIOD_MIN = 5  # acnsim simulation tick length
+# Default feeder-to-theoretical-max ratio. 1.0 = unbinding (no
+# electrical-service constraint beyond per-EVSE max). The published
+# bench scope intentionally models only physical-slot scarcity via
+# FCFS admission; power-constrained extensions are downstream work.
+# Set < 1.0 to model a transformer/feeder cap (ACN's Caltech site is
+# ~0.125, typical retrofit workplaces ~0.3). Exposed through
+# build_acnsim_inputs(feeder_kw_ratio=...) and the bench CLI
+# --feeder-ratio flag.
+DEFAULT_FEEDER_RATIO = 1.0
 
 
 @dataclass
@@ -67,6 +76,8 @@ class AcnsimInputs:
     building_load: pd.DataFrame
     admission: AdmissionStats
     admitted_session_ids: set[str]
+    feeder_kw_ratio: float   # ratio applied; 1.0 = unbinding
+    feeder_kw: float          # absolute feeder cap in kW
 
 
 def load_scenario(scenario_dir: Path) -> ScenarioInputs:
@@ -145,11 +156,15 @@ def build_acnsim_inputs(
     inputs: ScenarioInputs,
     period_min: int = DEFAULT_PERIOD_MIN,
     voltage: float = DEFAULT_VOLTAGE,
+    feeder_kw_ratio: float = DEFAULT_FEEDER_RATIO,
 ) -> AcnsimInputs:
     """Materialize ChargingNetwork + EventQueue from v2b scenario.
 
-    FCFS admission gates sessions onto the finite charger pool before
-    they reach the scheduler.
+    FCFS admission gates sessions onto the finite charger pool. The
+    network's aggregate-current cap models the feeder/transformer
+    constraint: `feeder_kw_ratio × n_chargers × max_kw_per_evse`. With
+    ratio < 1.0 the cap binds when admitted EVs try to charge
+    simultaneously at full rate, forcing the scheduler to ration power.
     """
     network = ChargingNetwork()
     # V1G: clip negative min_rate to 0. Charger.max_rate_kw is in kW;
@@ -165,11 +180,11 @@ def build_acnsim_inputs(
         network.register_evse(evse, voltage=voltage, phase_angle=0)
         station_ids.append(station_id)
 
-    # Aggregate-current cap = n_chargers × max_amp. With one EVSE per
-    # physical charger this matches the per-station cap and only binds
-    # when something tries to violate it (e.g. UncontrolledCharging).
+    # Aggregate-current cap = feeder_kw_ratio × theoretical max.
+    feeder_kw = feeder_kw_ratio * n_chargers * max_kw_per_evse
+    feeder_amp_limit = max_amp * n_chargers * feeder_kw_ratio
     agg = acnsim.Current({sid: 1.0 for sid in station_ids})
-    network.add_constraint(agg, limit=max_amp * n_chargers, name="agg_current")
+    network.add_constraint(agg, limit=feeder_amp_limit, name="agg_current")
 
     # FCFS admission of sessions into the charger pool
     n_offered = len(inputs.sessions)
@@ -242,4 +257,6 @@ def build_acnsim_inputs(
         building_load=inputs.building_load,
         admission=admission,
         admitted_session_ids=admitted_session_ids,
+        feeder_kw_ratio=feeder_kw_ratio,
+        feeder_kw=feeder_kw,
     )

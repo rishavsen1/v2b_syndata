@@ -49,6 +49,8 @@ class MetricsResult:
     peak_net_reduction_pct: float | None = None  # set externally vs uncontrolled
     per_session_fulfillment: list[float] = field(default_factory=list)
     runtime_sec: float = 0.0
+    feeder_kw_ratio: float = 1.0
+    feeder_kw: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -69,4 +71,6 @@ class MetricsResult:
             "peak_net_kw": self.peak_net_kw,
             "peak_net_reduction_pct": self.peak_net_reduction_pct,
             "runtime_sec": self.runtime_sec,
+            "feeder_kw_ratio": self.feeder_kw_ratio,
+            "feeder_kw": self.feeder_kw,
         }

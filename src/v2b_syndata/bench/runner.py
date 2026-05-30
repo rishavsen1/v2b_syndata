@@ -23,6 +23,7 @@ def run_scenario(
     period_min: int = 5,
     voltage: float = 208.0,
     tz: str = "America/Los_Angeles",
+    feeder_kw_ratio: float = 1.0,
 ) -> MetricsResult:
     """Run one ACN-Sim simulation over a v2b scenario output directory.
 
@@ -46,7 +47,12 @@ def run_scenario(
     t0 = time.perf_counter()
 
     inputs = load_scenario(scenario_dir)
-    acn_inputs = build_acnsim_inputs(inputs, period_min=period_min, voltage=voltage)
+    acn_inputs = build_acnsim_inputs(
+        inputs,
+        period_min=period_min,
+        voltage=voltage,
+        feeder_kw_ratio=feeder_kw_ratio,
+    )
 
     pytz_tz = pytz.timezone(tz)
     sim_start_tz = pytz_tz.localize(acn_inputs.sim_start.to_pydatetime().replace(tzinfo=None))
@@ -73,6 +79,8 @@ def run_scenario(
         scenario_dir=scenario_dir,
     )
     metrics.runtime_sec = time.perf_counter() - t0
+    metrics.feeder_kw_ratio = acn_inputs.feeder_kw_ratio
+    metrics.feeder_kw = acn_inputs.feeder_kw
     return metrics
 
 
