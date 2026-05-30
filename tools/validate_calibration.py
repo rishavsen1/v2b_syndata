@@ -1,0 +1,661 @@
+#!/usr/bin/env python
+"""Calibration faithfulness verification harness.
+
+Compares generated CSVs against the real-data sources they were calibrated
+to. Per-region marginals (S1), joint arrival×dwell density (S2), held-out
+KS (S3), building load vs PNNL prototype design intent (S5), and weekly
+weekday/weekend patterns (S6).
+
+Scope (2026-05-30):
+  ACN-Data and ElaadNL/4TU Utrecht are calibrated against real bulk data
+  and qualify for S1/S2/S3/S6. EV WATTS and INL are fixture-only and
+  therefore excluded from real-vs-generated comparison. S5 is source-
+  independent and runs on the EnergyPlus building-load output of a default
+  scenario per (archetype, size).
+
+Usage:
+    uv run python tools/validate_calibration.py \\
+        --output data/calibration_validation/ \\
+        --seeds 50 \\
+        --workers 16 \\
+        [--sources acn,elaadnl]   # default: both real-calibrated sources
+
+Outputs:
+    data/calibration_validation/S1_marginals.csv
+    data/calibration_validation/S2_joint.csv
+    data/calibration_validation/S3_holdout.csv
+    data/calibration_validation/S5_buildingload.csv
+    data/calibration_validation/S6_weekly.csv
+    data/calibration_validation/S1_marginals/<source>/<region>_<var>.png
+    data/calibration_validation/S2_joint/<source>_<region>.png
+    data/calibration_validation/figure_calibration_panel.png  (paper Fig 14a)
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+import yaml as pyyaml
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "src"))
+
+from v2b_syndata.calibration.feature_extractor import (  # noqa: E402
+    aggregate_user_features,
+)
+from v2b_syndata.calibration.region_assignment import assign_user_to_region  # noqa: E402
+from v2b_syndata.calibration.sources import CALIBRATION_SOURCES  # noqa: E402
+from v2b_syndata.calibration.distribution_fitter import (  # noqa: E402
+    fit_truncnorm_arrival,
+    fit_weibull_dwell,
+)
+from v2b_syndata.runner import generate as runner_generate  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("validate")
+
+
+# Source → (policy, scenario, source_args, calibration_population)
+SOURCE_SPECS = {
+    "acn": {
+        "policy": "acn_data",
+        "scenario": "S_acn_workplace",
+        "source_args": {
+            "sites": ("caltech", "jpl", "office001"),
+            "year_start": 2019,
+            "year_end": 2021,
+            "cache_dir": REPO / "data" / "calibration" / "acn_cache",
+        },
+        "population": "acn_workplace_baseline",
+    },
+    "elaadnl": {
+        "policy": "elaadnl_open_2020",
+        "scenario": "S_elaadnl_public_eu",
+        "source_args": {
+            "archive_tag": "utrecht_4tu_2024",
+            "venue_filter": "workplace",
+            "cache_dir": REPO / "data" / "calibration" / "elaadnl_cache",
+        },
+        "population": "elaadnl_public_eu",
+    },
+}
+
+
+@dataclass
+class SourceData:
+    name: str
+    sessions_df: pd.DataFrame    # session-level
+    region_axes: list[dict]
+    user_to_region: dict[str, str]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Source-side data fetch
+# ──────────────────────────────────────────────────────────────────────
+
+def load_source(source_key: str) -> SourceData:
+    """Pull real SessionFeatures + assign each user to a region."""
+    spec = SOURCE_SPECS[source_key]
+    src_cls = CALIBRATION_SOURCES[spec["policy"]]
+    src = src_cls()
+    cfg = dict(spec["source_args"])  # copy
+    log.info("loading source %s …", source_key)
+    sessions = src.fetch_sessions(cfg)
+    log.info("  fetched %d sessions", len(sessions))
+
+    # Build the same UserFeatures aggregation used at calibrate-time.
+    arr_times = [s.arrival_time for s in sessions]
+    users = aggregate_user_features(sessions, min(arr_times), max(arr_times))
+    log.info("  aggregated %d users", len(users))
+
+    # Region assignment via the live population axes_distribution.
+    pops_yaml = pyyaml.safe_load(
+        (REPO / "configs" / "populations.yaml").read_text()
+    )
+    region_axes = pops_yaml[spec["population"]]["axes_distribution"]
+    user_to_region = {}
+    for u in users:
+        r = assign_user_to_region(u, region_axes) or "__unassigned__"
+        user_to_region[u.user_id] = r
+
+    # Flatten sessions → DataFrame, augment with region + derived fields.
+    rows = []
+    for s in sessions:
+        rows.append(
+            dict(
+                user_id=s.user_id,
+                arrival_time=s.arrival_time,
+                arrival_hour=s.arrival_hour,
+                dwell_hours=s.dwell_hours,
+                kwh_delivered=s.kwh_delivered,
+                region=user_to_region.get(s.user_id, "__unassigned__"),
+            )
+        )
+    sessions_df = pd.DataFrame(rows)
+    sessions_df["arrival_time"] = pd.to_datetime(sessions_df["arrival_time"], utc=True)
+
+    return SourceData(
+        name=source_key,
+        sessions_df=sessions_df,
+        region_axes=region_axes,
+        user_to_region=user_to_region,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Generated-side: parallel seed generation
+# ──────────────────────────────────────────────────────────────────────
+
+def _gen_one(args: tuple) -> tuple[int, Path | None, str]:
+    scenario, seed, out_dir, config_dir = args
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest = out_dir / "manifest.json"
+    if manifest.exists():
+        return seed, out_dir, "cached"
+    try:
+        runner_generate(
+            scenario_id=scenario, seed=seed,
+            output_dir=out_dir, config_dir=config_dir,
+        )
+        return seed, out_dir, "generated"
+    except Exception as e:  # noqa: BLE001
+        log.error("seed %d failed: %s", seed, e)
+        return seed, None, f"err: {type(e).__name__}: {e}"
+
+
+def generate_seed_set(
+    source_key: str, seeds: int, output_root: Path, workers: int
+) -> list[Path]:
+    """Generate `seeds` seeded scenarios for the source. Return list of output dirs."""
+    spec = SOURCE_SPECS[source_key]
+    scenario = spec["scenario"]
+    base = output_root / "scenarios" / source_key
+    jobs = [
+        (scenario, seed, base / f"seed{seed}", REPO / "configs")
+        for seed in range(1, seeds + 1)
+    ]
+    log.info("generating %d %s seeds …", seeds, source_key)
+    out_dirs = []
+    with ProcessPoolExecutor(max_workers=min(workers, 8)) as ex:
+        for fut in as_completed([ex.submit(_gen_one, j) for j in jobs]):
+            seed, sdir, msg = fut.result()
+            if sdir is not None:
+                out_dirs.append(sdir)
+    log.info("  %d seeds materialized", len(out_dirs))
+    return sorted(out_dirs)
+
+
+def load_generated(source_key: str, seed_dirs: list[Path]) -> pd.DataFrame:
+    """Concatenate sessions.csv across all seeds; tag each row with region."""
+    spec = SOURCE_SPECS[source_key]
+    pops_yaml = pyyaml.safe_load(
+        (REPO / "configs" / "populations.yaml").read_text()
+    )
+    region_axes = pops_yaml[spec["population"]]["axes_distribution"]
+
+    frames = []
+    for sdir in seed_dirs:
+        sessions = pd.read_csv(
+            sdir / "sessions.csv",
+            parse_dates=["arrival", "departure"],
+        )
+        users = pd.read_csv(sdir / "users.csv")
+        # Map car_id → user attrs → region. users.csv has the per-user
+        # behavioral axes (phi, kappa, region directly).
+        if "region" in users.columns:
+            car_region = dict(zip(users["car_id"], users["region"]))
+        else:
+            # Fall back: assign by (phi, kappa) range match
+            car_region = {}
+            for _, row in users.iterrows():
+                fake_user = type("U", (), {
+                    "phi": row["phi"], "kappa": row["kappa"],
+                    "delta_km": row.get("delta_km", 0.0),
+                    "user_id": str(row["car_id"]),
+                })()
+                car_region[row["car_id"]] = (
+                    assign_user_to_region(fake_user, region_axes)
+                    or "__unassigned__"
+                )
+
+        sessions["region"] = sessions["car_id"].map(car_region).fillna("__unassigned__")
+        sessions["arrival_hour"] = (
+            sessions["arrival"].dt.hour
+            + sessions["arrival"].dt.minute / 60.0
+        )
+        sessions["dwell_hours"] = (
+            sessions["departure"] - sessions["arrival"]
+        ).dt.total_seconds() / 3600.0
+        sessions["seed"] = int(sdir.name.replace("seed", ""))
+        frames.append(
+            sessions[["seed", "car_id", "region", "arrival",
+                      "arrival_hour", "dwell_hours", "arrival_soc"]]
+        )
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S1: per-region marginal validation
+# ──────────────────────────────────────────────────────────────────────
+
+def s1_marginals(
+    source_key: str,
+    source_df: pd.DataFrame,
+    generated_df: pd.DataFrame,
+    output_root: Path,
+) -> pd.DataFrame:
+    """KS, Wasserstein-1, histogram-overlay plots per (region, variable)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    out_dir = output_root / "S1_marginals" / source_key
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+    variables = [
+        ("arrival_hour", "hour-of-day", (0, 24)),
+        ("dwell_hours", "dwell (h)", (0, 24)),
+    ]
+    # Only compute regions that have data on BOTH sides
+    regions = sorted(
+        set(source_df["region"]) & set(generated_df["region"])
+        - {"__unassigned__"}
+    )
+
+    for region in regions:
+        src_r = source_df[source_df["region"] == region]
+        gen_r = generated_df[generated_df["region"] == region]
+        for var, label, xlim in variables:
+            src_vals = src_r[var].dropna().to_numpy()
+            gen_vals = gen_r[var].dropna().to_numpy()
+            if len(src_vals) < 30 or len(gen_vals) < 30:
+                log.warning("  %s/%s/%s: tiny sample (src=%d, gen=%d)",
+                            source_key, region, var, len(src_vals), len(gen_vals))
+                continue
+
+            ks_stat, ks_p = stats.ks_2samp(src_vals, gen_vals)
+            w1 = stats.wasserstein_distance(src_vals, gen_vals)
+            rows.append({
+                "source": source_key, "region": region, "variable": var,
+                "n_source": len(src_vals), "n_generated": len(gen_vals),
+                "ks_statistic": float(ks_stat), "ks_pvalue": float(ks_p),
+                "wasserstein_1": float(w1),
+                "source_mean": float(np.mean(src_vals)),
+                "source_std": float(np.std(src_vals)),
+                "generated_mean": float(np.mean(gen_vals)),
+                "generated_std": float(np.std(gen_vals)),
+            })
+
+            fig, ax = plt.subplots(figsize=(6, 3.5))
+            ax.hist(src_vals, bins=40, range=xlim, density=True,
+                    alpha=0.5, label=f"source (n={len(src_vals)})",
+                    color="tab:blue", edgecolor="none")
+            ax.hist(gen_vals, bins=40, range=xlim, density=True,
+                    alpha=0.5, label=f"generated (n={len(gen_vals)})",
+                    color="tab:orange", edgecolor="none")
+            ax.set_xlabel(label)
+            ax.set_ylabel("density")
+            ax.set_title(
+                f"{source_key} / {region} / {var}\n"
+                f"K-S={ks_stat:.3f}, W₁={w1:.3f}"
+            )
+            ax.legend(loc="upper right", fontsize=8)
+            fig.tight_layout()
+            fig.savefig(out_dir / f"{region}_{var}.png", dpi=130)
+            plt.close(fig)
+
+    return pd.DataFrame(rows)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S2: joint (arrival × dwell) validation
+# ──────────────────────────────────────────────────────────────────────
+
+def s2_joint(
+    source_key: str,
+    source_df: pd.DataFrame,
+    generated_df: pd.DataFrame,
+    output_root: Path,
+) -> pd.DataFrame:
+    """Spearman ρ comparison + side-by-side 2D KDE."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    out_dir = output_root / "S2_joint" / source_key
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+    regions = sorted(
+        set(source_df["region"]) & set(generated_df["region"])
+        - {"__unassigned__"}
+    )
+    for region in regions:
+        src_r = source_df[source_df["region"] == region]
+        gen_r = generated_df[generated_df["region"] == region]
+        src_arr = src_r["arrival_hour"].dropna().to_numpy()
+        src_dwell = src_r["dwell_hours"].dropna().to_numpy()
+        gen_arr = gen_r["arrival_hour"].dropna().to_numpy()
+        gen_dwell = gen_r["dwell_hours"].dropna().to_numpy()
+
+        if min(len(src_arr), len(src_dwell), len(gen_arr), len(gen_dwell)) < 30:
+            continue
+
+        # Align lengths (pairwise)
+        n_src = min(len(src_arr), len(src_dwell))
+        n_gen = min(len(gen_arr), len(gen_dwell))
+        rho_src, _ = stats.spearmanr(src_arr[:n_src], src_dwell[:n_src])
+        rho_gen, _ = stats.spearmanr(gen_arr[:n_gen], gen_dwell[:n_gen])
+        rho_gap = abs(rho_src - rho_gen)
+
+        rows.append({
+            "source": source_key, "region": region,
+            "n_source": int(n_src), "n_generated": int(n_gen),
+            "spearman_rho_source": float(rho_src),
+            "spearman_rho_generated": float(rho_gen),
+            "rho_gap": float(rho_gap),
+        })
+
+        # Side-by-side scatter + density (cheap proxy for KDE)
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True, sharex=True)
+        for ax, (a, d, label, color) in zip(
+            axes,
+            [(src_arr[:n_src], src_dwell[:n_src], "source", "tab:blue"),
+             (gen_arr[:n_gen], gen_dwell[:n_gen], "generated", "tab:orange")],
+        ):
+            ax.scatter(a, d, s=1.5, alpha=0.25, color=color)
+            ax.set_xlabel("arrival_hour")
+            ax.set_title(f"{label} (n={len(a)}, ρ_S={stats.spearmanr(a, d)[0]:.2f})",
+                         fontsize=9)
+            ax.set_xlim(0, 24)
+            ax.set_ylim(0, 24)
+        axes[0].set_ylabel("dwell_hours")
+        fig.suptitle(f"{source_key} / {region}: joint (arrival × dwell)", fontsize=11)
+        fig.tight_layout()
+        fig.savefig(out_dir / f"{region}.png", dpi=130)
+        plt.close(fig)
+
+    return pd.DataFrame(rows)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S3: held-out KS (where sample size ≥ 200 per region)
+# ──────────────────────────────────────────────────────────────────────
+
+def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
+    """80/20 split, refit on train, KS on test."""
+    rows = []
+    regions = sorted(set(source_df["region"]) - {"__unassigned__"})
+    for region in regions:
+        src_r = source_df[source_df["region"] == region]
+        if len(src_r) < 200:
+            continue
+        # Deterministic split by user_id sort.
+        users_sorted = sorted(src_r["user_id"].unique())
+        cut = int(len(users_sorted) * 0.8)
+        train_uids = set(users_sorted[:cut])
+        train = src_r[src_r["user_id"].isin(train_uids)]
+        test = src_r[~src_r["user_id"].isin(train_uids)]
+        if len(test) < 30:
+            continue
+
+        # Fit arrival on train, KS on test
+        for var, fit_fn in [
+            ("arrival_hour", fit_truncnorm_arrival),
+            ("dwell_hours", fit_weibull_dwell),
+        ]:
+            train_vals = train[var].dropna().to_numpy()
+            test_vals = test[var].dropna().to_numpy()
+            if len(train_vals) < 50 or len(test_vals) < 30:
+                continue
+            fit = fit_fn(train_vals)
+            if fit is None:
+                continue
+            # Build CDF from fit params and run kstest(test, cdf)
+            if var == "arrival_hour" and fit.get("dist") == "truncnorm":
+                from scipy.stats import truncnorm
+                a, b = (6 - fit["mu"]) / fit["sigma"], (20 - fit["mu"]) / fit["sigma"]
+                cdf = truncnorm(a, b, loc=fit["mu"], scale=fit["sigma"]).cdf
+            elif var == "dwell_hours" and fit.get("dist") == "weibull":
+                from scipy.stats import weibull_min
+                cdf = weibull_min(fit["k"], scale=fit["lambda"]).cdf
+            else:
+                continue
+
+            ks_train = float(fit.get("ks_fit_quality", float("nan")))
+            ks_holdout, _ = stats.kstest(test_vals, cdf)
+            rows.append({
+                "source": source_key, "region": region, "variable": var,
+                "n_train": len(train_vals), "n_test": len(test_vals),
+                "ks_train": ks_train, "ks_holdout": float(ks_holdout),
+                "delta": float(ks_holdout - ks_train) if not np.isnan(ks_train) else float("nan"),
+            })
+
+    return pd.DataFrame(rows)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S5: building load vs PNNL prototype design intent
+# ──────────────────────────────────────────────────────────────────────
+
+# (archetype, size) → default scenario that uses it
+S5_SCENARIOS = {
+    ("office", "small"):     "S_size_small",
+    ("office", "medium"):    "S01",
+    ("office", "large"):     "S_size_large",
+    ("retail", "standalone"): "S_arch_retail",
+}
+
+# PNNL design-intent ratios (peak/off-peak; weekday/weekend) — derived
+# from samplers/load.py::_WEEKDAY_OCC_BY_SOURCE schedules.
+# Office: ~0.95 peak vs ~0.05 off-peak → 19× theoretical; we expect 4-8×
+# realized due to plug-load + ramp.
+# Retail: ~0.90 peak vs ~0.15 off-peak → ~6× theoretical, 3-5× realized.
+PNNL_EXPECTED_PEAK_OFFPEAK = {
+    "office": (4.0, 8.0),     # peak/off-peak realized range
+    "retail": (3.0, 6.0),
+    "mixed":  (3.0, 6.0),
+}
+PNNL_EXPECTED_WEEKDAY_WEEKEND = {
+    "office": (2.5, 8.0),
+    "retail": (1.2, 2.5),     # retail open 7 days, smaller gap
+    "mixed":  (2.0, 5.0),
+}
+
+
+def s5_buildingload(output_root: Path) -> pd.DataFrame:
+    """Per (archetype, size), generate scenario; compare building_load ratios."""
+    rows = []
+    for (arch, size), scenario in S5_SCENARIOS.items():
+        out_dir = output_root / "scenarios_s5" / scenario / "seed42"
+        if not (out_dir / "manifest.json").exists():
+            out_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                runner_generate(
+                    scenario_id=scenario, seed=42,
+                    output_dir=out_dir, config_dir=REPO / "configs",
+                )
+            except Exception as e:  # noqa: BLE001
+                log.warning("S5: gen %s failed: %s", scenario, e)
+                continue
+
+        try:
+            bl = pd.read_csv(
+                out_dir / "building_load.csv", parse_dates=["datetime"]
+            )
+        except FileNotFoundError:
+            continue
+
+        bl["hour"] = bl["datetime"].dt.hour
+        bl["dow"] = bl["datetime"].dt.dayofweek
+        peak = float(bl["power_kw"].max())
+        off_peak_mask = bl["hour"] < 6
+        off_peak = float(bl.loc[off_peak_mask, "power_kw"].mean())
+        weekday = float(bl.loc[bl["dow"] < 5, "power_kw"].mean())
+        weekend = float(bl.loc[bl["dow"] >= 5, "power_kw"].mean())
+
+        po_ratio = peak / off_peak if off_peak > 1e-3 else float("inf")
+        ww_ratio = weekday / weekend if weekend > 1e-3 else float("inf")
+
+        exp_po_lo, exp_po_hi = PNNL_EXPECTED_PEAK_OFFPEAK.get(arch, (0, 100))
+        exp_ww_lo, exp_ww_hi = PNNL_EXPECTED_WEEKDAY_WEEKEND.get(arch, (0, 100))
+
+        rows.append({
+            "scenario": scenario, "archetype": arch, "size": size,
+            "peak_kw": peak, "off_peak_kw": off_peak,
+            "weekday_kw": weekday, "weekend_kw": weekend,
+            "peak_off_peak_ratio": po_ratio,
+            "weekday_weekend_ratio": ww_ratio,
+            "po_in_range": bool(exp_po_lo <= po_ratio <= exp_po_hi),
+            "ww_in_range": bool(exp_ww_lo <= ww_ratio <= exp_ww_hi),
+            "expected_po_range": f"[{exp_po_lo}, {exp_po_hi}]",
+            "expected_ww_range": f"[{exp_ww_lo}, {exp_ww_hi}]",
+        })
+
+    return pd.DataFrame(rows)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S6: weekly pattern (weekday vs weekend active rate)
+# ──────────────────────────────────────────────────────────────────────
+
+def s6_weekly(
+    source_key: str,
+    source_df: pd.DataFrame,
+    generated_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Weekday vs weekend active-rate per source vs per generated."""
+    def ratios(df: pd.DataFrame) -> tuple[float, float, float]:
+        if df.empty or "arrival_time" not in df.columns:
+            return float("nan"), float("nan"), float("nan")
+        df = df.copy()
+        df["dow"] = pd.to_datetime(df["arrival_time"]).dt.dayofweek
+        weekday_sessions = (df["dow"] < 5).sum()
+        weekend_sessions = (df["dow"] >= 5).sum()
+        n_weekdays = max(1, df.loc[df["dow"] < 5, "arrival_time"].dt.normalize().nunique())
+        n_weekenddays = max(1, df.loc[df["dow"] >= 5, "arrival_time"].dt.normalize().nunique())
+        wd_per_day = weekday_sessions / n_weekdays
+        we_per_day = weekend_sessions / n_weekenddays
+        return float(wd_per_day), float(we_per_day), float(wd_per_day / we_per_day) if we_per_day > 0 else float("inf")
+
+    src_wd, src_we, src_ratio = ratios(source_df)
+    # generated_df uses 'arrival' rather than 'arrival_time'
+    gen_df_renamed = generated_df.rename(columns={"arrival": "arrival_time"})
+    gen_wd, gen_we, gen_ratio = ratios(gen_df_renamed)
+
+    return pd.DataFrame([{
+        "source": source_key,
+        "source_weekday_sess_per_day": src_wd,
+        "source_weekend_sess_per_day": src_we,
+        "source_weekly_ratio": src_ratio,
+        "generated_weekday_sess_per_day": gen_wd,
+        "generated_weekend_sess_per_day": gen_we,
+        "generated_weekly_ratio": gen_ratio,
+        "gap_ratio_log10": abs(np.log10(src_ratio) - np.log10(gen_ratio))
+                            if src_ratio > 0 and gen_ratio > 0 and np.isfinite(src_ratio) and np.isfinite(gen_ratio)
+                            else float("nan"),
+    }])
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────────────────────────────
+
+def main() -> int:
+    p = argparse.ArgumentParser(description="Calibration faithfulness verification")
+    p.add_argument("--output", default="data/calibration_validation")
+    p.add_argument("--seeds", type=int, default=50)
+    p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--sources", default="acn,elaadnl",
+                   help="comma list of source keys (default: acn,elaadnl)")
+    args = p.parse_args()
+
+    output_root = Path(args.output)
+    output_root.mkdir(parents=True, exist_ok=True)
+    source_keys = [s.strip() for s in args.sources.split(",") if s.strip()]
+
+    t_total = time.perf_counter()
+
+    s1_all, s2_all, s3_all, s6_all = [], [], [], []
+
+    for source_key in source_keys:
+        if source_key not in SOURCE_SPECS:
+            log.warning("unknown source %s, skipping", source_key)
+            continue
+        log.info("=" * 60)
+        log.info("Source: %s", source_key)
+
+        source_data = load_source(source_key)
+        seed_dirs = generate_seed_set(source_key, args.seeds, output_root, args.workers)
+        generated = load_generated(source_key, seed_dirs)
+
+        log.info("  source sessions: %d; generated sessions: %d",
+                 len(source_data.sessions_df), len(generated))
+
+        # S1
+        log.info("  S1 marginals…")
+        s1_df = s1_marginals(source_key, source_data.sessions_df, generated, output_root)
+        s1_all.append(s1_df)
+
+        # S2
+        log.info("  S2 joint…")
+        s2_df = s2_joint(source_key, source_data.sessions_df, generated, output_root)
+        s2_all.append(s2_df)
+
+        # S3
+        log.info("  S3 held-out KS…")
+        s3_df = s3_holdout(source_key, source_data.sessions_df)
+        s3_all.append(s3_df)
+
+        # S6
+        log.info("  S6 weekly pattern…")
+        s6_df = s6_weekly(source_key, source_data.sessions_df, generated)
+        s6_all.append(s6_df)
+
+    # S5 (source-independent)
+    log.info("=" * 60)
+    log.info("S5 building load vs PNNL prototype intent…")
+    s5_df = s5_buildingload(output_root)
+    s5_df.to_csv(output_root / "S5_buildingload.csv", index=False)
+
+    pd.concat(s1_all, ignore_index=True).to_csv(output_root / "S1_marginals.csv", index=False) if s1_all else None
+    pd.concat(s2_all, ignore_index=True).to_csv(output_root / "S2_joint.csv", index=False) if s2_all else None
+    pd.concat(s3_all, ignore_index=True).to_csv(output_root / "S3_holdout.csv", index=False) if s3_all else None
+    pd.concat(s6_all, ignore_index=True).to_csv(output_root / "S6_weekly.csv", index=False) if s6_all else None
+
+    log.info("=" * 60)
+    log.info("Done in %.1fs. Outputs at %s/", time.perf_counter() - t_total, output_root)
+    log.info("CSVs: S1_marginals, S2_joint, S3_holdout, S5_buildingload, S6_weekly")
+
+    # Print quick summaries
+    if s1_all:
+        s1 = pd.concat(s1_all, ignore_index=True)
+        print("\n=== S1 marginals summary ===")
+        print(s1[["source", "region", "variable", "n_source", "n_generated",
+                  "ks_statistic", "wasserstein_1"]].round(3).to_string(index=False))
+    if s3_all:
+        s3 = pd.concat(s3_all, ignore_index=True)
+        if not s3.empty:
+            print("\n=== S3 held-out KS ===")
+            print(s3.round(3).to_string(index=False))
+    if s6_all:
+        s6 = pd.concat(s6_all, ignore_index=True)
+        print("\n=== S6 weekly ratio ===")
+        print(s6.round(3).to_string(index=False))
+    print("\n=== S5 building-load ratios ===")
+    print(s5_df.round(2).to_string(index=False))
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

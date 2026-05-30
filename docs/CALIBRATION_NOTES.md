@@ -177,6 +177,22 @@ consistency. Schema TODO: the column-name constants in
 end_time_utc, energy_kwh, evse_id, venue_type, rated_power_kw); confirm against
 the real livewire release and bump `SCHEMA_VERSION` when the mapping changes.
 
+**Bulk-data acquisition status (2026-05-30):** EV WATTS Public Database
+(13M+ sessions, 50k+ ports, US-wide, 2019–) is hosted at
+https://livewire.energy.gov/ds/evwatts/evwatts.public behind an
+account-required single-page application (free account, no
+programmatic API endpoint exposed in WebFetch / curl probing). Bulk
+download requires manual portal navigation + likely NDA for full
+attributes (per OSTI biblio 1970735, "researchers from partner
+national labs can request additional attributes via
+evwattsdata@energetics.com under a non-disclosure agreement"). Status:
+**fixture-only with documented `EVWATTS_BULK_URL` env-var hook**.
+Users with portal access can drop the bulk CSV into
+`data/calibration/evwatts_cache/evwatts_<tag>.csv` and re-run
+`v2b-syndata calibrate --population evwatts_workplace_public
+--source-arg evwatts:release_tag=<tag>`. Real-data acquisition deferred
+to v2 follow-up.
+
 Implemented: `inl_ev_project` policy adds INL EV Project Phase 1 (Idaho
 National Lab, avt.inl.gov, 2011–2013 ChargePoint+Blink fleet on ~24 kWh Leaf
 and Volt EVs) as a third real-data source. One descriptor ships today:
@@ -192,6 +208,16 @@ diverge). Schema TODO: column-name constants in
 evse_id, venue, evse_power_kw) target a placeholder schema; confirm against
 the real avt.inl.gov Phase 1 release and bump `SCHEMA_VERSION` when the
 mapping changes.
+
+**Bulk-data acquisition status (2026-05-30):** INL EV Project Phase 1
+captured ~4 million charging events across ~8,000 plug-in EVs in
+2011–2014 (ECOtality-led ARRA project, INL-analyzed). Public outputs at
+https://avt.inl.gov/project-type/ev-project.html are predominantly
+aggregate technical reports (OSTI 1369632, 1244615). Session-level CSV
+release was not located via public search or direct fetch. Status:
+**fixture-only with documented `INL_BULK_URL` env-var hook**. Direct
+INL contact would be required for the full Phase 1 corpus. Real-data
+acquisition deferred to v2 follow-up.
 
 Implemented: `elaadnl_open_2020` policy provides the fourth real-data
 source. Geographic axis: EU coverage alongside the three US-based
