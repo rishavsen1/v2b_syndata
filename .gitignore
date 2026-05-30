@@ -41,3 +41,4 @@ showcase/*
 showcase/short_overview/walkthrough_preview.png
 showcase/short_overview/__pycache__/
 handoff/
+data/paper_bench/
