@@ -123,18 +123,27 @@
 - **Geographic + venue + identity-strength coverage.** First synthetic V2B generator we know of to triangulate workplace (ACN, EV WATTS), residential legacy (INL), and EU public/semi-public/DCFC (ElaadNL). Identity strength is documented in manifest metadata: `vin_proxy` (INL, individual-driver) > `card_proxy` (ElaadNL, weak — RFID cards transfer between drivers) > `port_proxy` (EV WATTS, per-port shift-consistency, NOT individual driver).
 - **What is calibrated, what is hand-specified.** Calibrated: arrival distribution, dwell distribution, arrival-SoC distribution, copula correlation per region; per-population. Hand-specified (synthetic policy): commute distance δ (no validated source — `userInputs.milesRequested` is a noisy proxy, not measurement); required-SoC at depart (uniform TruncNorm(85, 5), deferred to Step 6 in repo roadmap); CONSENT cluster means (n=28 survey, hand-curated). Per-population `calibration_policy` enum (`acn_data` | `synthetic`) gates which path fires; manifest tags leaves `calibration:<provenance>` or `hand_specified:<population>`.
 - **Filter chain (transparent and reported).** ACN: 2019–2021 inclusive (2018 has 0% userID coverage); `n_sessions ≥ 5` per user; `n_weekdays_in_user_active_window ≥ 5`; per-session battery inference via `WhPerMile`+`kWhRequested` with default-60-kWh fallback. **Capacity-inference fallback rate is 33.3% on the ACN 2019-2021 run** — surfaced in `calibration_metadata`. Real ACN run: 42,451 sessions / 646 users post-filter on `acn_workplace_baseline` population, 634/646 (98.1%) region-assigned.
-- **Honest caveats (this is Ethics-axis material, not weakness):**
-  - **φ definition required a fix.** Original implementation used the global calibration window as denominator; correct definition uses per-user active window. This shifted 98% of ACN users from "unassigned" to assigned regions. Documented under `docs/CALIBRATION_NOTES.md` item #10.
-  - **Copula transform is biased.** `ρ_gaussian = 2·sin(π·ρ_spearman / 6)` is exact only for bivariate-normal copulas; for truncnorm × weibull marginals the bias is <0.05 in simulation but not zero.
-  - **`ks_fit_quality` is training-set goodness-of-fit, not generalization.** Held-out validation deferred. Some parametric families (TruncNorm/Weibull/Beta) do not fit empirical marginals well (`erratic.arrival.ks_fit_quality = 0.557` on ACN). The validator warning S2 surfaces this.
-  - **ElaadNL TZ.** Source ships naive Europe/Amsterdam timestamps; we localize naive to UTC without shifting for consistency with US sources. Per-session arrival_hour is offset by 1–2h vs Amsterdam wall-clock — uniform across the fit, documented.
+- **Real-data status (2026-05-30).** ACN-Data and ElaadNL/4TU Utrecht are calibrated end-to-end against real bulk corpora. ACN: **42,451 sessions, 646 users post-filter** (2019–2021, US workplace). ElaadNL: **55,379 sessions, 3,409 pseudonymized EVs** (Aug 2020 – Oct 2024, Utrecht NL workplace, via 4TU.ResearchData DOI 80ef3824, CC BY-NC-SA 4.0 — the SmoothEMS met GridShield consortium dataset of which ElaadNL is the data-API operator; substituted in for the original ElaadNL Open Charging Transactions endpoint, which was retired in favor of a dashboard-only interface, documented in `docs/CALIBRATION_NOTES.md`). EV WATTS and INL ship loader implementations + synthetic fixtures + documented `EVWATTS_BULK_URL` / `INL_BULK_URL` hooks; their bulk corpora sit behind an account-only SPA (livewire.energy.gov) and aggregate-only public releases (avt.inl.gov), respectively. Real-data acquisition for those two deferred to v2 follow-up. **Paper claim narrows to 2 real-data sources spanning US + EU geographies**, with 2 protocol-extension sources demonstrating loader/registry generality.
+
+- **Empirical generated-vs-real validation (NEW in v2).** `tools/validate_calibration.py` runs five orthogonal checks against the calibration corpus, with 50 seeded scenario generations per source:
+  - **S1 (marginal KS + Wasserstein-1).** Per-region per-variable (arrival_hour, dwell_hours). ACN strong-cohort regions: K-S 0.11–0.22, W₁ 0.76–1.44. ElaadNL: K-S 0.13–0.18, W₁ 0.49–0.61. ACN edge regions (erratic, rare_inconsistent, n<2k) show K-S up to 0.52 — flagged as low-n instability.
+  - **S2 (joint Spearman ρ).** All ρ-gaps **below 0.10**; ElaadNL daily_commuter ρ_source=−0.501 vs ρ_generated=−0.489 (gap=0.012); weekday_only gap=0.009. Copula captures the strong negative arrival–dwell correlation faithfully.
+  - **S3 (held-out KS, 80/20 user split, n ≥ 200 regions only).** Main-region deltas within ±0.06 of training-set KS; ElaadNL weekday_only holdout matches training within 0.002. Confirms parametric fits generalize. Edge regions (erratic, rare_inconsistent) show large deltas — low-sample noise, separately documented.
+  - **S5 (building load vs PNNL prototype intent).** Office small peak/off-peak 4.21× (in expected 4–8× range); office medium 8.54× (above), office large 2.38× (below). Weekday/weekend ratios consistently low (1.04–1.37 vs expected 2.5–8×) — surfaced under §8 Limits.
+  - **S6 (weekly weekday/weekend ratio).** ACN source 5.32× weekday bias; ElaadNL source 45.7× (strong workplace pattern). Generated produces ≈0 weekend sessions across both sources — confirmed paper limitation, §8.
+- **Honest caveats (Ethics-axis material, not weakness):**
+  - **φ definition required a fix.** Original implementation used the global calibration window as denominator; correct definition uses per-user active window. This shifted 98% of ACN users from "unassigned" to assigned regions. Documented in `docs/CALIBRATION_NOTES.md` item #10.
+  - **Copula transform is biased.** `ρ_gaussian = 2·sin(π·ρ_spearman / 6)` is exact only for bivariate-normal copulas; for truncnorm × weibull marginals the bias is <0.05 in simulation but not zero. S2 validation shows ρ-gap ≤ 0.10 empirically.
+  - **`ks_fit_quality` is training-set.** S3 held-out validation (above) is the v2 answer; deltas confirm fits generalize within ±0.06 for main regions.
+  - **ElaadNL TZ.** Naive Europe/Amsterdam timestamps treated as UTC for consistency; arrival_hour offset 1–2h vs wall-clock, uniform across fit, documented.
   - **INL is legacy fleet** (~24 kWh Nissan Leaf, Chevy Volt, 2011–2013). Do not mix with modern-battery scenarios.
-- **B4 guard.** `distribution_fitter.py` post-validates every fit against `DIST_PARAM_RANGES`; out-of-range fits are dropped with a warning, generation falls back to placeholder formulas. Fired cleanly on the real ACN run for `occasional_visitor.arrival.sigma=6.45` and `occasional_visitor.soc_arrival.{alpha=267, beta=53}`.
+- **B4 guard.** `distribution_fitter.py` post-validates every fit against `DIST_PARAM_RANGES`; out-of-range fits are dropped with a warning, generation falls back to placeholder formulas. Fired cleanly on real-data runs (e.g., ACN `occasional_visitor.arrival.sigma=6.45`, ElaadNL `daily_commuter.soc_arrival` underdetermined).
 
 ### Figures / tables
 
-- Fig 11 (ACN-Data calibration fit, arrival × dwell × soc).
-- Tab 4: 4-source comparison — rows = sources, cols = years, geo, venue, ID strength, license, calibrated fields, caveats.
+- Fig 11 (multi-source calibration faithfulness panel): 2-row figure: row 1 = arrival_hour histogram overlay (source vs 50-seed generated) for ACN/regular_charger and ElaadNL/daily_commuter; row 2 = joint (arrival × dwell) scatter density side-by-side. Build via `tools/validate_calibration.py`.
+- Tab 4: 4-source comparison — rows = sources, cols = years, geo, venue, ID strength, license, real-vs-fixture status, calibrated fields, n_sessions/n_users post-filter, caveats.
+- Tab 5: S1/S2/S3 numeric summary — rows = (source, region, variable), cols = n, K-S, W₁, Spearman ρ gap, held-out delta.
 
 ### Cites
 
@@ -240,10 +249,13 @@
   - **Geographic & venue representativeness.** Acknowledged limits: workplace charging is overrepresented (ACN + EV WATTS); residential coverage is only INL legacy fleet; only one EU source. Future calibration sources (NHTS for δ; non-PG&E territories for tariff) are roadmapped, not shipped.
   - **Algorithmic-fairness implications of using this data.** Researchers who use these scenarios to compare V2B control policies should report scenario coverage explicitly because policy performance on `S_consent_strict` will differ from `S_consent_relaxed`, and aggregating without disclosure can hide who pays the consent cost.
 - **Limits explicitly carried into the paper, not hidden.**
-  - Building load currently uses Denver-prototype HVAC sizing (other climate-zone variants are a one-line change in `PROTOTYPE_MAP`).
-  - Per-day weekday/weekend shift quirk on Jan 1 2020 calendar Mondays (rolled into "Sunday Holidays AllOtherDays" branch by PNNL prototype; documented, not chased).
-  - Required-SoC distribution is uncalibrated (deferred). δ uncalibrated (proxy noisy). H2 tariff-tier consistency intentionally breakable under `price_jitter`.
-  - Single-platform tested for bitwise reproducibility (Linux x86_64 + EnergyPlus 23.2); cross-platform identity not claimed.
+  - **Weekly weekday/weekend pattern is not reproduced** (S6 validation). Real ACN data shows weekday/weekend session-per-day ratio ≈ 5.3×; ElaadNL/Utrecht ≈ 45.7× (workplace lot is empty on weekends). Generated data produces **≈0 weekend sessions** by design — the renderer samples each calendar day i.i.d. and most ship-default scenarios use `sim_window.weekdays_only=true`. Documenting this as v1 limitation; future work adds an explicit weekly-schedule term on φ.
+  - **Building load weekday/weekend ratio is flat** (S5 validation, 1.04–1.37× across office sizes vs PNNL expected 2.5–8×). PNNL prototype occupancy schedules do encode weekend differentiation; the post-EnergyPlus aggregation appears to smooth more than expected. Investigating; documented as known.
+  - **Building load currently uses Denver-prototype HVAC sizing** (other climate-zone variants are a one-line change in `PROTOTYPE_MAP`).
+  - **Day-of-week mis-alignment on calendar Jan 1 2020 Mondays** (rolled into "Sunday Holidays AllOtherDays" branch by PNNL prototype; documented, not chased).
+  - **Required-SoC distribution is uncalibrated** (deferred to Step 6). δ uncalibrated (proxy noisy). H2 tariff-tier consistency intentionally breakable under `price_jitter`.
+  - **Single-platform tested for bitwise reproducibility** (Linux x86_64 + EnergyPlus 23.2); cross-platform identity not claimed.
+  - **EV WATTS / INL Phase 1 are fixture-only** in current shipping repo; bulk-data acquisition deferred (access path documented for each). Generator-as-substrate claim is independent of this — the loader pattern is exercised on synthetic fixtures and validated for the two real sources.
 
 ### Figures / tables
 

@@ -112,7 +112,15 @@ None at the realization level — `v2b_syndata` is not a supervised benchmark an
 - Treat session-level variation across seeds as within-condition noise, per `docs/CALIBRATION_NOTES.md` item #12 — the D5 rejection sampler couples `max(charger_rate)` and `car.capacity_kwh` to session realizations, so varying either knob shifts session counts in addition to its primary effect. The `affects_csv` declarations in `configs/knobs.yaml` are accurate about this coupling.
 - For climate / season generalization: hold out a climate (e.g. Miami) at training time and evaluate on the held-out climate's seasonal scenarios. The factor-cross over climate × season is intentionally orthogonal to fleet / equipment / DR, so leave-one-climate-out splits are meaningful.
 
-For calibration validation: held-out KS validation (train/test split of the underlying ACN-Data sessions) is **deferred to Step 5.5** — the current `ks_fit_quality` field is in-sample only (see `docs/CALIBRATION_NOTES.md` item 6). Users wishing to perform held-out validation can run the calibration pipeline against a temporal split of ACN (e.g. fit on 2019–2020, test on 2021) by adjusting the year window in `src/v2b_syndata/calibration/acn_fetcher.py`.
+For calibration validation: `tools/validate_calibration.py` runs five orthogonal checks (S1 marginal KS + Wasserstein-1, S2 joint Spearman ρ gap, S3 80/20 held-out KS, S5 building-load vs PNNL prototype intent, S6 weekly weekday/weekend ratio) against the two real-calibrated sources (ACN, ElaadNL/4TU). Headline empirical results (50 seeded scenarios per source):
+
+- **S1**: ACN strong-cohort regions K-S 0.11–0.22, W₁ 0.76–1.44; ElaadNL K-S 0.13–0.18, W₁ 0.49–0.61.
+- **S2**: All region ρ-gaps below 0.10 (ElaadNL daily_commuter 0.012; ElaadNL weekday_only 0.009; ACN regular_charger 0.044).
+- **S3**: Main-region held-out KS deltas within ±0.06 of training-set KS, confirming the parametric fits generalize.
+- **S5**: Office small peak/off-peak 4.21× (in PNNL expected 4–8×); office medium 8.54× (above); weekday/weekend ratios 1.04–1.37 (below expected 2.5–8×, surfaced as limitation).
+- **S6**: ACN source 5.32× weekday/weekend ratio; ElaadNL 45.7×. Generated produces ≈0 weekend sessions — surfaced as v1 limitation (i.i.d.-per-day arrival sampling).
+
+Held-out KS used a deterministic 80/20 user split (sort by user_id, take first 80% for train). Output CSVs at `data/calibration_validation/{S1_marginals,S2_joint,S3_holdout,S5_buildingload,S6_weekly}.csv`.
 
 ### Are there any errors, sources of noise, or redundancies?
 
@@ -193,7 +201,14 @@ Generation-time data flow uses **EnergyPlus** (23.2.0, bundled ASHRAE 90.1-2019 
 
 ### If the dataset is a sample from a larger set, what was the sampling strategy?
 
-For the parametric calibration: **convenience sample** — all four sources are taken in their entirety after the filter chain above. ACN-Data 2019–2021 yielded 42,451 sessions across 646 users post-filter (`docs/CALIBRATION_NOTES.md` item 9). The 2018 year was dropped because Caltech had 0% userID coverage that year (`docs/CALIBRATION_NOTES.md` §1). No power analysis or stratified sampling is performed; per-region sample sizes are reported under `calibration_metadata.region_distributions.<region>.n_samples` in the manifest.
+For the parametric calibration: **convenience sample** — each real-calibrated source is taken in its entirety after the filter chain above. As of 2026-05-30:
+
+- **ACN-Data 2019–2021**: 42,451 sessions / 646 users post-filter (`docs/CALIBRATION_NOTES.md` item 9). 2018 dropped (0% userID coverage at Caltech).
+- **ElaadNL/4TU Utrecht** (a.s.r. office parking lot, SmoothEMS met GridShield consortium output published via 4TU.ResearchData DOI 80ef3824, CC BY-NC-SA 4.0; substituted in for the deprecated ElaadNL Open Charging Transactions endpoint): 55,379 sessions / 3,409 pseudonymized EV identifiers / 4-year window (Aug 2020 – Oct 2024) / ~300 charging points.
+- **EV WATTS**: fixture only (80 sessions / 6 ports). Real bulk corpus sits behind an account-required SPA at `livewire.energy.gov/ds/evwatts/evwatts.public`; the `EVWATTS_BULK_URL` env-var hook is documented in `docs/CALIBRATION_NOTES.md` for users with portal access.
+- **INL EV Project Phase 1**: fixture only (78 sessions / 4 vehicles). Public outputs at `avt.inl.gov` are predominantly aggregate technical reports; session-level CSV requires direct INL contact. `INL_BULK_URL` env-var hook documented.
+
+No power analysis or stratified sampling is performed; per-region sample sizes are reported under `calibration_metadata.region_distributions.<region>.n_samples` in the populations.yaml block (and propagate to the manifest of any generated scenario whose population is calibrated).
 
 For the generator's per-realization sampling: forward simulation of the Bayes net with a single seed. Per-car independent streams ensure changing one car's parameters doesn't shift another's RNG path (`docs/DESIGN_NOTES.md` item 7).
 
@@ -210,7 +225,7 @@ Per calibration source:
 - **ACN-Data**: sessions from 2019-01-01 through 2021-12-31 (calendar years; 3-year window). Selected because 2018 had 0% userID coverage at the Caltech site.
 - **EV WATTS**: DOE/EPRI multi-year aggregate release (per-release version pinned via `SCHEMA_VERSION` in `src/v2b_syndata/calibration/sources/evwatts.py`).
 - **INL EV Project Phase 1**: 2011–2013, ChargePoint + Blink stations, ~24 kWh Leaf and Volt vehicles. Marked as a **legacy fleet** caveat (`docs/CALIBRATION_NOTES.md` item 11) — battery-capacity assumptions diverge from modern EVs.
-- **ElaadNL Open Charging Transactions**: 2020 NL/EU public + semi-public + DCFC L2 cohort.
+- **ElaadNL/4TU Utrecht**: Aug 2020 – Oct 2024 NL/EU office workplace cohort (a.s.r. office parking lot, 4TU.ResearchData DOI 80ef3824, CC BY-NC-SA 4.0). Substituted into the ElaadNL slot after the original Open Charging Transactions endpoint was retired in favor of dashboard-only access.
 - **CONSENT survey**: small-n (28) survey by the authors. Date `[TODO at submission time]`.
 
 Calibration runs are timestamped in the provenance string: e.g. `acn_data_2019_2021_20260506` records that the v1 fit ran on 2026-05-06.
