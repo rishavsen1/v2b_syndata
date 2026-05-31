@@ -34,7 +34,7 @@ from .types import ResolvedKnobs, ScenarioContext
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. See DESIGN_NOTES §1.
+DEFAULT_SIM_START = datetime(2020, 4, 1)  # April 2020 = full calendar month. See DESIGN_NOTES Section 1.
 
 
 def build_registry() -> SamplerRegistry:

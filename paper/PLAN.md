@@ -18,7 +18,7 @@ Living document. Updated as plan changes.
 ## Honest scope claim
 > We model physical-slot scarcity via FCFS admission; electrical-service constraints are configurable but the published bench uses feeder=1.0. Algorithm-comparison benchmarking is downstream work.
 
-## Headline contributions (§1)
+## Headline contributions (Section 1)
 1. Configurable, parametric V2B dataset generator covering 6 factors (building, users, cars, chargers, prices, DR) at the marginal level
 2. Unified 4-source `CalibrationSource` protocol (ACN-Data, EV WATTS, INL EVP-1, ElaadNL) — US + EU geography
 3. Bitwise reproducibility (D53), audited knob surface (98 knobs, Stage 1+2), manifest-level provenance
@@ -26,7 +26,7 @@ Living document. Updated as plan changes.
 
 ## Section structure (locked in `OUTLINE.md`)
 
-| § | Section | Pages | Eval axis |
+| # | Section | Pages | Eval axis |
 |---|---|---|---|
 | 1 | Introduction & Contributions | 1.00 | Impact |
 | 2 | Related Work & Positioning | 0.50 | Impact |
@@ -48,10 +48,10 @@ Living document. Updated as plan changes.
 6. **Fig 15** — verification pipeline diagram (validators, audit, manifest)
 
 ## Tables
-- §2: 23-row comparison table vs related artifacts (from `RELATED_WORK.md`)
-- §3: Knob surface summary (count by bucket, source priority chain)
-- §4: 4 calibration sources × {user_id_strategy, geography, vintage, n_sessions, license}
-- §7: paper_bench results (7 scenarios × 7 algos × 3 metrics)
+- Section 2: 23-row comparison table vs related artifacts (from `RELATED_WORK.md`)
+- Section 3: Knob surface summary (count by bucket, source priority chain)
+- Section 4: 4 calibration sources × {user_id_strategy, geography, vintage, n_sessions, license}
+- Section 7: paper_bench results (7 scenarios × 7 algos × 3 metrics)
 
 ## Appendices (unlimited)
 - A. Full Datasheet (`DATASHEET.md` rendered)
@@ -69,16 +69,16 @@ Living document. Updated as plan changes.
 |---|---|---|
 | W5 polish | #11 Ethics writeup | half day |
 | W5 polish | #12 Repro/accessibility polish | half day |
-| W5 verification | **Calibration faithfulness verification** (see §below) | 1–2 days |
-| W6 draft v1 | §1 Intro | 0.5 day |
-| W6 draft v1 | §2 Related | 0.25 day |
-| W6 draft v1 | §3 Design | 1 day |
-| W6 draft v1 | §4 Calibration | 0.5 day |
-| W6 draft v1 | §5 Scenario library | 0.25 day |
-| W7 draft v1 | §6 Reproducibility | 0.5 day |
-| W7 draft v1 | §7 Bench demo | 0.5 day |
-| W7 draft v1 | §8 Ethics & limits | 0.25 day |
-| W7 draft v1 | §9 Conclusion | 0.25 day |
+| W5 verification | **Calibration faithfulness verification** (see section below) | 1–2 days |
+| W6 draft v1 | Section 1 Intro | 0.5 day |
+| W6 draft v1 | Section 2 Related | 0.25 day |
+| W6 draft v1 | Section 3 Design | 1 day |
+| W6 draft v1 | Section 4 Calibration | 0.5 day |
+| W6 draft v1 | Section 5 Scenario library | 0.25 day |
+| W7 draft v1 | Section 6 Reproducibility | 0.5 day |
+| W7 draft v1 | Section 7 Bench demo | 0.5 day |
+| W7 draft v1 | Section 8 Ethics & limits | 0.25 day |
+| W7 draft v1 | Section 9 Conclusion | 0.25 day |
 | W7 review | #14 Internal review + revise | 1–2 days |
 | W8 submit | #15 Anonymize repo + OpenReview submit | 0.5 day |
 
@@ -99,10 +99,10 @@ All flagged in `DATASHEET.md` with 13 `[TODO at submission time]` markers.
 | Risk | Mitigation |
 |---|---|
 | KDD 2027 CFP timing | Watch site; fallback to NeurIPS D&B (Dec) or ICDM 2027 |
-| Page overrun on §3 (Design) | Per-tier detail to appendix; main keeps diagram + paragraph each |
+| Page overrun on Section 3 (Design) | Per-tier detail to appendix; main keeps diagram + paragraph each |
 | Reviewer asks for adacharge MPC | Cite as future work; show repo hook (`feeder_kw_ratio`) exists |
 | Companion paper IP overlap | Bench section independent; companion not cited as motivation |
-| **Calibration faithfulness challenged** | See verification plan below; ship empirical KS + Wasserstein numbers in §4 |
+| **Calibration faithfulness challenged** | See verification plan below; ship empirical KS + Wasserstein numbers in Section 4 |
 
 ## Calibration verification plan
 

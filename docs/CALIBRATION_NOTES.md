@@ -327,10 +327,10 @@ since occupancy schedules don't change. Empirical finding: 30-60% seasonal
 variation observed across all locations.
 
 Two ASHRAE 90.1 prototype mechanisms explain this:
-- Interior daylight-responsive lighting (ASHRAE 90.1 §9.4.1.1): interior 
+- Interior daylight-responsive lighting (ASHRAE 90.1 Section 9.4.1.1): interior 
   lights dim when daylight sensors detect sufficient illumination. 
   Winter = less daylight → higher midday interior lighting load.
-- Exterior lighting daylight controls (§9.4.1.4): exterior lights tied 
+- Exterior lighting daylight controls (Section 9.4.1.4): exterior lights tied 
   to astronomical dark hours. Winter = longer evening dark hours → 
   higher dusk inflex.
 

@@ -182,7 +182,7 @@ def test_deep_override_explicit_beats_calibration(config_dir):
 ])
 def test_check_type_and_range_rejects_malformed(config_dir, knob_path, bad_value, error_substr):
     """Single parametrized sweep covers every type-check branch of
-    ``_check_type_and_range`` (sub-85% line gap from COVERAGE_REPORT §6)."""
+    ``_check_type_and_range`` (sub-85% line gap from COVERAGE_REPORT Section 6)."""
     reg = load_knob_registry(config_dir / "knobs.yaml")
     with pytest.raises(KnobValidationError, match=error_substr):
         resolve_knobs(

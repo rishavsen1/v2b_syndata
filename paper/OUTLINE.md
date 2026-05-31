@@ -69,7 +69,7 @@
 
 - **Three families to compare against:** (i) empirical V2B/EV traces (ACN-Data, EV Project, EV WATTS, ElaadNL, ACN-Sim's bundled traces); (ii) building-load datasets (EnergyPlus reference buildings, BDG2 benchmark); (iii) general-purpose synthetic tabular generators (CTGAN, SDV, TabDDPM).
 - **Where v2b_syndata sits:** the only generator we know of that emits all seven coupled CSVs from one scenario, with documented dependencies between user behavior → sessions → building flexibility → tariff/DR response.
-- **Honest comparison:** ACN-Sim *consumes* charging traces (real or recorded), it does not generate the cross-family joint. ACN-Sim and v2b_syndata are complementary — ACN-Sim is the natural downstream simulator for our `sessions.csv` + `chargers.csv`, which we demonstrate in §7.
+- **Honest comparison:** ACN-Sim *consumes* charging traces (real or recorded), it does not generate the cross-family joint. ACN-Sim and v2b_syndata are complementary — ACN-Sim is the natural downstream simulator for our `sessions.csv` + `chargers.csv`, which we demonstrate in Section 7.
 - Position v2b_syndata as the **scenario substrate**, ACN-Sim as one downstream **algorithm runner**.
 
 ### Figure / table
@@ -135,8 +135,8 @@
     - **Interpretation**: TruncNorm captures arrival cleanly when the underlying cohort is genuinely unimodal (corporate workplace = tight 8–9 AM peak). Multi-modal arrival (university students, mixed-site averages) yields ~20–30% σ underfit at K-S 0.15–0.22. The driver is *behavioral schedule uniformity*, not site granularity.
   - **S2 (joint Spearman ρ).** All ρ-gaps **below 0.10**; ElaadNL daily_commuter ρ_source=−0.501 vs ρ_generated=−0.489 (gap=0.012); weekday_only gap=0.009. Copula captures the strong negative arrival–dwell correlation faithfully across both single-site and mixed-pool fits.
   - **S3 (held-out KS, 80/20 user split, n ≥ 200 regions only).** Main-region deltas within ±0.06 of training-set KS; ElaadNL weekday_only holdout matches training within 0.002. Confirms parametric fits generalize. Edge regions (erratic, rare_inconsistent) show large deltas — low-sample noise, separately documented.
-  - **S5 (building load vs PNNL prototype intent).** Office small peak/off-peak 4.21× (in expected 4–8× range); office medium 8.54× (above), office large 2.38× (below). Weekday/weekend ratios consistently low (1.04–1.37 vs expected 2.5–8×) — surfaced under §8 Limits.
-  - **S6 (weekly weekday/weekend ratio).** ACN source 5.32× weekday bias; ElaadNL source 45.7× (strong workplace pattern). Generated produces ≈0 weekend sessions across both sources — confirmed paper limitation, §8.
+  - **S5 (building load vs PNNL prototype intent).** Office small peak/off-peak 4.21× (in expected 4–8× range); office medium 8.54× (above), office large 2.38× (below). Weekday/weekend ratios consistently low (1.04–1.37 vs expected 2.5–8×) — surfaced under Section 8 Limits.
+  - **S6 (weekly weekday/weekend ratio).** ACN source 5.32× weekday bias; ElaadNL source 45.7× (strong workplace pattern). Generated produces ≈0 weekend sessions across both sources — confirmed paper limitation, Section 8.
 - **Honest caveats (Ethics-axis material, not weakness):**
   - **φ definition required a fix.** Original implementation used the global calibration window as denominator; correct definition uses per-user active window. This shifted 98% of ACN users from "unassigned" to assigned regions. Documented in `docs/CALIBRATION_NOTES.md` item #10.
   - **Copula transform is biased.** `ρ_gaussian = 2·sin(π·ρ_spearman / 6)` is exact only for bivariate-normal copulas; for truncnorm × weibull marginals the bias is <0.05 in simulation but not zero. S2 validation shows ρ-gap ≤ 0.10 empirically.
@@ -345,6 +345,6 @@
 - [ ] Repo URL anonymized; Zenodo DOI minted and inserted.
 - [ ] Datasheet appendix complete.
 - [ ] Reproducibility appendix shows real `csv_sha256` values for S01 seed=42 + the 7 bench scenarios.
-- [ ] License table in §8 filled in (no TBDs).
+- [ ] License table in Section 8 filled in (no TBDs).
 - [ ] Cites are concrete (no "TODO cite").
 - [ ] Figure captions name the source file under `showcase/figures/`.

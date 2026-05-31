@@ -13,7 +13,7 @@ HTML report: `htmlcov/index.html` (run `coverage html` after a `coverage run`)
 | Missed lines | 280 | 232 |
 | Tests | 237 | **278** (+41) |
 
-Improvements driven by §6 low-hanging-gap fill (tests/test_cli.py +
+Improvements driven by Section 6 low-hanging-gap fill (tests/test_cli.py +
 parametrized test_knob_loader.py extensions + test_dag.py extensions +
 tests/test_validate_io.py + tests/test_runner_modes.py). Critical-module
 deltas:
@@ -242,7 +242,7 @@ Combined lift: ~50 lines of real-branch coverage with ~10 short tests. Project t
 
 ## 8. Recommendation
 
-If V2 is started: also fill items 1-7 from §6 (small CLI + defensive tests).
+If V2 is started: also fill items 1-7 from Section 6 (small CLI + defensive tests).
 Estimated +50 covered lines / ~10 short tests / ~30 min effort. Lifts overall
 from 89% → ~93%, which clears the 90% gate without chasing INFRASTRUCTURE
 coverage that requires EnergyPlus in CI.

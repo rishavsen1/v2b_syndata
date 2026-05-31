@@ -79,7 +79,7 @@ behavioral region distribution is overwhelmingly low-frequency
 ("occasional visitor" / "erratic"), and high-φ residential commuter
 populations are essentially absent. `v2b_syndata`'s ACN calibration
 re-anchors the region grid on the empirical (φ, κ) joint observed in ACN
-itself (see `docs/CALIBRATION_NOTES.md` §9–§11); region match against the
+itself (see `docs/CALIBRATION_NOTES.md` Section 9–Section 11); region match against the
 original hand-authored `consent_default` grid was only ~2%.
 
 **EV WATTS (DOE / EPRI)** publishes multi-site session aggregates via the
@@ -118,7 +118,7 @@ wall-clock local time. The offset is uniform across the source's marginals,
 not a bug, but it is something downstream studies must account for if they
 care about local solar-time alignment.
 
-The bottom line for §2: real session datasets give us *marginals* for the
+The bottom line for Section 2: real session datasets give us *marginals* for the
 session-renderer subgraph (`f_arr`, `f_dwell`, `f_soc`); they do not give
 us a B × U × V × C × P × D joint. The job of `v2b_syndata` is to combine
 the empirical marginals with controllable joints and the rest of the V2B
@@ -274,7 +274,7 @@ Concretely:
 3. **Audited knob surface**: 98 knobs, all subjected to a two-stage
    monotonicity audit (existence + sign of effect), 67/67 admitted
    knobs MONOTONIC in the intended direction; 12 declaration corrections
-   in `knobs.yaml` came out of the audit (see `showcase/OVERVIEW.md` §7,
+   in `knobs.yaml` came out of the audit (see `showcase/OVERVIEW.md` Section 7,
    Table 4).
 
 4. **Bitwise reproducibility under the `clean` noise profile**: 11/11
@@ -343,7 +343,7 @@ real limitations of the artifact at the version targeting the KDD D&B
 5. **Battery-capacity-inference fallback rate is non-trivial.** The
    ACN-Data calibrator falls back to a 60 kWh default capacity when
    `WhPerMile` is missing or equals the sentinel 299, at a measured
-   ~33% fallback rate (`CALIBRATION_NOTES.md` §2 and §9). This biases
+   ~33% fallback rate (`CALIBRATION_NOTES.md` Section 2 and Section 9). This biases
    the arrival-SoC fit toward the fleet-median assumption and
    contributes to high KS distance on the soc_arrival fit (~0.4) for
    ACN-anchored populations.
@@ -356,13 +356,13 @@ real limitations of the artifact at the version targeting the KDD D&B
 
 7. **No Pecan Street residential calibration.** Pecan Street Dataport's
    license terms prevent inclusion without per-consumer licensing; we
-   document the gap (§5) rather than work around it.
+   document the gap (Section 5) rather than work around it.
 
 8. **NHTS-anchored commute-distance calibration is deferred.** The δ
    (commute-distance) axis is currently hand-specified per region with
    the ACN `userInputs.milesRequested` reported as a diagnostic only —
    it is a charge-target proxy, not a measured commute (see
-   `CALIBRATION_NOTES.md` §3). The NHTS-anchored fit is in Step 5.5
+   `CALIBRATION_NOTES.md` Section 3). The NHTS-anchored fit is in Step 5.5
    plan, not in the current release.
 
 9. **Single-platform tested for bitwise identity.** Reproducibility is

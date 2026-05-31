@@ -2,7 +2,7 @@
 
 Files committed under ``data/prototypes/``. Climate-zone-specific PNNL files —
 v1 ships the Denver (CZ 5B) variants per archetype. HVAC sizing is fixed by
-the prototype; weather signal comes from the EPW. See DESIGN_NOTES § 12.
+the prototype; weather signal comes from the EPW. See DESIGN_NOTES Section 12.
 """
 from __future__ import annotations
 

@@ -38,7 +38,7 @@ _DIRECTIONALITY = {"unidirectional", "bidirectional"}
 _PRICE_TYPES = {"off-peak", "peak"}
 _NEG_TYPES = {"type_i", "type_ii", "type_iii", "type_iv"}
 
-# F4/F5 share tolerance — n=20 is statistically tight at 0.05 (see DESIGN_NOTES §6).
+# F4/F5 share tolerance — n=20 is statistically tight at 0.05 (see DESIGN_NOTES Section 6).
 F_SHARE_TOL = 0.20
 
 

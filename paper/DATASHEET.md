@@ -83,7 +83,7 @@ A scenario YAML is a few hundred bytes. A realization directory (per scenario ×
 
 There is no single supervised "label" — `v2b_syndata` is a generative dataset, not a labeled benchmark. However, several **derived analytic targets** are surfaced:
 
-- **ψ (predictability index)** — triple `(ψ_freq, ψ_consist, ψ_accept)` summarizing the population, defined in `handoff/spec/PLAN.md` §"Predictability index ψ". Several scenarios target a specific ψ band (`S_psi_010.yaml`, …, `S_psi_090.yaml`).
+- **ψ (predictability index)** — triple `(ψ_freq, ψ_consist, ψ_accept)` summarizing the population, defined in `handoff/spec/PLAN.md` Section "Predictability index ψ". Several scenarios target a specific ψ band (`S_psi_010.yaml`, …, `S_psi_090.yaml`).
 - **`sessions.required_soc_at_depart`** — the per-session user-stated charging target, which downstream V2B schedulers treat as the constraint to satisfy.
 - **`manifest['e5']`** — per-realization infeasibility report.
 
@@ -93,7 +93,7 @@ Downstream tasks (peak shaving, DR participation, MPC scheduling, RL training) i
 
 Within the schemas defined in `handoff/spec/BAYES_NET.md`, no — non-nullable columns are enforced free of NaN by invariant A4. Outside the schemas, several quantities are *deliberately not* in the CSVs:
 
-- **No real driver identity.** Drivers in `users.csv` are synthetic `car_id` integers. (See §"Composition — sensitive data" and §"Collection process" for the calibration sources' driver identity caveats.)
+- **No real driver identity.** Drivers in `users.csv` are synthetic `car_id` integers. (See Section "Composition — sensitive data" and Section "Collection process" for the calibration sources' driver identity caveats.)
 - **No realized per-tick charger draws.** `sessions.csv` records arrival/departure SoC targets, not the scheduled or realized kW timeseries — those are produced by downstream simulators consuming `v2b_syndata` as input.
 - **No directly observed commute distance.** δ is hand-specified per region; the ACN calibration only proxies it via `userInputs.milesRequested`, which is a noisy stated-target proxy and is **not** persisted to `region_distributions` — see `docs/CALIBRATION_NOTES.md` item 3.
 - **No required-SoC distribution from data.** Step 5 calibrates arrival-SoC only; `required_soc_at_depart` remains a hardcoded `TruncNorm(85, 5)`. See `docs/DESIGN_NOTES.md` item 22.
@@ -190,7 +190,7 @@ The **parameters** of those Tier-2 distributions, for populations declaring `cal
 The calibration pipeline (`src/v2b_syndata/calibration/api.py` + per-source fetcher modules):
 
 1. **Fetch.** ACN-Data via `acnportal` and the Caltech HTTPS API (sites: caltech, jpl, office001; years 2019–2021 inclusive). EV WATTS via the Livewire DOE/EPRI bulk-release CSV. INL EV Project Phase 1 via the AVT.INL.GOV Phase 1 release. ElaadNL via the `open-data.elaad.io` Open Charging Transactions release. Each source is implemented as a `CalibrationSource` protocol; new sources extend the policy enum without breaking the generator.
-2. **Filter.** Per `docs/CALIBRATION_NOTES.md` §1: drop sessions with null userID, drop users with `n_sessions < 5`, drop users with `< 5 weekdays in their active window`.
+2. **Filter.** Per `docs/CALIBRATION_NOTES.md` Section 1: drop sessions with null userID, drop users with `n_sessions < 5`, drop users with `< 5 weekdays in their active window`.
 3. **Battery capacity inference.** Per-session via `WhPerMile × kWhRequested`; falls back to 60 kWh default when missing (capacity_inference_fallback_rate is logged in manifest).
 4. **Per-user feature extraction.** φ = active-weekdays / weekdays-in-user-active-window; κ = 1 − CV(arrival_hour); δ left hand-specified (proxy noise too high — see `docs/CALIBRATION_NOTES.md` item 3).
 5. **Region assignment.** Deterministic first-match against `axes_distribution[*]` ordering.
@@ -232,7 +232,7 @@ Calibration runs are timestamped in the provenance string: e.g. `acn_data_2019_2
 
 ### Were any ethical review processes conducted?
 
-The generator's synthetic outputs do not involve human subjects, so no IRB review is required for the artifact itself. The CONSENT survey (n=28) was conducted under institutional approval `[TODO at submission time]`. The four calibration sources were collected and released by their originating institutions under their respective ethical and data-sharing terms (see Composition §"Distribution" below for IP terms). `v2b_syndata` does not re-publish raw per-session data from those sources — only fitted distribution parameters propagate into the artifact.
+The generator's synthetic outputs do not involve human subjects, so no IRB review is required for the artifact itself. The CONSENT survey (n=28) was conducted under institutional approval `[TODO at submission time]`. The four calibration sources were collected and released by their originating institutions under their respective ethical and data-sharing terms (see Composition Section "Distribution" below for IP terms). `v2b_syndata` does not re-publish raw per-session data from those sources — only fitted distribution parameters propagate into the artifact.
 
 ---
 
@@ -240,7 +240,7 @@ The generator's synthetic outputs do not involve human subjects, so no IRB revie
 
 ### Was any preprocessing/cleaning/labeling of the data done?
 
-Yes, at calibration time. The filter chain is documented in `docs/CALIBRATION_NOTES.md` §1:
+Yes, at calibration time. The filter chain is documented in `docs/CALIBRATION_NOTES.md` Section 1:
 
 | Stage | Filter | Reason |
 |---|---|---|
