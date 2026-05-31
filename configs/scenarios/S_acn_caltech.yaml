@@ -1,0 +1,20 @@
+# S_acn_caltech.yaml — ACN-Data Caltech-site-only cohort.
+# Per-site subdivision of S_acn_workplace; same knob defaults, swaps
+# population to acn_caltech_baseline (calibrated against the Caltech
+# garage subset of the ACN-Data 2019-2021 corpus, n=277 users / 13,893
+# sessions). Use alongside S_acn_jpl and S_acn_office001 to surface the
+# arrival-distribution homogeneity claim — single-site fits are
+# unimodal, mixed-pool fits are not.
+scenario_id: S_acn_caltech
+description: |
+  ACN-Data Caltech site only. Subdivision of S_acn_workplace; mirrors
+  S01 knob defaults; swaps population to acn_caltech_baseline.
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: acn_caltech_baseline
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month

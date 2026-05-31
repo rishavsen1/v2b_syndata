@@ -1,0 +1,18 @@
+# S_acn_office001.yaml — ACN-Data Office001-site-only cohort.
+# Per-site subdivision of S_acn_workplace. SMALL COHORT: only 14 users /
+# 585 sessions; some regions will have <30 samples and the distribution
+# fitter will drop them under the B4 guard. Honestly documented in
+# docs/CALIBRATION_NOTES.md as the smallest of the three ACN cohorts.
+scenario_id: S_acn_office001
+description: |
+  ACN-Data Office001 site only. Subdivision of S_acn_workplace; mirrors
+  S01 knob defaults; swaps population to acn_office001_baseline.
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: acn_office001_baseline
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month

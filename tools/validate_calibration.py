@@ -76,6 +76,42 @@ SOURCE_SPECS = {
         },
         "population": "acn_workplace_baseline",
     },
+    # ACN per-site subdivisions (3 cohorts within the single ACN-Data
+    # dataset). Demonstrate that homogeneous single-site fits have
+    # tighter K-S than the mixed multi-site pool.
+    "acn_caltech": {
+        "policy": "acn_data",
+        "scenario": "S_acn_caltech",
+        "source_args": {
+            "sites": ("caltech",),
+            "year_start": 2019,
+            "year_end": 2021,
+            "cache_dir": REPO / "data" / "calibration" / "acn_cache",
+        },
+        "population": "acn_caltech_baseline",
+    },
+    "acn_jpl": {
+        "policy": "acn_data",
+        "scenario": "S_acn_jpl",
+        "source_args": {
+            "sites": ("jpl",),
+            "year_start": 2019,
+            "year_end": 2021,
+            "cache_dir": REPO / "data" / "calibration" / "acn_cache",
+        },
+        "population": "acn_jpl_baseline",
+    },
+    "acn_office001": {
+        "policy": "acn_data",
+        "scenario": "S_acn_office001",
+        "source_args": {
+            "sites": ("office001",),
+            "year_start": 2019,
+            "year_end": 2021,
+            "cache_dir": REPO / "data" / "calibration" / "acn_cache",
+        },
+        "population": "acn_office001_baseline",
+    },
     "elaadnl": {
         "policy": "elaadnl_open_2020",
         "scenario": "S_elaadnl_public_eu",

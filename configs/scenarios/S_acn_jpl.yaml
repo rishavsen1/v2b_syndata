@@ -1,0 +1,17 @@
+# S_acn_jpl.yaml — ACN-Data JPL-site-only cohort.
+# Per-site subdivision of S_acn_workplace. JPL is the largest ACN site
+# (n=382 users / 27,973 sessions). NASA workforce; expected to be more
+# regular-hours than Caltech's student cohort.
+scenario_id: S_acn_jpl
+description: |
+  ACN-Data JPL site only. Subdivision of S_acn_workplace; mirrors S01
+  knob defaults; swaps population to acn_jpl_baseline.
+descriptors:
+  location: nashville_tn
+  building: medium_office_v1
+  population: acn_jpl_baseline
+  equipment: balanced_50pct
+  noise: clean
+sim_window:
+  start: 2020-04-01
+  mode: month
