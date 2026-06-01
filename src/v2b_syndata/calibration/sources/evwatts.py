@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from ..evwatts_fetcher import fetch_all_sessions
-from ..feature_extractor import SessionFeatures
+from ..feature_extractor import MIN_DWELL_HOURS, SessionFeatures
 
 SCHEMA_VERSION = "v1"
 
@@ -130,7 +130,7 @@ def _extract_session_evwatts(
         end = end.tz_localize("UTC")
 
     dwell = (end - start).total_seconds() / 3600.0
-    if dwell <= 0 or dwell > 168.0:
+    if dwell < MIN_DWELL_HOURS or dwell > 168.0:  # < 30 min noise; > 1 week bogus
         return None
 
     arr_hour = start.hour + start.minute / 60.0 + start.second / 3600.0

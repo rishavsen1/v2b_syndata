@@ -5,11 +5,13 @@ public/semi-public/workplace L2 + DCFC sessions. Anonymized per-session RFID
 card IDs provide proxy longitudinal identity (one driver may hold multiple
 cards; cards can transfer — weaker than vin_proxy, stronger than port_proxy).
 
-Timezone caveat: ElaadNL CSVs ship naive *local* (Europe/Amsterdam) timestamps.
-For consistency with the ACN/EV WATTS/INL extractors (which all treat naive
-timestamps as UTC), this source also localizes naive timestamps to UTC without
-shifting. Result: per-session arrival_hour is offset by 1–2h vs. wall-clock
-Amsterdam time. Documented in docs/CALIBRATION_NOTES.md.
+Timezone: ElaadNL CSVs ship naive *local* (Europe/Amsterdam) timestamps. We
+attach UTC as a label without shifting (`utc=True` on a naive value relabels,
+it does not convert), so the extracted clock hour equals the Amsterdam
+wall-clock hour — i.e. arrival_hour is already correct local time, NOT offset.
+This differs from ACN, whose feed is *true* UTC and must be converted to
+Pacific. Do not "fix" this source by converting the UTC-labelled value to
+Amsterdam — that would add +1–2h and break a currently-correct hour.
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from typing import Any
 import pandas as pd
 
 from ..elaadnl_fetcher import fetch_all_sessions
-from ..feature_extractor import SessionFeatures
+from ..feature_extractor import MIN_DWELL_HOURS, SessionFeatures
 
 SCHEMA_VERSION = "v1"
 
@@ -161,9 +163,9 @@ def _extract_session_elaadnl(
     if max_kw is not None and (power is None or power > max_kw):
         return None
 
-    # TZ caveat (see module docstring): ElaadNL ships naive Europe/Amsterdam
-    # timestamps; we treat naive as UTC matching ACN/EV WATTS/INL pattern.
-    # arrival_hour distributions are therefore offset by 1–2h vs. wall-clock.
+    # TZ (see module docstring): ElaadNL ships naive Europe/Amsterdam timestamps;
+    # relabelling naive→UTC does not shift, so the extracted hour is already the
+    # correct Amsterdam wall-clock hour. Do NOT convert to Amsterdam here.
     try:
         start = pd.to_datetime(row[COL_START], utc=True, errors="raise")
         end = pd.to_datetime(row[COL_END], utc=True, errors="raise")
@@ -177,7 +179,7 @@ def _extract_session_elaadnl(
         end = end.tz_localize("UTC")
 
     dwell = (end - start).total_seconds() / 3600.0
-    if dwell <= 0 or dwell > 168.0:
+    if dwell < MIN_DWELL_HOURS or dwell > 168.0:  # < 30 min noise; > 1 week bogus
         return None
 
     arr_hour = start.hour + start.minute / 60.0 + start.second / 3600.0

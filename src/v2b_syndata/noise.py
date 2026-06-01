@@ -14,7 +14,9 @@ import pandas as pd
 from .seeding import rng_for_node
 from .types import ScenarioContext
 
-_MIN_SESSION_DURATION_SEC = 15 * 60  # 15 min — matches building_load grid resolution
+_MIN_SESSION_DURATION_SEC = 30 * 60  # 30 min floor — forward arrival-jitter must
+# not shrink a session below 30 min (matches the renderer's dwell clip_lo=0.5h and
+# the calibration <30-min ingestion filter). Still a 900s-grid multiple.
 
 # Sampler + validator both use 1.05 headroom for D5. Use a slightly tighter
 # factor for the post-jitter truncator so floating-point doesn't push the

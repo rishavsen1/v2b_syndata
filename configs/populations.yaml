@@ -133,114 +133,97 @@ acn_workplace_baseline:
     rare_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999999688022584
-        sigma: 4.986264982522814
-        n_samples: 3848
-        ks_fit_quality: 0.21842107782980502
+        mu: 10.06537955348669
+        sigma: 5.99999999822856
+        n_samples: 4723
+        ks_fit_quality: 0.08853700706154072
       dwell:
         dist: weibull
-        k: 1.3993092886964638
-        lambda: 6.021461767156862
-        n_samples: 3848
-        ks_fit_quality: 0.0770012464674491
+        k: 1.1724350564177057
+        lambda: 5.6260282608670575
+        n_samples: 4723
+        ks_fit_quality: 0.06291707213450348
       soc_arrival:
         dist: beta
-        alpha: 1.427777282099292
-        beta: 1.5105374788148511
-        n_samples: 3848
-        ks_fit_quality: 0.393947601739658
+        alpha: 1.1755065855464049
+        beta: 1.340853548559775
+        n_samples: 4723
+        ks_fit_quality: 0.36661147349705714
       copula:
-        rho_spearman: -0.360022218672144
-        rho_gaussian: -0.3747854843566052
-        n_samples: 3848
+        rho_spearman: -0.5441642060816433
+        rho_gaussian: -0.5621684796733354
+        n_samples: 4723
     rare_inconsistent:
+      arrival:
+        dist: truncnorm
+        mu: 11.721821664250733
+        sigma: 5.999999998684928
+        n_samples: 80
+        ks_fit_quality: 0.33418881350520796
       dwell:
         dist: weibull
-        k: 0.7937346339374594
-        lambda: 3.4978375846747047
-        n_samples: 1424
-        ks_fit_quality: 0.13016710052796943
+        k: 0.8195937860121927
+        lambda: 6.194507767089793
+        n_samples: 80
+        ks_fit_quality: 0.23567210132849203
       soc_arrival:
         dist: beta
-        alpha: 0.8160417569225421
-        beta: 1.0244551941827835
-        n_samples: 1424
-        ks_fit_quality: 0.38266888543247557
+        alpha: 0.9116318493184545
+        beta: 1.7019294573137806
+        n_samples: 80
+        ks_fit_quality: 0.49688869445751305
       copula:
-        rho_spearman: 0.054554509950221965
-        rho_gaussian: 0.05712158051729513
-        n_samples: 1424
+        rho_spearman: 0.052590556673176116
+        rho_gaussian: 0.05506574260954844
+        n_samples: 80
     occasional_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999998056151334
-        sigma: 4.902344430908057
-        n_samples: 15607
-        ks_fit_quality: 0.17543393662588314
+        mu: 6.000000956719308
+        sigma: 5.999994493815894
+        n_samples: 17313
+        ks_fit_quality: 0.1284677075237789
       dwell:
         dist: weibull
-        k: 1.8275812151715911
-        lambda: 7.47481197419917
-        n_samples: 15607
-        ks_fit_quality: 0.10624137142295464
+        k: 1.7204205391189364
+        lambda: 7.267115113750509
+        n_samples: 17313
+        ks_fit_quality: 0.10002929416641593
       soc_arrival:
         dist: beta
-        alpha: 1.3585955402846897
-        beta: 1.5401254181967678
-        n_samples: 15607
-        ks_fit_quality: 0.3847461435325952
+        alpha: 1.2497142049220358
+        beta: 1.3858098360167455
+        n_samples: 17313
+        ks_fit_quality: 0.3584558894616698
       copula:
-        rho_spearman: -0.5043374283229921
-        rho_gaussian: -0.5220241260091277
-        n_samples: 15607
+        rho_spearman: -0.6268781855343101
+        rho_gaussian: -0.6447410712502466
+        n_samples: 17313
     regular_charger:
       arrival:
         dist: truncnorm
-        mu: 18.045838026144345
-        sigma: 4.287997375401666
-        n_samples: 17857
-        ks_fit_quality: 0.14716905278814585
+        mu: 6.000000019178595
+        sigma: 5.040708663446626
+        n_samples: 18724
+        ks_fit_quality: 0.18638400304382827
       dwell:
         dist: weibull
-        k: 2.051300651028199
-        lambda: 7.86574949364447
-        n_samples: 17857
-        ks_fit_quality: 0.12386391183766238
+        k: 1.9816342759194332
+        lambda: 7.829659053322979
+        n_samples: 18724
+        ks_fit_quality: 0.11518280136992043
       soc_arrival:
         dist: beta
-        alpha: 0.8349570475160377
-        beta: 0.991104534948279
-        n_samples: 17857
-        ks_fit_quality: 0.3660783374308552
+        alpha: 0.8601656617813849
+        beta: 0.9975121416749549
+        n_samples: 18724
+        ks_fit_quality: 0.3587091131613043
       copula:
-        rho_spearman: -0.4534433714369331
-        rho_gaussian: -0.4703962260774919
-        n_samples: 17857
-    erratic:
-      arrival:
-        dist: truncnorm
-        mu: 8.443386353577619
-        sigma: 5.999999999341096
-        n_samples: 1805
-        ks_fit_quality: 0.5167358599569813
-      dwell:
-        dist: weibull
-        k: 1.0186497607613911
-        lambda: 5.215875623917329
-        n_samples: 1805
-        ks_fit_quality: 0.0727888354105416
-      soc_arrival:
-        dist: beta
-        alpha: 0.7970941787062007
-        beta: 0.8112670123244302
-        n_samples: 1805
-        ks_fit_quality: 0.32393978656646855
-      copula:
-        rho_spearman: 0.031520231223341404
-        rho_gaussian: 0.033006410518777084
-        n_samples: 1805
+        rho_spearman: -0.5716755787245417
+        rho_gaussian: -0.5897575175466935
+        n_samples: 18724
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260506
+    source: calibration:acn_data_2019_2021_20260601
     dataset: ACN-Data
     sites:
       - caltech
@@ -249,30 +232,13 @@ acn_workplace_baseline:
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-05-06'
-    n_users_total: 646
-    n_sessions_total: 42451
-    n_users_assigned_in_population: 634
-    n_users_with_userinputs: 634
-    capacity_inference_fallback_rate: 0.3326894537231161
-    unassigned_user_rate: 0.018575851393188854
-
-# ──────────────────────────────────────────────────────────────────────────
-# ACN per-site populations. NOT separate datasets — these are three
-# cohorts within the single ACN-Data publication (Lee et al. 2019),
-# split to reduce the within-source heterogeneity that caused the
-# multi-modal arrival distribution in `acn_workplace_baseline`'s fit
-# (mixed pool: σ_arrival=3.67 with K-S=0.15; per-site fits expected
-# to give σ closer to source σ_per_site with K-S < 0.12 per site).
-#
-# Same `calibration_policy: acn_data`. The `site` source-arg gates
-# which Caltech ACN site is loaded (per-site CSV cache under
-# data/calibration/acn_cache/<site>_<years>.json).
-#
-# Citation: count these as 3 cohorts of ONE source (ACN-Data), not as
-# 3 distinct sources.
-# ──────────────────────────────────────────────────────────────────────────
-
+    calibration_date: '2026-06-01'
+    n_users_total: 635
+    n_sessions_total: 41774
+    n_users_assigned_in_population: 632
+    n_users_with_userinputs: 632
+    capacity_inference_fallback_rate: 0.33360463446162686
+    unassigned_user_rate: 0.004724409448818898
 acn_caltech_baseline:
   description: "ACN-Data Caltech site only (2019-2021). Student/faculty workplace
     cohort."
@@ -307,127 +273,110 @@ acn_caltech_baseline:
     rare_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999999987779734
-        sigma: 5.120947238178436
-        n_samples: 1775
-        ks_fit_quality: 0.26028153335142057
+        mu: 14.191795908545718
+        sigma: 5.999999980637373
+        n_samples: 2757
+        ks_fit_quality: 0.10195478266177344
       dwell:
         dist: weibull
-        k: 1.1571089486555892
-        lambda: 4.447653883511913
-        n_samples: 1775
-        ks_fit_quality: 0.06713221423116478
+        k: 0.9666716944393348
+        lambda: 4.286336643763553
+        n_samples: 2757
+        ks_fit_quality: 0.11829613743470038
       soc_arrival:
         dist: beta
-        alpha: 1.4578262546279503
-        beta: 1.4087397788121248
-        n_samples: 1775
-        ks_fit_quality: 0.38022775000592646
+        alpha: 1.04899594574523
+        beta: 1.1468434090536954
+        n_samples: 2757
+        ks_fit_quality: 0.3348182288701893
       copula:
-        rho_spearman: -0.2126104124680023
-        rho_gaussian: -0.22218552544017525
-        n_samples: 1775
+        rho_spearman: -0.38257011810429364
+        rho_gaussian: -0.39795264481953246
+        n_samples: 2757
     rare_inconsistent:
+      arrival:
+        dist: truncnorm
+        mu: 12.084253950635896
+        sigma: 5.999999999865793
+        n_samples: 74
+        ks_fit_quality: 0.31644757828277126
       dwell:
         dist: weibull
-        k: 0.7558263287063876
-        lambda: 3.1386624403484946
-        n_samples: 1331
-        ks_fit_quality: 0.17813061914651818
+        k: 0.8186467917098169
+        lambda: 6.372141870745379
+        n_samples: 74
+        ks_fit_quality: 0.2381142496620444
       soc_arrival:
         dist: beta
-        alpha: 0.7902916154431697
-        beta: 1.018417767037137
-        n_samples: 1331
-        ks_fit_quality: 0.3904316718885025
+        alpha: 0.996230110862985
+        beta: 2.2152183149381983
+        n_samples: 74
+        ks_fit_quality: 0.5535830852734772
       copula:
-        rho_spearman: 0.02335936434493745
-        rho_gaussian: 0.02446125924543685
-        n_samples: 1331
+        rho_spearman: 0.12072655110698317
+        rho_gaussian: 0.12634037114434313
+        n_samples: 74
     occasional_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999999779771525
-        sigma: 3.8683476603298796
-        n_samples: 3363
-        ks_fit_quality: 0.15466886332753563
+        mu: 10.284384855272082
+        sigma: 5.999999751068922
+        n_samples: 4658
+        ks_fit_quality: 0.14892276389691567
       dwell:
         dist: weibull
-        k: 1.7733935936316896
-        lambda: 7.270710908848315
-        n_samples: 3363
-        ks_fit_quality: 0.1275840542251116
+        k: 1.4690957477206565
+        lambda: 6.662231794905867
+        n_samples: 4658
+        ks_fit_quality: 0.09317779639020995
       soc_arrival:
         dist: beta
-        alpha: 1.3136942754956706
-        beta: 1.1182434248011683
-        n_samples: 3363
-        ks_fit_quality: 0.28567397815172224
+        alpha: 1.0182439144730469
+        beta: 0.9854956260320794
+        n_samples: 4658
+        ks_fit_quality: 0.3015642081136307
       copula:
-        rho_spearman: -0.32146534297132917
-        rho_gaussian: -0.33505040955123344
-        n_samples: 3363
+        rho_spearman: -0.44044809683664815
+        rho_gaussian: -0.45715857556514855
+        n_samples: 4658
     regular_charger:
       arrival:
         dist: truncnorm
-        mu: 19.999999993857514
-        sigma: 3.9436544491384486
-        n_samples: 5306
-        ks_fit_quality: 0.19656971844524496
+        mu: 10.13762326492156
+        sigma: 3.3584296093835198
+        n_samples: 5361
+        ks_fit_quality: 0.10715247612058437
       dwell:
         dist: weibull
-        k: 1.7421656929265643
-        lambda: 6.995768695741749
-        n_samples: 5306
-        ks_fit_quality: 0.09001546761994317
+        k: 1.6636666943490575
+        lambda: 7.179002863627964
+        n_samples: 5361
+        ks_fit_quality: 0.08899602852914901
       soc_arrival:
         dist: beta
-        alpha: 1.8510778227021414
-        beta: 1.1790529862135386
-        n_samples: 5306
-        ks_fit_quality: 0.3327725814875875
+        alpha: 1.8392559858815023
+        beta: 1.1874198640875147
+        n_samples: 5361
+        ks_fit_quality: 0.33691716899736857
       copula:
-        rho_spearman: -0.27774212078793875
-        rho_gaussian: -0.28982677289982556
-        n_samples: 5306
-    erratic:
-      arrival:
-        dist: truncnorm
-        mu: 8.630632464306064
-        sigma: 5.999999999326768
-        n_samples: 1170
-        ks_fit_quality: 0.5357664433662969
-      dwell:
-        dist: weibull
-        k: 0.8710157568983862
-        lambda: 5.118052754994064
-        n_samples: 1170
-        ks_fit_quality: 0.11326862813217631
-      soc_arrival:
-        dist: beta
-        alpha: 0.6174407677563853
-        beta: 0.8400025387787455
-        n_samples: 1170
-        ks_fit_quality: 0.40376567679639985
-      copula:
-        rho_spearman: -0.02055787264134239
-        rho_gaussian: -0.02152773816237738
-        n_samples: 1170
+        rho_spearman: -0.3792615829607139
+        rho_gaussian: -0.39455663839432986
+        n_samples: 5361
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260530
+    source: calibration:acn_data_2019_2021_20260601
     dataset: ACN-Data
     sites:
       - caltech
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-05-30'
-    n_users_total: 277
-    n_sessions_total: 13893
-    n_users_assigned_in_population: 270
-    n_users_with_userinputs: 270
-    capacity_inference_fallback_rate: 0.42956884762110414
-    unassigned_user_rate: 0.02527075812274368
+    calibration_date: '2026-06-01'
+    n_users_total: 266
+    n_sessions_total: 13395
+    n_users_assigned_in_population: 265
+    n_users_with_userinputs: 265
+    capacity_inference_fallback_rate: 0.4368794326241135
+    unassigned_user_rate: 0.0037593984962406013
 acn_jpl_baseline:
   description: "ACN-Data JPL site only (2019-2021). NASA workforce, regular schedules."
   calibration_policy: acn_data
@@ -461,133 +410,87 @@ acn_jpl_baseline:
     rare_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999997100385315
-        sigma: 4.778676638733211
-        n_samples: 2333
-        ks_fit_quality: 0.21291040475477685
+        mu: 6.000000003784843
+        sigma: 5.949729933476084
+        n_samples: 2454
+        ks_fit_quality: 0.10907551110144453
       dwell:
         dist: weibull
-        k: 1.655209646496179
-        lambda: 6.921945703518979
-        n_samples: 2333
-        ks_fit_quality: 0.07424691800079763
+        k: 1.6626537653510574
+        lambda: 6.620706957641653
+        n_samples: 2454
+        ks_fit_quality: 0.06383621852349297
       soc_arrival:
         dist: beta
-        alpha: 1.4762549058002914
-        beta: 1.6195310569103507
-        n_samples: 2333
-        ks_fit_quality: 0.4039264143161831
+        alpha: 1.4603238229747812
+        beta: 1.52189841618953
+        n_samples: 2454
+        ks_fit_quality: 0.39366552423744305
       copula:
-        rho_spearman: -0.4732098864955237
-        rho_gaussian: -0.49048944740476375
-        n_samples: 2333
-    rare_inconsistent:
-      arrival:
-        dist: truncnorm
-        mu: 15.931649078372914
-        sigma: 5.999999998697163
-        n_samples: 254
-        ks_fit_quality: 0.32677162948141325
-      dwell:
-        dist: weibull
-        k: 1.431310555566148
-        lambda: 4.072993565963056
-        n_samples: 254
-        ks_fit_quality: 0.036611634029576234
-      soc_arrival:
-        dist: beta
-        alpha: 1.9699052766588971
-        beta: 1.2049504969503007
-        n_samples: 254
-        ks_fit_quality: 0.3161410019327806
-      copula:
-        rho_spearman: 0.046886811157542695
-        rho_gaussian: 0.049094821934945736
-        n_samples: 254
+        rho_spearman: -0.6093194764107155
+        rho_gaussian: -0.6273082710078218
+        n_samples: 2454
     occasional_consistent:
       arrival:
         dist: truncnorm
-        mu: 18.866578673161595
-        sigma: 4.664816148430239
-        n_samples: 11571
-        ks_fit_quality: 0.1954852542431808
+        mu: 6.000000082996429
+        sigma: 5.009266278234441
+        n_samples: 11702
+        ks_fit_quality: 0.24437742038510418
       dwell:
         dist: weibull
-        k: 1.9838254759337413
-        lambda: 7.64174343253857
-        n_samples: 11571
-        ks_fit_quality: 0.12672215855883673
+        k: 1.97987761725707
+        lambda: 7.62833237797885
+        n_samples: 11702
+        ks_fit_quality: 0.12330992580175049
       soc_arrival:
         dist: beta
-        alpha: 1.3706432939371036
-        beta: 1.6538496655625181
-        n_samples: 11571
-        ks_fit_quality: 0.39684542218843827
+        alpha: 1.3752727471640924
+        beta: 1.6601892501417437
+        n_samples: 11702
+        ks_fit_quality: 0.3984635161318487
       copula:
-        rho_spearman: -0.5192787006051152
-        rho_gaussian: -0.5371120848260784
-        n_samples: 11571
+        rho_spearman: -0.6667288392908075
+        rho_gaussian: -0.6841014668748994
+        n_samples: 11702
     regular_charger:
       arrival:
         dist: truncnorm
-        mu: 15.811053971676444
-        sigma: 3.2924506005797625
-        n_samples: 12484
-        ks_fit_quality: 0.1755494890332573
+        mu: 6.000000014925071
+        sigma: 4.6744030325736325
+        n_samples: 13168
+        ks_fit_quality: 0.3366876257334146
       dwell:
         dist: weibull
-        k: 2.239280746883531
-        lambda: 8.21030736075091
-        n_samples: 12484
-        ks_fit_quality: 0.15313128620477956
+        k: 2.2022909989057657
+        lambda: 8.063627714800269
+        n_samples: 13168
+        ks_fit_quality: 0.1476590011154435
       soc_arrival:
         dist: beta
-        alpha: 0.9322109576391201
-        beta: 1.2645061022642492
-        n_samples: 12484
-        ks_fit_quality: 0.3998027476131387
+        alpha: 0.9532211739508851
+        beta: 1.23396849960098
+        n_samples: 13168
+        ks_fit_quality: 0.3854728554796339
       copula:
-        rho_spearman: -0.4309277118124575
-        rho_gaussian: -0.4474471574088926
-        n_samples: 12484
-    erratic:
-      arrival:
-        dist: truncnorm
-        mu: 8.234082922045788
-        sigma: 5.9999999958279915
-        n_samples: 716
-        ks_fit_quality: 0.47950200745782284
-      dwell:
-        dist: weibull
-        k: 1.7863452553224628
-        lambda: 5.006754388528906
-        n_samples: 716
-        ks_fit_quality: 0.09614939623787255
-      soc_arrival:
-        dist: beta
-        alpha: 3.4425994641087203
-        beta: 1.4783502077133932
-        n_samples: 716
-        ks_fit_quality: 0.3948959998470518
-      copula:
-        rho_spearman: 0.21407298313792741
-        rho_gaussian: 0.22370758002159472
-        n_samples: 716
+        rho_spearman: -0.5684087869918644
+        rho_gaussian: -0.5864877949094701
+        n_samples: 13168
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260530
+    source: calibration:acn_data_2019_2021_20260601
     dataset: ACN-Data
     sites:
       - jpl
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-05-30'
-    n_users_total: 382
-    n_sessions_total: 27973
-    n_users_assigned_in_population: 379
-    n_users_with_userinputs: 379
-    capacity_inference_fallback_rate: 0.28245093483001465
-    unassigned_user_rate: 0.007853403141361256
+    calibration_date: '2026-06-01'
+    n_users_total: 379
+    n_sessions_total: 27799
+    n_users_assigned_in_population: 377
+    n_users_with_userinputs: 377
+    capacity_inference_fallback_rate: 0.28170078060361886
+    unassigned_user_rate: 0.005277044854881266
 acn_office001_baseline:
   description: "ACN-Data Office001 site only (2019-2021). Corporate workplace cohort."
   calibration_policy: acn_data
@@ -621,86 +524,86 @@ acn_office001_baseline:
     rare_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999999992481584
-        sigma: 4.992423420036703
-        n_samples: 42
-        ks_fit_quality: 0.27965519291573676
+        mu: 10.960583307664445
+        sigma: 2.9129356980140555
+        n_samples: 41
+        ks_fit_quality: 0.14660963020585194
       dwell:
         dist: weibull
-        k: 1.966369425200714
-        lambda: 5.2122068355540385
-        n_samples: 42
-        ks_fit_quality: 0.1759250408938694
+        k: 2.13549326197764
+        lambda: 5.3549939297486695
+        n_samples: 41
+        ks_fit_quality: 0.1740645279425337
       soc_arrival:
         dist: beta
-        alpha: 2.0917472322469757
-        beta: 2.5204716243944096
-        n_samples: 42
-        ks_fit_quality: 0.516760434440481
+        alpha: 2.0669027710521735
+        beta: 2.4666187784934728
+        n_samples: 41
+        ks_fit_quality: 0.5149397520106638
       copula:
-        rho_spearman: -0.19244793776841423
-        rho_gaussian: -0.20119013513794706
-        n_samples: 42
+        rho_spearman: -0.6576655052264809
+        rho_gaussian: -0.6751751851778541
+        n_samples: 41
     occasional_consistent:
       arrival:
         dist: truncnorm
-        mu: 19.999999906857084
-        sigma: 4.1419904375847665
-        n_samples: 188
-        ks_fit_quality: 0.4034165076787891
+        mu: 10.761309213369373
+        sigma: 3.933618722986375
+        n_samples: 187
+        ks_fit_quality: 0.12805466500809626
       dwell:
         dist: weibull
-        k: 1.1510431407852943
-        lambda: 9.870885323026354
-        n_samples: 188
-        ks_fit_quality: 0.2075456822842887
+        k: 1.1603649681080652
+        lambda: 9.952765513542769
+        n_samples: 187
+        ks_fit_quality: 0.20998719379059272
       soc_arrival:
         dist: beta
-        alpha: 2.3041340568616273
-        beta: 2.948979670768604
-        n_samples: 188
-        ks_fit_quality: 0.5268821861301922
+        alpha: 2.2973239678849544
+        beta: 2.9346397643627946
+        n_samples: 187
+        ks_fit_quality: 0.5265702630454121
       copula:
-        rho_spearman: -0.3625837876203367
-        rho_gaussian: -0.3774200954499946
-        n_samples: 188
+        rho_spearman: -0.28559919620860036
+        rho_gaussian: -0.29796535648767564
+        n_samples: 187
     regular_charger:
       arrival:
         dist: truncnorm
-        mu: 17.832004626887773
-        sigma: 2.0696944564120283
-        n_samples: 347
-        ks_fit_quality: 0.09883341919303429
+        mu: 10.052994766765362
+        sigma: 1.662853947610564
+        n_samples: 346
+        ks_fit_quality: 0.09705326646405532
       dwell:
         dist: weibull
-        k: 2.298117132004662
-        lambda: 8.005215261455207
-        n_samples: 347
-        ks_fit_quality: 0.16369281717240358
+        k: 2.316023133426543
+        lambda: 8.030391414375496
+        n_samples: 346
+        ks_fit_quality: 0.16476506697314997
       soc_arrival:
         dist: beta
-        alpha: 0.11524470999547502
-        beta: 0.7747092085458288
-        n_samples: 347
-        ks_fit_quality: 0.37646072513194273
+        alpha: 0.11543866363505462
+        beta: 0.7739656297483056
+        n_samples: 346
+        ks_fit_quality: 0.3757893039020568
       copula:
-        rho_spearman: -0.6008350861402135
-        rho_gaussian: -0.618865628719853
-        n_samples: 347
+        rho_spearman: -0.6578952762281177
+        rho_gaussian: -0.6754016703686238
+        n_samples: 346
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260530
+    source: calibration:acn_data_2019_2021_20260601
     dataset: ACN-Data
     sites:
       - office001
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-05-30'
+    calibration_date: '2026-06-01'
     n_users_total: 14
-    n_sessions_total: 585
+    n_sessions_total: 580
     n_users_assigned_in_population: 14
     n_users_with_userinputs: 14
-    capacity_inference_fallback_rate: 0.4341880341880342
+    capacity_inference_fallback_rate: 0.4362068965517241
     unassigned_user_rate: 0.0
 stable_commuter_heavy:
   description: "Stable office workforce — high frequency, high consistency. High ψ."

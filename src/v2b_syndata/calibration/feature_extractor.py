@@ -9,6 +9,17 @@ import pandas as pd
 
 MIN_SESSIONS_PER_USER = 5  # Drop users with fewer; statistical noise.
 
+# ACN-Data ships connection/disconnect in true UTC (the "GMT" suffix is real).
+# All three ACN sites (Caltech, JPL, Office001) are in California, so arrival
+# *clock hour* must be read in Pacific time — otherwise an 08:00 PT commute
+# arrival is recorded as 16:00 and the fitted distribution clips at the 20:00
+# truncnorm ceiling. (bench/runner.py already anchors ACN at America/Los_Angeles.)
+ACN_TZ = "America/Los_Angeles"
+
+# Sessions shorter than this are dropped before fitting — sub-30-min plug-ins
+# are dominated by metering noise / failed connects and bias the dwell fit.
+MIN_DWELL_HOURS = 0.5
+
 
 @dataclass
 class SessionFeatures:
@@ -41,13 +52,17 @@ def extract_session(raw: dict[str, Any], site: str) -> SessionFeatures | None:
     Returns None if essential fields cannot be parsed.
     """
     try:
-        connection = pd.to_datetime(raw["connectionTime"], format="%a, %d %b %Y %H:%M:%S GMT", utc=True)
-        disconnect = pd.to_datetime(raw["disconnectTime"], format="%a, %d %b %Y %H:%M:%S GMT", utc=True)
+        # Parse as true UTC, convert to Pacific wall-clock, then drop the tz so
+        # arrival_time is naive *local* (no timezone in any downstream CSV).
+        connection = (pd.to_datetime(raw["connectionTime"], format="%a, %d %b %Y %H:%M:%S GMT", utc=True)
+                      .tz_convert(ACN_TZ).tz_localize(None))
+        disconnect = (pd.to_datetime(raw["disconnectTime"], format="%a, %d %b %Y %H:%M:%S GMT", utc=True)
+                      .tz_convert(ACN_TZ).tz_localize(None))
     except (KeyError, ValueError, TypeError):
         return None
 
     dwell = (disconnect - connection).total_seconds() / 3600.0
-    if dwell <= 0 or dwell > 168.0:  # > 1 week is bogus
+    if dwell < MIN_DWELL_HOURS or dwell > 168.0:  # < 30 min noise; > 1 week bogus
         return None
 
     arr_hour = connection.hour + connection.minute / 60.0 + connection.second / 3600.0
