@@ -150,10 +150,19 @@ def apply_noise(ctx: ScenarioContext) -> dict[str, Any]:
                 # (already a 900-multiple since both endpoints are on ticks).
                 max_forward = (deps - arrivals).dt.total_seconds().astype(int) - _MIN_SESSION_DURATION_SEC
                 shifts_sec = np.minimum(shifts_sec, max_forward.to_numpy())
-                # Backward bound — keep new_arrival >= sim_window.start.
+                # Backward bound — keep new_arrival >= max(sim_window.start,
+                # departure's calendar-day start). The day-start floor enforces
+                # C12 (no overnight): departure is fixed and shares arrival's day
+                # at render, so flooring arrival at midnight keeps the whole
+                # session on one calendar day even under large backward jitter
+                # (the forward bound already keeps it before departure).
                 sim_start_ts = pd.Timestamp(ctx.sim_start)
-                min_backward = (sim_start_ts - arrivals).dt.total_seconds().astype(int)
-                shifts_sec = np.maximum(shifts_sec, min_backward.to_numpy())
+                day_start = deps.dt.normalize()
+                min_backward = np.maximum(
+                    (sim_start_ts - arrivals).dt.total_seconds().astype(int).to_numpy(),
+                    (day_start - arrivals).dt.total_seconds().astype(int).to_numpy(),
+                )
+                shifts_sec = np.maximum(shifts_sec, min_backward)
                 new_arrivals = arrivals + pd.to_timedelta(shifts_sec, unit="s")
                 df["arrival"] = new_arrivals.dt.strftime("%Y-%m-%d %H:%M:%S")
                 df["duration_sec"] = (deps - new_arrivals).dt.total_seconds().astype(int)

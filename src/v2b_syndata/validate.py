@@ -236,6 +236,14 @@ def _check_c(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
         secs = (dep - arr).dt.total_seconds().astype(int)
         rep.add((secs == sess["duration_sec"].astype(int)).all(),
                 "C6: duration_sec mismatch")
+        # C12: no overnight stays — arrival and departure share a calendar day.
+        # This is a *synthetic-generator* invariant (renderer rejects crossings,
+        # noise floors backward arrival-jitter at the day start). Do NOT point
+        # validate() at real-data-derived session frames (e.g. the overnight
+        # charging legitimately present in data/calibration_validation) — those
+        # are checked via the separate calibration path, not here.
+        rep.add(bool((arr.dt.normalize() == dep.dt.normalize()).all()),
+                "C12: session crosses midnight (overnight stay)")
         # C7: per-car non-overlap
         for car_id, group in sess.groupby("car_id"):
             g = group.sort_values("arrival")
