@@ -202,6 +202,12 @@ def main() -> int:
                  "KS (lower=better), 70/30 split. **Evaluation only — generator unchanged.**_\n")
     lines.append(f"\nFeatures: arrival_hour, dwell_hours. Split seed={args.seed}, "
                  f"min train={MIN_TRAIN}/test={MIN_TEST}.\n")
+    lines.append(f"\n> **Read KS as the primary metric.** `truncnorm[6,20]` assigns zero "
+                 f"density outside [6,20], so any test point beyond the bounds (corrected ACN "
+                 f"has cohorts pinned at the 6:00 floor) hits the per-sample log-floor "
+                 f"({_LOGFLOOR}) and inflates its NLL — much of the truncnorm NLL gap is "
+                 f"boundary mass, not shape. The held-out KS comparison is unaffected and "
+                 f"reaches the same verdict.\n")
 
     summary: list[str] = []
     reliable: list[tuple[str, str, str, str]] = []  # (source, feature, best, current)
