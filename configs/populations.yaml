@@ -880,13 +880,13 @@ evwatts_workplace_public:
         rho_gaussian: -0.4431067599883351
         n_samples: 64
   calibration_metadata:
-    source: calibration:evwatts_fixture_20260528
+    source: calibration:evwatts_fixture_20260601
     dataset: EV WATTS (DOE/EPRI)
     user_id_strategy: port_proxy
     release_tag: fixture
     venue_filter: workplace_public
     schema_version: v1
-    calibration_date: '2026-05-28'
+    calibration_date: '2026-06-01'
     n_users_total: 6
     n_sessions_total: 64
     n_users_assigned_in_population: 6
@@ -967,42 +967,20 @@ inl_residential_legacy:
         rho_gaussian: 0.012281067454739284
         n_samples: 64
   calibration_metadata:
-    source: calibration:inl_ev_project_fixture_20260528
+    source: calibration:inl_ev_project_fixture_20260601
     dataset: INL EV Project Phase 1
     user_id_strategy: vin_proxy
     archive_tag: fixture
     venue_filter: residential
     fleet_era: phase1_2011_2013
     schema_version: v1
-    calibration_date: '2026-05-28'
+    calibration_date: '2026-06-01'
     n_users_total: 4
     n_sessions_total: 65
     n_users_assigned_in_population: 4
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0
     unassigned_user_rate: 0.0
-
-# ──────────────────────────────────────────────────────────────────────────
-# ElaadNL slot — real-data v2 anchored at the SmoothEMS met GridShield
-# dataset (a.s.r. office parking lot, Utrecht NL, Aug 2020 – Oct 2024).
-# Consortium output of ElaadNL + University of Twente + a.s.r. + MENNEKES
-# + Kropman + Amperapark; ElaadNL operates the data API. Published via
-# 4TU.ResearchData under DOI 80ef3824-3f5d-4e45-8794-3b8791efbd13,
-# CC BY-NC-SA 4.0. 55,379 sessions / 3,409 pseudonymized EV identifiers.
-# user_id = "elaadnl:card:<EV_id_x>" — workplace charging IDs are
-# pseudonymized; some IDs are shared across drivers per README disclaimer,
-# so longitudinal identity is weaker than INL's vin_proxy. Fallback to
-# "elaadnl:port:<evse_id>" if card missing.
-# TZ caveat: naive Europe/Amsterdam timestamps (UTC+1 winter / +2 summer)
-# treated as UTC for consistency with other sources; arrival_hour offset
-# 1–2h vs wall-clock (see docs/CALIBRATION_NOTES.md).
-# Note: legacy fixture (75 rows) still ships at
-# tests/test_calibration/fixtures/elaadnl_fixture.csv for unit-test use;
-# fetcher auto-detects which schema is in the cache and renames columns.
-# Source-args:
-#   --source-arg elaadnl:archive_tag=utrecht_4tu_2024 \
-#                elaadnl:venue_filter=workplace
-# ──────────────────────────────────────────────────────────────────────────
 elaadnl_public_eu:
   description: "ElaadNL / 4TU Utrecht workplace EU cohort (2020–2024, 55k sessions,
     3.4k EVs)"
@@ -1032,39 +1010,39 @@ elaadnl_public_eu:
     daily_commuter:
       arrival:
         dist: truncnorm
-        mu: 8.495872578727493
-        sigma: 2.043562979090281
-        n_samples: 8227
-        ks_fit_quality: 0.16154228251492087
+        mu: 8.488018041893405
+        sigma: 1.9906626755263013
+        n_samples: 8029
+        ks_fit_quality: 0.1591522127306808
       dwell:
         dist: weibull
-        k: 3.123791284891067
-        lambda: 8.09775713104019
-        n_samples: 8227
-        ks_fit_quality: 0.1259565983753166
+        k: 3.2590370213080195
+        lambda: 8.173932685681557
+        n_samples: 8029
+        ks_fit_quality: 0.12132125544802036
       copula:
-        rho_spearman: -0.5010947434342011
-        rho_gaussian: -0.5187453546853242
-        n_samples: 8227
+        rho_spearman: -0.49438518853944907
+        rho_gaussian: -0.5119563944865901
+        n_samples: 8029
     weekday_only:
       arrival:
         dist: truncnorm
-        mu: 8.68303781868979
-        sigma: 2.129780848046814
-        n_samples: 19174
-        ks_fit_quality: 0.1404041233353195
+        mu: 8.698536854627744
+        sigma: 2.1245287020533974
+        n_samples: 19266
+        ks_fit_quality: 0.14130331948335073
       dwell:
         dist: weibull
-        k: 3.0663362738145574
-        lambda: 7.63479841494559
-        n_samples: 19174
-        ks_fit_quality: 0.10297846827092938
+        k: 3.094271937012601
+        lambda: 7.636334538440078
+        n_samples: 19266
+        ks_fit_quality: 0.10152574360016209
       copula:
-        rho_spearman: -0.5176384374766079
-        rho_gaussian: -0.5354573079792402
-        n_samples: 19174
+        rho_spearman: -0.5181854593801983
+        rho_gaussian: -0.5360092141112075
+        n_samples: 19266
   calibration_metadata:
-    source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260530
+    source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260601
     dataset: ElaadNL / 4TU Utrecht office parking (SmoothEMS met GridShield)
     user_id_strategy: card_proxy
     archive_tag: utrecht_4tu_2024
@@ -1072,10 +1050,10 @@ elaadnl_public_eu:
     dataset_release: open_2020
     geography: NL_EU
     schema_version: v1
-    calibration_date: '2026-05-30'
-    n_users_total: 1236
-    n_sessions_total: 55379
-    n_users_assigned_in_population: 294
+    calibration_date: '2026-06-01'
+    n_users_total: 1231
+    n_sessions_total: 55201
+    n_users_assigned_in_population: 293
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0
-    unassigned_user_rate: 0.7621359223300971
+    unassigned_user_rate: 0.7619821283509342
