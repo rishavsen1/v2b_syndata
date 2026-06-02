@@ -31,6 +31,16 @@ def test_jitter_preserves_temporal_ordering(tmp_path: Path):
     assert (dur >= 15 * 60).all(), "sessions shorter than 15 min after jitter"
 
 
+def test_jitter_respects_30min_floor(tmp_path: Path):
+    """Forward arrival-jitter must not shrink any session below 30 min
+    (_MIN_SESSION_DURATION_SEC = 30*60)."""
+    out = _gen(tmp_path, {"noise.arrival_time_jitter_min": 60.0})
+    sess = pd.read_csv(out / "sessions.csv")
+    dur = (pd.to_datetime(sess["departure"]) - pd.to_datetime(sess["arrival"])).dt.total_seconds()
+    assert (dur >= 30 * 60).all(), \
+        f"{int((dur < 30 * 60).sum())} sessions under 30 min after jitter"
+
+
 def test_jitter_keeps_sessions_in_window(tmp_path: Path):
     """Backward jitter must not push arrival before sim_window.start."""
     out = _gen(tmp_path, {"noise.arrival_time_jitter_min": 60.0})

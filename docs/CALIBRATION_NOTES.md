@@ -300,7 +300,7 @@ breaking the generator.
 
 | metric | acn_workplace_baseline | (vs old consent_default attempt) |
 |---|---|---|
-| regions calibrated | **5/5** | 4/5 |
+| regions calibrated | **5/5** (4/5 after 2026-06-01, see below) | 4/5 |
 | n_users assigned | **634** | 31 |
 | unassigned_user_rate | **0.019** | 0.952 |
 | capacity fallback | 0.333 | 0.333 |
@@ -311,6 +311,17 @@ occasional_consistent 15,607; regular_charger 17,857; erratic 1,805.
 KS fit quality varies (0.07–0.52); arrival fits are weakest. Family choice
 (TruncNorm/Weibull/Beta) revisit deferred. soc_arrival fits are uniformly
 high (~0.4); related to capacity-inference fallback rate.
+
+> **2026-06-01 — ACN UTC→Pacific fix changed coverage.** ACN-Data is true UTC
+> and CA sites; reading arrival in Pacific lowered arrival means ~16→~8. Because
+> region assignment uses `kappa = 1 − std/mean(arrival_hour)` (origin-dependent),
+> the shift re-bucketed users: the `erratic` (and for per-site cohorts also
+> `rare_inconsistent`) regions emptied to ≤1 real user and fall back to
+> placeholder distributions. Post-fix coverage: **acn_workplace_baseline 4/5,
+> acn_jpl_baseline / acn_office001_baseline 3/5, acn_caltech_baseline 4/5**.
+> Generated arrivals are sane (mean ~9–10). Fixing kappa to be origin-invariant
+> + re-tuning the axes_distribution grid is tracked as a model-adequacy item
+> (see docs/MODEL_SELECTION.md).
 
 ### Manifest stamps after Step 5.5
 

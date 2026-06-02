@@ -14,7 +14,9 @@ import pandas as pd
 from .seeding import rng_for_node
 from .types import ScenarioContext
 
-_MIN_SESSION_DURATION_SEC = 15 * 60  # 15 min — matches building_load grid resolution
+_MIN_SESSION_DURATION_SEC = 30 * 60  # 30 min floor — forward arrival-jitter must
+# not shrink a session below 30 min (matches the renderer's dwell clip_lo=0.5h and
+# the calibration <30-min ingestion filter). Still a 900s-grid multiple.
 
 # Sampler + validator both use 1.05 headroom for D5. Use a slightly tighter
 # factor for the post-jitter truncator so floating-point doesn't push the
@@ -150,10 +152,19 @@ def apply_noise(ctx: ScenarioContext) -> dict[str, Any]:
                 # (already a 900-multiple since both endpoints are on ticks).
                 max_forward = (deps - arrivals).dt.total_seconds().astype(int) - _MIN_SESSION_DURATION_SEC
                 shifts_sec = np.minimum(shifts_sec, max_forward.to_numpy())
-                # Backward bound — keep new_arrival >= sim_window.start.
+                # Backward bound — keep new_arrival >= max(sim_window.start,
+                # departure's calendar-day start). The day-start floor enforces
+                # C12 (no overnight): departure is fixed and shares arrival's day
+                # at render, so flooring arrival at midnight keeps the whole
+                # session on one calendar day even under large backward jitter
+                # (the forward bound already keeps it before departure).
                 sim_start_ts = pd.Timestamp(ctx.sim_start)
-                min_backward = (sim_start_ts - arrivals).dt.total_seconds().astype(int)
-                shifts_sec = np.maximum(shifts_sec, min_backward.to_numpy())
+                day_start = deps.dt.normalize()
+                min_backward = np.maximum(
+                    (sim_start_ts - arrivals).dt.total_seconds().astype(int).to_numpy(),
+                    (day_start - arrivals).dt.total_seconds().astype(int).to_numpy(),
+                )
+                shifts_sec = np.maximum(shifts_sec, min_backward)
                 new_arrivals = arrivals + pd.to_timedelta(shifts_sec, unit="s")
                 df["arrival"] = new_arrivals.dt.strftime("%Y-%m-%d %H:%M:%S")
                 df["duration_sec"] = (deps - new_arrivals).dt.total_seconds().astype(int)

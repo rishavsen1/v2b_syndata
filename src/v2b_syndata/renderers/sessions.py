@@ -3,6 +3,7 @@
 Constraints enforced atomically per session-day:
 - Non-overlap with prior session for same car_id
 - Inside building_load datetime range
+- No overnight stay: departure on same calendar day as arrival (C12)
 - required_soc_at_depart > arrival_soc           (D6)
 - required_soc_at_depart >= min_depart_soc * 100 (D7)
 - required - arrival reachable by max charger × dwell × 1.05 (D5)
@@ -149,6 +150,11 @@ def render(ctx: ScenarioContext) -> None:
                 if arrival < dt_min or departure > dt_max + pd.Timedelta(minutes=15):
                     continue
                 if prior_departure is not None and arrival < prior_departure:
+                    continue
+                # No overnight stays (C12): departure must land on the same
+                # calendar day as arrival. Reject-and-retry rather than clamp,
+                # so the dwell distribution stays intact for same-day sessions.
+                if departure.date() != arrival.date():
                     continue
 
                 # 3. Sample arrival_soc; clamp to car's allowed band.

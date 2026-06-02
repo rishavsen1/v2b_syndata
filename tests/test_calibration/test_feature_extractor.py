@@ -14,8 +14,11 @@ def test_extract_session_with_userinputs(raw_acn_session):
     sf = extract_session(raw_acn_session, site="caltech")
     assert sf is not None
     assert sf.user_id == "12345"
-    assert sf.arrival_hour == pytest.approx(9.0, abs=0.01)
-    assert sf.dwell_hours == pytest.approx(8.0, abs=0.01)
+    # 09:00 UTC on 6 Jan 2020 (PST, UTC-8) → 01:00 Pacific. ACN feed is true UTC
+    # and sites are in California, so the clock hour is read in Pacific time.
+    assert sf.arrival_hour == pytest.approx(1.0, abs=0.01)
+    assert sf.dwell_hours == pytest.approx(8.0, abs=0.01)  # tz-invariant difference
+    assert sf.arrival_time.tzinfo is None  # naive local — no tz in downstream CSVs
     assert sf.kwh_delivered == pytest.approx(12.3)
     assert sf.miles_requested == 40.0
     assert sf.wh_per_mile == 250.0
