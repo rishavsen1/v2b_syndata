@@ -121,10 +121,12 @@ def test_e2e_calibration_pipeline(populated_cache, tmp_populations_yaml, tmp_pat
                 assert 0.0 <= dvals["ks_fit_quality"] <= 1.0
 
 
-def test_e2e_calibration_writeback_preserves_existing_blocks(
+def test_e2e_calibration_writeback_preserves_region_bounds_and_other_blocks(
     populated_cache, tmp_populations_yaml, tmp_path,
 ):
-    """axes_distribution / negotiation / fleet must be byte-equivalent after writeback."""
+    """Calibration rewrites axes_distribution *weights* from empirical user share
+    but must preserve region identity + bounds (freq/consist/dist_km), keep the
+    vector normalized to 1.0, and leave negotiation / fleet byte-equivalent."""
     from v2b_syndata.calibration import calibrate_populations
 
     before = pyyaml.safe_load(tmp_populations_yaml.read_text())
@@ -145,7 +147,15 @@ def test_e2e_calibration_writeback_preserves_existing_blocks(
 
     after = pyyaml.safe_load(tmp_populations_yaml.read_text())
     post = after["acn_workplace_baseline"]
-    assert post["axes_distribution"] == pre_axes
+
+    # Region identity + bounds preserved; only weights are recalibrated.
+    assert [r["name"] for r in post["axes_distribution"]] == [r["name"] for r in pre_axes]
+    for r_post, r_pre in zip(post["axes_distribution"], pre_axes, strict=True):
+        assert r_post["freq"] == r_pre["freq"]
+        assert r_post["consist"] == r_pre["consist"]
+        assert r_post["dist_km"] == r_pre["dist_km"]
+    assert abs(sum(r["weight"] for r in post["axes_distribution"]) - 1.0) < 1e-6
+    # negotiation + fleet untouched by calibration.
     assert post["negotiation"] == pre_neg
     assert post["fleet"] == pre_fleet
 

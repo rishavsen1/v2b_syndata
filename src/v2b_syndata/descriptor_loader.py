@@ -81,6 +81,13 @@ def expand_descriptors(
     out["ev_fleet.battery_mix"] = (list(pop["fleet"]["battery_mix"]), pop_name)
     out["ev_fleet.battery_heterogeneity"] = (pop["fleet"]["battery_heterogeneity"], pop_name)
 
+    # Calibrated weekend appearance factor (written into calibration_metadata by
+    # `v2b-syndata calibrate`). Absent for hand-authored populations → the knob
+    # falls back to its 1.0 default.
+    waf = (pop.get("calibration_metadata") or {}).get("weekend_activity_factor")
+    if waf is not None:
+        out["user_behavior.weekend_activity_factor"] = (float(waf), pop_name)
+
     # region_distributions overlay (Step 5 / D47, D51, C2; Step 5.5 policy split).
     # Per-population calibration_policy controls source stamping:
     #   acn_data  → source = calibration_metadata.source ("calibration:<provenance>")

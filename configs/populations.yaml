@@ -102,16 +102,11 @@ acn_workplace_baseline:
     # ACN cohort. See CALIBRATION_NOTES.md item #11 for the histogram.
     # Initial weights: equal-share placeholder; tune from empirical user share
     # after first calibration run reports per-region n_users.
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
-        50], weight: 0.40}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
-        3, 80], weight: 0.20}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
-        dist_km: [5, 60], weight: 0.20}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.15}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
-        weight: 0.05}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.362342}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.006329}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.400316}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.231013}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -235,6 +230,7 @@ acn_workplace_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 635
     n_sessions_total: 41774
+    weekend_activity_factor: 0.1681
     n_users_assigned_in_population: 632
     n_users_with_userinputs: 632
     capacity_inference_fallback_rate: 0.33360463446162686
@@ -245,16 +241,11 @@ acn_caltech_baseline:
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
-        50], weight: 0.40}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
-        3, 80], weight: 0.20}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
-        dist_km: [5, 60], weight: 0.20}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.15}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
-        weight: 0.05}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.528302}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.011321}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.30566}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.154717}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -373,6 +364,7 @@ acn_caltech_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 266
     n_sessions_total: 13395
+    weekend_activity_factor: 0.3499
     n_users_assigned_in_population: 265
     n_users_with_userinputs: 265
     capacity_inference_fallback_rate: 0.4368794326241135
@@ -382,16 +374,11 @@ acn_jpl_baseline:
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
-        50], weight: 0.40}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
-        3, 80], weight: 0.20}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
-        dist_km: [5, 60], weight: 0.20}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.15}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
-        weight: 0.05}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.286472}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.002653}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.440318}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.270557}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -487,6 +474,7 @@ acn_jpl_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 379
     n_sessions_total: 27799
+    weekend_activity_factor: 0.0738
     n_users_assigned_in_population: 377
     n_users_with_userinputs: 377
     capacity_inference_fallback_rate: 0.28170078060361886
@@ -496,16 +484,11 @@ acn_office001_baseline:
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
-        50], weight: 0.40}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
-        3, 80], weight: 0.20}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
-        dist_km: [5, 60], weight: 0.20}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.15}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
-        weight: 0.05}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.285714}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.0}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.357143}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.357143}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -601,6 +584,7 @@ acn_office001_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 14
     n_sessions_total: 580
+    weekend_activity_factor: 0.6536
     n_users_assigned_in_population: 14
     n_users_with_userinputs: 14
     capacity_inference_fallback_rate: 0.4362068965517241
@@ -987,12 +971,9 @@ elaadnl_public_eu:
   calibration_policy: elaadnl_open_2020
 
   axes_distribution:
-    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20,
-        60], weight: 0.5}
-    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 
-            50], weight: 0.3}
-    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], 
-        weight: 0.2}
+    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20, 60], weight: 0.21843}
+    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 50], weight: 0.78157}
+    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -1053,6 +1034,7 @@ elaadnl_public_eu:
     calibration_date: '2026-06-01'
     n_users_total: 1231
     n_sessions_total: 55201
+    weekend_activity_factor: 0.0219
     n_users_assigned_in_population: 293
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0

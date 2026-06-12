@@ -117,6 +117,34 @@ def test_weekdays_only_false(fast_generate, assert_sanity):
     assert rep.passed, f"weekdays_only=False: {'; '.join(rep.errors)}"
 
 
+def test_weekend_factor_zero_suppresses_weekend(fast_generate, assert_sanity):
+    """weekend_activity_factor=0 hard-zeroes weekend appearance even when
+    weekdays_only is False (the factor gates weekend sessions)."""
+    out, manifest = fast_generate(overrides={
+        "sim_window.weekdays_only": False,
+        "user_behavior.weekend_activity_factor": 0.0,
+    })
+    assert_sanity(out, manifest)
+    sess = pd.read_csv(out / "sessions.csv")
+    if len(sess) > 0:
+        weekday = pd.to_datetime(sess["arrival"]).dt.weekday
+        assert not (weekday >= 5).any(), "factor=0 must suppress all weekend sessions"
+
+
+def test_weekdays_only_true_forces_five_day_week(fast_generate, assert_sanity):
+    """weekdays_only=True forces a synthetic 5-day week regardless of a nonzero
+    weekend_activity_factor — preserving the default-scenario behavior."""
+    out, manifest = fast_generate(overrides={
+        "sim_window.weekdays_only": True,
+        "user_behavior.weekend_activity_factor": 1.0,
+    })
+    assert_sanity(out, manifest)
+    sess = pd.read_csv(out / "sessions.csv")
+    if len(sess) > 0:
+        weekday = pd.to_datetime(sess["arrival"]).dt.weekday
+        assert not (weekday >= 5).any(), "weekdays_only=True must hard-zero weekend sessions"
+
+
 def test_month_mode_anchored_at_arbitrary_start(fast_generate, assert_sanity):
     """mode=month + start=2021-08-15 → window snaps to Aug 1, 2021 → Sep 1, 2021."""
     out, manifest = fast_generate(

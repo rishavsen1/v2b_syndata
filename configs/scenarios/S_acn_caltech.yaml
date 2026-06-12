@@ -15,6 +15,7 @@ descriptors:
   population: acn_caltech_baseline
   equipment: balanced_50pct
   noise: clean
-sim_window:
-  start: 2020-04-01
-  mode: month
+overrides:
+  sim_window.start: 2020-04-01
+  sim_window.mode: month
+  sim_window.weekdays_only: false   # emit calibrated weekend sessions (weekend_activity_factor)

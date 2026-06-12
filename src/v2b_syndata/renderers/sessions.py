@@ -81,10 +81,18 @@ def render(ctx: ScenarioContext) -> None:
     max_charger_rate = float(chargers["max_rate_kw"].max())
 
     weekdays_only = bool(ctx.knobs.get("sim_window.weekdays_only"))
+    # weekdays_only forces a synthetic 5-day week (factor 0). Otherwise weekend
+    # appearance scales the weekday rate φ by the calibrated weekend factor.
+    weekend_factor = 0.0 if weekdays_only else float(
+        ctx.knobs.get("user_behavior.weekend_activity_factor")
+    )
 
     # Iterate days in sim window (use the date of dt_min through dt_max).
     days = pd.date_range(dt_min.normalize(), dt_max.normalize(), freq="D")
-    if weekdays_only:
+    if weekend_factor <= 0.0:
+        # No weekend activity → skip weekend days entirely. Bitwise-identical to
+        # the pre-weekend-factor behavior (the default for every scenario that
+        # does not opt in via weekdays_only=false).
         days = [d for d in days if d.weekday() < 5]
     else:
         days = list(days)
@@ -112,7 +120,11 @@ def render(ctx: ScenarioContext) -> None:
 
         for day in days:
             rng = rng_for_car(ctx.seed, f"sessions:{day.date().isoformat()}", car_id)
-            if rng.random() >= u.phi:
+            # Per-day appearance: φ on weekdays, φ·weekend_factor on Sat/Sun.
+            # Each date keys an independent RNG stream, so weekday decisions are
+            # unaffected by enabling weekend days.
+            appear_p = u.phi if day.weekday() < 5 else u.phi * weekend_factor
+            if rng.random() >= appear_p:
                 continue  # No appearance
 
             arrival_ts: pd.Timestamp | None = None

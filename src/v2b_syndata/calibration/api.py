@@ -15,6 +15,7 @@ from .feature_extractor import (
     SessionFeatures,
     aggregate_user_features,
     extract_session,  # re-exported for backwards-compat callers
+    population_weekend_factor,
 )
 from .region_assignment import assign_users
 from .sources import CALIBRATION_SOURCES
@@ -270,12 +271,40 @@ def _calibrate_one_population(
         "unassigned_user_rate": float(unassigned_rate),
     })
 
+    # Population weekend:weekday session-rate ratio (drives weekend appearance
+    # at generation; read back via user_behavior.weekend_activity_factor).
+    pop_sessions = [s for sess in sessions_by_uid.values() for s in sess]
+    metadata["weekend_activity_factor"] = round(
+        population_weekend_factor(pop_sessions), 4
+    )
+
+    # Empirical per-region USER share → axes_distribution weights. Generation
+    # draws a car's region from this single field (per_entity.py); the prior
+    # hand-authored placeholder (e.g. flat 0.20) decoupled it from reality and
+    # over-produced rare regions ~100x. USER share (not session share) matches
+    # the per-car assignment unit and the F5 validator. Normalized over the
+    # assigned regions so the vector sums to 1.0 (knob_loader requires it);
+    # genuinely-zero-user regions get weight 0.
+    total_assigned = sum(
+        len(v) for k, v in region_to_users.items() if k != "__unassigned__"
+    )
+    axes_weights: dict[str, float] | None = None
+    if total_assigned > 0:
+        raw = {
+            region["name"]: len(region_to_users.get(region["name"], [])) / total_assigned
+            for region in axes
+        }
+        s = sum(raw.values())
+        if s > 0:
+            axes_weights = {k: v / s for k, v in raw.items()}
+
     if write_yaml:
         write_region_distributions(
             populations_yaml_path,
             pop_name,
             region_fits,
             metadata,
+            axes_weights=axes_weights,
         )
 
     return {
