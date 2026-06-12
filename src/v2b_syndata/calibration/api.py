@@ -15,6 +15,7 @@ from .feature_extractor import (
     SessionFeatures,
     aggregate_user_features,
     extract_session,  # re-exported for backwards-compat callers
+    population_weekend_factor,
 )
 from .region_assignment import assign_users
 from .sources import CALIBRATION_SOURCES
@@ -269,6 +270,13 @@ def _calibrate_one_population(
         "capacity_inference_fallback_rate": float(fallback_rate),
         "unassigned_user_rate": float(unassigned_rate),
     })
+
+    # Population weekend:weekday session-rate ratio (drives weekend appearance
+    # at generation; read back via user_behavior.weekend_activity_factor).
+    pop_sessions = [s for sess in sessions_by_uid.values() for s in sess]
+    metadata["weekend_activity_factor"] = round(
+        population_weekend_factor(pop_sessions), 4
+    )
 
     if write_yaml:
         write_region_distributions(

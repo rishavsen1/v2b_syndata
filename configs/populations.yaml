@@ -235,6 +235,7 @@ acn_workplace_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 635
     n_sessions_total: 41774
+    weekend_activity_factor: 0.1681
     n_users_assigned_in_population: 632
     n_users_with_userinputs: 632
     capacity_inference_fallback_rate: 0.33360463446162686
@@ -373,6 +374,7 @@ acn_caltech_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 266
     n_sessions_total: 13395
+    weekend_activity_factor: 0.3499
     n_users_assigned_in_population: 265
     n_users_with_userinputs: 265
     capacity_inference_fallback_rate: 0.4368794326241135
@@ -487,6 +489,7 @@ acn_jpl_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 379
     n_sessions_total: 27799
+    weekend_activity_factor: 0.0738
     n_users_assigned_in_population: 377
     n_users_with_userinputs: 377
     capacity_inference_fallback_rate: 0.28170078060361886
@@ -601,6 +604,7 @@ acn_office001_baseline:
     calibration_date: '2026-06-01'
     n_users_total: 14
     n_sessions_total: 580
+    weekend_activity_factor: 0.6536
     n_users_assigned_in_population: 14
     n_users_with_userinputs: 14
     capacity_inference_fallback_rate: 0.4362068965517241
@@ -1053,6 +1057,7 @@ elaadnl_public_eu:
     calibration_date: '2026-06-01'
     n_users_total: 1231
     n_sessions_total: 55201
+    weekend_activity_factor: 0.0219
     n_users_assigned_in_population: 293
     n_users_with_userinputs: 0
     capacity_inference_fallback_rate: 1.0

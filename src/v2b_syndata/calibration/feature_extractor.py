@@ -192,3 +192,36 @@ def aggregate_user_features(
         ))
 
     return out
+
+
+def population_weekend_factor(sessions: list[SessionFeatures]) -> float:
+    """Population-level weekend appearance rate as a fraction of the weekday rate.
+
+    Defined as (weekend sessions / unique weekend dates) ÷
+    (weekday sessions / unique weekday dates) — the same sessions-per-day
+    definition the S6 validator uses, so a generated population that draws
+    weekend appearances at φ·factor reproduces the source's weekday:weekend
+    session ratio. Returns 0.0 when the source has no weekend sessions (pure
+    5-day pattern) and 1.0 only as a degenerate fallback when there are no
+    weekday sessions to normalize against.
+    """
+    if not sessions:
+        return 0.0
+    wd_sessions = we_sessions = 0
+    wd_dates: set = set()
+    we_dates: set = set()
+    for s in sessions:
+        ts = pd.Timestamp(s.arrival_time)
+        if ts.dayofweek < 5:
+            wd_sessions += 1
+            wd_dates.add(ts.date())
+        else:
+            we_sessions += 1
+            we_dates.add(ts.date())
+    if wd_sessions == 0 or not wd_dates:
+        return 1.0
+    if we_sessions == 0 or not we_dates:
+        return 0.0
+    wd_per_day = wd_sessions / len(wd_dates)
+    we_per_day = we_sessions / len(we_dates)
+    return float(we_per_day / wd_per_day)

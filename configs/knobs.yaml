@@ -116,6 +116,13 @@ user_behavior:
     description: "Floor on required_soc_at_depart"
     affects_csv: [sessions.csv]
 
+  weekend_activity_factor:
+    type: float
+    range: [0.0, 5.0]
+    default: 1.0
+    description: "Weekend appearance rate as a fraction of the weekday rate φ. A car's per-day appearance probability is φ on weekdays and φ·weekend_activity_factor on Sat/Sun. Calibrated populations set this from real data (write_region_distributions stamps calibration_metadata.weekend_activity_factor; ≈0.08–0.38 for ACN/ElaadNL workplaces); hand-authored populations keep the 1.0 default. Has no effect unless sim_window.weekdays_only is false (which forces it to 0)."
+    affects_csv: [sessions.csv]
+
   axes_distribution_dirichlet_alpha:
     type: float
     range: [1.0, 1000000.0]
@@ -267,6 +274,7 @@ sim_window:
   weekdays_only:
     type: bool
     default: true
+    description: "When true (default), force a synthetic 5-day week: weekend appearance is hard-zeroed (weekend days are skipped entirely) regardless of user_behavior.weekend_activity_factor. Set false to emit calibrated weekend sessions at φ·weekend_activity_factor. Kept default-true so existing scenarios are unchanged; data-calibrated cohort scenarios set it false."
     affects_csv: [sessions.csv]
 
   start:
