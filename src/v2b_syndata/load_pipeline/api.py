@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import cache as cache_mod
-from . import ep_runner, output_parser, weather
+from . import ep_runner, leap_weather, output_parser, weather
 from .occupancy_inject import inject_occupancy
 from .prototypes import get_prototype_idf
 
@@ -111,29 +111,44 @@ def _simulate_single(
     sim_window_end: pd.Timestamp,
 ) -> tuple[pd.Series, pd.Series]:
     proto_idf = get_prototype_idf(archetype, size)
+    year = pd.Timestamp(sim_window_start).year
 
-    # Cache key uses the *prototype* hash (deterministic) plus inputs.
+    # Cache key uses the *prototype* hash (deterministic) plus inputs. ``leap=``
+    # keys the leap-aware weather transform below. We deliberately do NOT tag
+    # the key with the EnergyPlus binary version: that would force a callable
+    # binary just to compute the key, making a populated parquet cache unusable
+    # on a machine without EnergyPlus (CI / shipped-cache reproducibility). The
+    # 23.2->24.1 prototype upgrade already invalidates the cache via the hashed
+    # IDF bytes; a bare binary swap that leaves the IDFs untouched needs a
+    # manual cache clear.
     key = cache_mod.cache_key(
         idf_path=proto_idf,
         epw_path=epw_path,
         occupancy=occupancy,
         sim_window_start=sim_window_start,
         sim_window_end=sim_window_end,
-        extra=f"meters={','.join(_REQUIRED_METERS)};rp=annual;ts=4;year={pd.Timestamp(sim_window_start).year}",
+        extra=(
+            f"meters={','.join(_REQUIRED_METERS)};rp=annual;ts=4;year={year}"
+            f";leap={int(leap_weather.is_leap(year))}"
+        ),
     )
     cached = cache_mod.get_cached(key)
     if cached is not None:
         return cached
 
+    # Binary is resolved lazily here (cache miss only) — never required for a
+    # cache hit.
     with tempfile.TemporaryDirectory(prefix="v2b_ep_") as tmp:
         tmp = Path(tmp)
         injected = inject_occupancy(proto_idf, occupancy, tmp / "injected.idf")
-        runtime = _prepare_idf_for_run(
-            injected, tmp / "runtime.idf",
-            year=pd.Timestamp(sim_window_start).year,
-        )
+        runtime = _prepare_idf_for_run(injected, tmp / "runtime.idf", year=year)
+        # A 365-day TMYx cannot faithfully simulate a leap year (EnergyPlus
+        # mis-sequences the day-of-week across the missing Feb 29). Inject one.
+        run_epw = epw_path
+        if leap_weather.is_leap(year):
+            run_epw = leap_weather.make_leap_epw(epw_path, tmp / "weather.epw", year)
         ep_out = tmp / "ep_run"
-        meter_csv = ep_runner.run_energyplus(runtime, epw_path, ep_out)
+        meter_csv = ep_runner.run_energyplus(runtime, run_epw, ep_out)
         flex, inflex = output_parser.parse_eplusout(
             meter_csv, sim_window_start, sim_window_end
         )
