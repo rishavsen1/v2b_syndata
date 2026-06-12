@@ -13,6 +13,14 @@ Scope (2026-05-30):
   independent and runs on the EnergyPlus building-load output of a default
   scenario per (archetype, size).
 
+EnergyPlus:
+  Pin the engine for a reproducible baseline — the bundled prototypes are
+  EnergyPlus 24.1, so run with ``ENERGYPLUS_BIN=/usr/local/bin/energyplus``
+  (or any 24.1 install). Absolute load kW shift across EnergyPlus major
+  versions; the load cache keys on the prototype IDF bytes, so upgrading the
+  prototypes invalidates it automatically — but a bare binary swap that leaves
+  the IDFs untouched needs a manual ``rm -rf data/load_pipeline_cache``.
+
 Usage:
     uv run python tools/validate_calibration.py \\
         --output data/calibration_validation/ \\

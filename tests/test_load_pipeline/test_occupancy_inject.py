@@ -50,21 +50,31 @@ def test_inject_idf_parses_with_eppy(tmp_path, small_office_idf):
     out = tmp_path / "round.idf"
     inject_occupancy(small_office_idf, s, out)
 
+    # Locate the bundled Energy+.idd from the *discovered* EnergyPlus install
+    # (its IDD must match the prototype IDF version), falling back to install
+    # globs; skip eppy validation only if no EnergyPlus is present.
+    import glob
+    import os
+
     from eppy.modeleditor import IDF
 
-    # Locate the bundled Energy+.idd from the EnergyPlus install via env or
-    # the ep_runner's discovery; failing those, skip the eppy validation.
-    import os
-    idd_candidates = []
+    from v2b_syndata.load_pipeline.ep_runner import discover_energyplus
+    from v2b_syndata.load_pipeline.exceptions import EnergyPlusBinaryNotFound
+
+    idd_candidates: list[Path] = []
     if "ENERGYPLUS_PATH" in os.environ:
         idd_candidates.append(Path(os.environ["ENERGYPLUS_PATH"]) / "Energy+.idd")
+    try:
+        # Resolve symlinks (/usr/local/bin/energyplus → the versioned install dir
+        # that actually holds Energy+.idd).
+        idd_candidates.append(discover_energyplus().resolve().parent / "Energy+.idd")
+    except EnergyPlusBinaryNotFound:
+        pass
     idd_candidates.extend(
-        Path(p) / "Energy+.idd"
-        for p in [
-            "/usr/local/EnergyPlus-26-1-0",
-            "/usr/local/EnergyPlus-23-2-0",
-            str(Path.home() / "opt" / "EnergyPlus-23.2.0-7636e6b3e9-Linux-Ubuntu22.04-x86_64"),
-        ]
+        Path(p)
+        for g in ("/usr/local/EnergyPlus-*/Energy+.idd",
+                  str(Path.home() / "opt" / "EnergyPlus-*" / "Energy+.idd"))
+        for p in glob.glob(g)
     )
     idd = next((c for c in idd_candidates if c.exists()), None)
     if idd is None:
