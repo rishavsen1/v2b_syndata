@@ -17,3 +17,4 @@ overrides:
   sim_window.start: 2020-04-01
   sim_window.mode: month
   sim_window.weekdays_only: false   # emit calibrated weekend sessions (weekend_activity_factor)
+  user_behavior.min_depart_soc: 0.0   # no arbitrary floor: use the calibrated soc_depart (only D6: required > arrival)

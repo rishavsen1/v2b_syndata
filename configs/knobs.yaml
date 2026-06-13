@@ -111,9 +111,9 @@ user_behavior:
 
   min_depart_soc:
     type: float
-    range: [0.5, 1.0]
+    range: [0.0, 1.0]
     default: 0.80
-    description: "Floor on required_soc_at_depart"
+    description: "Behavioral floor on required_soc_at_depart (D7). A discretionary prior, NOT a hard constraint — the only structural rule is required_soc_at_depart > arrival_soc (D6). Default 0.80 for hand-authored populations; data-calibrated cohorts set it to 0.0 so the empirical departure-SoC (region_distributions.soc_depart) is not clamped by an arbitrary floor."
     affects_csv: [sessions.csv]
 
   weekend_activity_factor:

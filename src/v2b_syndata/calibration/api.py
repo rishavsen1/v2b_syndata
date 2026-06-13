@@ -138,8 +138,15 @@ def calibrate_populations(
         window_end = max(arrival_times)
         users = aggregate_user_features(sessions, window_start, window_end)
 
-        # Battery inference + arrival SoC per session.
+        # Battery inference + arrival SoC per session. Departure-SoC target is
+        # the SoC the car *left at* = arrival SoC + delivered energy / capacity
+        # (the empirical achieved departure, per the calibration design). We use
+        # delivered — NOT requested — because arrival SoC is itself reconstructed
+        # as 1 - requested/capacity (battery_inference), so requested would make
+        # departure identically 1.0 (circular). Delivered captures real early
+        # unplugs (ACN mean ≈ 0.78, vs the old hardcoded 0.85).
         arr_soc_by_uid: dict[str, list[float]] = {}
+        depart_soc_by_uid: dict[str, list[float]] = {}
         capacity_fallback_count = 0
         capacity_total = 0
         for s in sessions:
@@ -150,6 +157,10 @@ def calibrate_populations(
             soc = reconstruct_arrival_soc(s, cap)
             if soc is not None:
                 arr_soc_by_uid.setdefault(s.user_id, []).append(soc)
+                if s.kwh_delivered is not None and cap and cap > 0:
+                    depart = min(1.0 - 1e-6, soc + float(s.kwh_delivered) / float(cap))
+                    if depart > soc:
+                        depart_soc_by_uid.setdefault(s.user_id, []).append(depart)
         total_capacity_total += capacity_total
         total_capacity_fallback += capacity_fallback_count
         fallback_rate = (
@@ -171,6 +182,7 @@ def calibrate_populations(
                 users=users,
                 sessions_by_uid=sessions_by_uid,
                 arr_soc_by_uid=arr_soc_by_uid,
+                depart_soc_by_uid=depart_soc_by_uid,
                 populations_yaml_path=populations_yaml_path,
                 provenance=provenance,
                 dataset_name=source.dataset_name(),
@@ -209,6 +221,7 @@ def _calibrate_one_population(
     users: list,
     sessions_by_uid: dict[str, list[SessionFeatures]],
     arr_soc_by_uid: dict[str, list[float]],
+    depart_soc_by_uid: dict[str, list[float]],
     populations_yaml_path: Path,
     provenance: str,
     dataset_name: str,
@@ -233,6 +246,7 @@ def _calibrate_one_population(
         arr_list: list[float] = []
         dwell_list: list[float] = []
         soc_list: list[float] = []
+        depart_list: list[float] = []
         for u in region_users:
             sess = sessions_by_uid.get(u.user_id, [])
             for s in sess:
@@ -240,15 +254,17 @@ def _calibrate_one_population(
                 dwell_list.append(s.dwell_hours)
             socs = arr_soc_by_uid.get(u.user_id, [])
             soc_list.extend(socs)
+            depart_list.extend(depart_soc_by_uid.get(u.user_id, []))
             if socs:
                 n_users_with_inputs += 1
 
         arrivals = np.asarray(arr_list, dtype=float)
         dwells = np.asarray(dwell_list, dtype=float)
         soc_arr = np.asarray(soc_list, dtype=float) if soc_list else None
-        fit = fit_region(arrivals, dwells, soc_arr)
+        soc_dep = np.asarray(depart_list, dtype=float) if depart_list else None
+        fit = fit_region(arrivals, dwells, soc_arr, soc_departs=soc_dep)
         clean: dict[str, Any] = {}
-        for key in ("arrival", "dwell", "soc_arrival", "copula"):
+        for key in ("arrival", "dwell", "soc_arrival", "soc_depart", "copula"):
             if fit.get(key) is not None:
                 clean[key] = fit[key]
         if clean:

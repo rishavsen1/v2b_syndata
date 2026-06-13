@@ -109,15 +109,28 @@ def fit_weibull_dwell(dwell_hours: np.ndarray) -> dict[str, Any] | None:
     return _drop_if_oor("dwell", fit, {"k": "dwell.k", "lambda": "dwell.lambda"})
 
 
-def fit_beta_soc(soc_fractions: np.ndarray) -> dict[str, Any] | None:
+def fit_beta_soc(soc_fractions: np.ndarray, leaf_prefix: str = "soc_arrival") -> dict[str, Any] | None:
     """Fit Beta(α, β) on [0, 1]. Returns canonical dict, or None if any param
     falls outside DIST_PARAM_RANGES (B4 guard).
+
+    ``leaf_prefix`` selects the range table entry to validate against —
+    ``soc_arrival`` (arrival SoC) or ``soc_depart`` (departure-SoC requirement).
     """
     n = int(len(soc_fractions))
     arr = np.clip(np.asarray(soc_fractions, dtype=float), 1e-6, 1 - 1e-6)
     if len(arr) < 2:
         return None
-    alpha, beta, _, _ = st.beta.fit(arr, floc=0, fscale=1)
+    try:
+        alpha, beta, _, _ = st.beta.fit(arr, floc=0, fscale=1)
+    except st.FitError:
+        # MLE failed to converge (e.g. departure SoC piled near 1.0). Skip the
+        # distribution rather than crash — same posture as the B4 range guard.
+        warnings.warn(
+            f"calibration: {leaf_prefix} Beta MLE did not converge (n={n}); "
+            "dropping distribution",
+            RuntimeWarning, stacklevel=2,
+        )
+        return None
     alpha = float(alpha)
     beta = float(beta)
     if alpha <= 0 or beta <= 0:
@@ -125,8 +138,8 @@ def fit_beta_soc(soc_fractions: np.ndarray) -> dict[str, Any] | None:
     ks = float(st.kstest(arr, "beta", args=(alpha, beta, 0, 1)).statistic)
     fit = {"dist": "beta", "alpha": alpha, "beta": beta,
            "n_samples": n, "ks_fit_quality": ks}
-    return _drop_if_oor("soc_arrival", fit,
-                        {"alpha": "soc_arrival.alpha", "beta": "soc_arrival.beta"})
+    return _drop_if_oor(leaf_prefix, fit,
+                        {"alpha": f"{leaf_prefix}.alpha", "beta": f"{leaf_prefix}.beta"})
 
 
 def fit_copula_rho(arrivals: np.ndarray, dwells: np.ndarray) -> dict[str, Any]:
@@ -147,8 +160,9 @@ def fit_region(
     arrivals: np.ndarray,
     dwells: np.ndarray,
     soc_arrivals: np.ndarray | None,
+    soc_departs: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Fit all four (arrival, dwell, soc_arrival, copula) for one region.
+    """Fit (arrival, dwell, soc_arrival, soc_depart, copula) for one region.
 
     Skips a distribution and returns it as None if MIN_SAMPLES not met.
     """
@@ -165,6 +179,10 @@ def fit_region(
         out["soc_arrival"] = fit_beta_soc(soc_arrivals)
     else:
         out["soc_arrival"] = None
+    if soc_departs is not None and len(soc_departs) >= MIN_SAMPLES:
+        out["soc_depart"] = fit_beta_soc(soc_departs, leaf_prefix="soc_depart")
+    else:
+        out["soc_depart"] = None
     if len(arrivals) >= MIN_SAMPLES and len(dwells) >= MIN_SAMPLES:
         out["copula"] = fit_copula_rho(arrivals, dwells)
     else:

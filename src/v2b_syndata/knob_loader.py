@@ -38,6 +38,8 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "dwell.lambda": (0.01, 24.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
+    "soc_depart.alpha": (0.01, 50.0),
+    "soc_depart.beta": (0.01, 50.0),
     "copula.rho_gaussian": (-0.99, 0.99),
 }
 

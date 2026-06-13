@@ -4,14 +4,26 @@ Constraints enforced atomically per session-day:
 - Non-overlap with prior session for same car_id
 - Inside building_load datetime range
 - No overnight stay: departure on same calendar day as arrival (C12)
-- required_soc_at_depart > arrival_soc           (D6)
-- required_soc_at_depart >= min_depart_soc * 100 (D7)
+- required_soc_at_depart > arrival_soc           (D6, structural)
+- required_soc_at_depart >= min_depart_soc * 100 (D7, behavioral floor)
 - required - arrival reachable by max charger × dwell × 1.05 (D5)
 
 If any constraint fails after _MAX_RETRIES attempts, the session is dropped
-for that car-day. Reachability is enforced by *rejection*, not clamping —
-required_soc represents the user's stated target and must always sit above
-arrival_soc.
+for that car-day. Reachability is enforced by *rejection*, not clamping.
+
+Departure-SoC requirement (`required_soc_at_depart`) — the only departure-side
+SoC the dataset carries, i.e. departure SoC *is* required SoC:
+  * Calibrated cohorts: drawn from the per-region empirical Beta
+    `region_distributions.<region>.soc_depart`, fit to the SoC cars left at in
+    the source (arrival_soc + delivered/capacity). These scenarios set
+    `min_depart_soc = 0`, so the empirical distribution flows through unclamped;
+    only D6 (> arrival) constrains it. The 80% floor is a discretionary prior,
+    not a physical requirement, so it is dropped where real data is available.
+  * Fallback (hand-authored populations, and sources without the data to
+    reconstruct departure SoC such as ElaadNL — no kWhRequested → no arrival
+    SoC): no `soc_depart` block, so required_soc is drawn from the prior
+    truncnorm(85, 5) floored at `min_depart_soc` (default 0.80). The prior
+    required_soc thus serves as the departure SoC.
 """
 from __future__ import annotations
 
@@ -69,6 +81,7 @@ def render(ctx: ScenarioContext) -> None:
     f_arr = ctx.latents["f_arr"]
     f_dwell = ctx.latents["f_dwell"]
     f_soc = ctx.latents["f_soc"]
+    f_soc_depart = ctx.latents.get("f_soc_depart", {})
     min_depart_soc_pct = float(ctx.knobs.get("user_behavior.min_depart_soc")) * 100.0
 
     # Grid bounds — sessions must be within building_load datetime range.
@@ -105,6 +118,7 @@ def render(ctx: ScenarioContext) -> None:
         arr_p = f_arr[car_id]
         dw_p = f_dwell[car_id]
         soc_p = f_soc[car_id]
+        soc_depart_p = f_soc_depart.get(car_id)
 
         # Region-stable copula dispatch (C4): decide once per car BEFORE entering
         # the day/retry loops so RNG consumption is deterministic across retries.
@@ -183,9 +197,17 @@ def render(ctx: ScenarioContext) -> None:
                     # User arrived too charged for any valid target → drop session-day.
                     break
 
-                r_soc_pct = _sample_truncnorm(
-                    rng, mu=85.0, sigma=5.0, lo=floor, hi=ceiling,
-                )
+                # Departure-SoC requirement: calibrated Beta per region when
+                # available (sample on [0,1], clamp into the D6/D7 band), else
+                # the hardcoded N(85, 5) — kept bit-identical for uncalibrated
+                # populations (same single RNG draw).
+                if soc_depart_p is not None:
+                    beta_d = float(rng.beta(soc_depart_p["alpha"], soc_depart_p["beta"])) * 100.0
+                    r_soc_pct = max(floor, min(ceiling, beta_d))
+                else:
+                    r_soc_pct = _sample_truncnorm(
+                        rng, mu=85.0, sigma=5.0, lo=floor, hi=ceiling,
+                    )
 
                 # 5. D5 reachability via rejection.
                 duration_hr = duration_sec / 3600.0

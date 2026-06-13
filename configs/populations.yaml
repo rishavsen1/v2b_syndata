@@ -144,6 +144,12 @@ acn_workplace_baseline:
         beta: 1.340853548559775
         n_samples: 4723
         ks_fit_quality: 0.36661147349705714
+      soc_depart:
+        dist: beta
+        alpha: 1.4760526811910402
+        beta: 0.3679958602188522
+        n_samples: 4723
+        ks_fit_quality: 0.14013658988676936
       copula:
         rho_spearman: -0.5441642060816433
         rho_gaussian: -0.5621684796733354
@@ -167,6 +173,12 @@ acn_workplace_baseline:
         beta: 1.7019294573137806
         n_samples: 80
         ks_fit_quality: 0.49688869445751305
+      soc_depart:
+        dist: beta
+        alpha: 1.1490783501526973
+        beta: 0.23533107552135363
+        n_samples: 80
+        ks_fit_quality: 0.2918289561234336
       copula:
         rho_spearman: 0.052590556673176116
         rho_gaussian: 0.05506574260954844
@@ -190,6 +202,12 @@ acn_workplace_baseline:
         beta: 1.3858098360167455
         n_samples: 17313
         ks_fit_quality: 0.3584558894616698
+      soc_depart:
+        dist: beta
+        alpha: 1.7422614981082798
+        beta: 0.42269330514334486
+        n_samples: 17313
+        ks_fit_quality: 0.14634696195252483
       copula:
         rho_spearman: -0.6268781855343101
         rho_gaussian: -0.6447410712502466
@@ -213,6 +231,12 @@ acn_workplace_baseline:
         beta: 0.9975121416749549
         n_samples: 18724
         ks_fit_quality: 0.3587091131613043
+      soc_depart:
+        dist: beta
+        alpha: 1.9697521819448807
+        beta: 0.5125392186430171
+        n_samples: 18708
+        ks_fit_quality: 0.10088050866978349
       copula:
         rho_spearman: -0.5716755787245417
         rho_gaussian: -0.5897575175466935
@@ -280,6 +304,12 @@ acn_caltech_baseline:
         beta: 1.1468434090536954
         n_samples: 2757
         ks_fit_quality: 0.3348182288701893
+      soc_depart:
+        dist: beta
+        alpha: 1.723143555091253
+        beta: 0.48028621702303137
+        n_samples: 2757
+        ks_fit_quality: 0.10228603815242399
       copula:
         rho_spearman: -0.38257011810429364
         rho_gaussian: -0.39795264481953246
@@ -303,6 +333,12 @@ acn_caltech_baseline:
         beta: 2.2152183149381983
         n_samples: 74
         ks_fit_quality: 0.5535830852734772
+      soc_depart:
+        dist: beta
+        alpha: 1.0740484167901185
+        beta: 0.22368829658502143
+        n_samples: 74
+        ks_fit_quality: 0.3008827135592352
       copula:
         rho_spearman: 0.12072655110698317
         rho_gaussian: 0.12634037114434313
@@ -326,6 +362,12 @@ acn_caltech_baseline:
         beta: 0.9854956260320794
         n_samples: 4658
         ks_fit_quality: 0.3015642081136307
+      soc_depart:
+        dist: beta
+        alpha: 2.1645167022576186
+        beta: 0.536767048051924
+        n_samples: 4658
+        ks_fit_quality: 0.07699740265328237
       copula:
         rho_spearman: -0.44044809683664815
         rho_gaussian: -0.45715857556514855
@@ -349,6 +391,12 @@ acn_caltech_baseline:
         beta: 1.1874198640875147
         n_samples: 5361
         ks_fit_quality: 0.33691716899736857
+      soc_depart:
+        dist: beta
+        alpha: 2.495904627459737
+        beta: 0.5814188480924424
+        n_samples: 5361
+        ks_fit_quality: 0.07270824040317458
       copula:
         rho_spearman: -0.3792615829607139
         rho_gaussian: -0.39455663839432986
@@ -413,6 +461,12 @@ acn_jpl_baseline:
         beta: 1.52189841618953
         n_samples: 2454
         ks_fit_quality: 0.39366552423744305
+      soc_depart:
+        dist: beta
+        alpha: 1.4339833857736128
+        beta: 0.3170566483265416
+        n_samples: 2454
+        ks_fit_quality: 0.17450482265558398
       copula:
         rho_spearman: -0.6093194764107155
         rho_gaussian: -0.6273082710078218
@@ -436,6 +490,12 @@ acn_jpl_baseline:
         beta: 1.6601892501417437
         n_samples: 11702
         ks_fit_quality: 0.3984635161318487
+      soc_depart:
+        dist: beta
+        alpha: 1.6093189505967465
+        beta: 0.3818457740238311
+        n_samples: 11702
+        ks_fit_quality: 0.18099527171028518
       copula:
         rho_spearman: -0.6667288392908075
         rho_gaussian: -0.6841014668748994
@@ -459,6 +519,12 @@ acn_jpl_baseline:
         beta: 1.23396849960098
         n_samples: 13168
         ks_fit_quality: 0.3854728554796339
+      soc_depart:
+        dist: beta
+        alpha: 1.9165358626917377
+        beta: 0.5030026672246297
+        n_samples: 13152
+        ks_fit_quality: 0.13502788156190193
       copula:
         rho_spearman: -0.5684087869918644
         rho_gaussian: -0.5864877949094701
@@ -523,6 +589,12 @@ acn_office001_baseline:
         beta: 2.4666187784934728
         n_samples: 41
         ks_fit_quality: 0.5149397520106638
+      soc_depart:
+        dist: beta
+        alpha: 1.1459614416475252
+        beta: 0.3149108951186333
+        n_samples: 41
+        ks_fit_quality: 0.21586944680048425
       copula:
         rho_spearman: -0.6576655052264809
         rho_gaussian: -0.6751751851778541
@@ -546,6 +618,12 @@ acn_office001_baseline:
         beta: 2.9346397643627946
         n_samples: 187
         ks_fit_quality: 0.5265702630454121
+      soc_depart:
+        dist: beta
+        alpha: 1.2807830438222667
+        beta: 0.5363442598424419
+        n_samples: 187
+        ks_fit_quality: 0.2681849087436976
       copula:
         rho_spearman: -0.28559919620860036
         rho_gaussian: -0.29796535648767564
@@ -569,6 +647,12 @@ acn_office001_baseline:
         beta: 0.7739656297483056
         n_samples: 346
         ks_fit_quality: 0.3757893039020568
+      soc_depart:
+        dist: beta
+        alpha: 0.7149723595883088
+        beta: 0.38707125443500845
+        n_samples: 346
+        ks_fit_quality: 0.348696736146945
       copula:
         rho_spearman: -0.6578952762281177
         rho_gaussian: -0.6754016703686238
