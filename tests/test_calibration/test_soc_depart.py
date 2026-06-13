@@ -33,17 +33,21 @@ def _sess(kwh_requested, kwh_delivered=10.0):
     )
 
 
-def test_reconstruct_arrival_soc_exact_with_requested():
-    assert abs(reconstruct_arrival_soc(_sess(30.0), 60.0) - 0.5) < 1e-9
+def test_reconstruct_arrival_soc_requires_rng():
+    """Arrival SoC is unobserved in every dataset, so reconstruction needs the
+    prior RNG — there is no exact requested-based path anymore (uniform)."""
+    assert reconstruct_arrival_soc(_sess(30.0), 60.0) is None   # requested present, still no rng
+    assert reconstruct_arrival_soc(_sess(None), 60.0) is None
 
 
-def test_reconstruct_arrival_soc_estimated_without_requested():
-    s = _sess(kwh_requested=None)
-    assert reconstruct_arrival_soc(s, 60.0) is None          # no rng → None
+def test_reconstruct_arrival_soc_prior_uniform():
+    """With an rng, arrival is drawn from the prior identically whether or not
+    requested energy is present (ACN gets no special treatment)."""
     rng = np.random.default_rng(0)
-    vals = [reconstruct_arrival_soc(s, 60.0, rng=rng) for _ in range(300)]
+    vals = [reconstruct_arrival_soc(_sess(30.0 if i % 2 else None), 60.0, rng=rng)
+            for i in range(300)]
     assert all(0.05 <= v <= 0.95 for v in vals)
-    assert 0.30 < float(np.mean(vals)) < 0.50                # ~prior mean 0.40
+    assert 0.30 < float(np.mean(vals)) < 0.50                   # ~prior mean 0.40
 
 
 def test_fit_beta_soc_depart_leaf_prefix():

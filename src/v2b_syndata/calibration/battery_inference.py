@@ -50,19 +50,18 @@ def reconstruct_arrival_soc(
     capacity_kwh: float,
     rng: np.random.Generator | None = None,
 ) -> float | None:
-    """Returns arrival SoC fraction in [0, 1], or None if it cannot be obtained.
+    """Estimate arrival SoC from the normal prior — uniformly, for every source.
 
-    With ``kwh_requested`` (ACN): exact, ``1 - kWhRequested/capacity``.
-    Without it but with a seeded ``rng``: estimated from the normal arrival-SoC
-    prior (sources that log delivered energy only). ``None`` if capacity is
-    invalid, or if requested is missing and no ``rng`` was supplied.
+    No charging dataset records SoC. Deriving it from ``kWhRequested`` as
+    ``1 - kWhRequested/capacity`` assumes the request tops the car to a full
+    charge, which the data contradicts (ACN delivered/requested ≈ 0.58, and the
+    1-req/cap arrival clusters implausibly near 1.0 for small requests). So
+    arrival SoC is treated as *unobserved* and drawn from a shared prior for all
+    sources; ``kWhRequested`` is used only for capacity inference, and the real
+    per-session signal (delivered energy) drives the departure SoC. Returns
+    ``None`` if capacity is invalid or no seeded ``rng`` is supplied.
     """
-    if capacity_kwh <= 0:
-        return None
-    if s.kwh_requested is not None:
-        soc = 1.0 - s.kwh_requested / capacity_kwh
-        return float(max(0.0, min(1.0, soc)))
-    if rng is None:
+    if capacity_kwh <= 0 or rng is None:
         return None
     soc = float(rng.normal(ARRIVAL_SOC_PRIOR_MEAN, ARRIVAL_SOC_PRIOR_STD))
     return max(ARRIVAL_SOC_PRIOR_LO, min(ARRIVAL_SOC_PRIOR_HI, soc))

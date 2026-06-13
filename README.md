@@ -123,24 +123,25 @@ Full launch options + a recommended new-user usage path live in [`showcase/READM
 
 `v2b-syndata calibrate` fits per-region behavioral distributions from real
 charging-session datasets. **Charger logs record *energy* (kWh) and timestamps —
-never state-of-charge.** SoC is *reconstructed*:
+never state-of-charge**, so SoC is modeled, uniformly across every source:
 
-- `arrival_soc   = 1 − kWhRequested / capacity`   (needs requested energy)
-- `departure_soc = arrival_soc + kWhDelivered / capacity`   (the SoC the car left at)
+- `arrival_soc   = ` draw from a normal prior (`battery_inference.ARRIVAL_SOC_PRIOR_*`, mean ≈ 0.40) — arrival SoC is *unobserved* in all datasets
+- `departure_soc = arrival_soc + kWhDelivered / capacity`   (the SoC the car left at — the calibrated `soc_depart`, `required_soc_at_depart`)
 
-> **Only ACN-Data provides the full picture** — it logs the user's *requested*
-> energy as a kiosk input, so arrival (and hence departure) SoC are exact. Every
-> other source records **delivered energy only**; for those, arrival SoC is
-> estimated from a normal prior (`battery_inference.ARRIVAL_SOC_PRIOR_*`,
-> mean ≈ 0.40) and the departure-SoC requirement is taken from
-> `arrival + delivered/capacity`.
+> **Only ACN-Data provides the requested-energy / trip inputs** (`kWhRequested`,
+> `milesRequested`, `WhPerMile`), which give it the best **capacity inference**.
+> We deliberately do **not** derive arrival SoC from `kWhRequested` (`1 − req/cap`):
+> that assumes the request tops the car to full, which the data contradicts
+> (ACN delivered/requested ≈ 0.58). Arrival SoC is therefore drawn from a shared
+> prior for every source, and the real per-session signal — **delivered energy,
+> which all sources record** — drives the departure-SoC requirement.
 
-| source | requested energy | delivered energy | arrival / departure SoC |
-|---|---|---|---|
-| **ACN-Data** (Caltech/JPL/Office001) | ✅ `kWhRequested` | ✅ | exact (full picture) |
-| **ElaadNL / 4TU** | ❌ | ✅ | arrival estimated (prior) → departure |
-| **EV WATTS** | ❌ | ✅ | arrival estimated (prior) → departure |
-| **INL** (EV Project Phase 1) | ❌ | ✅ | arrival estimated (prior) → departure |
+| source | requested / trip inputs | delivered energy | capacity | SoC model |
+|---|---|---|---|---|
+| **ACN-Data** (Caltech/JPL/Office001) | ✅ `kWhRequested`, miles, Wh/mi | ✅ | inferred per-session | prior arrival → delivered departure |
+| **ElaadNL / 4TU** | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
+| **EV WATTS** | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
+| **INL** (EV Project Phase 1) | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
 
 Raw per-session fields, by source:
 
