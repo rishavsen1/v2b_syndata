@@ -149,12 +149,16 @@ def calibrate_populations(
         depart_soc_by_uid: dict[str, list[float]] = {}
         capacity_fallback_count = 0
         capacity_total = 0
+        # Fixed-seed RNG for the arrival-SoC prior used by sources without
+        # requested energy. Sessions iterate in a stable order, so the estimate
+        # (and therefore the fitted soc_arrival/soc_depart) is reproducible.
+        arr_soc_rng = np.random.default_rng(20260613)
         for s in sessions:
             cap, src = infer_capacity(s)
             capacity_total += 1
             if src == "fallback":
                 capacity_fallback_count += 1
-            soc = reconstruct_arrival_soc(s, cap)
+            soc = reconstruct_arrival_soc(s, cap, rng=arr_soc_rng)
             if soc is not None:
                 arr_soc_by_uid.setdefault(s.user_id, []).append(soc)
                 if s.kwh_delivered is not None and cap and cap > 0:

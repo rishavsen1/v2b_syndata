@@ -1085,6 +1085,18 @@ elaadnl_public_eu:
         lambda: 8.173932685681557
         n_samples: 8029
         ks_fit_quality: 0.12132125544802036
+      soc_arrival:
+        dist: beta
+        alpha: 3.5912270148968846
+        beta: 5.391035325824867
+        n_samples: 8029
+        ks_fit_quality: 0.03812028463610384
+      soc_depart:
+        dist: beta
+        alpha: 0.9391298865342477
+        beta: 0.2935622708308472
+        n_samples: 8029
+        ks_fit_quality: 0.2741431414634923
       copula:
         rho_spearman: -0.49438518853944907
         rho_gaussian: -0.5119563944865901
@@ -1102,6 +1114,18 @@ elaadnl_public_eu:
         lambda: 7.636334538440078
         n_samples: 19266
         ks_fit_quality: 0.10152574360016209
+      soc_arrival:
+        dist: beta
+        alpha: 3.709599063580009
+        beta: 5.582307326375782
+        n_samples: 19266
+        ks_fit_quality: 0.03141112868440149
+      soc_depart:
+        dist: beta
+        alpha: 0.9236903399082047
+        beta: 0.23329313531905876
+        n_samples: 19266
+        ks_fit_quality: 0.2560257905308709
       copula:
         rho_spearman: -0.5181854593801983
         rho_gaussian: -0.5360092141112075
