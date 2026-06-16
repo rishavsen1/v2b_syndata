@@ -22,7 +22,8 @@ SoC the dataset carries, i.e. departure SoC *is* required SoC:
   * Fallback (hand-authored populations, and sources without the data to
     reconstruct departure SoC such as ElaadNL — no kWhRequested → no arrival
     SoC): no `soc_depart` block, so required_soc is drawn from the prior
-    truncnorm(85, 5) floored at `min_depart_soc` (default 0.80). The prior
+    truncnorm(`user_behavior.depart_soc_mu`, `user_behavior.depart_soc_sigma`;
+    defaults 85/5) floored at `min_depart_soc` (default 0.80). The prior
     required_soc thus serves as the departure SoC.
 """
 from __future__ import annotations
@@ -83,6 +84,11 @@ def render(ctx: ScenarioContext) -> None:
     f_soc = ctx.latents["f_soc"]
     f_soc_depart = ctx.latents.get("f_soc_depart", {})
     min_depart_soc_pct = float(ctx.knobs.get("user_behavior.min_depart_soc")) * 100.0
+    # Fallback departure-SoC TruncNorm params (uncalibrated/synthetic populations
+    # only; calibrated cohorts use the fitted soc_depart Beta). Defaults 85/5
+    # reproduce the prior hardcoded literals bit-for-bit.
+    depart_soc_mu = float(ctx.knobs.get("user_behavior.depart_soc_mu"))
+    depart_soc_sigma = float(ctx.knobs.get("user_behavior.depart_soc_sigma"))
 
     # Grid bounds — sessions must be within building_load datetime range.
     bl = ctx.rendered["building_load.csv"]
@@ -206,7 +212,8 @@ def render(ctx: ScenarioContext) -> None:
                     r_soc_pct = max(floor, min(ceiling, beta_d))
                 else:
                     r_soc_pct = _sample_truncnorm(
-                        rng, mu=85.0, sigma=5.0, lo=floor, hi=ceiling,
+                        rng, mu=depart_soc_mu, sigma=depart_soc_sigma,
+                        lo=floor, hi=ceiling,
                     )
 
                 # 5. D5 reachability via rejection.

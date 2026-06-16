@@ -116,6 +116,20 @@ user_behavior:
     description: "Behavioral floor on required_soc_at_depart (D7). A discretionary prior, NOT a hard constraint — the only structural rule is required_soc_at_depart > arrival_soc (D6). Default 0.80 for hand-authored populations; data-calibrated cohorts set it to 0.0 so the empirical departure-SoC (region_distributions.soc_depart) is not clamped by an arbitrary floor."
     affects_csv: [sessions.csv]
 
+  depart_soc_mu:
+    type: float
+    range: [0.0, 100.0]
+    default: 85.0
+    description: "Mean (%) of the fallback TruncNorm for required_soc_at_depart, used only by uncalibrated/synthetic populations (no region_distributions.soc_depart). Calibrated cohorts use the fitted soc_depart Beta and ignore this. Default 85 reproduces the prior hardcoded value."
+    affects_csv: [sessions.csv]
+
+  depart_soc_sigma:
+    type: float
+    range: [0.1, 50.0]
+    default: 5.0
+    description: "Std (%) of the fallback TruncNorm for required_soc_at_depart (paired with depart_soc_mu). Uncalibrated/synthetic populations only. Default 5 reproduces the prior hardcoded value. Must be > 0."
+    affects_csv: [sessions.csv]
+
   weekend_activity_factor:
     type: float
     range: [0.0, 5.0]
@@ -258,6 +272,20 @@ utility_rate:
     default: 0.05
     description: "Baseline Poisson rate (events/hour) before seasonal/temp/dow/tod modulation. Step 6: units corrected from events/day to events/hour per D63. Range widened to 10.0 to support sensitivity sweeps and cap-test scenarios."
     affects_csv: [dr_events.csv]
+
+  dr_incentive_per_kw:
+    type: float
+    range: [0.0, 100.0]
+    default: 1.0
+    description: "DR incentive ($/kW) paid on the committed load-reduction. Not used by the native single-building generator; consumed by the optimus export layer to populate the 'incentive' column of the unified dso_commands.csv."
+    affects_csv: []
+
+  dr_penalty_per_kwh:
+    type: float
+    range: [0.0, 100.0]
+    default: 1.0
+    description: "DR penalty ($/kWh) charged on energy consumed in excess of the committed firm-service level. Not used by the native single-building generator; consumed by the optimus export layer to populate the 'penalty' column of the unified dso_commands.csv."
+    affects_csv: []
 
 # ──────────────────────────────────────────────────────────────────────────
 # Bucket 6: Simulation Window (meta)

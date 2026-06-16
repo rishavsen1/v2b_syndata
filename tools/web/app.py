@@ -11,6 +11,7 @@ Local-only by default. See README for LAN exposure.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -335,6 +336,93 @@ def api_generate():
     })
 
 
+def _summarize_csv(path: Path) -> dict:
+    df = pd.read_csv(path)
+    numeric_df = df.select_dtypes(include="number")
+    return {
+        "row_count": int(len(df)),
+        "columns": list(df.columns),
+        "head": df.head(50).fillna("").to_dict(orient="records"),
+        "dtypes": {c: str(df[c].dtype) for c in df.columns},
+        "numeric_stats": (
+            numeric_df.describe().fillna(0).to_dict() if not numeric_df.empty else {}
+        ),
+    }
+
+
+@app.route("/api/generate-multi", methods=["POST"])
+def api_generate_multi():
+    """Generate N distinct buildings → optimus-compatible CSVs.
+
+    Payload: {output_mode, dr_program, dr_incentive_per_kw, dr_penalty_per_kwh,
+    default_policy, buildings:[{base_scenario, descriptors, overrides, seed,
+    noise_profile, policy}]}. Writes a temp multi-building config and shells
+    out to `cli generate-multi`, mirroring /api/generate.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    buildings = payload.get("buildings") or []
+    if not buildings:
+        return jsonify({"error": "at least one building is required"}), 400
+
+    run_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    run_dir = RUNS_DIR / run_id
+    run_dir.mkdir(parents=True)
+
+    # The payload IS a hand-authored multi-building config (top-level globals).
+    config_path = run_dir / "_input_config.json"
+    config_path.write_text(json.dumps(payload, indent=2))
+
+    cmd = [
+        sys.executable, "-m", "v2b_syndata.cli",
+        "--config-dir", str(CONFIGS),
+        "generate-multi",
+        "--config", str(config_path),
+        "--output-dir", str(run_dir),
+    ]
+    timeout = max(GEN_TIMEOUT_SEC, 120 * len(buildings))
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            cwd=str(REPO_ROOT),
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"Generation timed out after {timeout}s"}), 504
+
+    if result.returncode != 0:
+        return jsonify({
+            "error": result.stderr or "generation failed (no stderr)",
+            "stdout": result.stdout,
+            "command": " ".join(cmd),
+            "returncode": result.returncode,
+        }), 500
+
+    output_mode = payload.get("output_mode", "shared")
+    csv_summaries: dict = {}
+    if output_mode == "shared":
+        for csv_file in sorted(run_dir.glob("*.csv")):
+            csv_summaries[csv_file.name] = _summarize_csv(csv_file)
+    else:
+        for sub in sorted(p for p in run_dir.iterdir() if p.is_dir()):
+            for csv_file in sorted(sub.glob("*.csv")):
+                csv_summaries[f"{sub.name}/{csv_file.name}"] = _summarize_csv(csv_file)
+
+    config = {}
+    cfg_path = run_dir / "multi_building_config.json"
+    if cfg_path.exists():
+        config = json.loads(cfg_path.read_text())
+
+    prune_old_runs()
+    return jsonify({
+        "run_id": run_id,
+        "output_mode": output_mode,
+        "config": config,
+        "csv_summaries": csv_summaries,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "command": " ".join(cmd),
+    })
+
+
 @app.route("/api/output/<run_id>/<csv_name>")
 def api_csv(run_id: str, csv_name: str):
     # Path traversal guard: only basenames allowed; nothing fancy.
@@ -481,4 +569,9 @@ def api_manifest(run_id: str):
 if __name__ == "__main__":
     prune_old_runs()
     prune_temp_scenarios()
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # Bind all interfaces by default so the app is reachable over SSH/LAN
+    # (e.g. http://<host-ip>:5000). Override with HOST/PORT env vars; set
+    # HOST=127.0.0.1 to restore loopback-only access.
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host=host, port=port, debug=False)

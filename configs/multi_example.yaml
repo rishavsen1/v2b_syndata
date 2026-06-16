@@ -1,0 +1,24 @@
+# Example multi-building config for `v2b-syndata generate-multi`.
+# Globals at the top; one entry per building. See README "Multi-building
+# generation (optimus export)".
+output_mode: shared              # shared (building_id column) | per-building (subfolders)
+dr_program: CBP                  # global DR program → one unified dso_commands.csv
+dr_incentive_per_kw: 5.0         # $/kW on committed reduction → dso_commands.incentive
+dr_penalty_per_kwh: 12.0         # $/kWh on excess            → dso_commands.penalty
+default_policy: ILP-MPCFIXEDFSL
+
+buildings:
+  - base_scenario: S01
+    descriptors: {location: nashville_tn}
+    overrides: {ev_fleet.ev_count: 30, charging_infra.charger_count: 30}
+    seed: 42
+
+  - base_scenario: S01
+    descriptors: {building: large_office_v1, location: san_jose_ca}
+    overrides: {ev_fleet.ev_count: 25, charging_infra.charger_count: 25}
+    seed: 7
+
+  - base_scenario: S01
+    descriptors: {population: stable_commuter_heavy}
+    overrides: {ev_fleet.ev_count: 20, charging_infra.charger_count: 20}
+    seed: 99

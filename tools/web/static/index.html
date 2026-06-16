@@ -105,6 +105,64 @@
         </details>
     </section>
 
+    <section id="multi-building">
+        <details id="multi-building-details">
+            <summary>Multi-building — generate N distinct buildings (optimus export)</summary>
+            <p class="hint">Each building gets its own base scenario, descriptor picks, knob overrides, and seed. Output matches the <code>optimus-persist-multi</code> input CSV schema (with <code>building_id</code>). The run is exactly reproducible from the exported <code>multi_building_config.json</code>.</p>
+
+            <div class="mb-globals">
+                <label>
+                    <span class="field-name">Output layout</span>
+                    <span style="display:flex;gap:1rem;align-items:center">
+                        <label class="inline-flag"><input type="radio" name="mb-output-mode" value="shared" checked> shared (one set, <code>building_id</code> column)</label>
+                        <label class="inline-flag"><input type="radio" name="mb-output-mode" value="per-building"> per-building (subfolders)</label>
+                    </span>
+                </label>
+                <label>
+                    <span class="field-name">DR program (global)</span>
+                    <select id="mb-dr-program">
+                        <option value="">(base scenario)</option>
+                        <option value="none">none</option>
+                        <option value="CBP">CBP</option>
+                        <option value="BIP">BIP</option>
+                        <option value="ELRP">ELRP</option>
+                    </select>
+                </label>
+                <label>
+                    <span class="field-name">DR incentive ($/kW)</span>
+                    <input type="number" id="mb-dr-incentive" step="0.5" placeholder="(default)">
+                </label>
+                <label>
+                    <span class="field-name">DR penalty ($/kWh)</span>
+                    <input type="number" id="mb-dr-penalty" step="0.5" placeholder="(default)">
+                </label>
+                <label>
+                    <span class="field-name">Default policy</span>
+                    <input type="text" id="mb-default-policy" value="ILP-MPCFIXEDFSL">
+                </label>
+            </div>
+
+            <div id="building-cards"></div>
+            <button id="mb-add-building" type="button" class="secondary">+ Add building</button>
+
+            <div id="mb-action">
+                <button id="mb-generate-btn" type="button">Generate multi-building</button>
+                <span id="mb-status"></span>
+            </div>
+
+            <div id="multi-output" style="display:none">
+                <h3>Generated buildings</h3>
+                <div id="mb-output-meta"></div>
+                <div id="mb-output-tabs"></div>
+                <div id="mb-output-panel"></div>
+                <details>
+                    <summary>multi_building_config.json + stdout</summary>
+                    <pre id="mb-run-log"></pre>
+                </details>
+            </div>
+        </details>
+    </section>
+
     <section id="action">
         <button id="generate-btn" type="button">Generate scenario</button>
         <label class="inline-flag"><input type="checkbox" id="strict-e5"> strict E5 (fail on concurrency overflow)</label>

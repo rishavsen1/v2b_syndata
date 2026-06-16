@@ -110,7 +110,9 @@ def cmd_list_scenarios(args: argparse.Namespace) -> int:
 
 def cmd_calibrate(args: argparse.Namespace) -> int:
     import warnings
+
     import yaml as _yaml
+
     from .calibration import calibrate_populations
     from .calibration.sources import CALIBRATION_SOURCES
 
@@ -198,6 +200,43 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generate_multi(args: argparse.Namespace) -> int:
+    """Generate N distinct buildings → optimus-compatible CSVs."""
+    import json as _json
+
+    from .multi_building import (
+        config_from_dict,
+        generate_multi,
+        regenerate_from_config,
+    )
+
+    output_dir = Path(args.output_dir)
+    if args.from_config:
+        config = regenerate_from_config(
+            Path(args.from_config), output_dir, Path(args.config_dir)
+        )
+        print(f"regenerated {len(config['buildings'])} buildings "
+              f"({config['output_mode']}) -> {output_dir}")
+        return 0
+
+    if not args.config:
+        print("generate-multi requires --config <yaml|json> or "
+              "--from-config <multi_building_config.json>", file=sys.stderr)
+        return 2
+
+    cfg_path = Path(args.config)
+    raw = cfg_path.read_text()
+    data = _json.loads(raw) if cfg_path.suffix == ".json" else yaml.safe_load(raw)
+    cfg = config_from_dict(data)
+    if args.output_mode:
+        cfg.output_mode = args.output_mode
+
+    config = generate_multi(cfg, output_dir, Path(args.config_dir))
+    print(f"generated {len(config['buildings'])} buildings "
+          f"({config['output_mode']}) -> {output_dir}")
+    return 0
+
+
 def cmd_batch(args: argparse.Namespace) -> int:
     from .batch import run_batch
     extra: dict[str, object] = {}
@@ -246,6 +285,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
 def cmd_bench(args: argparse.Namespace) -> int:
     """Run an ACN-Sim scheduling baseline against a generated scenario."""
     import json as _json
+
     from .bench import available_algorithms, run_scenario
 
     if args.algo not in available_algorithms():
@@ -391,6 +431,19 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--force", action="store_true",
                    help="overwrite output_dir if it exists")
     b.set_defaults(func=cmd_batch)
+
+    gm = sub.add_parser(
+        "generate-multi",
+        help="generate N distinct buildings in one run → optimus-compatible CSVs",
+    )
+    gm.add_argument("--config", default=None,
+                    help="multi-building config (.yaml/.json): buildings[] + DR/output globals")
+    gm.add_argument("--from-config", default=None,
+                    help="regenerate a prior run from its multi_building_config.json")
+    gm.add_argument("--output-dir", required=True)
+    gm.add_argument("--output-mode", choices=["shared", "per-building"], default=None,
+                    help="override the config's output_mode (default: shared)")
+    gm.set_defaults(func=cmd_generate_multi)
 
     dg = sub.add_parser("docs-gen", help="emit auto-generated section of docs/KNOB_REFERENCE.md")
     dg.set_defaults(func=cmd_docs_gen)
