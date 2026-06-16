@@ -1512,4 +1512,190 @@ function escapeHtml(s) {
         .replace(/>/g, "&gt;");
 }
 
-init();
+// ────────────────────────────────────────────────────────────────────────────
+// Multi-building generation (optimus export). Self-contained: reuses the
+// already-loaded DESCRIPTORS + SCENARIOS, posts to /api/generate-multi.
+// ────────────────────────────────────────────────────────────────────────────
+
+let MB_CARD_SEQ = 0;
+
+function mbFillSelect(sel, items, blankLabel) {
+    sel.innerHTML = "";
+    if (blankLabel !== null) {
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = blankLabel;
+        sel.appendChild(blank);
+    }
+    (items || []).forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.id;
+        opt.textContent = it.description ? `${it.id} — ${it.description}` : it.id;
+        sel.appendChild(opt);
+    });
+}
+
+function createBuildingCard() {
+    const idx = MB_CARD_SEQ++;
+    const card = document.createElement("div");
+    card.className = "building-card";
+    card.dataset.cardId = idx;
+    card.innerHTML = `
+        <div class="building-card-head">
+            <span class="building-card-title"></span>
+            <button type="button" class="mb-remove secondary">− remove</button>
+        </div>
+        <div class="descriptor-grid">
+            <label><span class="field-name">Base scenario</span><select class="mb-base"></select></label>
+            <label><span class="field-name">Location</span><select class="mb-location"></select></label>
+            <label><span class="field-name">Building</span><select class="mb-building"></select></label>
+            <label><span class="field-name">Population</span><select class="mb-population"></select></label>
+            <label><span class="field-name">Equipment</span><select class="mb-equipment"></select></label>
+            <label><span class="field-name">Noise profile</span><select class="mb-noise"></select></label>
+            <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
+            <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="(base)"></label>
+            <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="(base)"></label>
+            <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
+        </div>
+    `;
+    mbFillSelect(card.querySelector(".mb-base"), SCENARIOS, null);
+    mbFillSelect(card.querySelector(".mb-location"), DESCRIPTORS.location, "(base scenario)");
+    mbFillSelect(card.querySelector(".mb-building"), DESCRIPTORS.building, "(base scenario)");
+    mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "(base scenario)");
+    mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "(base scenario)");
+    mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "(base scenario)");
+    card.querySelector(".mb-remove").addEventListener("click", () => {
+        card.remove();
+        renumberBuildingCards();
+    });
+    return card;
+}
+
+function renumberBuildingCards() {
+    document.querySelectorAll("#building-cards .building-card").forEach((card, i) => {
+        card.querySelector(".building-card-title").textContent = `Building ${i} (building_id=${i})`;
+    });
+}
+
+function addBuilding() {
+    document.getElementById("building-cards").appendChild(createBuildingCard());
+    renumberBuildingCards();
+}
+
+function buildMultiPayload() {
+    const mode = (document.querySelector("input[name='mb-output-mode']:checked") || {}).value || "shared";
+    const drProgram = document.getElementById("mb-dr-program").value;
+    const incentive = parseFloat(document.getElementById("mb-dr-incentive").value);
+    const penalty = parseFloat(document.getElementById("mb-dr-penalty").value);
+    const defaultPolicy = document.getElementById("mb-default-policy").value || "ILP-MPCFIXEDFSL";
+
+    const buildings = [];
+    document.querySelectorAll("#building-cards .building-card").forEach(card => {
+        const descriptors = {};
+        ["location", "building", "population", "equipment"].forEach(k => {
+            const v = card.querySelector(".mb-" + k).value;
+            if (v) descriptors[k] = v;
+        });
+        const overrides = {};
+        const ev = parseInt(card.querySelector(".mb-ev-count").value, 10);
+        const ch = parseInt(card.querySelector(".mb-charger-count").value, 10);
+        if (!isNaN(ev)) overrides["ev_fleet.ev_count"] = ev;
+        if (!isNaN(ch)) overrides["charging_infra.charger_count"] = ch;
+        const noise = card.querySelector(".mb-noise").value || null;
+        const policy = card.querySelector(".mb-policy").value || null;
+        buildings.push({
+            base_scenario: card.querySelector(".mb-base").value,
+            descriptors,
+            overrides,
+            seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
+            noise_profile: noise,
+            policy,
+        });
+    });
+
+    const payload = { output_mode: mode, default_policy: defaultPolicy, buildings };
+    if (drProgram) payload.dr_program = drProgram;
+    if (!isNaN(incentive)) payload.dr_incentive_per_kw = incentive;
+    if (!isNaN(penalty)) payload.dr_penalty_per_kwh = penalty;
+    return payload;
+}
+
+async function generateMulti() {
+    const status = document.getElementById("mb-status");
+    const payload = buildMultiPayload();
+    if (!payload.buildings.length) {
+        status.textContent = "Add at least one building.";
+        return;
+    }
+    status.textContent = `Generating ${payload.buildings.length} building(s)…`;
+    const btn = document.getElementById("mb-generate-btn");
+    btn.disabled = true;
+    try {
+        const resp = await fetch("/api/generate-multi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            status.textContent = "Error: " + (data.error || resp.status);
+            document.getElementById("mb-run-log").textContent =
+                (data.stdout || "") + "\n" + (data.error || "");
+            return;
+        }
+        status.textContent = `Generated ${payload.buildings.length} building(s) (${data.output_mode}).`;
+        renderMultiOutput(data);
+    } catch (e) {
+        status.textContent = "Request failed: " + e;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function renderMultiOutput(data) {
+    document.getElementById("multi-output").style.display = "";
+    document.getElementById("mb-output-meta").innerHTML =
+        `<p class="small">run_id <code>${escapeHtml(data.run_id)}</code> · mode <code>${escapeHtml(data.output_mode)}</code> · ${Object.keys(data.csv_summaries).length} files</p>`;
+    const names = Object.keys(data.csv_summaries);
+    const tabs = document.getElementById("mb-output-tabs");
+    const panel = document.getElementById("mb-output-panel");
+    tabs.innerHTML = "";
+    const show = (name) => {
+        const s = data.csv_summaries[name];
+        const cols = s.columns;
+        const rows = s.head.slice(0, 20);
+        let html = `<p class="small">${escapeHtml(name)} — ${s.row_count} rows</p><table class="csv-preview"><thead><tr>`;
+        cols.forEach(c => html += `<th>${escapeHtml(c)}</th>`);
+        html += "</tr></thead><tbody>";
+        rows.forEach(r => {
+            html += "<tr>";
+            cols.forEach(c => html += `<td>${escapeHtml(r[c])}</td>`);
+            html += "</tr>";
+        });
+        html += "</tbody></table>";
+        panel.innerHTML = html;
+    };
+    names.forEach((name, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "tab";
+        b.textContent = name;
+        b.addEventListener("click", () => show(name));
+        tabs.appendChild(b);
+        if (i === 0) show(name);
+    });
+    document.getElementById("mb-run-log").textContent =
+        JSON.stringify(data.config, null, 2) + "\n\n" + (data.stdout || "");
+}
+
+function initMultiBuilding() {
+    if (!DESCRIPTORS || !SCENARIOS) return;  // config failed to load
+    const addBtn = document.getElementById("mb-add-building");
+    const genBtn = document.getElementById("mb-generate-btn");
+    if (!addBtn || !genBtn) return;
+    addBtn.addEventListener("click", addBuilding);
+    genBtn.addEventListener("click", generateMulti);
+    addBuilding();  // start with one card
+}
+
+init().then(initMultiBuilding);

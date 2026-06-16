@@ -104,8 +104,16 @@ def generate(
     cli_overrides: dict[str, Any] | None = None,
     noise_profile_override: str | None = None,
     strict_e5: bool = False,
+    descriptor_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Run end-to-end generation. Returns the manifest dict."""
+    """Run end-to-end generation. Returns the manifest dict.
+
+    `descriptor_overrides` (optional) replaces individual Tier-0 descriptor
+    picks (location/building/population/equipment) from the base scenario —
+    used by multi-building generation to vary each building's config without
+    authoring a scenario file per building. Default None → identical to the
+    scenario's own descriptors (bit-identical output preserved).
+    """
     # Normalize so direct-API callers can pass dates / tuples — keeps the
     # manifest JSON-serializable and matches the shape parse_overrides emits.
     cli_overrides = _normalize(dict(cli_overrides or {}))
@@ -114,6 +122,9 @@ def generate(
 
     scenario = load_scenario(config_dir / "scenarios" / f"{scenario_id}.yaml")
     descriptors = dict(scenario["descriptors"])
+    for _k, _v in (descriptor_overrides or {}).items():
+        if _v:
+            descriptors[_k] = _v
     scenario_overrides = scenario.get("overrides") or {}
 
     # noise.profile is a fan-out knob: setting it MUST also set every

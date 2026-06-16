@@ -4,8 +4,8 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 import requests
@@ -161,3 +161,55 @@ def parse_epw_temperatures(
         year=year, month=df["month"], day=df["day"], hour=df["hour"],
     ))
     return pd.Series(df["temp_c"].values, index=timestamps, name="dry_bulb_c")
+
+
+def parse_epw_weather(
+    epw_path: Path, *, year: int = 2020,
+) -> pd.DataFrame:
+    """Parse the four EPW weather fields used by the optimus `weather_data.csv`
+    export: dry-bulb temp, dew-point temp, relative humidity, wind speed.
+
+    Returns an hourly DataFrame indexed by datetime (built from each EPW row's
+    month/day/hour anchored to `year`, mirroring `parse_epw_temperatures`), with
+    columns `dry_bulb_temp_c, dew_point_temp_c, relative_humidity_pct,
+    wind_speed_m_s`.
+
+    EPW data-row columns (0-indexed):
+      1:Month 2:Day 3:Hour 6:DryBulb[°C] 7:DewPoint[°C]
+      8:RelativeHumidity[%] 21:WindSpeed[m/s]
+    Hour is 1-24 in EPW; remapped to 0-23 for pandas.
+    """
+    with Path(epw_path).open() as f:
+        for _ in range(8):
+            f.readline()  # skip headers
+        rows = []
+        for line in f:
+            parts = line.split(",")
+            if len(parts) < 22:
+                continue
+            try:
+                month = int(parts[1])
+                day = int(parts[2])
+                hour = int(parts[3]) - 1  # EPW 1-24 → 0-23
+                dry_bulb_c = float(parts[6])
+                dew_point_c = float(parts[7])
+                rel_humidity = float(parts[8])
+                wind_speed = float(parts[21])
+            except (ValueError, IndexError):
+                continue
+            rows.append((month, day, hour, dry_bulb_c, dew_point_c,
+                         rel_humidity, wind_speed))
+
+    df = pd.DataFrame(rows, columns=[
+        "month", "day", "hour", "dry_bulb_temp_c", "dew_point_temp_c",
+        "relative_humidity_pct", "wind_speed_m_s",
+    ])
+    timestamps = pd.to_datetime(dict(
+        year=year, month=df["month"], day=df["day"], hour=df["hour"],
+    ))
+    out = df[[
+        "dry_bulb_temp_c", "dew_point_temp_c",
+        "relative_humidity_pct", "wind_speed_m_s",
+    ]].copy()
+    out.index = timestamps
+    return out

@@ -72,7 +72,20 @@ uv run python tools/web/app.py
 # → Running on http://127.0.0.1:5000
 ```
 
-Local-only by default. See `tools/web/README.md` for LAN exposure and architecture details. Output runs land in `tools/web/runs/` (last 20 kept, gitignored).
+Output runs land in `tools/web/runs/` (last 20 kept, gitignored). See `tools/web/README.md` for architecture details.
+
+**Remote / SSH fallback.** `127.0.0.1` is loopback on the *server*, so if you run this over SSH the URL won't load in your laptop browser. The app honors `HOST`/`PORT` env vars — bind all interfaces and browse to the host's IP:
+
+```bash
+HOST=0.0.0.0 uv run python tools/web/app.py
+# → also Running on http://<host-ip>:5000   (e.g. http://10.2.218.193:5000)
+```
+
+Then open `http://<host-ip>:5000` from your laptop. Notes:
+- Find `<host-ip>` with `hostname -I`.
+- If it still won't load, a firewall is blocking the port: `sudo ufw allow 5000/tcp` (when ufw is active).
+- "Address already in use" → a stale server holds the port: `fuser -k 5000/tcp`.
+- `0.0.0.0` exposes the dev server to your whole LAN; default (`HOST=127.0.0.1`) keeps it loopback-only.
 
 ## Generate (CLI)
 
@@ -116,6 +129,8 @@ explorer.exe "$(wslpath -w showcase/short_overview/walkthrough.html)"
 cd showcase/short_overview && python -m http.server 8080
 #   → http://localhost:8080/walkthrough.html
 ```
+
+**Remote / SSH fallback.** `python -m http.server` already binds all interfaces, so over SSH just swap `localhost` for the host's IP — browse to `http://<host-ip>:8080/walkthrough.html` from your laptop (find `<host-ip>` with `hostname -I`; if it won't load, allow the port: `sudo ufw allow 8080/tcp`).
 
 Full launch options + a recommended new-user usage path live in [`showcase/README.md`](showcase/README.md#how-to-launch-the-interactive-cars--sessions-generation-walkthrough-walkthroughhtml).
 
@@ -171,16 +186,69 @@ Per scenario seed — deterministic CSVs (bitwise-identical for a given seed) + 
 
 `sessions.csv` SoC columns are *synthesized*: `arrival_soc` from the per-region
 calibrated Beta, and `required_soc_at_depart` from the calibrated departure-SoC
-(`region_distributions.soc_depart`) where available, else the `N(85, 5)` prior.
-The only hard SoC constraint is `required_soc_at_depart > arrival_soc` (D6); the
-80% `min_depart_soc` floor (D7) is a discretionary prior, set to 0 for the
-data-calibrated cohorts so the empirical departure SoC is not clamped.
+(`region_distributions.soc_depart`) where available, else a `TruncNorm`
+fallback whose mean/std are the knobs `user_behavior.depart_soc_mu` (default 85)
+and `user_behavior.depart_soc_sigma` (default 5) — applied only to uncalibrated/
+synthetic populations. The only hard SoC constraint is
+`required_soc_at_depart > arrival_soc` (D6); the 80% `min_depart_soc` floor (D7)
+is a discretionary prior, set to 0 for the data-calibrated cohorts so the
+empirical departure SoC is not clamped.
+
+## Multi-building generation (optimus export)
+
+Generate **N distinct buildings in one run** — each with its own base scenario,
+descriptor picks, knob overrides, and seed — and export them in the
+`optimus-persist-multi` input CSV schema (loader-compatible, with `building_id`).
+
+```bash
+uv run python -m v2b_syndata.cli generate-multi \
+    --config configs/multi_example.yaml \
+    --output-dir data/output/multi/ \
+    --output-mode shared          # or per-building
+
+# regenerate a prior run byte-identically from its exported config
+uv run python -m v2b_syndata.cli generate-multi \
+    --from-config data/output/multi/multi_building_config.json \
+    --output-dir data/output/multi_repro/
+```
+
+Config (YAML or JSON) — globals at the top, one entry per building:
+
+```yaml
+output_mode: shared            # shared (building_id column) | per-building (subfolders)
+dr_program: CBP                # global DR; one unified dso_commands.csv
+dr_incentive_per_kw: 5.0       # $/kW on committed reduction → dso_commands.incentive
+dr_penalty_per_kwh: 12.0       # $/kWh on excess            → dso_commands.penalty
+default_policy: ILP-MPCFIXEDFSL
+buildings:
+  - base_scenario: S01
+    descriptors: {location: nashville_tn}
+    overrides: {ev_fleet.ev_count: 30}
+    seed: 42
+  - base_scenario: S01
+    descriptors: {building: large_office_v1, location: san_jose_ca}
+    overrides: {ev_fleet.ev_count: 25}
+    seed: 7
+```
+
+- **shared** (default): one concatenated CSV per file with a `building_id`
+  column. **per-building**: numbered subfolders `<output-dir>/<building_id>/`,
+  each a complete single-building set.
+- Output files: `building_load, cars, chargers, sessions, grid_prices,
+  weather_data, occupancy, dso_commands` (unified, global), `policies`, plus
+  `multi_building_config.json` (the reproducibility record).
+- The webapp exposes the same feature: open the **Multi-building** panel, add
+  building cards with `+ Add building`, pick the output layout, and generate.
 
 ## Architecture
 
 See `handoff/spec/` for full spec (PLAN.md, BAYES_NET.md, validate_spec.md, knobs.yaml).
 
 Tier 0 descriptors → Tier 1 roots → Tier 1.5 per-entity → Tier 2 latents → Tier 3 renderers.
+
+For *why* each random quantity uses the distribution family it does, and which
+ground-truth features fit each parameter, see
+[`docs/GENERATIVE_MODELS.md`](docs/GENERATIVE_MODELS.md).
 
 ## Step 3 status
 
