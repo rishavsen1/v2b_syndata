@@ -500,8 +500,8 @@
 <div class="axes-grid">
   <div class="ax-card">
     <div class="ax-name">φ &nbsp; frequency</div>
-    <div class="ax-meaning">Probability of showing up on any given weekday.</div>
-    <div class="ax-does">Bernoulli gate. Doesn't change <i>how</i> they arrive when they do — only <i>whether</i>.</div>
+    <div class="ax-meaning">Probability of showing up on any given weekday (weekends: φ · weekend_activity_factor).</div>
+    <div class="ax-does">Bernoulli gate. Doesn't change <i>how</i> they arrive when they do — only <i>whether</i>. Hand-authored populations are weekday-only by default (sim_window.weekdays_only=true); data-calibrated cohorts (ACN/ElaadNL) also emit weekend sessions at a calibrated fraction of φ.</div>
     <div class="ax-watch"><b>Drag it:</b> attendance bar moves; D5 panel gains "skipped" days. Histograms below don't change.</div>
   </div>
 
@@ -750,13 +750,13 @@ dwell   = Weibull⁻¹(u2; k, λ)</pre>
     </div>
     <div class="plot-card">
       <div class="title">Arrival SoC &nbsp;<span class="muted">— step 5 (Beta + shift)</span></div>
-      <div class="sub">shift_eff = shift_region − 0.003 · δ</div>
+      <div class="sub">Hand-authored default: Beta(α, β), shift_eff = shift_region − 0.003 · δ. Data-calibrated cohorts draw arrival SoC from a shared normal prior (SoC is unobserved in the source data, so it is not fit per region).</div>
       <div id="plot-soc" style="height:260px"></div>
     </div>
 
     <div class="plot-card">
-      <div class="title">Required SoC at departure &nbsp;<span class="muted">— step 6 (TruncNorm)</span></div>
-      <div class="sub">TruncNorm(85, 5) clamped to [max(min_depart_soc, arrival_soc + ε), max_allowed_soc]</div>
+      <div class="title">Required SoC at departure &nbsp;<span class="muted">— step 6</span></div>
+      <div class="sub">Hand-authored default: TruncNorm(85, 5) clamped to [max(min_depart_soc, arrival_soc + ε), max_allowed_soc]. Data-calibrated cohorts instead sample a fitted soc_depart Beta (the SoC the car left at) with min_depart_soc=0 — only the structural required_soc &gt; arrival_soc (D6) is enforced, no 80% floor.</div>
       <div id="plot-reqsoc" style="height:260px"></div>
     </div>
 
@@ -1265,6 +1265,8 @@ function renderSoc() {
 }
 
 function renderReqSoc() {
+  // This playground shows the HAND-AUTHORED default path. Data-calibrated
+  // cohorts instead sample a fitted soc_depart Beta with min_depart_soc=0.
   // required_soc ~ TruncNorm(85, 5; [floor, ceiling])
   // floor = max(min_depart_soc, arrival_soc + ε), ceiling = max_allowed_soc.
   // min_depart_soc default = 0.80 (knob: user_behavior.min_depart_soc).
