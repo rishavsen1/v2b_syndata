@@ -246,6 +246,10 @@ See `handoff/spec/` for full spec (PLAN.md, BAYES_NET.md, validate_spec.md, knob
 
 Tier 0 descriptors → Tier 1 roots → Tier 1.5 per-entity → Tier 2 latents → Tier 3 renderers.
 
+For *why* each random quantity uses the distribution family it does, and which
+ground-truth features fit each parameter, see
+[`docs/GENERATIVE_MODELS.md`](docs/GENERATIVE_MODELS.md).
+
 ## Step 3 status
 
 This implementation uses **stubs** for EnergyPlus (sinusoid building load) and DR events (deterministic mock events). Real integrations land in Steps 4 and 6. See `docs/DESIGN_NOTES.md` for non-trivial implementation choices.
