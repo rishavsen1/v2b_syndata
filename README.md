@@ -119,17 +119,62 @@ cd showcase/short_overview && python -m http.server 8080
 
 Full launch options + a recommended new-user usage path live in [`showcase/README.md`](showcase/README.md#how-to-launch-the-interactive-cars--sessions-generation-walkthrough-walkthroughhtml).
 
+## Input datasets (calibration sources)
+
+`v2b-syndata calibrate` fits per-region behavioral distributions from real
+charging-session datasets. **Charger logs record *energy* (kWh) and timestamps —
+never state-of-charge**, so SoC is modeled, uniformly across every source:
+
+- `arrival_soc   = ` draw from a normal prior (`battery_inference.ARRIVAL_SOC_PRIOR_*`, mean ≈ 0.40) — arrival SoC is *unobserved* in all datasets
+- `departure_soc = arrival_soc + kWhDelivered / capacity`   (the SoC the car left at — the calibrated `soc_depart`, `required_soc_at_depart`)
+
+> **Only ACN-Data provides the requested-energy / trip inputs** (`kWhRequested`,
+> `milesRequested`, `WhPerMile`), which give it the best **capacity inference**.
+> We deliberately do **not** derive arrival SoC from `kWhRequested` (`1 − req/cap`):
+> that assumes the request tops the car to full, which the data contradicts
+> (ACN delivered/requested ≈ 0.58). Arrival SoC is therefore drawn from a shared
+> prior for every source, and the real per-session signal — **delivered energy,
+> which all sources record** — drives the departure-SoC requirement.
+
+| source | requested / trip inputs | delivered energy | capacity | SoC model |
+|---|---|---|---|---|
+| **ACN-Data** (Caltech/JPL/Office001) | ✅ `kWhRequested`, miles, Wh/mi | ✅ | inferred per-session | prior arrival → delivered departure |
+| **ElaadNL / 4TU** | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
+| **EV WATTS** | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
+| **INL** (EV Project Phase 1) | ❌ | ✅ | default 60 kWh | prior arrival → delivered departure |
+
+Raw per-session fields, by source:
+
+- **ACN-Data:** `sessionID, userID, siteID, stationID, connectionTime, disconnectTime, kWhDelivered, userInputs{milesRequested, WhPerMile, kWhRequested, minutesAvailable}`
+- **ElaadNL / 4TU:** `EV_id_x, start_datetime, end_datetime, total_energy, capacity_kwh, commute_km_range_min/max, EV_brand/model_selfreported, ownership`
+- **EV WATTS:** `evse_id, venue_type, rated_power_kw, start_time_utc, end_time_utc, energy_kwh`
+- **INL:** `vehicle_id, evse_id, venue, evse_power_kw, start_time, end_time, energy_kwh`
+
+All sources normalize into one internal record before calibration —
+`SessionFeatures{user_id, site, arrival_time, arrival_hour, dwell_hours, kwh_delivered, miles_requested?, wh_per_mile?, kwh_requested?, minutes_available?}`
+(the `?` fields are populated for ACN only).
+
 ## Outputs
 
-Per scenario seed:
-- `building_load.csv` — flex + inflex building load (15-min)
-- `cars.csv` — vehicle physics
-- `users.csv` — behavioral axes + CONSENT weights
-- `chargers.csv` — charger fleet
-- `grid_prices.csv` — energy price tape
-- `dr_events.csv` — DR events (header-only if program=none)
-- `sessions.csv` — multi-day session log
-- `manifest.json` — reproducibility record
+Per scenario seed — deterministic CSVs (bitwise-identical for a given seed) + a manifest:
+
+| file | columns |
+|---|---|
+| `users.csv` | `car_id, region, phi, kappa, delta_km, negotiation_type, w1, w2` |
+| `cars.csv` | `car_id, capacity_kwh, min_allowed_soc, max_allowed_soc, battery_class` |
+| `chargers.csv` | `charger_id, directionality, min_rate_kw, max_rate_kw` |
+| `sessions.csv` | `session_id, car_id, building_id, arrival, departure, duration_sec, arrival_soc, required_soc_at_depart, previous_day_external_use_soc` |
+| `building_load.csv` | `datetime, power_flex_kw, power_inflex_kw, power_kw` (15-min, EnergyPlus) |
+| `grid_prices.csv` | `datetime, price_per_kwh, type` |
+| `dr_events.csv` | `event_id, start, end, magnitude_kw, notified_at` (header-only if program=none) |
+| `manifest.json` | knob resolution + provenance (reproducibility record) |
+
+`sessions.csv` SoC columns are *synthesized*: `arrival_soc` from the per-region
+calibrated Beta, and `required_soc_at_depart` from the calibrated departure-SoC
+(`region_distributions.soc_depart`) where available, else the `N(85, 5)` prior.
+The only hard SoC constraint is `required_soc_at_depart > arrival_soc` (D6); the
+80% `min_depart_soc` floor (D7) is a discretionary prior, set to 0 for the
+data-calibrated cohorts so the empirical departure SoC is not clamped.
 
 ## Architecture
 

@@ -1,6 +1,7 @@
 """Tests for battery_inference."""
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from v2b_syndata.calibration.battery_inference import (
@@ -58,18 +59,23 @@ def test_infer_capacity_oversize_falls_back():
     assert cap == DEFAULT_CAPACITY_KWH
 
 
-def test_reconstruct_arrival_soc():
-    s = _make_session(kwh_requested=12.0)
-    soc = reconstruct_arrival_soc(s, capacity_kwh=60.0)
-    assert soc == 0.8  # 1 - 12/60
+def test_reconstruct_arrival_soc_prior_draw_ignores_requested():
+    # Arrival SoC is drawn from the prior regardless of requested energy
+    # (uniform across sources — no 1-requested/capacity path).
+    rng = np.random.default_rng(0)
+    s = _make_session(kwh_requested=12.0)          # would have been 0.8 under 1-req/cap
+    vals = [reconstruct_arrival_soc(s, 60.0, rng=rng) for _ in range(300)]
+    assert all(0.05 <= v <= 0.95 for v in vals)
+    assert 0.30 < float(np.mean(vals)) < 0.50      # ~prior mean 0.40, not 0.8
 
 
-def test_reconstruct_arrival_soc_no_kwh_requested():
-    s = _make_session()
-    assert reconstruct_arrival_soc(s, 60.0) is None
+def test_reconstruct_arrival_soc_no_rng_is_none():
+    # Without an rng, arrival can't be drawn → None, with or without requested.
+    assert reconstruct_arrival_soc(_make_session(kwh_requested=12.0), 60.0) is None
+    assert reconstruct_arrival_soc(_make_session(), 60.0) is None
 
 
-def test_reconstruct_arrival_soc_clamps():
-    s = _make_session(kwh_requested=80.0)  # exceeds capacity
-    soc = reconstruct_arrival_soc(s, capacity_kwh=60.0)
-    assert soc == 0.0
+def test_reconstruct_arrival_soc_invalid_capacity_is_none():
+    assert reconstruct_arrival_soc(
+        _make_session(kwh_requested=12.0), 0.0, rng=np.random.default_rng(0)
+    ) is None

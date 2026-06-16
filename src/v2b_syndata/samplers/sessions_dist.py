@@ -59,10 +59,12 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
 
 
 def sample_f_soc(ctx: ScenarioContext) -> None:
-    """Per-user Beta(α, β) shifted by -δ * 0.003. Calibrated leaf wins."""
+    """Per-user arrival-SoC Beta(α, β) shifted by -δ * 0.003, plus the
+    departure-SoC requirement Beta when calibrated. Calibrated leaf wins."""
     assert ctx.a_user is not None
     assert ctx.a_fleet is not None
     params = {}
+    depart_params: dict[Any, dict[str, float] | None] = {}
     for car_id, u in ctx.a_user.items():
         car = ctx.a_fleet[car_id]
         soc_cal = _region_dist(ctx, u.region, "soc_arrival")
@@ -74,4 +76,12 @@ def sample_f_soc(ctx: ScenarioContext) -> None:
             "clip_lo": car.min_allowed_soc / 100.0,
             "clip_hi": car.max_allowed_soc / 100.0,
         }
+        # Departure-SoC requirement: None → renderer keeps the hardcoded
+        # N(85, 5) fallback (bit-identical for uncalibrated populations).
+        dep_cal = _region_dist(ctx, u.region, "soc_depart")
+        depart_params[car_id] = (
+            {"alpha": float(dep_cal["alpha"]), "beta": float(dep_cal["beta"])}
+            if "alpha" in dep_cal and "beta" in dep_cal else None
+        )
     ctx.latents["f_soc"] = params
+    ctx.latents["f_soc_depart"] = depart_params
