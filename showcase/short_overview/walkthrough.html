@@ -756,7 +756,7 @@ dwell   = Weibull⁻¹(u2; k, λ)</pre>
 
     <div class="plot-card">
       <div class="title">Required SoC at departure &nbsp;<span class="muted">— step 6</span></div>
-      <div class="sub">Hand-authored default: TruncNorm(85, 5) clamped to [max(min_depart_soc, arrival_soc + ε), max_allowed_soc]. Data-calibrated cohorts instead sample a fitted soc_depart Beta (the SoC the car left at) with min_depart_soc=0 — only the structural required_soc &gt; arrival_soc (D6) is enforced, no 80% floor.</div>
+      <div class="sub">Hand-authored default: TruncNorm(depart_soc_mu, depart_soc_sigma) — defaults 85, 5 (knobs <code>user_behavior.depart_soc_mu</code>/<code>depart_soc_sigma</code>) — clamped to [max(min_depart_soc, arrival_soc + ε), max_allowed_soc]. Data-calibrated cohorts instead sample a fitted soc_depart Beta (the SoC the car left at) with min_depart_soc=0 — only the structural required_soc &gt; arrival_soc (D6) is enforced, no 80% floor.</div>
       <div id="plot-reqsoc" style="height:260px"></div>
     </div>
 
@@ -1267,7 +1267,8 @@ function renderSoc() {
 function renderReqSoc() {
   // This playground shows the HAND-AUTHORED default path. Data-calibrated
   // cohorts instead sample a fitted soc_depart Beta with min_depart_soc=0.
-  // required_soc ~ TruncNorm(85, 5; [floor, ceiling])
+  // required_soc ~ TruncNorm(depart_soc_mu, depart_soc_sigma; [floor, ceiling])
+  //   defaults 85, 5 (knobs user_behavior.depart_soc_mu / depart_soc_sigma)
   // floor = max(min_depart_soc, arrival_soc + ε), ceiling = max_allowed_soc.
   // min_depart_soc default = 0.80 (knob: user_behavior.min_depart_soc).
   // max_allowed_soc default = 100 (typical battery class bound).
