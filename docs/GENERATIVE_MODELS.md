@@ -1,9 +1,20 @@
 # Generative models
 
 How every random quantity in a generated dataset is modeled: **which
-distribution family** is used (and why that family over the alternatives), and
-**which ground-truth features** fit its parameters. This is the reference for
-"why is arrival time a truncated normal and not a beta?" type questions.
+distribution family** is used, **why that family** was chosen, and **which
+ground-truth features** fit its parameters. This is the reference for "why is
+arrival time a truncated normal and not a beta?" type questions.
+
+> **On "why this family".** The family choices below were made on *principled*
+> grounds — correct support, composability with the copula, interpretable
+> parameters — **not** by an empirical contest between candidate families. The
+> calibration code records only a single self-KS per quantity, never an AIC/BIC
+> comparison. A retrospective model-selection study (see
+> [Empirical model selection](#empirical-model-selection-2026-06) and
+> `docs/experiments/`) shows where the principled choice matches the data
+> (dwell→Weibull) and where it is a deliberate simplification
+> (arrival→TruncNorm). Read the "why" columns as design rationale, and that
+> section for the empirical verdict.
 
 ## Two layers
 
@@ -311,3 +322,32 @@ generation uses the hand-authored default). Out-of-range or non-convergent fits
 are dropped with a `RuntimeWarning` so calibration runs surface the issue rather
 than silently shipping a degenerate parameter. The forward generator validates
 the *output* separately (`validate.py`, the S/D/E/F invariant checks).
+
+> Note this is **goodness-of-fit of the chosen family only** — it does not
+> compare against alternative families. That comparison is the next section.
+
+## Empirical model selection (2026-06)
+
+The family choices above were principled, not competed. This retrospective
+study (reproducible via `docs/experiments/model_selection.py` and
+`model_fit_plots.py`) fits competing families to real ground-truth data —
+**ACN-Data** (41,774 sessions, Caltech+JPL+Office001) and **ElaadNL** (55,201,
+Utrecht), through the same feature pipeline — and ranks them by AIC / BIC / KS.
+
+| quantity | chosen | input feature(s) | best by AIC | best by KS | verdict |
+|---|---|---|---|---|---|
+| **arrival hour** | TruncNorm(μ,σ)[6,20] | local connect clock-hour | GaussMix-2 | GaussMix-2 (KS 0.029 vs 0.108) | **deliberate simplification.** Arrival is *bimodal* (morning peak + midday shoulder); 8.3% of ACN arrivals fall outside [6,20] and are structurally discarded. Kept for closed-form copula composability + interpretable μ. |
+| **dwell** | Weibull(k,λ) | disconnect − connect | **Weibull** | **Weibull** (KS 0.102) | **empirically vindicated** — best of the standard duration families on the pooled data, JPL, and ElaadNL; Gamma a close 2nd (per-site winner at Caltech). |
+| **arrival × dwell** | Gaussian copula ρ | Spearman ρ of the two | Frank | n/a | strong **negative** dependence (Kendall τ=−0.44, ρ=−0.60; later arrival → shorter stay), reproduced on ElaadNL. Gaussian ≫ independence but **Frank fits better**; Gaussian kept because it composes with the marginal inverse-CDFs via shared normal scores. |
+| **arrival SoC** | Beta(α,β) prior | **none — unobserved** | n/a | n/a | **no model comparison is possible** (no charger records SoC). Honest prior, correctly *not* derived from kWhRequested. |
+| **departure SoC** | Beta(α,β) | arrival_prior + delivered/capacity | Kumaraswamy (≈Beta, ΔAIC 114) | TruncNorm | Beta ≈ Kumaraswamy → defensible. **Caveat:** partly synthetic — the real signal is delivered/capacity (mean 0.30); the fit inherits the arrival prior's shape. |
+
+Robustness (dwell AIC-winner / arrival [6,20] coverage): Caltech `Gamma/0.95`,
+JPL `Weibull/0.90`, Office001 `Lognormal(n=580)/1.00`, ElaadNL `Weibull/1.00`.
+
+**Takeaway.** Dwell→Weibull and region-weights→empirical-share are well
+justified. Arrival→TruncNorm is the weakest link (unimodal model of a bimodal
+quantity, support clips ~8% of arrivals) — a deliberate trade for
+composability/interpretability. The copula captures the sign and bulk of a real,
+strong negative dependence; departure-SoC Beta is fine but its fit is partly an
+artifact of the arrival prior. Full tables + plot in `docs/experiments/`.
