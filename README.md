@@ -259,3 +259,46 @@ This implementation uses **stubs** for EnergyPlus (sinusoid building load) and D
 ```bash
 uv run pytest
 ```
+
+## Model description (EV-user generative models)
+
+The behavioral models are fit from three real per-session observables in the
+charging logs — **arrival timestamp, departure timestamp, delivered energy** —
+plus, for ACN-Data only, the driver's **trip request** (miles, Wh/mi, kWh
+requested). State-of-charge is **never recorded**, so anything SoC-related is a
+modeled prior, not a fit. Distribution families were chosen on *principled*
+grounds (correct support, composability with the copula, interpretable
+parameters); a retrospective AIC/BIC/KS study (ACN-Data n=41,774, ElaadNL
+n=55,201; `docs/experiments/`) then checked those choices against the data.
+
+| quantity | family | input feature(s) | why this family | empirical verdict |
+|---|---|---|---|---|
+| **arrival hour** | TruncNorm(μ,σ) on [6,20] | local clock-hour of connection | unimodal commute peak on a bounded daytime support; closed-form truncated quantile drives the copula | **deliberate simplification** — arrival is *bimodal* and ~8% of arrivals fall outside [6,20]; a mixture fits better (KS 0.03 vs 0.11) |
+| **dwell** | Weibull(k,λ) | disconnect − connect | canonical non-negative, right-skewed duration with a closed-form quantile | **best of the standard families** (wins AIC + KS; Gamma a close 2nd) |
+| **arrival × dwell** | Gaussian copula ρ | Spearman ρ of (arrival, dwell) | couples the marginals without distorting them; one rank-based parameter | captures a strong **negative** dependence (τ≈−0.44) and ≫ independence; Frank fits marginally better |
+| **arrival SoC** | Beta(α,β) prior | **none — unobserved** | bounded fraction on [0,1]; mean ≈ 0.40 | **not fittable** — no charger records SoC; deliberately *not* derived from kWhRequested |
+| **departure SoC** | Beta(α,β) [TruncNorm fallback] | arrival_prior + delivered/capacity | bounded fraction; conjugate, interpretable | Beta ≈ Kumaraswamy (defensible); fit partly synthetic (real signal is delivered/capacity ≈ 0.30) |
+| **φ, κ, δ / region mix** | empirical (uniform-in-region; categorical share) | weekday frequency; 1−CV(arrival); miles×1.609 | membership is discrete; the only honest "parameter" is the observed mix | region weights are the **exact** empirical user share |
+
+Full rationale and per-model detail: [`docs/GENERATIVE_MODELS.md`](docs/GENERATIVE_MODELS.md).
+
+### Source vs generated distributions
+
+Round-trip check — calibrate `S_acn_caltech` from ACN-Data Caltech, generate a
+cohort, and overlay the **source** (ground truth) against the **generated**
+output. Reproduce with `docs/experiments/source_vs_generated.py`.
+
+![Source vs generated distributions](docs/experiments/source_vs_generated.png)
+
+The 2-sample KS gaps (arrival 0.12, dwell 0.15, departure-SoC 0.19) make the
+model's limitations visible and honest: generated arrival is broader/later and
+hard-clipped at 6/20; generated dwell misses the source's **bimodal** shape and
+shows a clamp artifact near 14 h; departure SoC over-piles near 100%.
+
+Candidate-family comparison against the raw data (empirical vs each fitted
+family), from `docs/experiments/model_fit_plots.py`:
+
+![Candidate families vs ground truth](docs/experiments/model_fit_comparison.png)
+
+See [`docs/experiments/`](docs/experiments/) for the full AIC/BIC/KS tables and
+the reproducible scripts.
