@@ -67,6 +67,23 @@ function getEffectiveSource(path) {
     return "default";
 }
 
+// Parse a fetch Response as JSON, but fail with a legible message when the
+// server returns HTML (a 404/500 page) instead of JSON — otherwise resp.json()
+// throws the cryptic "Unexpected token '<', "<!doctype "...". A 404 here almost
+// always means the Flask dev server is stale (it does NOT auto-reload): the
+// browser loaded new static files but the running process lacks the new route.
+async function safeJson(resp) {
+    const text = await resp.text();
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        const hint = resp.status === 404
+            ? " — endpoint not found; the web server is likely running old code. Restart it: python tools/web/app.py"
+            : " — restart the web server (python tools/web/app.py) if it is running old code";
+        throw new Error(`Server returned a non-JSON ${resp.status} response${hint}`);
+    }
+}
+
 async function init() {
     try {
         [DESCRIPTORS, KNOBS, SCENARIOS] = await Promise.all([
@@ -145,7 +162,7 @@ async function refreshResolvedDefaults() {
                 descriptors: state.descriptors,
             }),
         });
-        const data = await resp.json();
+        const data = await safeJson(resp);
         if (data.error) {
             console.warn("resolve failed:", data.error);
             return;
@@ -665,7 +682,7 @@ async function startBatch() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        data = await resp.json();
+        data = await safeJson(resp);
         if (!resp.ok) {
             status.className = "error";
             status.textContent = `Error: ${data.error || resp.statusText}`;
@@ -690,7 +707,7 @@ async function pollBatch() {
     let data;
     try {
         const resp = await fetch(`/api/batch/${CURRENT_BATCH_ID}/status`);
-        data = await resp.json();
+        data = await safeJson(resp);
     } catch (e) {
         document.getElementById("batch-status-text").textContent = "poll failed: " + e.message;
         BATCH_POLL_ID = setTimeout(pollBatch, 2000);
@@ -1028,7 +1045,7 @@ async function generate() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        const data = await resp.json();
+        const data = await safeJson(resp);
         if (!resp.ok) {
             status.className = "error";
             status.textContent = `Error: ${data.error || resp.statusText}`;
@@ -1636,7 +1653,7 @@ async function generateMulti() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        const data = await resp.json();
+        const data = await safeJson(resp);
         if (!resp.ok) {
             status.textContent = "Error: " + (data.error || resp.status);
             document.getElementById("mb-run-log").textContent =
