@@ -10,185 +10,91 @@
 <body>
 <header>
     <h1>V2B Synthetic Dataset Generator</h1>
-    <p class="subtitle">Configure scenario descriptors and individual knobs, then generate a reproducible run.</p>
+    <p class="subtitle">Configure one or more buildings, then generate a reproducible optimus-format dataset (buildings × samples × months).</p>
 </header>
 
 <main>
-    <section id="base-scenario">
-        <h2>Base scenario</h2>
-        <select id="base-scenario-select"></select>
-        <p class="hint">Start from a pre-built scenario. Modifications below override these defaults.</p>
+    <section id="buildings">
+        <h2>Buildings</h2>
+        <p class="hint">Each card is one distinct building (its own scenario, descriptors, seed). Output always uses the <code>optimus-persist-multi</code> schema (a <code>building_id</code> column). Add as many as you like.</p>
+        <div id="building-cards"></div>
+        <button id="add-building" type="button" class="secondary">+ Add building</button>
     </section>
 
-    <section id="descriptors">
-        <h2>Scenario descriptors</h2>
-        <div class="descriptor-grid">
+    <section id="run-settings">
+        <h2>Run settings</h2>
+        <div class="run-grid">
             <label>
-                <span class="field-name">Location</span>
-                <select id="location-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Building</span>
-                <select id="building-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Population</span>
-                <select id="population-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Equipment</span>
-                <select id="equipment-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Noise profile <span style="font-size: 0.75rem; color: #999;">(check noise_profiles.yaml)</span></span>
-                <select id="noise-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Seed</span>
-                <input type="number" id="seed" value="42" step="1">
-            </label>
-            <label>
-                <span class="field-name">Weather station (tmyx)</span>
-                <select id="tmyx-select"></select>
-            </label>
-            <label>
-                <span class="field-name">Peak kW</span>
-                <input type="number" id="peak-kw" min="50" max="5000" step="10">
-            </label>
-            <label>
-                <span class="field-name">Peak kW scaling</span>
-                <span style="display:flex;align-items:center;gap:0.4rem">
-                    <input type="checkbox" id="peak-kw-scaling">
-                    <span class="small" style="font-style:italic;color:#666">on = lock max(power_kw) to peak_kw</span>
+                <span class="field-name">Output layout</span>
+                <span style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+                    <label class="inline-flag"><input type="radio" name="output-mode" value="shared" checked> shared (<code>building_id</code> column)</label>
+                    <label class="inline-flag"><input type="radio" name="output-mode" value="per-building"> per-building (subfolders)</label>
                 </span>
             </label>
+            <label><span class="field-name">Output path</span><input type="text" id="u-output-path" placeholder="(default: tools/web/runs/…)"></label>
+            <label><span class="field-name">Start month</span><input type="month" id="u-start-month" value="2024-04"></label>
+            <label><span class="field-name">End month</span><input type="month" id="u-end-month" value="2024-04"></label>
+            <label><span class="field-name">Samples / month</span><input type="number" id="u-samples" min="1" max="100" value="1"></label>
+            <label><span class="field-name">Workers</span><input type="number" id="u-workers" min="1" max="16" value="4"></label>
+            <label><span class="field-name">Noise profile</span><select id="u-noise"></select></label>
+            <label><span class="field-name">DR program (global)</span>
+                <select id="u-dr-program">
+                    <option value="">(scenario default)</option>
+                    <option value="none">none</option>
+                    <option value="CBP">CBP</option>
+                    <option value="BIP">BIP</option>
+                    <option value="ELRP">ELRP</option>
+                </select>
+            </label>
+            <label><span class="field-name">DR incentive ($/kW)</span><input type="number" id="u-dr-incentive" step="0.5" placeholder="(default)"></label>
+            <label><span class="field-name">DR penalty ($/kWh)</span><input type="number" id="u-dr-penalty" step="0.5" placeholder="(default)"></label>
+            <label><span class="field-name">Default policy</span><input type="text" id="u-default-policy" value="ILP-MPCFIXEDFSL"></label>
+            <label class="inline-flag" style="margin-left:0"><input type="checkbox" id="u-force" checked> overwrite output if exists</label>
         </div>
-        <p class="hint">Pickers above reflect the base scenario. Change any to override that descriptor for this run. Weather list comes from <code>configs/locations.yaml</code> — <a href="https://climate.onebuilding.org" target="_blank">browse TMYx</a> + add to that YAML for stations not listed.</p>
-    </section>
-
-    <section id="batch-config">
-        <h2>Batch generation (optional)</h2>
-        <p class="hint">Generate many samples across a date range. Leave the defaults (1 sample, single month) to keep current single-shot behavior.</p>
-        <div class="batch-grid">
-            <label>
-                <span class="field-name">Output path</span>
-                <input type="text" id="batch-output-path" placeholder="/tmp/batch_run">
-            </label>
-            <label>
-                <span class="field-name">Start month</span>
-                <input type="month" id="batch-start-month" value="2024-04">
-            </label>
-            <label>
-                <span class="field-name">End month</span>
-                <input type="month" id="batch-end-month" value="2024-04">
-            </label>
-            <label>
-                <span class="field-name">Samples / month</span>
-                <input type="number" id="batch-samples" min="1" max="100" value="1">
-            </label>
-            <label>
-                <span class="field-name">Workers</span>
-                <input type="number" id="batch-workers" min="1" max="16" value="4">
-            </label>
-            <label class="inline-flag" style="margin-left:0">
-                <input type="checkbox" id="batch-force"> overwrite if exists
-            </label>
-        </div>
-        <div id="batch-estimate" class="hint"></div>
+        <div id="run-estimate" class="hint"></div>
     </section>
 
     <section id="advanced">
         <details id="advanced-details">
-            <summary>Advanced — direct knob overrides</summary>
-            <p class="hint">Modify individual knobs. Values are bounded by the declared ranges in <code>configs/knobs.yaml</code>. Knob overrides take precedence over descriptors.</p>
+            <summary>Advanced — shared knob overrides (applied to <em>every</em> building)</summary>
+            <p class="hint">These knob overrides are merged into every building card. Per-building descriptors/seed/EV-count live on the cards above. Bounded by the ranges in <code>configs/knobs.yaml</code>.</p>
             <div id="knob-buckets"></div>
         </details>
     </section>
 
-    <section id="multi-building">
-        <details id="multi-building-details">
-            <summary>Multi-building — generate N distinct buildings (optimus export)</summary>
-            <p class="hint">Each building gets its own base scenario, descriptor picks, knob overrides, and seed. Output matches the <code>optimus-persist-multi</code> input CSV schema (with <code>building_id</code>). The run is exactly reproducible from the exported <code>multi_building_config.json</code>.</p>
-
-            <div class="mb-globals">
-                <label>
-                    <span class="field-name">Output layout</span>
-                    <span style="display:flex;gap:1rem;align-items:center">
-                        <label class="inline-flag"><input type="radio" name="mb-output-mode" value="shared" checked> shared (one set, <code>building_id</code> column)</label>
-                        <label class="inline-flag"><input type="radio" name="mb-output-mode" value="per-building"> per-building (subfolders)</label>
-                    </span>
-                </label>
-                <label>
-                    <span class="field-name">DR program (global)</span>
-                    <select id="mb-dr-program">
-                        <option value="">(base scenario)</option>
-                        <option value="none">none</option>
-                        <option value="CBP">CBP</option>
-                        <option value="BIP">BIP</option>
-                        <option value="ELRP">ELRP</option>
-                    </select>
-                </label>
-                <label>
-                    <span class="field-name">DR incentive ($/kW)</span>
-                    <input type="number" id="mb-dr-incentive" step="0.5" placeholder="(default)">
-                </label>
-                <label>
-                    <span class="field-name">DR penalty ($/kWh)</span>
-                    <input type="number" id="mb-dr-penalty" step="0.5" placeholder="(default)">
-                </label>
-                <label>
-                    <span class="field-name">Default policy</span>
-                    <input type="text" id="mb-default-policy" value="ILP-MPCFIXEDFSL">
-                </label>
-            </div>
-
-            <div id="building-cards"></div>
-            <button id="mb-add-building" type="button" class="secondary">+ Add building</button>
-
-            <div id="mb-action">
-                <button id="mb-generate-btn" type="button">Generate multi-building</button>
-                <span id="mb-status"></span>
-            </div>
-
-            <div id="multi-output" style="display:none">
-                <h3>Generated buildings</h3>
-                <div id="mb-output-meta"></div>
-                <div id="mb-output-tabs"></div>
-                <div id="mb-output-panel"></div>
-                <details>
-                    <summary>multi_building_config.json + stdout</summary>
-                    <pre id="mb-run-log"></pre>
-                </details>
-            </div>
-        </details>
-    </section>
-
     <section id="action">
-        <button id="generate-btn" type="button">Generate scenario</button>
-        <label class="inline-flag"><input type="checkbox" id="strict-e5"> strict E5 (fail on concurrency overflow)</label>
+        <button id="generate-btn" type="button">Generate</button>
+        <label class="inline-flag"><input type="checkbox" id="u-strict-e5"> strict E5 (fail on concurrency overflow)</label>
         <span id="status"></span>
     </section>
 
-    <section id="batch-progress" style="display:none">
-        <h2>Batch progress</h2>
+    <section id="progress" style="display:none">
+        <h2>Progress</h2>
         <div id="batch-status-text" class="small"></div>
         <div id="batch-month-table"></div>
-        <button id="batch-cancel" type="button" style="margin-top:0.5rem">Cancel</button>
-    </section>
-
-    <section id="override-summary" style="display:none">
-        <h2>Pending overrides</h2>
-        <pre id="override-pre"></pre>
     </section>
 
     <section id="output" style="display:none">
         <h2>Generated output</h2>
         <div id="output-meta"></div>
+
+        <div id="unified-analysis">
+            <h3>Distributions</h3>
+            <div class="analysis-controls">
+                <label>Month <select id="ua-month"></select></label>
+                <label>CSV <select id="ua-csv"></select></label>
+                <label>Feature <select id="ua-feature"></select></label>
+                <button id="ua-run" type="button" class="secondary">Plot</button>
+                <span id="ua-status" class="analysis-status"></span>
+            </div>
+            <div id="unified-plot" style="min-height:420px"></div>
+        </div>
+
+        <h3>CSV preview</h3>
         <div id="output-tabs"></div>
         <div id="output-panel"></div>
-        <div id="downloads"></div>
         <details>
-            <summary>stdout / stderr / command</summary>
+            <summary>run log / config</summary>
             <pre id="run-log"></pre>
         </details>
     </section>

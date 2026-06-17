@@ -16,28 +16,34 @@ let KNOBS = null;         // {bucket: {knob: spec}}
 let SCENARIOS = null;     // [{id, description, descriptors, overrides}, ...]
 let RESOLVED = {};        // {path: {value, source}} — from /api/resolve
 
-// Feature picker for distribution plots, per-CSV.
+// Feature picker for distribution plots, per-CSV — OPTIMUS schema (building_id
+// aware). Column names match export_optimus.py output.
 const PLOT_FEATURES = {
     "building_load.csv": [
-        { value: "power_kw",         label: "power_kw (total)" },
-        { value: "power_flex_kw",    label: "power_flex_kw (HVAC)" },
-        { value: "power_inflex_kw",  label: "power_inflex_kw (lights + plug)" },
+        { value: "power_kw",            label: "power_kw (total)" },
+        { value: "power_kw_flexible",   label: "power_kw_flexible (HVAC)" },
+        { value: "power_kw_inflexible", label: "power_kw_inflexible (lights + plug)" },
     ],
     "sessions.csv": [
         { value: "arrival_hour",                  label: "arrival hour" },
-        { value: "departure_hour",                label: "departure hour" },
-        { value: "duration_sec",                  label: "duration (sec)" },
-        { value: "arrival_soc",                   label: "arrival SoC" },
+        { value: "duration",                      label: "dwell (hours)" },
         { value: "required_soc_at_depart",        label: "required SoC at depart" },
         { value: "previous_day_external_use_soc", label: "previous-day external use SoC" },
     ],
     "cars.csv": [
         { value: "capacity_kwh",     label: "capacity (kWh)" },
+        { value: "soc",              label: "soc (first arrival)" },
+        { value: "frequency",        label: "frequency φ" },
+        { value: "user_type",        label: "user_type (region)" },
         { value: "min_allowed_soc",  label: "min allowed SoC" },
         { value: "max_allowed_soc",  label: "max allowed SoC" },
-        { value: "battery_class",    label: "battery class" },
+    ],
+    "grid_prices.csv": [
+        { value: "price_per_kwh",    label: "price ($/kWh)" },
     ],
 };
+// CSVs that carry per-building distributions worth plotting.
+const PLOTTABLE_CSVS = ["building_load.csv", "sessions.csv", "cars.csv", "grid_prices.csv"];
 
 // Default fixed bin count for histogram overlays. Bin EDGES are computed
 // from the global min/max across all samples in a batch run so bars from
@@ -96,15 +102,26 @@ async function init() {
         return;
     }
 
-    populateScenarioSelect();
-    populateDescriptorSelects();
-    populateNoiseSelect();
-    populateTmyxSelect();
-    populateKnobBuckets();
-    attachListeners();
-    attachShortcutListeners();
-    syncFromScenario(state.base_scenario);
-    await refreshResolvedDefaults();
+    // Global noise-profile dropdown (run setting).
+    const noiseSel = document.getElementById("u-noise");
+    if (noiseSel) {
+        noiseSel.innerHTML = "";
+        [{ id: "tmyx_stochastic", description: "seed-varying (recommended for samples)" },
+         ...(DESCRIPTORS.noise || [])].forEach(n => {
+            if (noiseSel.querySelector(`option[value="${n.id}"]`)) return;
+            const o = document.createElement("option");
+            o.value = n.id; o.textContent = n.description ? `${n.id} — ${n.description}` : n.id;
+            noiseSel.appendChild(o);
+        });
+    }
+
+    populateKnobBuckets();              // Advanced → shared overrides (state.overrides)
+    document.getElementById("add-building").addEventListener("click", addBuilding);
+    document.getElementById("generate-btn").addEventListener("click", startUnified);
+    const estInputs = ["u-start-month", "u-end-month", "u-samples"];
+    estInputs.forEach(id => document.getElementById(id).addEventListener("input", updateRunEstimate));
+    addBuilding();                      // start with one building card
+    updateRunEstimate();
 }
 
 function populateTmyxSelect() {
@@ -1002,14 +1019,13 @@ async function cancelBatch() {
 }
 
 function renderOverrideSummary() {
+    // The unified UI has no override-summary panel; shared knob overrides live
+    // in state.overrides and are read by buildUnifiedPayload. No-op if absent.
     const section = document.getElementById("override-summary");
     const pre = document.getElementById("override-pre");
-    const payload = buildPayload();
-    const hasContent =
-        Object.keys(payload.overrides).length > 0 ||
-        Object.keys(payload.descriptors).length > 0 ||
-        payload.noise_profile;
-    section.style.display = hasContent ? "" : "none";
+    if (!section || !pre) return;
+    const payload = { overrides: state.overrides };
+    section.style.display = Object.keys(state.overrides).length ? "" : "none";
     pre.textContent = JSON.stringify(payload, null, 2);
 }
 
@@ -1572,6 +1588,8 @@ function createBuildingCard() {
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="(base)"></label>
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="(base)"></label>
+            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="(base)"></label>
+            <label><span class="field-name">Peak kW scaling</span><span style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" class="mb-peak-scaling" checked><span class="small" style="color:#666">lock max→peak_kw</span></span></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
         </div>
     `;
@@ -1599,13 +1617,7 @@ function addBuilding() {
     renumberBuildingCards();
 }
 
-function buildMultiPayload() {
-    const mode = (document.querySelector("input[name='mb-output-mode']:checked") || {}).value || "shared";
-    const drProgram = document.getElementById("mb-dr-program").value;
-    const incentive = parseFloat(document.getElementById("mb-dr-incentive").value);
-    const penalty = parseFloat(document.getElementById("mb-dr-penalty").value);
-    const defaultPolicy = document.getElementById("mb-default-policy").value || "ILP-MPCFIXEDFSL";
-
+function buildUnifiedPayload() {
     const buildings = [];
     document.querySelectorAll("#building-cards .building-card").forEach(card => {
         const descriptors = {};
@@ -1616,103 +1628,220 @@ function buildMultiPayload() {
         const overrides = {};
         const ev = parseInt(card.querySelector(".mb-ev-count").value, 10);
         const ch = parseInt(card.querySelector(".mb-charger-count").value, 10);
+        const pk = parseFloat(card.querySelector(".mb-peak-kw").value);
         if (!isNaN(ev)) overrides["ev_fleet.ev_count"] = ev;
         if (!isNaN(ch)) overrides["charging_infra.charger_count"] = ch;
-        const noise = card.querySelector(".mb-noise").value || null;
-        const policy = card.querySelector(".mb-policy").value || null;
+        if (!isNaN(pk)) overrides["building_load.peak_kw"] = pk;
+        overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-scaling").checked;
         buildings.push({
             base_scenario: card.querySelector(".mb-base").value,
             descriptors,
             overrides,
             seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
-            noise_profile: noise,
-            policy,
+            noise_profile: card.querySelector(".mb-noise").value || null,
+            policy: card.querySelector(".mb-policy").value || null,
         });
     });
 
-    const payload = { output_mode: mode, default_policy: defaultPolicy, buildings };
-    if (drProgram) payload.dr_program = drProgram;
-    if (!isNaN(incentive)) payload.dr_incentive_per_kw = incentive;
-    if (!isNaN(penalty)) payload.dr_penalty_per_kwh = penalty;
+    const val = id => document.getElementById(id).value;
+    const num = id => { const v = parseFloat(val(id)); return isNaN(v) ? null : v; };
+    const payload = {
+        buildings,
+        shared_overrides: { ...state.overrides },   // Advanced panel → every building
+        output_mode: (document.querySelector("input[name='output-mode']:checked") || {}).value || "shared",
+        output_path: val("u-output-path") || "",
+        start_month: val("u-start-month"),
+        end_month: val("u-end-month") || val("u-start-month"),
+        samples: parseInt(val("u-samples"), 10) || 1,
+        workers: parseInt(val("u-workers"), 10) || 4,
+        force: document.getElementById("u-force").checked,
+        noise_profile: val("u-noise") || "tmyx_stochastic",
+        default_policy: val("u-default-policy") || "ILP-MPCFIXEDFSL",
+        strict_e5: document.getElementById("u-strict-e5").checked,
+    };
+    const drp = val("u-dr-program"); if (drp) payload.dr_program = drp;
+    const inc = num("u-dr-incentive"); if (inc !== null) payload.dr_incentive_per_kw = inc;
+    const pen = num("u-dr-penalty"); if (pen !== null) payload.dr_penalty_per_kwh = pen;
     return payload;
 }
 
-async function generateMulti() {
-    const status = document.getElementById("mb-status");
-    const payload = buildMultiPayload();
-    if (!payload.buildings.length) {
-        status.textContent = "Add at least one building.";
-        return;
+function runEstimate() {
+    const sm = document.getElementById("u-start-month").value;
+    const em = document.getElementById("u-end-month").value || sm;
+    const samples = parseInt(document.getElementById("u-samples").value, 10) || 1;
+    let months = 1;
+    if (sm && em) {
+        const [sy, smm] = sm.split("-").map(Number);
+        const [ey, emm] = em.split("-").map(Number);
+        months = Math.max(1, (ey - sy) * 12 + (emm - smm) + 1);
     }
-    status.textContent = `Generating ${payload.buildings.length} building(s)…`;
-    const btn = document.getElementById("mb-generate-btn");
+    const nb = document.querySelectorAll("#building-cards .building-card").length;
+    return { months, samples, units: months * samples, buildings: nb, total: months * samples * nb };
+}
+
+function updateRunEstimate() {
+    const e = runEstimate();
+    const el = document.getElementById("run-estimate");
+    if (el) el.textContent =
+        `${e.buildings} building(s) × ${e.samples} sample(s) × ${e.months} month(s) `
+        + `= ${e.units} unit(s), ${e.total} building-generations.`;
+}
+
+let UNIFIED_JOB = null, UNIFIED_POLL = null;
+
+async function startUnified() {
+    const status = document.getElementById("status");
+    const payload = buildUnifiedPayload();
+    if (!payload.buildings.length) { status.textContent = "Add at least one building."; return; }
+    if (!payload.start_month) { status.textContent = "Set a start month."; return; }
+    const btn = document.getElementById("generate-btn");
     btn.disabled = true;
+    status.textContent = "Launching…";
     try {
-        const resp = await fetch("/api/generate-multi", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+        const resp = await fetch("/api/generate-unified", {
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
         const data = await safeJson(resp);
-        if (!resp.ok) {
-            status.textContent = "Error: " + (data.error || resp.status);
-            document.getElementById("mb-run-log").textContent =
-                (data.stdout || "") + "\n" + (data.error || "");
-            return;
-        }
-        status.textContent = `Generated ${payload.buildings.length} building(s) (${data.output_mode}).`;
-        renderMultiOutput(data);
+        if (!resp.ok) { status.textContent = "Error: " + (data.error || resp.status); btn.disabled = false; return; }
+        UNIFIED_JOB = { id: data.job_id, output_mode: payload.output_mode };
+        document.getElementById("progress").style.display = "";
+        status.textContent = `Running job ${data.job_id}…`;
+        pollUnified();
     } catch (e) {
         status.textContent = "Request failed: " + e;
-    } finally {
         btn.disabled = false;
     }
 }
 
-function renderMultiOutput(data) {
-    document.getElementById("multi-output").style.display = "";
-    document.getElementById("mb-output-meta").innerHTML =
-        `<p class="small">run_id <code>${escapeHtml(data.run_id)}</code> · mode <code>${escapeHtml(data.output_mode)}</code> · ${Object.keys(data.csv_summaries).length} files</p>`;
-    const names = Object.keys(data.csv_summaries);
-    const tabs = document.getElementById("mb-output-tabs");
-    const panel = document.getElementById("mb-output-panel");
-    tabs.innerHTML = "";
-    const show = (name) => {
-        const s = data.csv_summaries[name];
-        const cols = s.columns;
-        const rows = s.head.slice(0, 20);
-        let html = `<p class="small">${escapeHtml(name)} — ${s.row_count} rows</p><table class="csv-preview"><thead><tr>`;
-        cols.forEach(c => html += `<th>${escapeHtml(c)}</th>`);
-        html += "</tr></thead><tbody>";
-        rows.forEach(r => {
-            html += "<tr>";
-            cols.forEach(c => html += `<td>${escapeHtml(r[c])}</td>`);
-            html += "</tr>";
-        });
-        html += "</tbody></table>";
-        panel.innerHTML = html;
+async function pollUnified() {
+    if (!UNIFIED_JOB) return;
+    let data;
+    try {
+        const resp = await fetch(`/api/generate-unified/${UNIFIED_JOB.id}/status`);
+        data = await safeJson(resp);
+    } catch (e) {
+        document.getElementById("status").textContent = "Status poll failed: " + e;
+        return;
+    }
+    renderBatchStatus({ manifest: data.manifest, elapsed_sec: data.elapsed_sec });
+    if (data.running) {
+        UNIFIED_POLL = setTimeout(pollUnified, 2000);
+        return;
+    }
+    document.getElementById("generate-btn").disabled = false;
+    const m = data.manifest || {};
+    document.getElementById("status").textContent =
+        `Done — ${m.status || "?"} (${m.n_succeeded || 0}/${m.n_total || 0} units, exit ${data.exit_code}).`;
+    if (m.status === "succeeded" || m.status === "partial") showUnifiedAnalysis(m);
+}
+
+function showUnifiedAnalysis(manifest) {
+    document.getElementById("output").style.display = "";
+    document.getElementById("output-meta").innerHTML =
+        `<p class="small">job <code>${escapeHtml(UNIFIED_JOB.id)}</code> · ${manifest.n_buildings} building(s) · `
+        + `${escapeHtml(manifest.output_mode)} · ${manifest.n_succeeded}/${manifest.n_total} units</p>`;
+    document.getElementById("run-log").textContent = JSON.stringify(manifest, null, 2);
+
+    const months = [...new Set((manifest.samples || [])
+        .filter(s => s.status === "succeeded").map(s => s.month))];
+    document.getElementById("ua-month").innerHTML =
+        months.map(mo => `<option value="${mo}">${mo}</option>`).join("");
+    const csvSel = document.getElementById("ua-csv");
+    csvSel.innerHTML = PLOTTABLE_CSVS.map(c => `<option value="${c}">${c}</option>`).join("");
+    const syncFeat = () => {
+        const feats = PLOT_FEATURES[csvSel.value] || [];
+        document.getElementById("ua-feature").innerHTML =
+            feats.map(f => `<option value="${f.value}">${f.label}</option>`).join("");
     };
-    names.forEach((name, i) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "tab";
-        b.textContent = name;
-        b.addEventListener("click", () => show(name));
-        tabs.appendChild(b);
-        if (i === 0) show(name);
+    csvSel.onchange = syncFeat; syncFeat();
+    document.getElementById("ua-run").onclick = () => runUnifiedAnalysis(manifest);
+    runUnifiedAnalysis(manifest);
+}
+
+async function runUnifiedAnalysis(manifest) {
+    const month = document.getElementById("ua-month").value;
+    const csv = document.getElementById("ua-csv").value;
+    const feature = document.getElementById("ua-feature").value;
+    const st = document.getElementById("ua-status");
+    st.textContent = "loading…";
+    const samples = (manifest.samples || [])
+        .filter(s => s.status === "succeeded" && s.month === month)
+        .map(s => s.sample_idx);
+    const byBuilding = {};
+    for (const s of samples) {
+        let rows;
+        try {
+            rows = await fetchAndParseCsv(
+                `/api/generate-unified/${UNIFIED_JOB.id}/csv/${month}/${s}/${csv}`);
+        } catch { continue; }
+        rows.forEach(r => {
+            const b = (r.building_id ?? 0);
+            (byBuilding[b] = byBuilding[b] || []).push(r);
+        });
+    }
+    const nB = Object.keys(byBuilding).length;
+    if (!nB) { st.textContent = "no data"; return; }
+    st.textContent = `${nB} building(s) · ${samples.length} sample(s)`;
+    plotOptimus("unified-plot", csv, byBuilding, feature);
+}
+
+const BCOLORS = ["#2c7fb8", "#d8853b", "#31a354", "#756bb1", "#c51b8a", "#636363"];
+
+function plotOptimus(divId, csvName, byBuilding, feature) {
+    const ids = Object.keys(byBuilding).sort((a, b) => a - b);
+    const traces = [];
+    ids.forEach((bid, i) => {
+        const rows = byBuilding[bid];
+        const color = BCOLORS[i % BCOLORS.length];
+        const name = `building ${bid}`;
+        if (csvName === "building_load.csv") {
+            const slot = {};
+            rows.forEach(r => {
+                const d = new Date(r.datetime);
+                if (isNaN(d)) return;
+                const t = d.getHours() + d.getMinutes() / 60;
+                (slot[t] = slot[t] || []).push(Number(r[feature] ?? r.power_kw));
+            });
+            const xs = Object.keys(slot).map(Number).sort((a, b) => a - b);
+            traces.push({
+                x: xs, y: xs.map(t => slot[t].reduce((a, b) => a + b, 0) / slot[t].length),
+                name, type: "scatter", mode: "lines", line: { color },
+            });
+        } else if (csvName === "grid_prices.csv") {
+            traces.push({
+                x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
+                name, type: "scatter", mode: "lines", line: { color },
+            });
+        } else {
+            const vals = extractOptimusFeature(rows, csvName, feature);
+            traces.push({
+                x: vals, name, type: "histogram", opacity: 0.55,
+                marker: { color }, nbinsx: feature === "arrival_hour" ? 24 : 30,
+            });
+        }
     });
-    document.getElementById("mb-run-log").textContent =
-        JSON.stringify(data.config, null, 2) + "\n\n" + (data.stdout || "");
+    const isHist = !["building_load.csv", "grid_prices.csv"].includes(csvName);
+    Plotly.newPlot(divId, traces, {
+        title: `${csvName} — ${feature} by building`,
+        margin: { t: 40, l: 60, r: 10, b: 50 },
+        barmode: isHist ? "overlay" : undefined,
+        xaxis: { title: csvName === "building_load.csv" ? "hour of day" : feature },
+        yaxis: { title: isHist ? "count" : (csvName === "building_load.csv" ? "power_kw" : "$/kWh") },
+    });
 }
 
-function initMultiBuilding() {
-    if (!DESCRIPTORS || !SCENARIOS) return;  // config failed to load
-    const addBtn = document.getElementById("mb-add-building");
-    const genBtn = document.getElementById("mb-generate-btn");
-    if (!addBtn || !genBtn) return;
-    addBtn.addEventListener("click", addBuilding);
-    genBtn.addEventListener("click", generateMulti);
-    addBuilding();  // start with one card
+function extractOptimusFeature(rows, csvName, feature) {
+    if (csvName === "sessions.csv" && feature === "arrival_hour") {
+        return rows.map(r => {
+            const d = new Date(r.arrival);
+            return isNaN(d) ? null : d.getHours() + d.getMinutes() / 60;
+        }).filter(v => v !== null);
+    }
+    if (csvName === "sessions.csv" && feature === "duration") {
+        return rows.map(r => Number(r.duration) / 3600).filter(v => !isNaN(v));  // sec → hours
+    }
+    return rows.map(r => Number(r[feature])).filter(v => !isNaN(v));
 }
 
-init().then(initMultiBuilding);
+init();

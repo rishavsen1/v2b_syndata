@@ -471,3 +471,16 @@ button.secondary:hover { background: var(--primary); color: white; }
 #mb-action { margin-top: 1rem; display: flex; align-items: center; gap: 1rem; }
 #mb-status { font-size: 0.85rem; color: var(--text-muted); }
 #mb-output-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.5rem 0; }
+
+/* ── Unified run-settings grid ──────────────────────────────────────────── */
+.run-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin: 0.5rem 0 0.75rem;
+}
+.run-grid label { display: flex; flex-direction: column; gap: 0.25rem; }
+.run-grid .field-name { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.run-grid select, .run-grid input[type="text"], .run-grid input[type="number"],
+.run-grid input[type="month"] { width: 100%; }
+#unified-analysis { margin: 0.5rem 0 1rem; }

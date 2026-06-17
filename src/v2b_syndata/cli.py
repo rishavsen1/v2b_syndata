@@ -207,6 +207,7 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
     from .multi_building import (
         config_from_dict,
         generate_multi,
+        generate_multi_batch,
         regenerate_from_config,
     )
 
@@ -230,6 +231,28 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
     cfg = config_from_dict(data)
     if args.output_mode:
         cfg.output_mode = args.output_mode
+
+    # Batch mode: buildings × samples × months when --start-month is given.
+    if args.start_month:
+        def _progress(res, m):
+            n_done = m["n_succeeded"] + m["n_failed"]
+            print(f"  [{n_done}/{m['n_total']}] {res.month}/{res.sample_idx} "
+                  f"{res.status} ({res.duration_sec:.1f}s)", file=sys.stderr)
+        manifest = generate_multi_batch(
+            cfg, output_dir, Path(args.config_dir),
+            start_month=args.start_month,
+            end_month=args.end_month or args.start_month,
+            samples_per_month=args.samples_per_month,
+            seed_base=args.seed_base,
+            workers=args.workers,
+            noise_profile=args.noise_profile,
+            force=args.force,
+            progress_callback=_progress,
+        )
+        print(f"multi-building batch {manifest['status']}: "
+              f"{manifest['n_succeeded']}/{manifest['n_total']} units "
+              f"({len(cfg.buildings)} buildings) -> {output_dir}", file=sys.stderr)
+        return 0 if manifest["status"] in ("succeeded", "partial") else 2
 
     config = generate_multi(cfg, output_dir, Path(args.config_dir))
     print(f"generated {len(config['buildings'])} buildings "
@@ -443,6 +466,16 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--output-dir", required=True)
     gm.add_argument("--output-mode", choices=["shared", "per-building"], default=None,
                     help="override the config's output_mode (default: shared)")
+    # Batch flags: when --start-month is given, generate buildings × samples ×
+    # months into <output-dir>/<MONTH>/<sample>/ with a batch_manifest.json.
+    gm.add_argument("--start-month", default=None, help="YYYY-MM (inclusive); enables batch mode")
+    gm.add_argument("--end-month", default=None, help="YYYY-MM (inclusive); defaults to start-month")
+    gm.add_argument("--samples-per-month", type=int, default=1)
+    gm.add_argument("--workers", type=int, default=4)
+    gm.add_argument("--seed-base", type=int, default=0)
+    gm.add_argument("--noise-profile", default="tmyx_stochastic",
+                    help="batch noise profile (default tmyx_stochastic; clean = deterministic)")
+    gm.add_argument("--force", action="store_true", help="overwrite output-dir if it exists")
     gm.set_defaults(func=cmd_generate_multi)
 
     dg = sub.add_parser("docs-gen", help="emit auto-generated section of docs/KNOB_REFERENCE.md")
