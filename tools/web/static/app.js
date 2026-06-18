@@ -1599,9 +1599,9 @@ function createBuildingCard() {
             <label><span class="field-name">Equipment</span><select class="mb-equipment"></select></label>
             <label><span class="field-name">Noise profile</span><select class="mb-noise"></select></label>
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
-            <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="(base)"></label>
-            <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="(base)"></label>
-            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="(base)"></label>
+            <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
+            <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="scenario default"></label>
+            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="scenario default"></label>
             <label><span class="field-name">Peak kW scaling</span><span style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" class="mb-peak-scaling" checked><span class="small" style="color:#666">lock max→peak_kw</span></span></label>
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(100)"></label>
@@ -1631,11 +1631,27 @@ function createBuildingCard() {
     };
     card.querySelector(".mb-max-soc").addEventListener("input", checkSoc);
     mbFillSelect(card.querySelector(".mb-base"), SCENARIOS, null);
-    mbFillSelect(card.querySelector(".mb-location"), DESCRIPTORS.location, "(base scenario)");
-    mbFillSelect(card.querySelector(".mb-building"), DESCRIPTORS.building, "(base scenario)");
-    mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "(base scenario)");
-    mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "(base scenario)");
-    mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "(base scenario)");
+    mbFillSelect(card.querySelector(".mb-location"), DESCRIPTORS.location, "");
+    mbFillSelect(card.querySelector(".mb-building"), DESCRIPTORS.building, "");
+    mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
+    mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
+    mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
+    // The blank ("inherit") option shows the ACTUAL value the chosen base
+    // scenario resolves to (e.g. "use base: nashville_tn") instead of a vague
+    // "(base scenario)". Refresh whenever the base scenario changes.
+    const baseSel = card.querySelector(".mb-base");
+    const updateInheritLabels = () => {
+        const sc = (SCENARIOS || []).find(s => s.id === baseSel.value);
+        const d = (sc && sc.descriptors) || {};
+        [["location", ".mb-location"], ["building", ".mb-building"],
+         ["population", ".mb-population"], ["equipment", ".mb-equipment"],
+         ["noise", ".mb-noise"]].forEach(([key, cls]) => {
+            const opt = card.querySelector(cls).options[0];
+            opt.textContent = d[key] ? `use base: ${d[key]}` : "scenario default";
+        });
+    };
+    baseSel.addEventListener("change", updateInheritLabels);
+    updateInheritLabels();
     card.querySelector(".mb-remove").addEventListener("click", () => {
         card.remove();
         renumberBuildingCards();
