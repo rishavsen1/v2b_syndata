@@ -105,6 +105,11 @@ def prune_old_runs(keep: int = MAX_RUNS_KEPT) -> None:
     )
     for old in runs[keep:]:
         shutil.rmtree(old, ignore_errors=True)
+    # Sweep stale unified-batch temp configs (kept only until their run starts).
+    cfgs = sorted(RUNS_DIR.glob("_unified_cfg_*.json"),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in cfgs[keep:]:
+        old.unlink(missing_ok=True)
 
 
 def prune_temp_scenarios() -> None:
@@ -458,18 +463,20 @@ def api_generate_unified():
         if payload.get(k) not in (None, ""):
             config[k] = payload[k]
 
-    out = payload.get("output_path") or ""
-    output_path = (str(Path(out).expanduser().resolve()) if out
-                   else str(RUNS_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:6]}"))
-
-    cfg_file = Path(output_path).parent / f"_unified_cfg_{uuid.uuid4().hex[:6]}.json"
-    cfg_file.parent.mkdir(parents=True, exist_ok=True)
-    cfg_file.write_text(json.dumps(config, indent=2))
-
     start_month = payload.get("start_month")
     end_month = payload.get("end_month") or start_month
     if not start_month:
         return jsonify({"error": "start_month is required"}), 400
+
+    out = payload.get("output_path") or ""
+    output_path = (str(Path(out).expanduser().resolve()) if out
+                   else str(RUNS_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:6]}"))
+
+    job_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    # Temp config lives in RUNS_DIR (gitignored, app-managed) — NOT next to the
+    # user's output path, which for a relative path would litter the repo root.
+    cfg_file = RUNS_DIR / f"_unified_cfg_{job_id}.json"
+    cfg_file.write_text(json.dumps(config, indent=2))
 
     cmd = [
         sys.executable, "-m", "v2b_syndata.cli",
@@ -487,7 +494,6 @@ def api_generate_unified():
     if payload.get("force", True):
         cmd.append("--force")
 
-    job_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, cwd=str(REPO_ROOT),
