@@ -1636,9 +1636,10 @@ function createBuildingCard() {
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
-    // The blank ("inherit") option shows the ACTUAL value the chosen base
-    // scenario resolves to (e.g. "use base: nashville_tn") instead of a vague
-    // "(base scenario)". Refresh whenever the base scenario changes.
+    // The blank ("inherit") dropdown option shows the actual descriptor value
+    // the chosen base scenario resolves to; the EV/charger/peak placeholders
+    // show the actual resolved knob numbers (via /api/resolve). Both refresh on
+    // base-scenario or descriptor changes.
     const baseSel = card.querySelector(".mb-base");
     const updateInheritLabels = () => {
         const sc = (SCENARIOS || []).find(s => s.id === baseSel.value);
@@ -1650,8 +1651,35 @@ function createBuildingCard() {
             opt.textContent = d[key] ? d[key] : "scenario default";
         });
     };
-    baseSel.addEventListener("change", updateInheritLabels);
-    updateInheritLabels();
+    const refreshResolvedPlaceholders = async () => {
+        const descriptors = {};
+        ["location", "building", "population", "equipment"].forEach(k => {
+            const v = card.querySelector(".mb-" + k).value;
+            if (v) descriptors[k] = v;
+        });
+        try {
+            const r = await fetch("/api/resolve", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base_scenario: baseSel.value, descriptors }),
+            });
+            const data = await safeJson(r);
+            if (data.error) return;
+            const set = (cls, path) => {
+                const v = (data[path] || {}).value;
+                if (v != null) card.querySelector(cls).placeholder = String(v);
+            };
+            set(".mb-ev-count", "ev_fleet.ev_count");
+            set(".mb-charger-count", "charging_infra.charger_count");
+            set(".mb-peak-kw", "building_load.peak_kw");
+            set(".mb-min-soc", "ev_fleet.min_allowed_soc");
+            set(".mb-max-soc", "ev_fleet.max_allowed_soc");
+        } catch (e) { /* leave placeholders as-is */ }
+    };
+    const refreshCard = () => { updateInheritLabels(); refreshResolvedPlaceholders(); };
+    [baseSel, ".mb-location", ".mb-building", ".mb-population", ".mb-equipment"]
+        .forEach(s => (typeof s === "string" ? card.querySelector(s) : s)
+                 .addEventListener("change", refreshCard));
+    refreshCard();
     card.querySelector(".mb-remove").addEventListener("click", () => {
         card.remove();
         renumberBuildingCards();
