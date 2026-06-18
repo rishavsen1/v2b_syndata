@@ -118,6 +118,19 @@ async function init() {
     populateKnobBuckets();              // Advanced → shared overrides (state.overrides)
     document.getElementById("add-building").addEventListener("click", addBuilding);
     document.getElementById("generate-btn").addEventListener("click", startUnified);
+    const loadFile = document.getElementById("load-config-file");
+    document.getElementById("load-config").addEventListener("click", () => loadFile.click());
+    loadFile.addEventListener("change", async () => {
+        if (!loadFile.files.length) return;
+        try {
+            applyConfig(JSON.parse(await loadFile.files[0].text()));
+            document.getElementById("status").textContent =
+                "Config loaded — click Generate to reproduce.";
+        } catch (e) {
+            document.getElementById("status").textContent = "Bad config file: " + e;
+        }
+        loadFile.value = "";
+    });
     const estInputs = ["u-start-month", "u-end-month", "u-samples"];
     estInputs.forEach(id => document.getElementById(id).addEventListener("input", updateRunEstimate));
     addBuilding();                      // start with one building card
@@ -1595,6 +1608,11 @@ function createBuildingCard() {
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
+        <details class="mb-adv">
+            <summary>Advanced overrides (JSON) — per building</summary>
+            <p class="hint" style="margin:0.3rem 0">Any knob, e.g. <code>{"user_behavior.min_depart_soc": 0.0, "utility_rate.dr_program": "CBP"}</code>. Merged into this building (explicit fields above win on conflict). Global Advanced applies to all buildings; this is per-building.</p>
+            <textarea class="mb-adv-overrides" rows="3" style="width:100%;font-family:monospace" placeholder="{}"></textarea>
+        </details>
     `;
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
     // sessions. Warn live. Floor = shared override min_depart_soc, else 80%.
@@ -1631,6 +1649,57 @@ function renumberBuildingCards() {
     });
 }
 
+function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    a.click(); URL.revokeObjectURL(a.href);
+}
+
+// Repopulate one card from a building spec (inverse of buildUnifiedPayload).
+function setCardValues(card, b) {
+    const set = (sel, v) => { if (v != null && v !== "") card.querySelector(sel).value = v; };
+    set(".mb-base", b.base_scenario);
+    const d = b.descriptors || {};
+    set(".mb-location", d.location); set(".mb-building", d.building);
+    set(".mb-population", d.population); set(".mb-equipment", d.equipment);
+    set(".mb-noise", b.noise_profile); set(".mb-seed", b.seed);
+    set(".mb-policy", b.policy);
+    const o = b.overrides || {};
+    set(".mb-ev-count", o["ev_fleet.ev_count"]);
+    set(".mb-charger-count", o["charging_infra.charger_count"]);
+    set(".mb-peak-kw", o["building_load.peak_kw"]);
+    set(".mb-min-soc", o["ev_fleet.min_allowed_soc"]);
+    set(".mb-max-soc", o["ev_fleet.max_allowed_soc"]);
+    if ("building_load.peak_kw_scaling" in o)
+        card.querySelector(".mb-peak-scaling").checked = !!o["building_load.peak_kw_scaling"];
+    const adv = card.querySelector(".mb-adv-overrides");
+    if (adv && b.advanced_json) adv.value = b.advanced_json;
+}
+
+// Restore the whole form from a downloaded run config → "regenerate".
+function applyConfig(cfg) {
+    document.getElementById("building-cards").innerHTML = "";
+    (cfg.buildings || []).forEach(b => {
+        const card = createBuildingCard();
+        document.getElementById("building-cards").appendChild(card);
+        setCardValues(card, b);
+    });
+    renumberBuildingCards();
+    const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
+    set("u-output-path", cfg.output_path); set("u-start-month", cfg.start_month);
+    set("u-end-month", cfg.end_month); set("u-samples", cfg.samples);
+    set("u-workers", cfg.workers); set("u-noise", cfg.noise_profile);
+    set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
+    set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
+    if (cfg.output_mode) {
+        const r = document.querySelector(`input[name='output-mode'][value='${cfg.output_mode}']`);
+        if (r) r.checked = true;
+    }
+    if (cfg.shared_overrides) state.overrides = { ...cfg.shared_overrides };
+    updateRunEstimate();
+}
+
 function addBuilding() {
     document.getElementById("building-cards").appendChild(createBuildingCard());
     renumberBuildingCards();
@@ -1644,7 +1713,15 @@ function buildUnifiedPayload() {
             const v = card.querySelector(".mb-" + k).value;
             if (v) descriptors[k] = v;
         });
-        const overrides = {};
+        // Per-building Advanced overrides (JSON) — applied first so the explicit
+        // card fields below win on any key conflict.
+        const advRaw = card.querySelector(".mb-adv-overrides").value.trim();
+        let adv = {};
+        if (advRaw) {
+            try { adv = JSON.parse(advRaw); }
+            catch (e) { throw new Error(`Building advanced-overrides JSON invalid: ${e.message}`); }
+        }
+        const overrides = { ...adv };
         const ev = parseInt(card.querySelector(".mb-ev-count").value, 10);
         const ch = parseInt(card.querySelector(".mb-charger-count").value, 10);
         const pk = parseFloat(card.querySelector(".mb-peak-kw").value);
@@ -1663,6 +1740,7 @@ function buildUnifiedPayload() {
             seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
             noise_profile: card.querySelector(".mb-noise").value || null,
             policy: card.querySelector(".mb-policy").value || null,
+            advanced_json: advRaw || undefined,   // round-trips via download/load
         });
     });
 
@@ -1710,13 +1788,16 @@ function updateRunEstimate() {
         + `= ${e.units} unit(s), ${e.total} building-generations.`;
 }
 
-let UNIFIED_JOB = null, UNIFIED_POLL = null;
+let UNIFIED_JOB = null, UNIFIED_POLL = null, LAST_PAYLOAD = null;
 
 async function startUnified() {
     const status = document.getElementById("status");
-    const payload = buildUnifiedPayload();
+    let payload;
+    try { payload = buildUnifiedPayload(); }
+    catch (e) { status.textContent = String(e.message || e); return; }
     if (!payload.buildings.length) { status.textContent = "Add at least one building."; return; }
     if (!payload.start_month) { status.textContent = "Set a start month."; return; }
+    LAST_PAYLOAD = payload;
     const btn = document.getElementById("generate-btn");
     btn.disabled = true;
     status.textContent = "Launching…";
@@ -1761,9 +1842,21 @@ async function pollUnified() {
 
 function showUnifiedAnalysis(manifest) {
     document.getElementById("output").style.display = "";
-    document.getElementById("output-meta").innerHTML =
+    const meta = document.getElementById("output-meta");
+    meta.innerHTML =
         `<p class="small">job <code>${escapeHtml(UNIFIED_JOB.id)}</code> · ${manifest.n_buildings} building(s) · `
         + `${escapeHtml(manifest.output_mode)} · ${manifest.n_succeeded}/${manifest.n_total} units</p>`;
+    const bar = document.createElement("div");
+    bar.className = "analysis-controls";
+    const zip = document.createElement("a");
+    zip.href = `/api/generate-unified/${UNIFIED_JOB.id}/download`;
+    zip.className = "secondary"; zip.textContent = "⬇ Download outputs (zip)";
+    zip.style.textDecoration = "none"; zip.style.padding = "0.3rem 0.7rem";
+    const cfgBtn = document.createElement("button");
+    cfgBtn.type = "button"; cfgBtn.className = "secondary"; cfgBtn.textContent = "⬇ Download run config";
+    cfgBtn.onclick = () => downloadJson(LAST_PAYLOAD, `unified_config_${UNIFIED_JOB.id}.json`);
+    bar.append(zip, cfgBtn);
+    meta.appendChild(bar);
     document.getElementById("run-log").textContent = JSON.stringify(manifest, null, 2);
 
     const months = [...new Set((manifest.samples || [])

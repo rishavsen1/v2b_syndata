@@ -10,6 +10,7 @@ Local-only by default. See README for LAN exposure.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
@@ -17,6 +18,7 @@ import subprocess
 import sys
 import time
 import uuid
+import zipfile
 from pathlib import Path
 
 import pandas as pd
@@ -445,7 +447,8 @@ def api_generate_unified():
     shared = payload.get("shared_overrides") or {}
     bspecs = []
     for b in buildings:
-        ov = {**(b.get("overrides") or {}), **shared}  # global Advanced wins
+        # Global Advanced (shared) first, then per-building overrides win.
+        ov = {**shared, **(b.get("overrides") or {})}
         bspecs.append({
             "base_scenario": b.get("base_scenario", "S01"),
             "descriptors": b.get("descriptors") or {},
@@ -542,6 +545,27 @@ def api_unified_csv(job_id: str, month: str, sample: str, csv_name: str):
     return Response(
         fpath.read_bytes(), mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={csv_name}"},
+    )
+
+
+@app.route("/api/generate-unified/<job_id>/download")
+def api_unified_download(job_id: str):
+    """Zip the whole output tree (all months/samples/CSVs + manifests) so a run
+    is downloadable in one click."""
+    if job_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown job"}), 404
+    root = Path(BATCH_JOBS[job_id]["output_path"])
+    if not root.exists():
+        return jsonify({"error": "output not found"}), 404
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(root.rglob("*")):
+            if f.is_file():
+                zf.write(f, f.relative_to(root))
+    buf.seek(0)
+    return Response(
+        buf.read(), mimetype="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=unified_{job_id}.zip"},
     )
 
 
