@@ -89,8 +89,8 @@ def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
     return _drop_if_oor("arrival", fit, {"mu": "arrival.mu", "sigma": "arrival.sigma"})
 
 
-MIXTURE_MIN_SAMPLES = 60      # need enough data to justify 5 params
-MIXTURE_BIC_MARGIN = 10.0     # keep the mixture only if it beats single by >= this
+MIXTURE_MIN_SAMPLES = 60       # need enough data to justify 5 params
+MIXTURE_KS_MARGIN = 0.02       # keep the mixture only if its KS beats single by >= this
 
 
 def _gmm2_em(x: np.ndarray, iters: int = 300):
@@ -116,29 +116,26 @@ def _gmm2_em(x: np.ndarray, iters: int = 300):
 
 
 def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
-    """Fit a 2-component arrival mixture on [6, 20] and return it ONLY if it
-    beats a single Gaussian by a BIC margin (i.e. the data is meaningfully
-    bimodal) and both components pass DIST_PARAM_RANGES. Else None → caller
-    falls back to the single TruncNorm. Components ordered by mean (mu1 <= mu2).
+    """Fit a 2-component arrival mixture and return it ONLY if its goodness-of-fit
+    (KS of the truncated-mixture CDF — the exact form generation samples) beats
+    the single TruncNorm by `MIXTURE_KS_MARGIN` and both components pass
+    DIST_PARAM_RANGES. Else None → caller falls back to the single TruncNorm.
+
+    Out-of-[6,20] arrivals are *filtered* (not clipped): clipping piles boundary
+    mass that the EM overfits with a spurious spike at 6/20. Components ordered
+    by mean (mu1 <= mu2).
     """
     a, b = ARRIVAL_LO, ARRIVAL_HI
-    arr = np.clip(np.asarray(arrival_hours, float), a + 1e-6, b - 1e-6)
+    arr = np.asarray(arrival_hours, float)
+    arr = arr[(arr >= a) & (arr <= b)]
     n = len(arr)
     if n < MIXTURE_MIN_SAMPLES:
         return None
 
-    mu, sd, w, ll2 = _gmm2_em(arr)
-    # single-Gaussian baseline on the same clipped data (consistent comparison)
-    mu0, sd0 = float(arr.mean()), float(max(arr.std(), 1e-3))
-    ll1 = float(st.norm.logpdf(arr, mu0, sd0).sum())
-    bic1 = 2 * np.log(n) - 2 * ll1
-    bic2 = 5 * np.log(n) - 2 * ll2
-    if (bic1 - bic2) < MIXTURE_BIC_MARGIN:
-        return None  # not bimodal enough to justify the mixture
-
+    mu, sd, w, _ = _gmm2_em(arr)
     order = np.argsort(mu)
     mu, sd, w = mu[order], sd[order], w[order]
-    # KS of the truncated mixture CDF (each component truncated to [a, b]).
+
     def mix_cdf(q):
         q = np.asarray(q, float)
         return sum(
@@ -146,13 +143,21 @@ def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] |
                                     loc=mu[j], scale=sd[j])
             for j in range(2)
         )
-    ks = float(st.kstest(arr, mix_cdf).statistic)
+    ks_mix = float(st.kstest(arr, mix_cdf).statistic)
+
+    # Single-TruncNorm KS on the SAME filtered data (apples-to-apples vs the
+    # form generation actually uses). Only ship the mixture if it's meaningfully
+    # better — selection is tied directly to generation fidelity, not raw BIC.
+    single = fit_truncnorm_arrival(arr)
+    if single is None or (single["ks_fit_quality"] - ks_mix) < MIXTURE_KS_MARGIN:
+        return None
+
     fit = {
         "dist": "truncnorm_mixture",
         "w1": float(w[0]),
         "mu1": float(mu[0]), "sigma1": float(sd[0]),
         "mu2": float(mu[1]), "sigma2": float(sd[1]),
-        "n_samples": n, "ks_fit_quality": ks,
+        "n_samples": n, "ks_fit_quality": ks_mix,
     }
     return _drop_if_oor("arrival_mixture", fit, {
         "w1": "arrival.w1",
