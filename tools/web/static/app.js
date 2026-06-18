@@ -61,15 +61,16 @@ const SHORTCUT_KNOBS = new Set([
     "building_load.peak_kw_scaling",
 ]);
 
-function getEffectiveDefault(path, spec) {
-    if (RESOLVED && RESOLVED[path] && RESOLVED[path].value !== undefined) {
-        return RESOLVED[path].value;
+// `resolved` is a per-card {path: {value, source}} map from /api/resolve.
+function getEffectiveDefault(path, spec, resolved) {
+    if (resolved && resolved[path] && resolved[path].value !== undefined) {
+        return resolved[path].value;
     }
     return spec.default;
 }
 
-function getEffectiveSource(path) {
-    if (RESOLVED && RESOLVED[path]) return RESOLVED[path].source;
+function getEffectiveSource(path, resolved) {
+    if (resolved && resolved[path]) return resolved[path].source;
     return "default";
 }
 
@@ -102,20 +103,6 @@ async function init() {
         return;
     }
 
-    // Global noise-profile dropdown (run setting).
-    const noiseSel = document.getElementById("u-noise");
-    if (noiseSel) {
-        noiseSel.innerHTML = "";
-        [{ id: "tmyx_stochastic", description: "seed-varying (recommended for samples)" },
-         ...(DESCRIPTORS.noise || [])].forEach(n => {
-            if (noiseSel.querySelector(`option[value="${n.id}"]`)) return;
-            const o = document.createElement("option");
-            o.value = n.id; o.textContent = n.description ? `${n.id} — ${n.description}` : n.id;
-            noiseSel.appendChild(o);
-        });
-    }
-
-    populateKnobBuckets();              // Advanced → shared overrides (state.overrides)
     document.getElementById("add-building").addEventListener("click", addBuilding);
     document.getElementById("generate-btn").addEventListener("click", startUnified);
     const loadFile = document.getElementById("load-config-file");
@@ -221,8 +208,8 @@ async function refreshResolvedDefaults() {
     refreshShortcutWidgets();
 }
 
-function updateSourceLabel(widget, path) {
-    const src = (path in state.overrides) ? "explicit (you)" : getEffectiveSource(path);
+function updateSourceLabel(widget, path, ctx) {
+    const src = (path in ctx.overrides) ? "explicit (you)" : getEffectiveSource(path, ctx.resolved);
     const label = widget.querySelector(".source-label");
     if (!label) return;
     label.textContent = `from: ${src}`;
@@ -324,8 +311,12 @@ function syncFromScenario(scenarioId) {
 // Knob bucket rendering
 // ────────────────────────────────────────────────────────────────────
 
-function populateKnobBuckets() {
-    const container = document.getElementById("knob-buckets");
+// Render the full knob panel INTO a per-card container, bound to that card's
+// ctx ({overrides, resolved}). Each widget reads/writes ctx, so cards are fully
+// independent.
+function populateCardKnobs(card) {
+    const container = card.querySelector(".card-knob-buckets");
+    const ctx = card._ctx;
     container.innerHTML = "";
     for (const [bucket, knobs] of Object.entries(KNOBS)) {
         const section = document.createElement("section");
@@ -333,47 +324,65 @@ function populateKnobBuckets() {
         const h3 = document.createElement("h3");
         h3.textContent = bucket;
         section.appendChild(h3);
-
         for (const [knobName, spec] of Object.entries(knobs)) {
             const path = `${bucket}.${knobName}`;
-            if (SHORTCUT_KNOBS.has(path)) continue;  // promoted to descriptor section
-            const widget = createKnobWidget(path, spec);
-            section.appendChild(widget);
+            if (SHORTCUT_KNOBS.has(path)) continue;  // promoted to per-card quick-fields
+            section.appendChild(createKnobWidget(path, spec, ctx));
         }
         container.appendChild(section);
     }
 }
 
-function refreshShortcutWidgets() {
-    // Pull current resolved (or override) values into the descriptor-section widgets.
-    const tmyxEl = document.getElementById("tmyx-select");
-    const peakEl = document.getElementById("peak-kw");
-    const scaleEl = document.getElementById("peak-kw-scaling");
-    if (tmyxEl) {
-        const val = ("building_load.tmyx_station" in state.overrides)
-            ? state.overrides["building_load.tmyx_station"]
-            : (RESOLVED["building_load.tmyx_station"] || {}).value;
-        if (val !== undefined && val !== null) {
-            // If the value isn't in the dropdown, leave the "(use base)" blank selected.
-            const opt = Array.from(tmyxEl.options).find(o => o.value === val);
-            tmyxEl.value = opt ? val : "";
+// POST the card's base + descriptors to /api/resolve; refresh that card's knob
+// widgets (non-overridden ones snap to the resolved value) + numeric placeholders.
+async function refreshCardKnobs(card) {
+    const ctx = card._ctx;
+    const descriptors = {};
+    ["location", "building", "population", "equipment"].forEach(k => {
+        const v = card.querySelector(".mb-" + k).value;
+        if (v) descriptors[k] = v;
+    });
+    try {
+        const r = await fetch("/api/resolve", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ base_scenario: card.querySelector(".mb-base").value, descriptors }),
+        });
+        const data = await safeJson(r);
+        if (!data.error) ctx.resolved = data;
+    } catch (e) { /* keep prior resolved */ }
+    // refresh each widget that the user hasn't overridden
+    card.querySelectorAll(".card-knob-buckets .knob").forEach(widget => {
+        const path = widget.dataset.path;
+        const [bucket, knobName] = path.split(/\.(.+)/);
+        const spec = (KNOBS[bucket] || {})[knobName];
+        if (!spec) return;
+        if (!(path in ctx.overrides)) {
+            const input = widget.querySelector(".knob-input-row > :first-child");
+            if (input) resetWidgetValue(input, spec, getEffectiveDefault(path, spec, ctx.resolved));
+            widget.classList.remove("modified");
         }
-    }
-    if (peakEl) {
-        const val = ("building_load.peak_kw" in state.overrides)
-            ? state.overrides["building_load.peak_kw"]
-            : (RESOLVED["building_load.peak_kw"] || {}).value;
-        if (val !== undefined && val !== null) peakEl.value = val;
-    }
-    if (scaleEl) {
-        const val = ("building_load.peak_kw_scaling" in state.overrides)
-            ? state.overrides["building_load.peak_kw_scaling"]
-            : (RESOLVED["building_load.peak_kw_scaling"] || {}).value;
-        if (val !== undefined && val !== null) scaleEl.checked = !!val;
-    }
+        updateSourceLabel(widget, path, ctx);
+    });
 }
 
-function createKnobWidget(path, spec) {
+// Set the card's knob widgets to reflect ctx.overrides (used by config load).
+function syncCardKnobWidgets(card) {
+    const ctx = card._ctx;
+    card.querySelectorAll(".card-knob-buckets .knob").forEach(widget => {
+        const path = widget.dataset.path;
+        const [bucket, knobName] = path.split(/\.(.+)/);
+        const spec = (KNOBS[bucket] || {})[knobName];
+        if (!spec) return;
+        const overridden = path in ctx.overrides;
+        const val = overridden ? ctx.overrides[path] : getEffectiveDefault(path, spec, ctx.resolved);
+        const input = widget.querySelector(".knob-input-row > :first-child");
+        if (input) resetWidgetValue(input, spec, val);
+        widget.classList.toggle("modified", overridden);
+        updateSourceLabel(widget, path, ctx);
+    });
+}
+
+function createKnobWidget(path, spec, ctx) {
     const wrapper = document.createElement("div");
     wrapper.className = "knob";
     wrapper.dataset.path = path;
@@ -403,7 +412,7 @@ function createKnobWidget(path, spec) {
 
     const inputRow = document.createElement("div");
     inputRow.className = "knob-input-row";
-    const input = createInputForType(path, spec, wrapper);
+    const input = createInputForType(path, spec, wrapper, ctx);
     inputRow.appendChild(input);
 
     const resetBtn = document.createElement("button");
@@ -412,11 +421,10 @@ function createKnobWidget(path, spec) {
     resetBtn.style.padding = "0.2rem 0.5rem";
     resetBtn.style.fontSize = "0.7rem";
     resetBtn.addEventListener("click", () => {
-        delete state.overrides[path];
+        delete ctx.overrides[path];
         wrapper.classList.remove("modified");
-        resetWidgetValue(input, spec, getEffectiveDefault(path, spec));
-        updateSourceLabel(wrapper, path);
-        renderOverrideSummary();
+        resetWidgetValue(input, spec, getEffectiveDefault(path, spec, ctx.resolved));
+        updateSourceLabel(wrapper, path, ctx);
     });
     inputRow.appendChild(resetBtn);
 
@@ -431,20 +439,19 @@ function createKnobWidget(path, spec) {
     return wrapper;
 }
 
-function createInputForType(path, spec, wrapper) {
-    const effDefault = getEffectiveDefault(path, spec);
+function createInputForType(path, spec, wrapper, ctx) {
+    const effDefault = getEffectiveDefault(path, spec, ctx.resolved);
     const onChange = (v, valid = true) => {
         if (!valid) return;
-        const baseline = getEffectiveDefault(path, spec);
+        const baseline = getEffectiveDefault(path, spec, ctx.resolved);
         if (deepEqual(v, baseline)) {
-            delete state.overrides[path];
+            delete ctx.overrides[path];
             wrapper.classList.remove("modified");
         } else {
-            state.overrides[path] = v;
+            ctx.overrides[path] = v;
             wrapper.classList.add("modified");
         }
-        updateSourceLabel(wrapper, path);
-        renderOverrideSummary();
+        updateSourceLabel(wrapper, path, ctx);
     };
 
     switch (spec.type) {
@@ -499,10 +506,10 @@ function createInputForType(path, spec, wrapper) {
         }
 
         case "simplex":
-            return createSimplexWidget(path, spec, wrapper, onChange);
+            return createSimplexWidget(path, spec, wrapper, onChange, ctx);
 
         case "vec2":
-            return createVec2Widget(path, spec, onChange);
+            return createVec2Widget(path, spec, onChange, ctx);
 
         case "list[vec2]":
         case "list[region]":
@@ -525,11 +532,11 @@ function createInputForType(path, spec, wrapper) {
     }
 }
 
-function createSimplexWidget(path, spec, wrapper, onChange) {
+function createSimplexWidget(path, spec, wrapper, onChange, ctx) {
     const container = document.createElement("div");
     container.className = "simplex-widget";
 
-    const effDefault = getEffectiveDefault(path, spec);
+    const effDefault = getEffectiveDefault(path, spec, ctx.resolved);
     const components = spec.components || effDefault.map((_, i) => `c${i}`);
     const inputs = components.map((name, i) => {
         const wrap = document.createElement("div");
@@ -566,10 +573,10 @@ function createSimplexWidget(path, spec, wrapper, onChange) {
     return container;
 }
 
-function createVec2Widget(path, spec, onChange) {
+function createVec2Widget(path, spec, onChange, ctx) {
     const container = document.createElement("div");
     container.className = "vec2-widget";
-    const [a, b] = getEffectiveDefault(path, spec);
+    const [a, b] = getEffectiveDefault(path, spec, ctx.resolved);
     const ia = document.createElement("input");
     const ib = document.createElement("input");
     [ia, ib].forEach(i => {
@@ -1586,10 +1593,14 @@ function createBuildingCard() {
     const card = document.createElement("div");
     card.className = "building-card";
     card.dataset.cardId = idx;
+    card._ctx = { overrides: {}, resolved: {} };  // per-building knob state
     card.innerHTML = `
         <div class="building-card-head">
             <span class="building-card-title"></span>
-            <button type="button" class="mb-remove secondary">− remove</button>
+            <span style="display:flex;gap:0.4rem">
+                <button type="button" class="mb-dup secondary">⧉ duplicate</button>
+                <button type="button" class="mb-remove secondary">− remove</button>
+            </span>
         </div>
         <div class="descriptor-grid">
             <label><span class="field-name">Base scenario</span><select class="mb-base"></select></label>
@@ -1609,37 +1620,40 @@ function createBuildingCard() {
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
         <details class="mb-adv">
-            <summary>Advanced overrides (JSON) — per building</summary>
-            <p class="hint" style="margin:0.3rem 0">Any knob, e.g. <code>{"user_behavior.min_depart_soc": 0.0, "utility_rate.dr_program": "CBP"}</code>. Merged into this building (explicit fields above win on conflict). Global Advanced applies to all buildings; this is per-building.</p>
-            <textarea class="mb-adv-overrides" rows="3" style="width:100%;font-family:monospace" placeholder="{}"></textarea>
+            <summary>Advanced — knobs (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">Every <code>configs/knobs.yaml</code> knob, scoped to this building. Defaults show the resolved value for this card's base scenario + descriptors; change any to override (the quick-fields above take precedence for EV/charger/peak/SoC).</p>
+            <div class="card-knob-buckets"></div>
         </details>
     `;
-    // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
-    // sessions. Warn live. Floor = shared override min_depart_soc, else 80%.
-    const checkSoc = () => {
-        const w = card.querySelector(".mb-soc-warn");
-        const mx = parseFloat(card.querySelector(".mb-max-soc").value);
-        const floorPct = (("user_behavior.min_depart_soc" in state.overrides)
-            ? Number(state.overrides["user_behavior.min_depart_soc"]) : 0.80) * 100;
-        if (!isNaN(mx) && mx <= floorPct) {
-            w.style.display = "";
-            w.textContent = `⚠ Max SoC ${mx}% ≤ departure floor min_depart_soc (${floorPct}%) `
-                + `→ all sessions will be dropped. Raise Max SoC or lower min_depart_soc in Advanced.`;
-        } else {
-            w.style.display = "none";
-        }
-    };
-    card.querySelector(".mb-max-soc").addEventListener("input", checkSoc);
     mbFillSelect(card.querySelector(".mb-base"), SCENARIOS, null);
     mbFillSelect(card.querySelector(".mb-location"), DESCRIPTORS.location, "");
     mbFillSelect(card.querySelector(".mb-building"), DESCRIPTORS.building, "");
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
-    // The blank ("inherit") dropdown option shows the actual descriptor value
-    // the chosen base scenario resolves to; the EV/charger/peak placeholders
-    // show the actual resolved knob numbers (via /api/resolve). Both refresh on
-    // base-scenario or descriptor changes.
+    populateCardKnobs(card);   // render the per-card knob panel bound to card._ctx
+
+    // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
+    // sessions for this building. Warn live. Floor = this card's min_depart_soc
+    // (override → resolved → 0.80 default).
+    const checkSoc = () => {
+        const w = card.querySelector(".mb-soc-warn");
+        const mx = parseFloat(card.querySelector(".mb-max-soc").value);
+        const ov = card._ctx.overrides, res = card._ctx.resolved;
+        const floor = ("user_behavior.min_depart_soc" in ov)
+            ? Number(ov["user_behavior.min_depart_soc"])
+            : ((res["user_behavior.min_depart_soc"] || {}).value ?? 0.80);
+        const floorPct = floor * 100;
+        if (!isNaN(mx) && mx <= floorPct) {
+            w.style.display = "";
+            w.textContent = `⚠ Max SoC ${mx}% ≤ departure floor min_depart_soc (${floorPct}%) `
+                + `→ all sessions dropped. Raise Max SoC or lower min_depart_soc in this building's Advanced.`;
+        } else {
+            w.style.display = "none";
+        }
+    };
+    card.querySelector(".mb-max-soc").addEventListener("input", checkSoc);
+
     const baseSel = card.querySelector(".mb-base");
     const updateInheritLabels = () => {
         const sc = (SCENARIOS || []).find(s => s.id === baseSel.value);
@@ -1651,35 +1665,35 @@ function createBuildingCard() {
             opt.textContent = d[key] ? d[key] : "scenario default";
         });
     };
-    const refreshResolvedPlaceholders = async () => {
-        const descriptors = {};
-        ["location", "building", "population", "equipment"].forEach(k => {
-            const v = card.querySelector(".mb-" + k).value;
-            if (v) descriptors[k] = v;
-        });
-        try {
-            const r = await fetch("/api/resolve", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base_scenario: baseSel.value, descriptors }),
-            });
-            const data = await safeJson(r);
-            if (data.error) return;
-            const set = (cls, path) => {
-                const v = (data[path] || {}).value;
-                if (v != null) card.querySelector(cls).placeholder = String(v);
-            };
-            set(".mb-ev-count", "ev_fleet.ev_count");
-            set(".mb-charger-count", "charging_infra.charger_count");
-            set(".mb-peak-kw", "building_load.peak_kw");
-            set(".mb-min-soc", "ev_fleet.min_allowed_soc");
-            set(".mb-max-soc", "ev_fleet.max_allowed_soc");
-        } catch (e) { /* leave placeholders as-is */ }
+    const setPlaceholders = () => {
+        const set = (cls, path) => {
+            const v = (card._ctx.resolved[path] || {}).value;
+            if (v != null) card.querySelector(cls).placeholder = String(v);
+        };
+        set(".mb-ev-count", "ev_fleet.ev_count");
+        set(".mb-charger-count", "charging_infra.charger_count");
+        set(".mb-peak-kw", "building_load.peak_kw");
+        set(".mb-min-soc", "ev_fleet.min_allowed_soc");
+        set(".mb-max-soc", "ev_fleet.max_allowed_soc");
     };
-    const refreshCard = () => { updateInheritLabels(); refreshResolvedPlaceholders(); };
+    // One /api/resolve per refresh → card._ctx.resolved → labels + placeholders + knob widgets.
+    const refreshCard = async () => {
+        updateInheritLabels();
+        await refreshCardKnobs(card);
+        setPlaceholders();
+        checkSoc();
+    };
+    card._refresh = refreshCard;
     [baseSel, ".mb-location", ".mb-building", ".mb-population", ".mb-equipment"]
         .forEach(s => (typeof s === "string" ? card.querySelector(s) : s)
                  .addEventListener("change", refreshCard));
     refreshCard();
+    card.querySelector(".mb-dup").addEventListener("click", () => {
+        const clone = createBuildingCard();
+        document.getElementById("building-cards").appendChild(clone);
+        setCardValues(clone, cardToSpec(card));
+        renumberBuildingCards();
+    });
     card.querySelector(".mb-remove").addEventListener("click", () => {
         card.remove();
         renumberBuildingCards();
@@ -1701,6 +1715,42 @@ function downloadJson(obj, filename) {
 }
 
 // Repopulate one card from a building spec (inverse of buildUnifiedPayload).
+// Knobs that have a dedicated quick-field input on the card (so they don't
+// also appear in the per-card knob panel / aren't double-counted).
+const QUICK_KEYS = {
+    "ev_fleet.ev_count": ".mb-ev-count",
+    "charging_infra.charger_count": ".mb-charger-count",
+    "building_load.peak_kw": ".mb-peak-kw",
+    "ev_fleet.min_allowed_soc": ".mb-min-soc",
+    "ev_fleet.max_allowed_soc": ".mb-max-soc",
+};
+
+// One building card → a BuildingSpec (overrides = per-card knob panel + quick
+// fields; quick fields win). Used by the payload and the Duplicate button.
+function cardToSpec(card) {
+    const descriptors = {};
+    ["location", "building", "population", "equipment"].forEach(k => {
+        const v = card.querySelector(".mb-" + k).value;
+        if (v) descriptors[k] = v;
+    });
+    const overrides = { ...card._ctx.overrides };
+    for (const [key, sel] of Object.entries(QUICK_KEYS)) {
+        const raw = card.querySelector(sel).value;
+        if (raw === "") continue;
+        const v = parseFloat(raw);
+        if (!isNaN(v)) overrides[key] = v;
+    }
+    overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-scaling").checked;
+    return {
+        base_scenario: card.querySelector(".mb-base").value,
+        descriptors,
+        overrides,
+        seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
+        noise_profile: card.querySelector(".mb-noise").value || null,
+        policy: card.querySelector(".mb-policy").value || null,
+    };
+}
+
 function setCardValues(card, b) {
     const set = (sel, v) => { if (v != null && v !== "") card.querySelector(sel).value = v; };
     set(".mb-base", b.base_scenario);
@@ -1709,16 +1759,18 @@ function setCardValues(card, b) {
     set(".mb-population", d.population); set(".mb-equipment", d.equipment);
     set(".mb-noise", b.noise_profile); set(".mb-seed", b.seed);
     set(".mb-policy", b.policy);
-    const o = b.overrides || {};
-    set(".mb-ev-count", o["ev_fleet.ev_count"]);
-    set(".mb-charger-count", o["charging_infra.charger_count"]);
-    set(".mb-peak-kw", o["building_load.peak_kw"]);
-    set(".mb-min-soc", o["ev_fleet.min_allowed_soc"]);
-    set(".mb-max-soc", o["ev_fleet.max_allowed_soc"]);
-    if ("building_load.peak_kw_scaling" in o)
+    const o = { ...(b.overrides || {}) };
+    // quick-field keys → their inputs; remove from the knob-panel overrides
+    for (const [key, sel] of Object.entries(QUICK_KEYS)) {
+        if (key in o) { card.querySelector(sel).value = o[key]; delete o[key]; }
+    }
+    if ("building_load.peak_kw_scaling" in o) {
         card.querySelector(".mb-peak-scaling").checked = !!o["building_load.peak_kw_scaling"];
-    const adv = card.querySelector(".mb-adv-overrides");
-    if (adv && b.advanced_json) adv.value = b.advanced_json;
+        delete o["building_load.peak_kw_scaling"];
+    }
+    card._ctx.overrides = o;            // remaining → per-card knob panel
+    syncCardKnobWidgets(card);
+    if (card._refresh) card._refresh();  // re-resolve + placeholders + SoC check
 }
 
 // Restore the whole form from a downloaded run config → "regenerate".
@@ -1733,14 +1785,13 @@ function applyConfig(cfg) {
     const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
     set("u-output-path", cfg.output_path); set("u-start-month", cfg.start_month);
     set("u-end-month", cfg.end_month); set("u-samples", cfg.samples);
-    set("u-workers", cfg.workers); set("u-noise", cfg.noise_profile);
+    set("u-workers", cfg.workers);
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
     if (cfg.output_mode) {
         const r = document.querySelector(`input[name='output-mode'][value='${cfg.output_mode}']`);
         if (r) r.checked = true;
     }
-    if (cfg.shared_overrides) state.overrides = { ...cfg.shared_overrides };
     updateRunEstimate();
 }
 
@@ -1750,49 +1801,14 @@ function addBuilding() {
 }
 
 function buildUnifiedPayload() {
-    const buildings = [];
-    document.querySelectorAll("#building-cards .building-card").forEach(card => {
-        const descriptors = {};
-        ["location", "building", "population", "equipment"].forEach(k => {
-            const v = card.querySelector(".mb-" + k).value;
-            if (v) descriptors[k] = v;
-        });
-        // Per-building Advanced overrides (JSON) — applied first so the explicit
-        // card fields below win on any key conflict.
-        const advRaw = card.querySelector(".mb-adv-overrides").value.trim();
-        let adv = {};
-        if (advRaw) {
-            try { adv = JSON.parse(advRaw); }
-            catch (e) { throw new Error(`Building advanced-overrides JSON invalid: ${e.message}`); }
-        }
-        const overrides = { ...adv };
-        const ev = parseInt(card.querySelector(".mb-ev-count").value, 10);
-        const ch = parseInt(card.querySelector(".mb-charger-count").value, 10);
-        const pk = parseFloat(card.querySelector(".mb-peak-kw").value);
-        const minSoc = parseFloat(card.querySelector(".mb-min-soc").value);
-        const maxSoc = parseFloat(card.querySelector(".mb-max-soc").value);
-        if (!isNaN(ev)) overrides["ev_fleet.ev_count"] = ev;
-        if (!isNaN(ch)) overrides["charging_infra.charger_count"] = ch;
-        if (!isNaN(pk)) overrides["building_load.peak_kw"] = pk;
-        if (!isNaN(minSoc)) overrides["ev_fleet.min_allowed_soc"] = minSoc;
-        if (!isNaN(maxSoc)) overrides["ev_fleet.max_allowed_soc"] = maxSoc;
-        overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-scaling").checked;
-        buildings.push({
-            base_scenario: card.querySelector(".mb-base").value,
-            descriptors,
-            overrides,
-            seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
-            noise_profile: card.querySelector(".mb-noise").value || null,
-            policy: card.querySelector(".mb-policy").value || null,
-            advanced_json: advRaw || undefined,   // round-trips via download/load
-        });
-    });
+    const buildings = Array.from(
+        document.querySelectorAll("#building-cards .building-card")
+    ).map(cardToSpec);   // each building fully self-contained (no global shared overrides)
 
     const val = id => document.getElementById(id).value;
     const num = id => { const v = parseFloat(val(id)); return isNaN(v) ? null : v; };
     const payload = {
         buildings,
-        shared_overrides: { ...state.overrides },   // Advanced panel → every building
         output_mode: (document.querySelector("input[name='output-mode']:checked") || {}).value || "shared",
         output_path: val("u-output-path") || "",
         start_month: val("u-start-month"),
@@ -1800,7 +1816,6 @@ function buildUnifiedPayload() {
         samples: parseInt(val("u-samples"), 10) || 1,
         workers: parseInt(val("u-workers"), 10) || 4,
         force: document.getElementById("u-force").checked,
-        noise_profile: val("u-noise") || "tmyx_stochastic",
         default_policy: val("u-default-policy") || "ILP-MPCFIXEDFSL",
         strict_e5: document.getElementById("u-strict-e5").checked,
     };

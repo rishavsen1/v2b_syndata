@@ -484,3 +484,18 @@ button.secondary:hover { background: var(--primary); color: white; }
 .run-grid select, .run-grid input[type="text"], .run-grid input[type="number"],
 .run-grid input[type="month"] { width: 100%; }
 #unified-analysis { margin: 0.5rem 0 1rem; }
+
+/* ── Per-building knob panel (inside a building card) ───────────────────── */
+.building-card .mb-adv { margin-top: 0.6rem; }
+.building-card .card-knob-buckets {
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid var(--border, #e2e2e2);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    margin-top: 0.4rem;
+    background: #fff;
+}
+.building-card .card-knob-buckets .knob-bucket h3 { font-size: 0.82rem; margin: 0.5rem 0 0.25rem; }
+.building-card .mb-dup { border-color: #2c7fb8; color: #2c7fb8; }
+.building-card .mb-dup:hover { background: #2c7fb8; color: #fff; }

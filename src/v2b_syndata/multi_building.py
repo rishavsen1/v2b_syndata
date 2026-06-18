@@ -285,12 +285,15 @@ def _unit_config(
         spec.overrides = dict(spec.overrides)
         spec.overrides["sim_window.mode"] = "month"
         spec.overrides["sim_window.start"] = month_iso
-        # Seed-varying batch: tmyx_stochastic + Dirichlet noise per batch.py.
-        if noise_profile == "tmyx_stochastic":
+        # Per-building noise wins; the batch-level noise_profile is the default
+        # for buildings that didn't set their own.
+        eff_noise = spec.noise_profile or noise_profile
+        # Seed-varying batch: tmyx_stochastic adds Dirichlet noise per batch.py.
+        if eff_noise == "tmyx_stochastic":
             spec.overrides.setdefault(
                 "user_behavior.axes_distribution_dirichlet_alpha", 30.0)
             spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
-        spec.noise_profile = noise_profile
+        spec.noise_profile = eff_noise
         spec.seed = spec.seed + seed_base + sample
     return cfg
 

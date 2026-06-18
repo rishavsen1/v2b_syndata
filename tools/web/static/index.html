@@ -38,7 +38,6 @@
             <label><span class="field-name">End month</span><input type="month" id="u-end-month" value="2024-04"></label>
             <label><span class="field-name">Samples / month</span><input type="number" id="u-samples" min="1" max="100" value="1"></label>
             <label><span class="field-name">Workers</span><input type="number" id="u-workers" min="1" max="16" value="4"></label>
-            <label><span class="field-name">Noise profile</span><select id="u-noise"></select></label>
             <label><span class="field-name">DR program (global)</span>
                 <select id="u-dr-program">
                     <option value="">(scenario default)</option>
@@ -54,14 +53,6 @@
             <label class="inline-flag" style="margin-left:0"><input type="checkbox" id="u-force" checked> overwrite output if exists</label>
         </div>
         <div id="run-estimate" class="hint"></div>
-    </section>
-
-    <section id="advanced">
-        <details id="advanced-details">
-            <summary>Advanced — shared knob overrides (applied to <em>every</em> building)</summary>
-            <p class="hint">These knob overrides are merged into every building card. Per-building descriptors/seed/EV-count live on the cards above. Bounded by the ranges in <code>configs/knobs.yaml</code>.</p>
-            <div id="knob-buckets"></div>
-        </details>
     </section>
 
     <section id="action">
