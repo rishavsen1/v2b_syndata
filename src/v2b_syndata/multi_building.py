@@ -19,9 +19,16 @@ reproduces byte-identical CSVs.
 """
 from __future__ import annotations
 
+import copy
 import json
+import shutil
 import tempfile
+import time
+import traceback
+import uuid
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +36,7 @@ import pandas as pd
 
 from . import __version__
 from . import export_optimus as exp
+from .batch import BatchResult, _months_between, _record_result, _write_manifest
 from .manifest import CSV_NAMES, _git_sha
 from .runner import generate
 
@@ -249,3 +257,168 @@ def regenerate_from_config(
     data = json.loads(Path(config_path).read_text())
     cfg = config_from_dict(data)
     return generate_multi(cfg, output_dir, config_dir)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unified batch: buildings × samples × months
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class _MultiUnitSpec:
+    """One (month, sample) generation unit for the multi-building batch."""
+    cfg: MultiConfig
+    month_label: str          # e.g. "APR2024"
+    sample_idx: int
+    seed: int                 # representative seed (for the manifest log)
+    unit_dir: Path            # <output_dir>/<MONTH>/<sample>/
+    config_dir: Path
+
+
+def _unit_config(
+    base: MultiConfig, month_iso: str, sample: int, noise_profile: str | None,
+    seed_base: int,
+) -> MultiConfig:
+    """Clone the base config for one (month, sample): pin the month window, the
+    per-sample seed offset, and the per-sample noise on every building."""
+    cfg = copy.deepcopy(base)
+    for spec in cfg.buildings:
+        spec.overrides = dict(spec.overrides)
+        spec.overrides["sim_window.mode"] = "month"
+        spec.overrides["sim_window.start"] = month_iso
+        # Seed-varying batch: tmyx_stochastic + Dirichlet noise per batch.py.
+        if noise_profile == "tmyx_stochastic":
+            spec.overrides.setdefault(
+                "user_behavior.axes_distribution_dirichlet_alpha", 30.0)
+            spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
+        spec.noise_profile = noise_profile
+        spec.seed = spec.seed + seed_base + sample
+    return cfg
+
+
+def _run_one_multi_unit(spec: _MultiUnitSpec) -> BatchResult:
+    """Worker: generate one (month, sample) multi-building optimus set."""
+    t0 = time.monotonic()
+    try:
+        generate_multi(spec.cfg, spec.unit_dir, spec.config_dir)
+        status, err = "succeeded", None
+    except Exception as e:  # noqa: BLE001
+        status = "failed"
+        err = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"[-2000:]
+    return BatchResult(
+        month=spec.month_label, sample_idx=spec.sample_idx, seed=spec.seed,
+        path=f"{spec.month_label}/{spec.sample_idx}", status=status,
+        duration_sec=time.monotonic() - t0, error=err,
+    )
+
+
+def generate_multi_batch(
+    cfg: MultiConfig,
+    output_dir: Path,
+    config_dir: Path,
+    start_month: str,
+    end_month: str,
+    samples_per_month: int,
+    *,
+    seed_base: int = 0,
+    workers: int = 4,
+    noise_profile: str | None = "tmyx_stochastic",
+    force: bool = False,
+    progress_callback=None,
+) -> dict[str, Any]:
+    """Generate buildings × samples × months → optimus CSVs in a batch tree.
+
+    Layout `<output_dir>/<MONTH>/<sample>/` (each a shared or per-building
+    optimus set with a `building_id` column). Mirrors `batch.run_batch`:
+    ProcessPool over (month, sample) units, a `batch_manifest.json` of the same
+    shape (+ `n_buildings`/`output_mode`), and per-sample-completion progress.
+    Each building's seed for a unit is `building.seed + seed_base + sample`.
+    """
+    output_dir = Path(output_dir)
+    if output_dir.exists():
+        if not force:
+            raise FileExistsError(
+                f"Output dir {output_dir} exists. Pass force=True to overwrite.")
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True)
+
+    months = _months_between(start_month, end_month)
+    specs: list[_MultiUnitSpec] = []
+    for label, dt in months:
+        iso = dt.strftime("%Y-%m-%d")
+        for s in range(samples_per_month):
+            specs.append(_MultiUnitSpec(
+                cfg=_unit_config(cfg, iso, s, noise_profile, seed_base),
+                month_label=label, sample_idx=s, seed=seed_base + s,
+                unit_dir=output_dir / label / str(s), config_dir=Path(config_dir),
+            ))
+
+    batch_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    manifest: dict[str, Any] = {
+        "batch_id": batch_id,
+        "kind": "multi_building",
+        "n_buildings": len(cfg.buildings),
+        "output_mode": cfg.output_mode,
+        "start_month": start_month,
+        "end_month": end_month,
+        "samples_per_month": samples_per_month,
+        "seed_base": seed_base,
+        "seed_strategy": "building.seed + seed_base + sample",
+        "noise_profile": noise_profile,
+        "workers": workers,
+        "started_at": datetime.utcnow().isoformat() + "Z",
+        "completed_at": None,
+        "status": "in_progress",
+        "n_total": len(specs),
+        "n_succeeded": 0,
+        "n_failed": 0,
+        "samples": [],
+    }
+    manifest_path = output_dir / "batch_manifest.json"
+    _write_manifest(manifest_path, manifest)
+
+    results: list[BatchResult] = []
+    use_parallel = workers > 1 and len(specs) > 1
+    if use_parallel:
+        try:
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_run_one_multi_unit, s): s for s in specs}
+                for fut in as_completed(futures):
+                    res = fut.result()
+                    results.append(res)
+                    _record_result(manifest, res)
+                    _write_manifest(manifest_path, manifest)
+                    if progress_callback:
+                        progress_callback(res, manifest)
+        except Exception as e:  # noqa: BLE001
+            manifest["parallel_fallback_reason"] = f"{type(e).__name__}: {e}"
+            use_parallel = False
+            done = {(r.month, r.sample_idx) for r in results}
+            for s in specs:
+                if (s.month_label, s.sample_idx) in done:
+                    continue
+                res = _run_one_multi_unit(s)
+                results.append(res)
+                _record_result(manifest, res)
+                _write_manifest(manifest_path, manifest)
+                if progress_callback:
+                    progress_callback(res, manifest)
+    else:
+        for s in specs:
+            res = _run_one_multi_unit(s)
+            results.append(res)
+            _record_result(manifest, res)
+            _write_manifest(manifest_path, manifest)
+            if progress_callback:
+                progress_callback(res, manifest)
+
+    manifest["completed_at"] = datetime.utcnow().isoformat() + "Z"
+    failed = manifest["n_failed"]
+    if failed == 0:
+        manifest["status"] = "succeeded"
+    elif failed > len(specs) // 2:
+        manifest["status"] = "failed"
+    else:
+        manifest["status"] = "partial"
+    manifest["samples"].sort(key=lambda r: (r["month"], r["sample_idx"]))
+    _write_manifest(manifest_path, manifest)
+    return manifest

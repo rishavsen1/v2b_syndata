@@ -423,6 +423,122 @@ def api_generate_multi():
     })
 
 
+@app.route("/api/generate-unified", methods=["POST"])
+def api_generate_unified():
+    """Unified generate: buildings × samples × months → optimus CSVs.
+
+    Async like /api/batch — Popens `cli generate-multi --start-month …`, returns
+    a job_id, client polls /api/generate-unified/<job>/status. Each
+    `shared_overrides` knob is merged into every building (the global Advanced
+    panel). Output tree: <output_path>/<MONTH>/<sample>/ (shared optimus set).
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    buildings = payload.get("buildings") or []
+    if not buildings:
+        return jsonify({"error": "at least one building is required"}), 400
+
+    shared = payload.get("shared_overrides") or {}
+    bspecs = []
+    for b in buildings:
+        ov = {**(b.get("overrides") or {}), **shared}  # global Advanced wins
+        bspecs.append({
+            "base_scenario": b.get("base_scenario", "S01"),
+            "descriptors": b.get("descriptors") or {},
+            "overrides": ov,
+            "seed": int(b.get("seed", 42)),
+            "noise_profile": b.get("noise_profile"),
+            "policy": b.get("policy"),
+        })
+    config = {
+        "output_mode": payload.get("output_mode", "shared"),
+        "default_policy": payload.get("default_policy", "ILP-MPCFIXEDFSL"),
+        "buildings": bspecs,
+    }
+    for k in ("dr_program", "dr_incentive_per_kw", "dr_penalty_per_kwh"):
+        if payload.get(k) not in (None, ""):
+            config[k] = payload[k]
+
+    out = payload.get("output_path") or ""
+    output_path = (str(Path(out).expanduser().resolve()) if out
+                   else str(RUNS_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:6]}"))
+
+    cfg_file = Path(output_path).parent / f"_unified_cfg_{uuid.uuid4().hex[:6]}.json"
+    cfg_file.parent.mkdir(parents=True, exist_ok=True)
+    cfg_file.write_text(json.dumps(config, indent=2))
+
+    start_month = payload.get("start_month")
+    end_month = payload.get("end_month") or start_month
+    if not start_month:
+        return jsonify({"error": "start_month is required"}), 400
+
+    cmd = [
+        sys.executable, "-m", "v2b_syndata.cli",
+        "--config-dir", str(CONFIGS),
+        "generate-multi",
+        "--config", str(cfg_file),
+        "--output-dir", output_path,
+        "--output-mode", config["output_mode"],
+        "--start-month", start_month,
+        "--end-month", end_month,
+        "--samples-per-month", str(int(payload.get("samples", 1))),
+        "--workers", str(int(payload.get("workers", 4))),
+        "--noise-profile", payload.get("noise_profile") or "tmyx_stochastic",
+    ]
+    if payload.get("force", True):
+        cmd.append("--force")
+
+    job_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, cwd=str(REPO_ROOT),
+    )
+    BATCH_JOBS[job_id] = {
+        "process": proc, "output_path": output_path,
+        "started_at": time.time(), "cmd": cmd, "kind": "unified",
+    }
+    return jsonify({"job_id": job_id, "output_path": output_path,
+                    "command": " ".join(cmd)})
+
+
+@app.route("/api/generate-unified/<job_id>/status")
+def api_unified_status(job_id: str):
+    if job_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown job"}), 404
+    job = BATCH_JOBS[job_id]
+    proc = job["process"]
+    retcode = proc.poll()
+    manifest = None
+    mpath = Path(job["output_path"]) / "batch_manifest.json"
+    if mpath.exists():
+        try:
+            manifest = json.loads(mpath.read_text())
+        except json.JSONDecodeError:
+            pass
+    return jsonify({
+        "job_id": job_id, "running": retcode is None, "exit_code": retcode,
+        "elapsed_sec": round(time.time() - job["started_at"], 1),
+        "manifest": manifest, "output_path": job["output_path"],
+    })
+
+
+@app.route("/api/generate-unified/<job_id>/csv/<month>/<sample>/<csv_name>")
+def api_unified_csv(job_id: str, month: str, sample: str, csv_name: str):
+    """Serve an optimus CSV from <output_path>/<MONTH>/<sample>/<csv> (shared
+    mode). Path-traversal guarded."""
+    if job_id not in BATCH_JOBS:
+        return jsonify({"error": "unknown job"}), 404
+    for part in (month, sample, csv_name):
+        if "/" in part or ".." in part:
+            return jsonify({"error": "invalid path"}), 400
+    fpath = Path(BATCH_JOBS[job_id]["output_path"]) / month / sample / csv_name
+    if not fpath.exists():
+        return jsonify({"error": f"not found: {fpath}"}), 404
+    return Response(
+        fpath.read_bytes(), mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={csv_name}"},
+    )
+
+
 @app.route("/api/output/<run_id>/<csv_name>")
 def api_csv(run_id: str, csv_name: str):
     # Path traversal guard: only basenames allowed; nothing fancy.

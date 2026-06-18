@@ -17,6 +17,7 @@ from v2b_syndata.multi_building import (
     BuildingSpec,
     MultiConfig,
     generate_multi,
+    generate_multi_batch,
     regenerate_from_config,
 )
 
@@ -125,6 +126,33 @@ def test_reproducibility_byte_identical(tmp_path, config_dir, stub_weather):
                  "dso_commands.csv", "policies.csv"):
         assert filecmp.cmp(out_a / name, out_b / name, shallow=False), \
             f"{name} not byte-identical across runs"
+
+
+def test_generate_multi_batch(tmp_path, config_dir, stub_weather):
+    """Unified engine: 2 buildings × 2 samples × 1 month → <MONTH>/<sample>/ tree."""
+    # No sim_window in overrides — the batch engine sets month/start itself.
+    specs = [
+        BuildingSpec("S01", descriptors={"location": "nashville_tn", "building": "medium_office_v1"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4}, seed=1000),
+        BuildingSpec("S01", descriptors={"location": "nashville_tn", "building": "large_office_v1"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4}, seed=2000),
+    ]
+    out = tmp_path / "batch"
+    manifest = generate_multi_batch(
+        MultiConfig(specs, output_mode="shared"), out, config_dir,
+        start_month="2021-09", end_month="2021-09", samples_per_month=2,
+        workers=1, noise_profile="clean",   # serial so the autouse stubs apply
+    )
+    assert manifest["status"] == "succeeded"
+    assert manifest["n_total"] == 2 and manifest["n_buildings"] == 2
+    assert (out / "batch_manifest.json").exists()
+    for s in (0, 1):
+        unit = out / "SEP2021" / str(s)
+        assert (unit / "multi_building_config.json").exists()
+        cars = pd.read_csv(unit / "cars.csv", index_col=0)
+        assert sorted(cars["building_id"].unique()) == [0, 1]
+        bl = pd.read_csv(unit / "building_load.csv")
+        assert sorted(bl["building_id"].unique()) == [0, 1]
 
 
 def test_regenerate_from_config(tmp_path, config_dir, stub_weather):
