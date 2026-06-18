@@ -114,3 +114,80 @@ def test_cli_docs_gen_emits_reference(capsys: pytest.CaptureFixture):
     assert "KNOB_REFERENCE" in out
     assert "ev_fleet.ev_count" in out
     assert "Deep-channel" in out or "deep" in out
+
+
+# ── generate-multi (single / batch / from-config) ────────────────────────────
+
+@pytest.fixture
+def _stub_weather(tmp_path, monkeypatch):
+    """Synthetic EPW so generate-multi's weather export needs no real station."""
+    import pandas as pd
+    from v2b_syndata import export_optimus as exp
+    epw = tmp_path / "fixture.epw"
+    idx = pd.date_range("2021-01-01", "2022-01-01", freq="h", inclusive="left")
+    lines = ["LOCATION,Test"] + ["HEADER"] * 7
+    for ts in idx:
+        cols = ["0"] * 22
+        cols[1], cols[2], cols[3] = str(ts.month), str(ts.day), str(ts.hour + 1)
+        cols[6], cols[7], cols[8], cols[21] = "15.0", "5.0", "50.0", "2.5"
+        if 6 <= ts.hour <= 20:
+            cols[13] = cols[14] = cols[15] = "300"
+        lines.append(",".join(cols))
+    epw.write_text("\n".join(lines) + "\n")
+    monkeypatch.setattr(exp.weather, "get_weather_epw", lambda *a, **k: epw)
+    return epw
+
+
+def _write_multi_cfg(path: Path) -> Path:
+    path.write_text(json.dumps({
+        "output_mode": "shared",
+        "buildings": [
+            {"base_scenario": "S01", "descriptors": {"location": "nashville_tn"},
+             "overrides": {"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4,
+                           "sim_window.mode": "custom", "sim_window.start": "2021-09-01",
+                           "sim_window.custom_end": "2021-09-04"}, "seed": 1},
+            {"base_scenario": "S01", "descriptors": {"location": "nashville_tn"},
+             "overrides": {"ev_fleet.ev_count": 7, "charging_infra.charger_count": 7,
+                           "sim_window.mode": "custom", "sim_window.start": "2021-09-01",
+                           "sim_window.custom_end": "2021-09-04"}, "seed": 2},
+        ],
+    }))
+    return path
+
+
+def test_cli_generate_multi_config(tmp_path: Path, _stub_weather):
+    import pandas as pd
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    out = tmp_path / "mb_out"
+    rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi",
+              "--config", str(cfg), "--output-dir", str(out))
+    assert rc == 0
+    cars = pd.read_csv(out / "cars.csv", index_col=0)
+    assert sorted(cars["building_id"].unique()) == [0, 1]
+    assert cars.groupby("building_id").size().to_dict() == {0: 4, 1: 7}
+    wx = pd.read_csv(out / "weather_data.csv")
+    assert "global_horizontal_w_m2" in wx.columns
+    assert (out / "multi_building_config.json").exists()
+
+
+def test_cli_generate_multi_batch(tmp_path: Path, _stub_weather):
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    out = tmp_path / "mb_batch"
+    rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg),
+              "--output-dir", str(out), "--start-month", "2021-09", "--end-month", "2021-09",
+              "--samples-per-month", "2", "--workers", "1", "--noise-profile", "clean")
+    assert rc == 0
+    assert (out / "batch_manifest.json").exists()
+    for s in (0, 1):
+        assert (out / "SEP2021" / str(s) / "cars.csv").exists()
+
+
+def test_cli_generate_multi_from_config(tmp_path: Path, _stub_weather):
+    import filecmp
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    a = tmp_path / "a"
+    _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg), "--output-dir", str(a))
+    b = tmp_path / "b"
+    _run("--config-dir", str(CONFIG_DIR), "generate-multi",
+         "--from-config", str(a / "multi_building_config.json"), "--output-dir", str(b))
+    assert filecmp.cmp(a / "cars.csv", b / "cars.csv", shallow=False)

@@ -155,6 +155,43 @@ def test_generate_multi_batch(tmp_path, config_dir, stub_weather):
         assert sorted(bl["building_id"].unique()) == [0, 1]
 
 
+def test_per_building_overrides_isolated(tmp_path, config_dir, stub_weather):
+    """Each building's knob overrides apply only to itself (no cross-contamination)."""
+    specs = [
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4}, seed=1),
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 9, "charging_infra.charger_count": 9}, seed=2),
+    ]
+    out = tmp_path / "iso"
+    generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir,
+                         start_month="2021-09", end_month="2021-09", samples_per_month=1,
+                         workers=1, noise_profile="clean")
+    cars = pd.read_csv(out / "SEP2021" / "0" / "cars.csv", index_col=0)
+    counts = cars.groupby("building_id").size().to_dict()
+    assert counts[0] == 4 and counts[1] == 9
+
+
+def test_per_building_noise_honored(tmp_path, config_dir, stub_weather):
+    """generate_multi_batch uses each spec's own noise_profile, not one global."""
+    specs = [
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4},
+                     seed=1, noise_profile="clean"),
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4},
+                     seed=2, noise_profile="tmyx_stochastic"),
+    ]
+    out = tmp_path / "noise"
+    generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir,
+                         start_month="2021-09", end_month="2021-09", samples_per_month=1,
+                         workers=1, noise_profile="clean")  # batch default only a fallback
+    import json
+    cfg = json.loads((out / "SEP2021" / "0" / "multi_building_config.json").read_text())
+    noises = {b["building_id"]: b["noise_profile"] for b in cfg["buildings"]}
+    assert noises[0] == "clean" and noises[1] == "tmyx_stochastic"
+
+
 def test_regenerate_from_config(tmp_path, config_dir, stub_weather):
     cfg = MultiConfig(_three_specs(), output_mode="shared", dr_program="CBP")
     out1 = tmp_path / "run1"

@@ -37,6 +37,7 @@ packages = ["src/v2b_syndata"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.1",
+    "pytest-playwright>=0.5",
     "ruff>=0.6",
     "mypy>=1.8",
 ]
@@ -44,6 +45,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "real_energyplus: invoke the real EnergyPlus subprocess (opt out of the stub)",
+    "webapp: Flask test-client endpoint tests",
+    "browser: Playwright headless browser end-to-end tests",
+]
 
 [tool.coverage.run]
 source = ["src/v2b_syndata"]

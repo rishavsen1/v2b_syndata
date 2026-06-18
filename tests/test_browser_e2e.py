@@ -1,0 +1,98 @@
+"""Headless-browser end-to-end tests for the web UI (Playwright + chromium).
+
+Drives the ACTUAL page: building cards, per-card Advanced knob panel, Duplicate,
+and a full Generate cycle. Marked `browser` (chromium); the generate cycle is
+also `real_energyplus` (the generate-unified subprocess runs EnergyPlus).
+
+Run:  uv run pytest tests/test_browser_e2e.py -m browser
+"""
+from __future__ import annotations
+
+import sys
+import threading
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("playwright.sync_api")
+from playwright.sync_api import sync_playwright  # noqa: E402
+from werkzeug.serving import make_server  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "web"))
+import app as webapp  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def server():
+    srv = make_server("127.0.0.1", 0, webapp.app)
+    port = srv.socket.getsockname()[1]
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    yield f"http://127.0.0.1:{port}"
+    srv.shutdown()
+
+
+@pytest.fixture
+def page():
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        yield pg
+        browser.close()
+
+
+@pytest.mark.browser
+def test_ui_cards_knobs_and_duplicate(page, server):
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    assert page.locator(".building-card").count() == 1
+
+    # per-card full knob panel is present (not just a JSON box)
+    first = page.locator(".building-card").first
+    first.locator(".mb-adv > summary").click()
+    assert first.locator(".card-knob-buckets .knob").count() > 5
+    assert page.locator("#knob-buckets").count() == 0      # no global Advanced panel
+    assert page.locator("#u-noise").count() == 0           # noise removed from Run settings
+    assert first.locator(".mb-noise").count() == 1         # noise is per-card
+
+    # add a 2nd building
+    page.click("#add-building")
+    assert page.locator(".building-card").count() == 2
+
+    # set a distinctive value on card 0, duplicate → clone carries it
+    page.locator(".building-card").first.locator(".mb-ev-count").fill("17")
+    page.locator(".building-card").first.locator(".mb-dup").click()
+    assert page.locator(".building-card").count() == 3
+    assert page.locator(".building-card").last.locator(".mb-ev-count").input_value() == "17"
+
+
+@pytest.mark.browser
+@pytest.mark.real_energyplus
+def test_ui_full_generate(page, server, tmp_path):
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    page.click("#add-building")  # 2 buildings
+    cards = page.locator(".building-card")
+    for i in (0, 1):
+        cards.nth(i).locator(".mb-ev-count").fill(str(3 + i * 4))   # 3 and 7
+        cards.nth(i).locator(".mb-charger-count").fill(str(3 + i * 4))
+        cards.nth(i).locator(".mb-noise").select_option("clean")
+    page.fill("#u-output-path", str(tmp_path / "run"))
+    page.fill("#u-samples", "1")
+    page.click("#generate-btn")
+    page.wait_for_function(
+        "document.getElementById('status').textContent.includes('Done')",
+        timeout=240000,
+    )
+    assert "succeeded" in page.locator("#status").inner_text().lower()
+    # output rendered: meta + the distribution analysis selects, and the analysis
+    # actually fetched the per-building CSVs (ua-status reports building/sample
+    # counts). The Plotly plot itself needs the cdn.plot.ly script, which a
+    # network-isolated headless browser can't load — so don't assert on it.
+    assert page.locator("#output").is_visible()
+    assert page.locator("#output-meta").inner_text() != ""
+    assert page.locator("#ua-csv option").count() > 0
+    page.wait_for_function(
+        "document.getElementById('ua-status').textContent.includes('building')",
+        timeout=20000,
+    )

@@ -83,6 +83,19 @@ the clean truncated-quantile the copula path relies on.
 read in the site's wall-clock timezone (`feature_extractor.extract_session`;
 ACN is converted UTC→`America/Los_Angeles` before reading the hour).
 
+> **Optional 2-component mixture (bimodal arrivals).** Real arrivals are often
+> *bimodal* (a sharp morning commute peak + a midday/afternoon shoulder) — a
+> single TruncNorm misses this (the empirical study cut KS 0.108→0.03 with a
+> mixture). Calibration therefore fits a 2-component truncated mixture on the
+> **pooled population** arrivals (arrival is ~independent of the φ/κ/δ region
+> axes, so a *per-region* fit mispools — it must be pooled and broadcast to all
+> regions) and keeps it **only if** it beats the single TruncNorm by a KS margin
+> (`fit_truncnorm_mixture_arrival`). Stored as numeric leaves
+> `arrival.w1/mu1/sigma1/mu2/sigma2`; generation inverts the mixture CDF on the
+> copula's shared uniform (`_mixture_ppf_u`), preserving determinism + the
+> copula. The ACN cohorts use it (validated arrival KS ≈ 0.07 vs source);
+> hand-authored/synthetic populations stay on the single TruncNorm (bit-identical).
+
 **Parameters.** μ, σ fit by MLE under the truncation
 (`fit_truncnorm_arrival`); the `[6, 20]` bounds are fixed in three places
 (`distribution_fitter.ARRIVAL_LO/HI`, `DIST_PARAM_RANGES`, and

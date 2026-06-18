@@ -163,7 +163,7 @@ def test_deep_override_explicit_beats_calibration(config_dir):
     ("ev_fleet.ev_count", "not_an_int", "expected int"),
     ("ev_fleet.ev_count", True, "expected int"),
     ("ev_fleet.ev_count", -1, "outside range"),
-    ("ev_fleet.ev_count", 999, "outside range"),
+    ("ev_fleet.ev_count", 1001, "outside range"),  # range is [1, 1000]
     ("user_behavior.min_depart_soc", 1.5, "outside range"),
     ("user_behavior.min_depart_soc", "0.8", "expected float"),
     ("user_behavior.min_depart_soc", True, "expected float"),

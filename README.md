@@ -237,8 +237,14 @@ buildings:
 - Output files: `building_load, cars, chargers, sessions, grid_prices,
   weather_data, occupancy, dso_commands` (unified, global), `policies`, plus
   `multi_building_config.json` (the reproducibility record).
-- The webapp exposes the same feature: open the **Multi-building** panel, add
-  building cards with `+ Add building`, pick the output layout, and generate.
+  `weather_data.csv` columns: `datetime, dry_bulb_temp_c, dew_point_temp_c,
+  relative_humidity_pct, wind_speed_m_s, global_horizontal_w_m2,
+  direct_normal_w_m2, diffuse_horizontal_w_m2` (+ `building_id` in shared mode) —
+  the three solar-irradiance channels come from the EPW (GHI/DNI/DHI).
+- The webapp exposes the same feature: each **building card** carries its own
+  full descriptor + knob (Advanced) panel + noise + a Duplicate button, while
+  Run settings hold the common levers (date range, samples, workers, output
+  mode/path, DR); one **Generate** runs buildings × samples × months.
 
 ## Architecture
 
