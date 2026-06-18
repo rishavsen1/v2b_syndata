@@ -103,6 +103,11 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
     if homog:
         mode_class = BATTERY_CLASSES[int(np.argmax(battery_mix))]
 
+    # Fleet-wide SoC band override (defaults 10/100 match every BATTERY_SPECS
+    # entry, so the default path is bit-identical). Applies to all cars.
+    min_soc = float(ctx.knobs.get("ev_fleet.min_allowed_soc"))
+    max_soc = float(ctx.knobs.get("ev_fleet.max_allowed_soc"))
+
     out: dict[int, FleetAttrs] = {}
     for car_id in range(1, ev_count + 1):
         if homog:
@@ -114,7 +119,7 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
         out[car_id] = FleetAttrs(
             car_id=car_id, battery_class=cls,
             capacity_kwh=spec["capacity_kwh"],
-            min_allowed_soc=spec["min_soc"],
-            max_allowed_soc=spec["max_soc"],
+            min_allowed_soc=min_soc,
+            max_allowed_soc=max_soc,
         )
     ctx.a_fleet = out

@@ -1590,6 +1590,8 @@ function createBuildingCard() {
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="(base)"></label>
             <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="(base)"></label>
             <label><span class="field-name">Peak kW scaling</span><span style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" class="mb-peak-scaling" checked><span class="small" style="color:#666">lock max→peak_kw</span></span></label>
+            <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
+            <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(100)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
         </div>
     `;
@@ -1629,9 +1631,13 @@ function buildUnifiedPayload() {
         const ev = parseInt(card.querySelector(".mb-ev-count").value, 10);
         const ch = parseInt(card.querySelector(".mb-charger-count").value, 10);
         const pk = parseFloat(card.querySelector(".mb-peak-kw").value);
+        const minSoc = parseFloat(card.querySelector(".mb-min-soc").value);
+        const maxSoc = parseFloat(card.querySelector(".mb-max-soc").value);
         if (!isNaN(ev)) overrides["ev_fleet.ev_count"] = ev;
         if (!isNaN(ch)) overrides["charging_infra.charger_count"] = ch;
         if (!isNaN(pk)) overrides["building_load.peak_kw"] = pk;
+        if (!isNaN(minSoc)) overrides["ev_fleet.min_allowed_soc"] = minSoc;
+        if (!isNaN(maxSoc)) overrides["ev_fleet.max_allowed_soc"] = maxSoc;
         overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-scaling").checked;
         buildings.push({
             base_scenario: card.querySelector(".mb-base").value,
@@ -1788,14 +1794,26 @@ async function runUnifiedAnalysis(manifest) {
 
 const BCOLORS = ["#2c7fb8", "#d8853b", "#31a354", "#756bb1", "#c51b8a", "#636363"];
 
+// rgba band colour from a hex (for the ±1σ variance shading).
+function rgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
 function plotOptimus(divId, csvName, byBuilding, feature) {
     const ids = Object.keys(byBuilding).sort((a, b) => a - b);
     const traces = [];
+    const isProfile = csvName === "building_load.csv";
+    const isLine = isProfile || csvName === "grid_prices.csv";
+
     ids.forEach((bid, i) => {
         const rows = byBuilding[bid];
         const color = BCOLORS[i % BCOLORS.length];
         const name = `building ${bid}`;
-        if (csvName === "building_load.csv") {
+
+        if (isProfile) {
+            // mean daily 15-min profile + ±1σ variance band (spread across the
+            // days × samples pooled into each time-of-day slot).
             const slot = {};
             rows.forEach(r => {
                 const d = new Date(r.datetime);
@@ -1804,31 +1822,40 @@ function plotOptimus(divId, csvName, byBuilding, feature) {
                 (slot[t] = slot[t] || []).push(Number(r[feature] ?? r.power_kw));
             });
             const xs = Object.keys(slot).map(Number).sort((a, b) => a - b);
-            traces.push({
-                x: xs, y: xs.map(t => slot[t].reduce((a, b) => a + b, 0) / slot[t].length),
-                name, type: "scatter", mode: "lines", line: { color },
+            const mean = [], lo = [], hi = [];
+            xs.forEach(t => {
+                const v = slot[t];
+                const m = v.reduce((a, b) => a + b, 0) / v.length;
+                const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
+                mean.push(m); lo.push(m - sd); hi.push(m + sd);
             });
+            // band = upper then lower with fill:'tonexty'
+            traces.push({ x: xs, y: hi, type: "scatter", mode: "lines",
+                          line: { width: 0 }, showlegend: false, hoverinfo: "skip" });
+            traces.push({ x: xs, y: lo, type: "scatter", mode: "lines",
+                          line: { width: 0 }, fill: "tonexty", fillcolor: rgba(color, 0.18),
+                          name: `${name} ±1σ`, hoverinfo: "skip" });
+            traces.push({ x: xs, y: mean, type: "scatter", mode: "lines",
+                          line: { color, width: 2 }, name });
         } else if (csvName === "grid_prices.csv") {
-            traces.push({
-                x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
-                name, type: "scatter", mode: "lines", line: { color },
-            });
+            traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
+                          name, type: "scatter", mode: "lines", line: { color } });
         } else {
+            // distribution → box plot per building (one box, grouped).
             const vals = extractOptimusFeature(rows, csvName, feature);
-            traces.push({
-                x: vals, name, type: "histogram", opacity: 0.55,
-                marker: { color }, nbinsx: feature === "arrival_hour" ? 24 : 30,
-            });
+            traces.push({ y: vals, name, type: "box", boxmean: true,
+                          marker: { color }, line: { color } });
         }
     });
-    const isHist = !["building_load.csv", "grid_prices.csv"].includes(csvName);
-    Plotly.newPlot(divId, traces, {
+
+    const layout = {
         title: `${csvName} — ${feature} by building`,
         margin: { t: 40, l: 60, r: 10, b: 50 },
-        barmode: isHist ? "overlay" : undefined,
-        xaxis: { title: csvName === "building_load.csv" ? "hour of day" : feature },
-        yaxis: { title: isHist ? "count" : (csvName === "building_load.csv" ? "power_kw" : "$/kWh") },
-    });
+        xaxis: { title: isProfile ? "hour of day" : (isLine ? "" : "building") },
+        yaxis: { title: isProfile ? "power_kw" : (csvName === "grid_prices.csv" ? "$/kWh" : feature) },
+    };
+    if (!isLine) layout.boxmode = "group";
+    Plotly.newPlot(divId, traces, layout);
 }
 
 function extractOptimusFeature(rows, csvName, feature) {

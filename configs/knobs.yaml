@@ -47,6 +47,20 @@ ev_fleet:
     description: "Dirichlet concentration α for per-sample battery mix noise. Default 1e6 = effectively off (preserves bitwise reproducibility). Batch mode uses α=30 → std ~8% per component (declared p·α form). Set high to disable."
     affects_csv: [cars.csv]
 
+  min_allowed_soc:
+    type: float
+    range: [0.0, 100.0]
+    default: 10.0
+    description: "Lower SoC bound (%) applied to EVERY car in cars.csv, overriding the per-battery-class default. Default 10 matches the battery-class spec (bit-identical). Flows into the arrival-SoC clamp band (sessions_dist.py)."
+    affects_csv: [cars.csv, sessions.csv]
+
+  max_allowed_soc:
+    type: float
+    range: [0.0, 100.0]
+    default: 100.0
+    description: "Upper SoC bound (%) applied to EVERY car in cars.csv, overriding the per-battery-class default. Default 100 matches the battery-class spec (bit-identical). Caps required_soc_at_depart and the arrival-SoC band."
+    affects_csv: [cars.csv, sessions.csv]
+
 # ──────────────────────────────────────────────────────────────────────────
 # Bucket 2: Charging Infrastructure
 # ──────────────────────────────────────────────────────────────────────────
