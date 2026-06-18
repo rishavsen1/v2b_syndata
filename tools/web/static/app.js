@@ -1806,7 +1806,8 @@ async function runUnifiedAnalysis(manifest) {
     const nB = Object.keys(byBuilding).length;
     if (!nB) { st.textContent = "no data"; return; }
     st.textContent = `${nB} building(s) · ${samples.length} sample(s)`;
-    plotOptimus("unified-plot", csv, byBuilding, feature);
+    const shape = document.getElementById("ua-shape").value;
+    plotOptimus("unified-plot", csv, byBuilding, feature, shape);
 }
 
 const BCOLORS = ["#2c7fb8", "#d8853b", "#31a354", "#756bb1", "#c51b8a", "#636363"];
@@ -1817,7 +1818,7 @@ function rgba(hex, a) {
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
-function plotOptimus(divId, csvName, byBuilding, feature) {
+function plotOptimus(divId, csvName, byBuilding, feature, shape = "box") {
     const ids = Object.keys(byBuilding).sort((a, b) => a - b);
     const traces = [];
     const isProfile = csvName === "building_load.csv";
@@ -1858,20 +1859,39 @@ function plotOptimus(divId, csvName, byBuilding, feature) {
             traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
                           name, type: "scatter", mode: "lines", line: { color } });
         } else {
-            // distribution → box plot per building (one box, grouped).
+            // distribution → box / violin / histogram per building (toggle).
             const vals = extractOptimusFeature(rows, csvName, feature);
-            traces.push({ y: vals, name, type: "box", boxmean: true,
-                          marker: { color }, line: { color } });
+            if (shape === "violin") {
+                traces.push({ y: vals, name, type: "violin", box: { visible: true },
+                              meanline: { visible: true }, points: false,
+                              line: { color }, fillcolor: rgba(color, 0.4) });
+            } else if (shape === "histogram") {
+                traces.push({ x: vals, name, type: "histogram", opacity: 0.55,
+                              marker: { color }, nbinsx: feature === "arrival_hour" ? 24 : 30 });
+            } else {  // box
+                traces.push({ y: vals, name, type: "box", boxmean: true,
+                              marker: { color }, line: { color } });
+            }
         }
     });
 
+    const isHistShape = !isLine && shape === "histogram";
     const layout = {
         title: `${csvName} — ${feature} by building`,
         margin: { t: 40, l: 60, r: 10, b: 50 },
-        xaxis: { title: isProfile ? "hour of day" : (isLine ? "" : "building") },
-        yaxis: { title: isProfile ? "power_kw" : (csvName === "grid_prices.csv" ? "$/kWh" : feature) },
+        xaxis: {
+            title: isProfile ? "hour of day"
+                 : isLine ? ""
+                 : isHistShape ? feature : "building",
+        },
+        yaxis: {
+            title: isProfile ? "power_kw"
+                 : csvName === "grid_prices.csv" ? "$/kWh"
+                 : isHistShape ? "count" : feature,
+        },
     };
-    if (!isLine) layout.boxmode = "group";
+    if (isHistShape) layout.barmode = "overlay";
+    else if (!isLine) layout.boxmode = "group";   // box + violin group by building
     Plotly.newPlot(divId, traces, layout);
 }
 
