@@ -1647,7 +1647,7 @@ function createBuildingCard() {
          ["population", ".mb-population"], ["equipment", ".mb-equipment"],
          ["noise", ".mb-noise"]].forEach(([key, cls]) => {
             const opt = card.querySelector(cls).options[0];
-            opt.textContent = d[key] ? `use base: ${d[key]}` : "scenario default";
+            opt.textContent = d[key] ? d[key] : "scenario default";
         });
     };
     baseSel.addEventListener("change", updateInheritLabels);
