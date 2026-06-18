@@ -98,6 +98,12 @@ def _write_epw(path: Path, year: int = 2021) -> Path:
         cols[6] = f"{15.0 + (i % 24) * 0.1:.1f}"   # dry bulb
         cols[7] = f"{5.0 + (i % 12) * 0.1:.1f}"    # dew point
         cols[8] = f"{40.0 + (i % 30):.1f}"         # RH %
+        # diurnal solar: 0 at night, a midday bump (cols 13/14/15 = GHI/DNI/DHI)
+        h = ts.hour
+        solar = max(0.0, 800.0 * (1 - abs(h - 13) / 7)) if 6 <= h <= 20 else 0.0
+        cols[13] = f"{solar:.0f}"            # global horizontal
+        cols[14] = f"{solar * 0.7:.0f}"      # direct normal
+        cols[15] = f"{solar * 0.3:.0f}"      # diffuse horizontal
         cols[21] = f"{2.0 + (i % 5) * 0.5:.1f}"    # wind speed
         lines.append(",".join(cols))
     path.write_text("\n".join(lines) + "\n")
@@ -225,12 +231,20 @@ def test_weather_window(tmp_path, monkeypatch):
     )
     assert list(out.columns) == [
         "datetime", "dry_bulb_temp_c", "dew_point_temp_c",
-        "relative_humidity_pct", "wind_speed_m_s", "building_id",
+        "relative_humidity_pct", "wind_speed_m_s",
+        "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2",
+        "building_id",
     ]
     assert len(out) == 30 * 24  # September, hourly
     assert out["datetime"].iloc[0] == "2021-09-01 00:00:00"
     assert out["datetime"].iloc[-1] == "2021-09-30 23:00:00"
     assert (out["building_id"] == 1).all()
+    # solar: non-negative, zero at night (hour 0), positive midday max
+    for c in ("global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2"):
+        assert (out[c] >= 0).all()
+    night = out[out["datetime"].str.endswith("00:00:00")]
+    assert (night["global_horizontal_w_m2"] == 0).all()
+    assert out["global_horizontal_w_m2"].max() > 0
 
 
 def test_index_col_constants():

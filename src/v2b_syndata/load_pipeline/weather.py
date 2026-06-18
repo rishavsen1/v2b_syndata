@@ -166,26 +166,32 @@ def parse_epw_temperatures(
 def parse_epw_weather(
     epw_path: Path, *, year: int = 2020,
 ) -> pd.DataFrame:
-    """Parse the four EPW weather fields used by the optimus `weather_data.csv`
-    export: dry-bulb temp, dew-point temp, relative humidity, wind speed.
+    """Parse the EPW weather fields used by the optimus `weather_data.csv`
+    export: dry-bulb temp, dew-point temp, relative humidity, wind speed, and
+    the three solar-irradiance channels.
 
     Returns an hourly DataFrame indexed by datetime (built from each EPW row's
     month/day/hour anchored to `year`, mirroring `parse_epw_temperatures`), with
     columns `dry_bulb_temp_c, dew_point_temp_c, relative_humidity_pct,
-    wind_speed_m_s`.
+    wind_speed_m_s, global_horizontal_w_m2, direct_normal_w_m2,
+    diffuse_horizontal_w_m2`.
 
     EPW data-row columns (0-indexed):
-      1:Month 2:Day 3:Hour 6:DryBulb[°C] 7:DewPoint[°C]
-      8:RelativeHumidity[%] 21:WindSpeed[m/s]
+      1:Month 2:Day 3:Hour 6:DryBulb[°C] 7:DewPoint[°C] 8:RelativeHumidity[%]
+      13:GlobalHorizontalRadiation 14:DirectNormalRadiation
+      15:DiffuseHorizontalRadiation (all Wh/m², hourly ≈ avg W/m²) 21:WindSpeed[m/s]
     Hour is 1-24 in EPW; remapped to 0-23 for pandas.
     """
+    cols = ["month", "day", "hour", "dry_bulb_temp_c", "dew_point_temp_c",
+            "relative_humidity_pct", "wind_speed_m_s",
+            "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2"]
     with Path(epw_path).open() as f:
         for _ in range(8):
             f.readline()  # skip headers
         rows = []
         for line in f:
             parts = line.split(",")
-            if len(parts) < 22:
+            if len(parts) < 22:  # need through wind speed (col 21) + solar (13-15)
                 continue
             try:
                 month = int(parts[1])
@@ -194,22 +200,23 @@ def parse_epw_weather(
                 dry_bulb_c = float(parts[6])
                 dew_point_c = float(parts[7])
                 rel_humidity = float(parts[8])
+                ghi = float(parts[13])
+                dni = float(parts[14])
+                dhi = float(parts[15])
                 wind_speed = float(parts[21])
             except (ValueError, IndexError):
                 continue
             rows.append((month, day, hour, dry_bulb_c, dew_point_c,
-                         rel_humidity, wind_speed))
+                         rel_humidity, wind_speed, ghi, dni, dhi))
 
-    df = pd.DataFrame(rows, columns=[
-        "month", "day", "hour", "dry_bulb_temp_c", "dew_point_temp_c",
-        "relative_humidity_pct", "wind_speed_m_s",
-    ])
+    df = pd.DataFrame(rows, columns=cols)
     timestamps = pd.to_datetime(dict(
         year=year, month=df["month"], day=df["day"], hour=df["hour"],
     ))
     out = df[[
         "dry_bulb_temp_c", "dew_point_temp_c",
         "relative_humidity_pct", "wind_speed_m_s",
+        "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2",
     ]].copy()
     out.index = timestamps
     return out

@@ -190,6 +190,9 @@ def build_weather(
         "dew_point_temp_c": wx["dew_point_temp_c"].values,
         "relative_humidity_pct": wx["relative_humidity_pct"].values,
         "wind_speed_m_s": wx["wind_speed_m_s"].values,
+        "global_horizontal_w_m2": wx["global_horizontal_w_m2"].values,
+        "direct_normal_w_m2": wx["direct_normal_w_m2"].values,
+        "diffuse_horizontal_w_m2": wx["diffuse_horizontal_w_m2"].values,
         "building_id": building_id,
     })
     return out
