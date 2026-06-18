@@ -1594,7 +1594,24 @@ function createBuildingCard() {
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(100)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
         </div>
+        <div class="mb-soc-warn inline-error" style="display:none"></div>
     `;
+    // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
+    // sessions. Warn live. Floor = shared override min_depart_soc, else 80%.
+    const checkSoc = () => {
+        const w = card.querySelector(".mb-soc-warn");
+        const mx = parseFloat(card.querySelector(".mb-max-soc").value);
+        const floorPct = (("user_behavior.min_depart_soc" in state.overrides)
+            ? Number(state.overrides["user_behavior.min_depart_soc"]) : 0.80) * 100;
+        if (!isNaN(mx) && mx <= floorPct) {
+            w.style.display = "";
+            w.textContent = `⚠ Max SoC ${mx}% ≤ departure floor min_depart_soc (${floorPct}%) `
+                + `→ all sessions will be dropped. Raise Max SoC or lower min_depart_soc in Advanced.`;
+        } else {
+            w.style.display = "none";
+        }
+    };
+    card.querySelector(".mb-max-soc").addEventListener("input", checkSoc);
     mbFillSelect(card.querySelector(".mb-base"), SCENARIOS, null);
     mbFillSelect(card.querySelector(".mb-location"), DESCRIPTORS.location, "(base scenario)");
     mbFillSelect(card.querySelector(".mb-building"), DESCRIPTORS.building, "(base scenario)");

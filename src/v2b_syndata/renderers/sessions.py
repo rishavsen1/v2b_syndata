@@ -28,12 +28,16 @@ SoC the dataset carries, i.e. departure SoC *is* required SoC:
 """
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 from ..seeding import rng_for_car
 from ..types import ScenarioContext
+
+logger = logging.getLogger(__name__)
 
 _COLUMNS = [
     "session_id", "car_id", "building_id", "arrival", "departure",
@@ -89,6 +93,21 @@ def render(ctx: ScenarioContext) -> None:
     # reproduce the prior hardcoded literals bit-for-bit.
     depart_soc_mu = float(ctx.knobs.get("user_behavior.depart_soc_mu"))
     depart_soc_sigma = float(ctx.knobs.get("user_behavior.depart_soc_sigma"))
+
+    # Footgun guard: required_soc is drawn in [floor, ceiling] with
+    # floor >= min_depart_soc% and ceiling = car.max_allowed_soc. If the
+    # departure floor meets or exceeds the SoC cap, every session-day is dropped
+    # (floor >= ceiling). Warn loudly rather than silently emit zero sessions.
+    if ctx.a_fleet:
+        fleet_max_soc = max(c.max_allowed_soc for c in ctx.a_fleet.values())
+        if min_depart_soc_pct >= fleet_max_soc:
+            logger.warning(
+                "min_depart_soc (%.1f%%) >= max_allowed_soc (%.1f%%): the "
+                "departure-SoC floor meets the cap, so ALL sessions will be "
+                "dropped (empty sessions.csv). Lower user_behavior.min_depart_soc "
+                "or raise ev_fleet.max_allowed_soc.",
+                min_depart_soc_pct, fleet_max_soc,
+            )
 
     # Grid bounds — sessions must be within building_load datetime range.
     bl = ctx.rendered["building_load.csv"]
