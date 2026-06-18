@@ -34,6 +34,14 @@ class KnobValidationError(ValueError):
 DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "arrival.mu": (6.0, 20.0),
     "arrival.sigma": (0.01, 6.0),
+    # Optional 2-component arrival mixture (bimodal commute + midday). Present
+    # only when calibration selects a mixture; w2 = 1 - w1. Single TruncNorm
+    # (mu/sigma above) remains the default.
+    "arrival.w1": (0.0, 1.0),
+    "arrival.mu1": (6.0, 20.0),
+    "arrival.sigma1": (0.01, 6.0),
+    "arrival.mu2": (6.0, 20.0),
+    "arrival.sigma2": (0.01, 6.0),
     "dwell.k": (0.01, 5.0),
     "dwell.lambda": (0.01, 24.0),
     "soc_arrival.alpha": (0.01, 50.0),

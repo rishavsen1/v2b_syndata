@@ -81,6 +81,32 @@ def _weibull_ppf_u(u: float, k: float, lam: float) -> float:
     return float(stats.weibull_min.ppf(u, k, scale=lam))
 
 
+def _mixture_ppf_u(u: float, comps: list, lo: float, hi: float) -> float:
+    """Inverse CDF at `u` of a 2-component TruncNorm mixture, each component
+    truncated to [lo, hi]. `comps` = [(w, mu, sigma), ...]. Pure function of u
+    (preserves the copula's shared uniform + determinism). Bisection on the
+    monotone mixture CDF — no closed form."""
+    if hi <= lo:
+        return lo
+
+    def cdf(x: float) -> float:
+        return sum(
+            w * float(stats.truncnorm.cdf(
+                x, (lo - mu) / sg, (hi - mu) / sg, loc=mu, scale=sg))
+            for (w, mu, sg) in comps
+        )
+
+    u = min(1.0 - 1e-9, max(1e-9, u))
+    a, b = lo, hi
+    for _ in range(60):  # ~1e-18 resolution over a 14h window
+        m = 0.5 * (a + b)
+        if cdf(m) < u:
+            a = m
+        else:
+            b = m
+    return 0.5 * (a + b)
+
+
 def render(ctx: ScenarioContext) -> None:
     assert ctx.a_user is not None and ctx.a_fleet is not None
     f_arr = ctx.latents["f_arr"]
@@ -171,20 +197,32 @@ def render(ctx: ScenarioContext) -> None:
             arrival_soc: float | None = None
             required_soc: float | None = None
 
+            arr_mix = arr_p.get("mixture")  # 2-component mixture, or None (single TruncNorm)
             for _ in range(_MAX_RETRIES):
-                # 1. Sample arrival hour + dwell, build window.
+                # 1. Sample arrival hour + dwell, build window. A calibrated
+                #    mixture region uses the mixture quantile on the SAME uniform
+                #    (copula path) or a single fresh draw (independent path); the
+                #    single-TruncNorm path is byte-identical to before.
                 if use_copula:
                     u_arr, u_dwell = _gaussian_copula_pair(rng, rho)
-                    arr_hour = _truncnorm_ppf_u(
-                        u_arr, mu=arr_p["mu"], sigma=arr_p["sigma"],
-                        lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
-                    )
+                    if arr_mix is not None:
+                        arr_hour = _mixture_ppf_u(u_arr, arr_mix,
+                                                  arr_p["trunc_lo"], arr_p["trunc_hi"])
+                    else:
+                        arr_hour = _truncnorm_ppf_u(
+                            u_arr, mu=arr_p["mu"], sigma=arr_p["sigma"],
+                            lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
+                        )
                     dwell_hr = _weibull_ppf_u(u_dwell, k=dw_p["k"], lam=dw_p["lam"])
                 else:
-                    arr_hour = _sample_truncnorm(
-                        rng, mu=arr_p["mu"], sigma=arr_p["sigma"],
-                        lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
-                    )
+                    if arr_mix is not None:
+                        arr_hour = _mixture_ppf_u(float(rng.random()), arr_mix,
+                                                  arr_p["trunc_lo"], arr_p["trunc_hi"])
+                    else:
+                        arr_hour = _sample_truncnorm(
+                            rng, mu=arr_p["mu"], sigma=arr_p["sigma"],
+                            lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
+                        )
                     dwell_hr = float(rng.weibull(dw_p["k"]) * dw_p["lam"])
                 dwell_hr = max(dw_p["clip_lo"], min(dwell_hr, dw_p["clip_hi"]))
 

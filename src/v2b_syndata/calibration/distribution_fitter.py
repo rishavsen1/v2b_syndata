@@ -89,6 +89,78 @@ def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
     return _drop_if_oor("arrival", fit, {"mu": "arrival.mu", "sigma": "arrival.sigma"})
 
 
+MIXTURE_MIN_SAMPLES = 60      # need enough data to justify 5 params
+MIXTURE_BIC_MARGIN = 10.0     # keep the mixture only if it beats single by >= this
+
+
+def _gmm2_em(x: np.ndarray, iters: int = 300):
+    """2-component 1-D Gaussian mixture via EM (ported from the model-selection
+    study). Returns (mu[2], sd[2], w[2], loglik)."""
+    n = len(x)
+    m = float(np.median(x))
+    lo_mask = x <= m
+    mu = np.array([x[lo_mask].mean(), x[~lo_mask].mean() if (~lo_mask).any() else m + 1])
+    sd = np.array([max(x[lo_mask].std(), 0.5),
+                   max(x[~lo_mask].std() if (~lo_mask).any() else 1.0, 0.5)])
+    w = np.array([0.5, 0.5])
+    for _ in range(iters):
+        p = np.array([w[j] * st.norm.pdf(x, mu[j], sd[j]) for j in range(2)])
+        r = p / (p.sum(0) + 1e-300)
+        nk = r.sum(1)
+        w = nk / n
+        mu = (r * x).sum(1) / nk
+        sd = np.maximum(np.sqrt((r * (x - mu[:, None]) ** 2).sum(1) / nk), 0.25)
+    loglik = float(np.log(np.array([w[j] * st.norm.pdf(x, mu[j], sd[j])
+                                    for j in range(2)]).sum(0) + 1e-300).sum())
+    return mu, sd, w, loglik
+
+
+def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
+    """Fit a 2-component arrival mixture on [6, 20] and return it ONLY if it
+    beats a single Gaussian by a BIC margin (i.e. the data is meaningfully
+    bimodal) and both components pass DIST_PARAM_RANGES. Else None → caller
+    falls back to the single TruncNorm. Components ordered by mean (mu1 <= mu2).
+    """
+    a, b = ARRIVAL_LO, ARRIVAL_HI
+    arr = np.clip(np.asarray(arrival_hours, float), a + 1e-6, b - 1e-6)
+    n = len(arr)
+    if n < MIXTURE_MIN_SAMPLES:
+        return None
+
+    mu, sd, w, ll2 = _gmm2_em(arr)
+    # single-Gaussian baseline on the same clipped data (consistent comparison)
+    mu0, sd0 = float(arr.mean()), float(max(arr.std(), 1e-3))
+    ll1 = float(st.norm.logpdf(arr, mu0, sd0).sum())
+    bic1 = 2 * np.log(n) - 2 * ll1
+    bic2 = 5 * np.log(n) - 2 * ll2
+    if (bic1 - bic2) < MIXTURE_BIC_MARGIN:
+        return None  # not bimodal enough to justify the mixture
+
+    order = np.argsort(mu)
+    mu, sd, w = mu[order], sd[order], w[order]
+    # KS of the truncated mixture CDF (each component truncated to [a, b]).
+    def mix_cdf(q):
+        q = np.asarray(q, float)
+        return sum(
+            w[j] * st.truncnorm.cdf(q, (a - mu[j]) / sd[j], (b - mu[j]) / sd[j],
+                                    loc=mu[j], scale=sd[j])
+            for j in range(2)
+        )
+    ks = float(st.kstest(arr, mix_cdf).statistic)
+    fit = {
+        "dist": "truncnorm_mixture",
+        "w1": float(w[0]),
+        "mu1": float(mu[0]), "sigma1": float(sd[0]),
+        "mu2": float(mu[1]), "sigma2": float(sd[1]),
+        "n_samples": n, "ks_fit_quality": ks,
+    }
+    return _drop_if_oor("arrival_mixture", fit, {
+        "w1": "arrival.w1",
+        "mu1": "arrival.mu1", "sigma1": "arrival.sigma1",
+        "mu2": "arrival.mu2", "sigma2": "arrival.sigma2",
+    })
+
+
 def fit_weibull_dwell(dwell_hours: np.ndarray) -> dict[str, Any] | None:
     """Fit Weibull(k, λ) via scipy weibull_min. Returns canonical dict, or None
     if any param falls outside DIST_PARAM_RANGES (B4 guard).
@@ -168,7 +240,12 @@ def fit_region(
     """
     out: dict[str, Any] = {}
     if len(arrivals) >= MIN_SAMPLES:
-        out["arrival"] = fit_truncnorm_arrival(arrivals)
+        # Prefer a 2-component mixture when the data is meaningfully bimodal
+        # (BIC-justified); otherwise the single TruncNorm (unchanged behavior).
+        out["arrival"] = (
+            fit_truncnorm_mixture_arrival(arrivals)
+            or fit_truncnorm_arrival(arrivals)
+        )
     else:
         out["arrival"] = None
     if len(dwells) >= MIN_SAMPLES:

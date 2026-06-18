@@ -27,16 +27,31 @@ def _region_dist(ctx: ScenarioContext, region: str, dist: str) -> dict[str, Any]
 
 
 def sample_f_arr(ctx: ScenarioContext) -> None:
-    """Per-user TruncNorm(μ, σ) parameters. Calibrated leaf wins; placeholder fallback."""
+    """Per-user arrival-hour parameters. Calibrated leaf wins; placeholder fallback.
+
+    A region whose calibrated `arrival` block carries the mixture leaves
+    (`w1, mu1, sigma1, mu2, sigma2`) gets a 2-component TruncNorm mixture;
+    otherwise the single TruncNorm(μ, σ) (default / hand-authored path,
+    bit-identical to before)."""
     assert ctx.a_user is not None
     params = {}
     for car_id, u in ctx.a_user.items():
         cal = _region_dist(ctx, u.region, "arrival")
-        mu = float(cal.get("mu", 8.5))
-        sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
-        sigma = float(cal.get("sigma", sigma_default))
-        params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": 6.0, "trunc_hi": 20.0,
-                          "phi": u.phi}
+        if "w1" in cal and "mu1" in cal:
+            w1 = float(cal["w1"])
+            params[car_id] = {
+                "mixture": [
+                    (w1, float(cal["mu1"]), float(cal["sigma1"])),
+                    (1.0 - w1, float(cal["mu2"]), float(cal["sigma2"])),
+                ],
+                "trunc_lo": 6.0, "trunc_hi": 20.0, "phi": u.phi,
+            }
+        else:
+            mu = float(cal.get("mu", 8.5))
+            sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
+            sigma = float(cal.get("sigma", sigma_default))
+            params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": 6.0,
+                              "trunc_hi": 20.0, "phi": u.phi}
     ctx.latents["f_arr"] = params
 
 
