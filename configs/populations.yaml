@@ -102,11 +102,16 @@ acn_workplace_baseline:
     # ACN cohort. See CALIBRATION_NOTES.md item #11 for the histogram.
     # Initial weights: equal-share placeholder; tune from empirical user share
     # after first calibration run reports per-region n_users.
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.362342}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.006329}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.400316}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.231013}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.362342}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.006329}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.400316}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.231013}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -127,11 +132,14 @@ acn_workplace_baseline:
   region_distributions:
     rare_consistent:
       arrival:
-        dist: truncnorm
-        mu: 10.06537955348669
-        sigma: 5.99999999822856
-        n_samples: 4723
-        ks_fit_quality: 0.08853700706154072
+        dist: truncnorm_mixture
+        w1: 0.46384652041209823
+        mu1: 7.47885961375071
+        sigma1: 0.8858769157778844
+        mu2: 12.59814570642455
+        sigma2: 3.1317565333518416
+        n_samples: 38299
+        ks_fit_quality: 0.05145149980074243
       dwell:
         dist: weibull
         k: 1.1724350564177057
@@ -156,11 +164,14 @@ acn_workplace_baseline:
         n_samples: 4723
     rare_inconsistent:
       arrival:
-        dist: truncnorm
-        mu: 11.721821664250733
-        sigma: 5.999999998684928
-        n_samples: 80
-        ks_fit_quality: 0.33418881350520796
+        dist: truncnorm_mixture
+        w1: 0.46384652041209823
+        mu1: 7.47885961375071
+        sigma1: 0.8858769157778844
+        mu2: 12.59814570642455
+        sigma2: 3.1317565333518416
+        n_samples: 38299
+        ks_fit_quality: 0.05145149980074243
       dwell:
         dist: weibull
         k: 0.8195937860121927
@@ -185,11 +196,14 @@ acn_workplace_baseline:
         n_samples: 80
     occasional_consistent:
       arrival:
-        dist: truncnorm
-        mu: 6.000000956719308
-        sigma: 5.999994493815894
-        n_samples: 17313
-        ks_fit_quality: 0.1284677075237789
+        dist: truncnorm_mixture
+        w1: 0.46384652041209823
+        mu1: 7.47885961375071
+        sigma1: 0.8858769157778844
+        mu2: 12.59814570642455
+        sigma2: 3.1317565333518416
+        n_samples: 38299
+        ks_fit_quality: 0.05145149980074243
       dwell:
         dist: weibull
         k: 1.7204205391189364
@@ -214,11 +228,14 @@ acn_workplace_baseline:
         n_samples: 17313
     regular_charger:
       arrival:
-        dist: truncnorm
-        mu: 6.000000019178595
-        sigma: 5.040708663446626
-        n_samples: 18724
-        ks_fit_quality: 0.18638400304382827
+        dist: truncnorm_mixture
+        w1: 0.46384652041209823
+        mu1: 7.47885961375071
+        sigma1: 0.8858769157778844
+        mu2: 12.59814570642455
+        sigma2: 3.1317565333518416
+        n_samples: 38299
+        ks_fit_quality: 0.05145149980074243
       dwell:
         dist: weibull
         k: 1.9816342759194332
@@ -242,7 +259,7 @@ acn_workplace_baseline:
         rho_gaussian: -0.5897575175466935
         n_samples: 18724
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260601
+    source: calibration:acn_data_2019_2021_20260618
     dataset: ACN-Data
     sites:
       - caltech
@@ -251,25 +268,30 @@ acn_workplace_baseline:
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-01'
+    calibration_date: '2026-06-18'
     n_users_total: 635
     n_sessions_total: 41774
-    weekend_activity_factor: 0.1681
     n_users_assigned_in_population: 632
     n_users_with_userinputs: 632
     capacity_inference_fallback_rate: 0.33360463446162686
     unassigned_user_rate: 0.004724409448818898
+    weekend_activity_factor: 0.1681
 acn_caltech_baseline:
   description: "ACN-Data Caltech site only (2019-2021). Student/faculty workplace
     cohort."
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.528302}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.011321}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.30566}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.154717}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.528302}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.011321}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.30566}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.154717}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -287,11 +309,14 @@ acn_caltech_baseline:
   region_distributions:
     rare_consistent:
       arrival:
-        dist: truncnorm
-        mu: 14.191795908545718
-        sigma: 5.999999980637373
-        n_samples: 2757
-        ks_fit_quality: 0.10195478266177344
+        dist: truncnorm_mixture
+        w1: 0.5055906925353449
+        mu1: 9.201409577637577
+        sigma1: 1.0027249812024048
+        mu2: 13.9472245675881
+        sigma2: 3.1950667937030444
+        n_samples: 12717
+        ks_fit_quality: 0.036095078610036135
       dwell:
         dist: weibull
         k: 0.9666716944393348
@@ -316,11 +341,14 @@ acn_caltech_baseline:
         n_samples: 2757
     rare_inconsistent:
       arrival:
-        dist: truncnorm
-        mu: 12.084253950635896
-        sigma: 5.999999999865793
-        n_samples: 74
-        ks_fit_quality: 0.31644757828277126
+        dist: truncnorm_mixture
+        w1: 0.5055906925353449
+        mu1: 9.201409577637577
+        sigma1: 1.0027249812024048
+        mu2: 13.9472245675881
+        sigma2: 3.1950667937030444
+        n_samples: 12717
+        ks_fit_quality: 0.036095078610036135
       dwell:
         dist: weibull
         k: 0.8186467917098169
@@ -345,11 +373,14 @@ acn_caltech_baseline:
         n_samples: 74
     occasional_consistent:
       arrival:
-        dist: truncnorm
-        mu: 10.284384855272082
-        sigma: 5.999999751068922
-        n_samples: 4658
-        ks_fit_quality: 0.14892276389691567
+        dist: truncnorm_mixture
+        w1: 0.5055906925353449
+        mu1: 9.201409577637577
+        sigma1: 1.0027249812024048
+        mu2: 13.9472245675881
+        sigma2: 3.1950667937030444
+        n_samples: 12717
+        ks_fit_quality: 0.036095078610036135
       dwell:
         dist: weibull
         k: 1.4690957477206565
@@ -374,11 +405,14 @@ acn_caltech_baseline:
         n_samples: 4658
     regular_charger:
       arrival:
-        dist: truncnorm
-        mu: 10.13762326492156
-        sigma: 3.3584296093835198
-        n_samples: 5361
-        ks_fit_quality: 0.10715247612058437
+        dist: truncnorm_mixture
+        w1: 0.5055906925353449
+        mu1: 9.201409577637577
+        sigma1: 1.0027249812024048
+        mu2: 13.9472245675881
+        sigma2: 3.1950667937030444
+        n_samples: 12717
+        ks_fit_quality: 0.036095078610036135
       dwell:
         dist: weibull
         k: 1.6636666943490575
@@ -402,31 +436,36 @@ acn_caltech_baseline:
         rho_gaussian: -0.39455663839432986
         n_samples: 5361
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260601
+    source: calibration:acn_data_2019_2021_20260618
     dataset: ACN-Data
     sites:
       - caltech
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-01'
+    calibration_date: '2026-06-18'
     n_users_total: 266
     n_sessions_total: 13395
-    weekend_activity_factor: 0.3499
     n_users_assigned_in_population: 265
     n_users_with_userinputs: 265
     capacity_inference_fallback_rate: 0.4368794326241135
     unassigned_user_rate: 0.0037593984962406013
+    weekend_activity_factor: 0.3499
 acn_jpl_baseline:
   description: "ACN-Data JPL site only (2019-2021). NASA workforce, regular schedules."
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.286472}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.002653}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.440318}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.270557}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.286472}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.002653}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.440318}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.270557}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -444,11 +483,14 @@ acn_jpl_baseline:
   region_distributions:
     rare_consistent:
       arrival:
-        dist: truncnorm
-        mu: 6.000000003784843
-        sigma: 5.949729933476084
-        n_samples: 2454
-        ks_fit_quality: 0.10907551110144453
+        dist: truncnorm_mixture
+        w1: 0.5648900144056337
+        mu1: 7.12656573575676
+        sigma1: 0.586821961088822
+        mu2: 12.675893789457781
+        sigma2: 2.8982839933618405
+        n_samples: 25004
+        ks_fit_quality: 0.03658554324852378
       dwell:
         dist: weibull
         k: 1.6626537653510574
@@ -473,11 +515,14 @@ acn_jpl_baseline:
         n_samples: 2454
     occasional_consistent:
       arrival:
-        dist: truncnorm
-        mu: 6.000000082996429
-        sigma: 5.009266278234441
-        n_samples: 11702
-        ks_fit_quality: 0.24437742038510418
+        dist: truncnorm_mixture
+        w1: 0.5648900144056337
+        mu1: 7.12656573575676
+        sigma1: 0.586821961088822
+        mu2: 12.675893789457781
+        sigma2: 2.8982839933618405
+        n_samples: 25004
+        ks_fit_quality: 0.03658554324852378
       dwell:
         dist: weibull
         k: 1.97987761725707
@@ -502,11 +547,14 @@ acn_jpl_baseline:
         n_samples: 11702
     regular_charger:
       arrival:
-        dist: truncnorm
-        mu: 6.000000014925071
-        sigma: 4.6744030325736325
-        n_samples: 13168
-        ks_fit_quality: 0.3366876257334146
+        dist: truncnorm_mixture
+        w1: 0.5648900144056337
+        mu1: 7.12656573575676
+        sigma1: 0.586821961088822
+        mu2: 12.675893789457781
+        sigma2: 2.8982839933618405
+        n_samples: 25004
+        ks_fit_quality: 0.03658554324852378
       dwell:
         dist: weibull
         k: 2.2022909989057657
@@ -530,31 +578,36 @@ acn_jpl_baseline:
         rho_gaussian: -0.5864877949094701
         n_samples: 13168
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260601
+    source: calibration:acn_data_2019_2021_20260618
     dataset: ACN-Data
     sites:
       - jpl
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-01'
+    calibration_date: '2026-06-18'
     n_users_total: 379
     n_sessions_total: 27799
-    weekend_activity_factor: 0.0738
     n_users_assigned_in_population: 377
     n_users_with_userinputs: 377
     capacity_inference_fallback_rate: 0.28170078060361886
     unassigned_user_rate: 0.005277044854881266
+    weekend_activity_factor: 0.0738
 acn_office001_baseline:
   description: "ACN-Data Office001 site only (2019-2021). Corporate workplace cohort."
   calibration_policy: acn_data
 
   axes_distribution:
-    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3, 50], weight: 0.285714}
-    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [3, 80], weight: 0.0}
-    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], dist_km: [5, 60], weight: 0.357143}
-    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [10, 80], weight: 0.357143}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], weight: 0.0}
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.285714}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.0}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
+        dist_km: [5, 60], weight: 0.357143}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.357143}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+        weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -572,11 +625,14 @@ acn_office001_baseline:
   region_distributions:
     rare_consistent:
       arrival:
-        dist: truncnorm
-        mu: 10.960583307664445
-        sigma: 2.9129356980140555
-        n_samples: 41
-        ks_fit_quality: 0.14660963020585194
+        dist: truncnorm_mixture
+        w1: 0.46365761945763
+        mu1: 8.88241978146195
+        sigma1: 0.8980488843936746
+        mu2: 12.105800158783767
+        sigma2: 2.167142064216042
+        n_samples: 578
+        ks_fit_quality: 0.03034096875516268
       dwell:
         dist: weibull
         k: 2.13549326197764
@@ -601,11 +657,14 @@ acn_office001_baseline:
         n_samples: 41
     occasional_consistent:
       arrival:
-        dist: truncnorm
-        mu: 10.761309213369373
-        sigma: 3.933618722986375
-        n_samples: 187
-        ks_fit_quality: 0.12805466500809626
+        dist: truncnorm_mixture
+        w1: 0.46365761945763
+        mu1: 8.88241978146195
+        sigma1: 0.8980488843936746
+        mu2: 12.105800158783767
+        sigma2: 2.167142064216042
+        n_samples: 578
+        ks_fit_quality: 0.03034096875516268
       dwell:
         dist: weibull
         k: 1.1603649681080652
@@ -630,11 +689,14 @@ acn_office001_baseline:
         n_samples: 187
     regular_charger:
       arrival:
-        dist: truncnorm
-        mu: 10.052994766765362
-        sigma: 1.662853947610564
-        n_samples: 346
-        ks_fit_quality: 0.09705326646405532
+        dist: truncnorm_mixture
+        w1: 0.46365761945763
+        mu1: 8.88241978146195
+        sigma1: 0.8980488843936746
+        mu2: 12.105800158783767
+        sigma2: 2.167142064216042
+        n_samples: 578
+        ks_fit_quality: 0.03034096875516268
       dwell:
         dist: weibull
         k: 2.316023133426543
@@ -658,21 +720,21 @@ acn_office001_baseline:
         rho_gaussian: -0.6754016703686238
         n_samples: 346
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260601
+    source: calibration:acn_data_2019_2021_20260618
     dataset: ACN-Data
     sites:
       - office001
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-01'
+    calibration_date: '2026-06-18'
     n_users_total: 14
     n_sessions_total: 580
-    weekend_activity_factor: 0.6536
     n_users_assigned_in_population: 14
     n_users_with_userinputs: 14
     capacity_inference_fallback_rate: 0.4362068965517241
     unassigned_user_rate: 0.0
+    weekend_activity_factor: 0.6536
 stable_commuter_heavy:
   description: "Stable office workforce — high frequency, high consistency. High ψ."
   calibration_policy: synthetic
@@ -1055,9 +1117,12 @@ elaadnl_public_eu:
   calibration_policy: elaadnl_open_2020
 
   axes_distribution:
-    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20, 60], weight: 0.21843}
-    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 50], weight: 0.78157}
-    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], weight: 0.0}
+    - {name: daily_commuter, freq: [0.4, 1.0], consist: [0.5, 1.0], dist_km: [20,
+        60], weight: 0.21843}
+    - {name: weekday_only, freq: [0.2, 0.5], consist: [0.4, 0.9], dist_km: [10, 
+            50], weight: 0.78157}
+    - {name: sparse, freq: [0.0, 0.2], consist: [0.0, 0.5], dist_km: [5, 80], 
+        weight: 0.0}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]

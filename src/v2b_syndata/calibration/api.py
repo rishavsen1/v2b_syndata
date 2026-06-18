@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 
 from .battery_inference import infer_capacity, reconstruct_arrival_soc
-from .distribution_fitter import fit_region
+from .distribution_fitter import fit_region, fit_truncnorm_mixture_arrival
 from .feature_extractor import (
     SessionFeatures,
     aggregate_user_features,
@@ -273,6 +273,22 @@ def _calibrate_one_population(
                 clean[key] = fit[key]
         if clean:
             region_fits[rname] = clean
+
+    # Arrival hour is ~independent of the (phi, kappa, delta) axes that DEFINE
+    # the regions, so a per-region arrival fit splinters the bimodal shape and
+    # mispools (each region's sharp early mode over-weights early arrivals).
+    # Fit ONE 2-component mixture on the POOLED population arrivals and broadcast
+    # it to every region. It only ships if it beats the single TruncNorm by a KS
+    # margin (see fit_truncnorm_mixture_arrival); otherwise the per-region single
+    # TruncNorm already in region_fits stands (bit-identical to before).
+    pooled_arrivals = np.asarray(
+        [s.arrival_hour for sess in sessions_by_uid.values() for s in sess],
+        dtype=float,
+    )
+    pooled_arr_mix = fit_truncnorm_mixture_arrival(pooled_arrivals)
+    if pooled_arr_mix is not None:
+        for rname in region_fits:
+            region_fits[rname]["arrival"] = pooled_arr_mix
 
     metadata: dict[str, Any] = {
         "source": provenance,
