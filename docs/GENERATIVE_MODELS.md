@@ -316,8 +316,23 @@ These are part of the generator but are not fit to data:
 - **Building load** (`load_pipeline/`) — a real **EnergyPlus** simulation of a
   DOE prototype building under TMYx weather and an ASHRAE 90.1 occupancy
   schedule. The output is rescaled so `max(power_kw) == peak_kw` when
-  `peak_kw_scaling` is on. This is building physics, not a sampled distribution;
-  the only randomness is a small post-sim ±5%/±3% realism noise on flex/inflex.
+  `peak_kw_scaling` is on. This is building physics, not a sampled distribution.
+  The post-sim ±5%/±3% realism noise on flex/inflex is now **profile-gated**
+  (`noise.load_flex_jitter_pct` / `noise.load_inflex_jitter_pct`): the `clean`
+  profile sets them to 0, so `clean` output is a **deterministic `load =
+  f(weather, building, occupancy)`** — the faithful target for learning
+  `load ← weather`. Other profiles keep 0.05/0.03 (unchanged).
+  - **Weather realizations.** `building_load.weather_temp_offset_c` (additive °C
+    on dry-bulb) and `building_load.weather_solar_scale` (×GHI/DNI/DHI) perturb
+    the EPW EnergyPlus *simulates* **and** the exported `weather_data.csv` via one
+    shared transform (`weather.perturb_weather_frame` / `perturb_epw_file`), so
+    the exported weather always matches the load it produced. For a
+    weather-driven, physically-faithful per-sample load distribution, run
+    `generate-multi --weather-sigma-c σ` (or the web "Weather variation σ"
+    field): each sample draws `temp_offset ~ N(0, σ)` from its seed, logged as an
+    explicit override. Pair with `--noise-profile clean` for a pure
+    weather→load signal — cross-sample variance then comes from weather, not
+    decoupled jitter.
 - **Grid prices** (`renderers/grid_prices.py`) — a deterministic
   time-of-use tape from the `energy_price_peak/offpeak` and `peak_window` knobs.
   Tariffs are schedules, not random variables.

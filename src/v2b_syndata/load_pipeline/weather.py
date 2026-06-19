@@ -163,6 +163,68 @@ def parse_epw_temperatures(
     return pd.Series(df["temp_c"].values, index=timestamps, name="dry_bulb_c")
 
 
+_SOLAR_COLS = ("global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2")
+
+
+def perturb_weather_frame(
+    df: pd.DataFrame, temp_offset_c: float = 0.0, solar_scale: float = 1.0,
+) -> pd.DataFrame:
+    """Apply the weather *realization* transform to a parsed weather frame:
+    additive °C offset on dry-bulb, multiplicative scale on the three solar
+    channels (clipped at 0). This is the SAME transform applied to the EPW the
+    EnergyPlus load sim consumes (`perturb_epw_file`), so the exported
+    `weather_data.csv` stays faithful to the load it produced.
+
+    Returns the frame unchanged (same object) when both knobs are no-ops.
+    """
+    if float(temp_offset_c) == 0.0 and float(solar_scale) == 1.0:
+        return df
+    out = df.copy()
+    if float(temp_offset_c) != 0.0:
+        out["dry_bulb_temp_c"] = out["dry_bulb_temp_c"] + float(temp_offset_c)
+    if float(solar_scale) != 1.0:
+        for c in _SOLAR_COLS:
+            if c in out.columns:
+                out[c] = (out[c] * float(solar_scale)).clip(lower=0.0)
+    return out
+
+
+def perturb_epw_file(
+    epw_path: Path, out_path: Path,
+    temp_offset_c: float = 0.0, solar_scale: float = 1.0,
+) -> Path:
+    """Rewrite an EPW with the weather realization transform so EnergyPlus
+    *simulates* the perturbed weather. Mirrors `perturb_weather_frame`: dry-bulb
+    (col 6) gets the additive offset; solar (cols 13/14/15) the multiplicative
+    scale (clipped ≥0). Header (first 8 lines) and all other columns are copied
+    verbatim. Data rows are detected exactly as `parse_epw_weather` does
+    (len ≥ 22, parseable month/day/hour).
+
+    No-op transform → returns `epw_path` unchanged (no rewrite).
+    """
+    if float(temp_offset_c) == 0.0 and float(solar_scale) == 1.0:
+        return Path(epw_path)
+    src = Path(epw_path).read_text().splitlines(keepends=True)
+    out_lines = src[:8]  # headers verbatim
+    for line in src[8:]:
+        nl = "\n" if line.endswith("\n") else ""
+        parts = line.rstrip("\n").split(",")
+        if len(parts) < 22:
+            out_lines.append(line)
+            continue
+        try:
+            int(parts[1]); int(parts[2]); int(parts[3])
+            parts[6] = repr(float(parts[6]) + float(temp_offset_c))
+            for ci in (13, 14, 15):
+                parts[ci] = repr(max(0.0, float(parts[ci]) * float(solar_scale)))
+        except (ValueError, IndexError):
+            out_lines.append(line)
+            continue
+        out_lines.append(",".join(parts) + nl)
+    Path(out_path).write_text("".join(out_lines))
+    return Path(out_path)
+
+
 def parse_epw_weather(
     epw_path: Path, *, year: int = 2020,
 ) -> pd.DataFrame:

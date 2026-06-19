@@ -246,6 +246,7 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
             seed_base=args.seed_base,
             workers=args.workers,
             noise_profile=args.noise_profile,
+            weather_sigma_c=args.weather_sigma_c,
             force=args.force,
             progress_callback=_progress,
         )
@@ -475,6 +476,11 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--seed-base", type=int, default=0)
     gm.add_argument("--noise-profile", default="tmyx_stochastic",
                     help="batch noise profile (default tmyx_stochastic; clean = deterministic)")
+    gm.add_argument("--weather-sigma-c", type=float, default=0.0,
+                    help="per-sample dry-bulb temperature offset std (°C). >0 makes "
+                         "cross-sample load variance weather-driven (EnergyPlus re-runs "
+                         "the perturbed weather; exported weather_data.csv matches). "
+                         "Pair with --noise-profile clean for a pure weather→load signal.")
     gm.add_argument("--force", action="store_true", help="overwrite output-dir if it exists")
     gm.set_defaults(func=cmd_generate_multi)
 

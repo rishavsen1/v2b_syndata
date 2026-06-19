@@ -23,12 +23,19 @@ def _stub_simulate_building_load(
     sim_window_end: pd.Timestamp,
     weather_type: str = "tmyx",
     weather_year: int | None = None,
+    temp_offset_c: float = 0.0,
+    solar_scale: float = 1.0,
 ) -> tuple[pd.Series, pd.Series]:
     """Deterministic synthetic load. Replaces the EnergyPlus pipeline in unit tests
-    so test runs do not need the EnergyPlus binary."""
+    so test runs do not need the EnergyPlus binary.
+
+    The flex (HVAC) series carries a crude +3%/°C ``temp_offset_c`` sensitivity so
+    the weather-realization path exhibits weather→load coupling in fast tests,
+    mirroring (sign/scale only) what real EnergyPlus does."""
     idx = pd.date_range(sim_window_start, sim_window_end, freq="15min", inclusive="left")
     hour = idx.hour + idx.minute / 60.0
     flex = np.clip(120.0 + 60.0 * np.sin(2 * np.pi * (hour - 6) / 24), 0.0, None)
+    flex = flex * (1.0 + 0.03 * float(temp_offset_c))  # HVAC responds to weather
     inflex = np.clip(40.0 + 15.0 * np.sin(2 * np.pi * (hour - 6) / 24), 0.0, None)
     return (
         pd.Series(flex, index=idx, name="L_flex"),

@@ -241,6 +241,15 @@ buildings:
   relative_humidity_pct, wind_speed_m_s, global_horizontal_w_m2,
   direct_normal_w_m2, diffuse_horizontal_w_m2` (+ `building_id` in shared mode) —
   the three solar-irradiance channels come from the EPW (GHI/DNI/DHI).
+- **Faithful weather→load** (for downstream learning): the `clean` profile now
+  produces a deterministic `building_load = f(weather)` (the historical ±5%/±3%
+  sampler noise is profile-gated via `noise.load_flex_jitter_pct` /
+  `load_inflex_jitter_pct`). To get a weather-*driven* per-sample distribution,
+  use `generate-multi --weather-sigma-c σ` (or the webapp "Weather variation σ"
+  field): each sample perturbs the EPW EnergyPlus simulates by `N(0, σ)` °C and
+  exports the **matching** `weather_data.csv`, so the load is physically
+  faithful to the weather you train on. `building_load.weather_temp_offset_c` /
+  `building_load.weather_solar_scale` set a fixed perturbation directly.
 - The webapp exposes the same feature: each **building card** carries its own
   full descriptor + knob (Advanced) panel + noise + a Duplicate button, while
   Run settings hold the common levers (date range, samples, workers, output

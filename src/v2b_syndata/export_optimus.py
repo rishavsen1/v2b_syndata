@@ -165,11 +165,18 @@ def build_weather(
     sim_end: pd.Timestamp,
     building_id: int,
     *,
+    temp_offset_c: float = 0.0,
+    solar_scale: float = 1.0,
     fetcher: Callable[[str], bytes] | None = None,
 ) -> pd.DataFrame:
     """Reconstruct hourly weather over [sim_start, sim_end) from the same EPW
     EnergyPlus consumed (leap-injected for leap years), matching the optimus
-    weather_data schema."""
+    weather_data schema.
+
+    ``temp_offset_c`` / ``solar_scale`` apply the weather *realization* transform
+    — they MUST match the values passed to ``simulate_building_load`` so the
+    exported weather stays faithful to the simulated load.
+    """
     sim_start = pd.Timestamp(sim_start)
     sim_end = pd.Timestamp(sim_end)
     year = sim_start.year
@@ -183,6 +190,7 @@ def build_weather(
     else:
         wx = weather.parse_epw_weather(epw_path, year=year)
 
+    wx = weather.perturb_weather_frame(wx, temp_offset_c, solar_scale)
     wx = wx[(wx.index >= sim_start) & (wx.index < sim_end)]
     out = pd.DataFrame({
         "datetime": wx.index.strftime("%Y-%m-%d %H:%M:%S"),

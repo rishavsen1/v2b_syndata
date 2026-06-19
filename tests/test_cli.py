@@ -175,9 +175,12 @@ def test_cli_generate_multi_batch(tmp_path: Path, _stub_weather):
     out = tmp_path / "mb_batch"
     rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg),
               "--output-dir", str(out), "--start-month", "2021-09", "--end-month", "2021-09",
-              "--samples-per-month", "2", "--workers", "1", "--noise-profile", "clean")
+              "--samples-per-month", "2", "--workers", "1", "--noise-profile", "clean",
+              "--weather-sigma-c", "2.0")
     assert rc == 0
-    assert (out / "batch_manifest.json").exists()
+    import json
+    manifest = json.loads((out / "batch_manifest.json").read_text())
+    assert manifest["weather_sigma_c"] == 2.0
     for s in (0, 1):
         assert (out / "SEP2021" / str(s) / "cars.csv").exists()
 

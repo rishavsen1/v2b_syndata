@@ -109,6 +109,8 @@ def _simulate_single(
     occupancy: pd.Series,
     sim_window_start: pd.Timestamp,
     sim_window_end: pd.Timestamp,
+    temp_offset_c: float = 0.0,
+    solar_scale: float = 1.0,
 ) -> tuple[pd.Series, pd.Series]:
     proto_idf = get_prototype_idf(archetype, size)
     year = pd.Timestamp(sim_window_start).year
@@ -130,6 +132,7 @@ def _simulate_single(
         extra=(
             f"meters={','.join(_REQUIRED_METERS)};rp=annual;ts=4;year={year}"
             f";leap={int(leap_weather.is_leap(year))}"
+            f";dT={float(temp_offset_c)!r};ssc={float(solar_scale)!r}"
         ),
     )
     cached = cache_mod.get_cached(key)
@@ -147,6 +150,12 @@ def _simulate_single(
         run_epw = epw_path
         if leap_weather.is_leap(year):
             run_epw = leap_weather.make_leap_epw(epw_path, tmp / "weather.epw", year)
+        # Weather realization: perturb the EPW EnergyPlus actually consumes so
+        # the simulated load is faithful to the (perturbed) weather we export.
+        # No-op when temp_offset_c == 0 and solar_scale == 1.
+        run_epw = weather.perturb_epw_file(
+            run_epw, tmp / "perturbed.epw", temp_offset_c, solar_scale,
+        )
         ep_out = tmp / "ep_run"
         meter_csv = ep_runner.run_energyplus(runtime, run_epw, ep_out)
         flex, inflex = output_parser.parse_eplusout(
@@ -166,6 +175,8 @@ def simulate_building_load(
     sim_window_end: pd.Timestamp,
     weather_type: str = "tmyx",
     weather_year: int | None = None,
+    temp_offset_c: float = 0.0,
+    solar_scale: float = 1.0,
 ) -> tuple[pd.Series, pd.Series]:
     """Return ``(L_flex_kw, L_inflex_kw)`` for the requested building over sim window.
 
@@ -174,6 +185,11 @@ def simulate_building_load(
     ``archetype="mixed"`` runs office + retail at the same size and averages.
     Implementation hinges on EnergyPlus + cached parquet artifacts; see
     ``handoff/spec/BAYES_NET.md`` Tier 2 nodes ``L_flex`` / ``L_inflex``.
+
+    ``temp_offset_c`` / ``solar_scale`` apply a *weather realization* transform
+    (additive °C on dry-bulb, multiplicative on solar) to the EPW EnergyPlus
+    consumes — keep them in sync with ``export_optimus.build_weather`` so the
+    exported weather matches the simulated load.
     """
     epw_path = weather.get_weather_epw(tmyx_station, weather_type, weather_year)
     sim_window_start = pd.Timestamp(sim_window_start)
@@ -185,14 +201,17 @@ def simulate_building_load(
         retail_size = size if (("retail", size) in _retail_keys()) else "med"
         flex_o, inflex_o = _simulate_single(
             "office", size, epw_path, occupancy, sim_window_start, sim_window_end,
+            temp_offset_c, solar_scale,
         )
         flex_r, inflex_r = _simulate_single(
             "retail", retail_size, epw_path, occupancy, sim_window_start, sim_window_end,
+            temp_offset_c, solar_scale,
         )
         return 0.5 * (flex_o + flex_r), 0.5 * (inflex_o + inflex_r)
 
     return _simulate_single(
         archetype, size, epw_path, occupancy, sim_window_start, sim_window_end,
+        temp_offset_c, solar_scale,
     )
 
 

@@ -769,7 +769,7 @@ function applyConfig(cfg) {
     const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
     set("u-output-path", cfg.output_path); set("u-start-month", cfg.start_month);
     set("u-end-month", cfg.end_month); set("u-samples", cfg.samples);
-    set("u-workers", cfg.workers);
+    set("u-weather-sigma", cfg.weather_sigma_c); set("u-workers", cfg.workers);
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
     if (cfg.output_mode) {
@@ -798,6 +798,7 @@ function buildUnifiedPayload() {
         start_month: val("u-start-month"),
         end_month: val("u-end-month") || val("u-start-month"),
         samples: parseInt(val("u-samples"), 10) || 1,
+        weather_sigma_c: parseFloat(val("u-weather-sigma")) || 0,
         workers: parseInt(val("u-workers"), 10) || 4,
         force: document.getElementById("u-force").checked,
         default_policy: val("u-default-policy") || "ILP-MPCFIXEDFSL",

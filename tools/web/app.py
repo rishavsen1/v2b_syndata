@@ -494,6 +494,12 @@ def api_generate_unified():
         "--workers", str(int(payload.get("workers", 4))),
         "--noise-profile", payload.get("noise_profile") or "tmyx_stochastic",
     ]
+    try:
+        wx_sigma = float(payload.get("weather_sigma_c") or 0.0)
+    except (TypeError, ValueError):
+        wx_sigma = 0.0
+    if wx_sigma > 0:
+        cmd += ["--weather-sigma-c", str(wx_sigma)]
     if payload.get("force", True):
         cmd.append("--force")
 

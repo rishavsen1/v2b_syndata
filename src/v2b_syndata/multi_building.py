@@ -39,6 +39,7 @@ from . import export_optimus as exp
 from .batch import BatchResult, _months_between, _record_result, _write_manifest
 from .manifest import CSV_NAMES, _git_sha
 from .runner import generate
+from .seeding import rng_for_node
 
 # Optimus per-building files (order is the on-disk write order).
 _PER_BUILDING_FILES = [
@@ -112,6 +113,8 @@ def _build_building_tables(
         "grid_prices.csv": exp.build_grid_prices(native["grid_prices.csv"], building_id),
         "weather_data.csv": exp.build_weather(
             str(knobs["building_load.tmyx_station"]), sim_start, sim_end, building_id,
+            temp_offset_c=float(knobs.get("building_load.weather_temp_offset_c", 0.0)),
+            solar_scale=float(knobs.get("building_load.weather_solar_scale", 1.0)),
         ),
         "occupancy.csv": exp.build_occupancy(
             str(knobs["building_load.occupancy_source"]), int(sim_start.year), building_id,
@@ -276,10 +279,17 @@ class _MultiUnitSpec:
 
 def _unit_config(
     base: MultiConfig, month_iso: str, sample: int, noise_profile: str | None,
-    seed_base: int,
+    seed_base: int, weather_sigma_c: float = 0.0,
 ) -> MultiConfig:
     """Clone the base config for one (month, sample): pin the month window, the
-    per-sample seed offset, and the per-sample noise on every building."""
+    per-sample seed offset, and the per-sample noise on every building.
+
+    When ``weather_sigma_c > 0`` each building draws a per-sample dry-bulb offset
+    ``N(0, weather_sigma_c)`` (seeded by its per-sample seed) and pins it as an
+    explicit ``building_load.weather_temp_offset_c`` override. EnergyPlus then
+    simulates the perturbed weather and the exported weather_data.csv matches —
+    so cross-sample load variance is weather-driven and physically faithful.
+    """
     cfg = copy.deepcopy(base)
     for spec in cfg.buildings:
         spec.overrides = dict(spec.overrides)
@@ -295,6 +305,13 @@ def _unit_config(
             spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
         spec.noise_profile = eff_noise
         spec.seed = spec.seed + seed_base + sample
+        # Weather realization: per-sample dry-bulb offset (explicit overrides
+        # win, so a building can pin its own fixed offset).
+        if weather_sigma_c > 0.0 and \
+           "building_load.weather_temp_offset_c" not in spec.overrides:
+            rng = rng_for_node(spec.seed, "weather_realization")
+            offset = float(rng.normal(0.0, weather_sigma_c))
+            spec.overrides["building_load.weather_temp_offset_c"] = round(offset, 4)
     return cfg
 
 
@@ -325,6 +342,7 @@ def generate_multi_batch(
     seed_base: int = 0,
     workers: int = 4,
     noise_profile: str | None = "tmyx_stochastic",
+    weather_sigma_c: float = 0.0,
     force: bool = False,
     progress_callback=None,
 ) -> dict[str, Any]:
@@ -350,7 +368,7 @@ def generate_multi_batch(
         iso = dt.strftime("%Y-%m-%d")
         for s in range(samples_per_month):
             specs.append(_MultiUnitSpec(
-                cfg=_unit_config(cfg, iso, s, noise_profile, seed_base),
+                cfg=_unit_config(cfg, iso, s, noise_profile, seed_base, weather_sigma_c),
                 month_label=label, sample_idx=s, seed=seed_base + s,
                 unit_dir=output_dir / label / str(s), config_dir=Path(config_dir),
             ))
@@ -367,6 +385,7 @@ def generate_multi_batch(
         "seed_base": seed_base,
         "seed_strategy": "building.seed + seed_base + sample",
         "noise_profile": noise_profile,
+        "weather_sigma_c": weather_sigma_c,
         "workers": workers,
         "started_at": datetime.utcnow().isoformat() + "Z",
         "completed_at": None,

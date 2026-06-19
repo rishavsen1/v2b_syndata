@@ -93,6 +93,8 @@ def _resolve_noise(knobs: ResolvedKnobs) -> dict[str, float]:
         "dr_notification_dropout_prob": float(knobs.get("noise.dr_notification_dropout_prob")),
         "price_jitter_pct": float(knobs.get("noise.price_jitter_pct")),
         "occupancy_jitter_pct": float(knobs.get("noise.occupancy_jitter_pct")),
+        "load_flex_jitter_pct": float(knobs.get("noise.load_flex_jitter_pct")),
+        "load_inflex_jitter_pct": float(knobs.get("noise.load_inflex_jitter_pct")),
     }
 
 

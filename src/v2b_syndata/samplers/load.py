@@ -80,6 +80,8 @@ def _resolve_loads(ctx: ScenarioContext) -> tuple[pd.Series, pd.Series]:
     size = ctx.knobs.get("building_load.size")
     tmyx_station = ctx.knobs.get("building_load.tmyx_station")
     occupancy_source = ctx.knobs.get("building_load.occupancy_source")
+    temp_offset_c = float(ctx.knobs.get("building_load.weather_temp_offset_c"))
+    solar_scale = float(ctx.knobs.get("building_load.weather_solar_scale"))
     idx = ctx.datetime_index()
     occupancy = _build_occupancy_series(str(occupancy_source), idx)
 
@@ -90,6 +92,8 @@ def _resolve_loads(ctx: ScenarioContext) -> tuple[pd.Series, pd.Series]:
         occupancy=occupancy,
         sim_window_start=pd.Timestamp(ctx.sim_start),
         sim_window_end=pd.Timestamp(ctx.sim_end),
+        temp_offset_c=temp_offset_c,
+        solar_scale=solar_scale,
     )
     # Reindex to the canonical sim window grid; fill missing with 0 (rare,
     # only at year boundaries when EP emits one fewer/extra row).
@@ -101,23 +105,26 @@ def _resolve_loads(ctx: ScenarioContext) -> tuple[pd.Series, pd.Series]:
 
 def sample_l_flex(ctx: ScenarioContext) -> None:
     flex, _ = _resolve_loads(ctx)
-    rng = rng_for_node(ctx.seed, "L_flex")
-    noise = rng.normal(0.0, 0.05, size=len(flex))  # ±5% per BAYES_NET
-    series = pd.Series(
-        np.clip(flex.to_numpy() * (1.0 + noise), 0.0, None),
-        index=flex.index,
-        name="L_flex",
-    )
-    ctx.latents["L_flex"] = series
+    # BAYES_NET measurement noise — now gated by the noise profile so the
+    # `clean` profile yields a deterministic load = f(weather) the downstream
+    # model can fit exactly. Non-clean profiles set 0.05 (unchanged behavior).
+    sigma = float(ctx.noise.get("load_flex_jitter_pct", 0.0))
+    if sigma > 0.0:
+        rng = rng_for_node(ctx.seed, "L_flex")
+        noise = rng.normal(0.0, sigma, size=len(flex))
+        values = np.clip(flex.to_numpy() * (1.0 + noise), 0.0, None)
+    else:
+        values = np.clip(flex.to_numpy(), 0.0, None)
+    ctx.latents["L_flex"] = pd.Series(values, index=flex.index, name="L_flex")
 
 
 def sample_l_inflex(ctx: ScenarioContext) -> None:
     _, inflex = _resolve_loads(ctx)
-    rng = rng_for_node(ctx.seed, "L_inflex")
-    noise = rng.normal(0.0, 0.03, size=len(inflex))  # ±3% per BAYES_NET
-    series = pd.Series(
-        np.clip(inflex.to_numpy() * (1.0 + noise), 0.0, None),
-        index=inflex.index,
-        name="L_inflex",
-    )
-    ctx.latents["L_inflex"] = series
+    sigma = float(ctx.noise.get("load_inflex_jitter_pct", 0.0))
+    if sigma > 0.0:
+        rng = rng_for_node(ctx.seed, "L_inflex")
+        noise = rng.normal(0.0, sigma, size=len(inflex))
+        values = np.clip(inflex.to_numpy() * (1.0 + noise), 0.0, None)
+    else:
+        values = np.clip(inflex.to_numpy(), 0.0, None)
+    ctx.latents["L_inflex"] = pd.Series(values, index=inflex.index, name="L_inflex")

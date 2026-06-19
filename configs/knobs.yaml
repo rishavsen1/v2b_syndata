@@ -193,6 +193,20 @@ building_load:
     description: "TMYx station ID (climate.onebuilding.org). Drives EnergyPlus weather. D37."
     affects_csv: [building_load.csv]
 
+  weather_temp_offset_c:
+    type: float
+    range: [-15.0, 15.0]
+    default: 0.0
+    description: "Weather realization: additive °C offset applied to the EPW dry-bulb temperature EnergyPlus simulates AND to the exported weather_data.csv (kept in sync). Use per-sample draws (generate-multi --weather-sigma-c) to produce a weather-driven, physically-faithful load distribution for downstream learning."
+    affects_csv: [building_load.csv, weather_data.csv]
+
+  weather_solar_scale:
+    type: float
+    range: [0.5, 1.5]
+    default: 1.0
+    description: "Weather realization: multiplicative scale on the EPW solar channels (GHI/DNI/DHI) EnergyPlus simulates AND the exported weather_data.csv. 1.0 = unchanged."
+    affects_csv: [building_load.csv, weather_data.csv]
+
   archetype:
     type: categorical
     choices: [office, retail, mixed]
@@ -380,4 +394,18 @@ noise:
     type: float
     range: [0.0, 0.30]
     default: 0.0
+    affects_csv: [building_load.csv]
+
+  load_flex_jitter_pct:
+    type: float
+    range: [0.0, 0.50]
+    default: 0.0
+    description: "Multiplicative Gaussian std on the EnergyPlus flex (HVAC) load, applied post-simulation. Default 0.0 → load is the exact f(weather) physics output (clean profile). Non-clean profiles set 0.05 (the historical BAYES_NET measurement noise)."
+    affects_csv: [building_load.csv]
+
+  load_inflex_jitter_pct:
+    type: float
+    range: [0.0, 0.50]
+    default: 0.0
+    description: "Multiplicative Gaussian std on the EnergyPlus inflex (lights+plug) load, post-simulation. Default 0.0 → deterministic; non-clean profiles set 0.03."
     affects_csv: [building_load.csv]

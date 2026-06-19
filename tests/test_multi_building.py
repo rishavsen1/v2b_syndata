@@ -192,6 +192,43 @@ def test_per_building_noise_honored(tmp_path, config_dir, stub_weather):
     assert noises[0] == "clean" and noises[1] == "tmyx_stochastic"
 
 
+def test_weather_sigma_drives_per_sample_realizations(tmp_path, config_dir, stub_weather):
+    """weather_sigma_c > 0 → each sample gets a distinct, reproducible dry-bulb
+    offset that perturbs BOTH the exported weather and the (stub) load — so the
+    cross-sample variance is weather-driven, not decoupled jitter."""
+    import json
+    specs = [
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4}, seed=1),
+    ]
+    kw = dict(start_month="2021-09", end_month="2021-09", samples_per_month=3,
+              workers=1, noise_profile="clean", weather_sigma_c=3.0)
+    out = tmp_path / "wx"
+    manifest = generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir, **kw)
+    assert manifest["weather_sigma_c"] == 3.0
+
+    offsets, wx_means, load_sums = [], [], []
+    for s in (0, 1, 2):
+        cfg = json.loads((out / "SEP2021" / str(s) / "multi_building_config.json").read_text())
+        off = cfg["buildings"][0]["overrides"]["building_load.weather_temp_offset_c"]
+        offsets.append(off)
+        wdf = pd.read_csv(out / "SEP2021" / str(s) / "weather_data.csv")
+        wx_means.append(round(wdf["dry_bulb_temp_c"].mean(), 6))
+        bl = pd.read_csv(out / "SEP2021" / str(s) / "building_load.csv")
+        load_sums.append(round(bl["power_kw_flexible"].sum(), 6))
+    # distinct realizations across samples
+    assert len(set(offsets)) == 3, f"offsets not distinct: {offsets}"
+    assert len(set(wx_means)) == 3, "exported weather identical across samples"
+    assert len(set(load_sums)) == 3, "load did not respond to per-sample weather"
+
+    # reproducible: same config + sigma → identical offsets
+    out2 = tmp_path / "wx2"
+    generate_multi_batch(MultiConfig(specs, output_mode="shared"), out2, config_dir, **kw)
+    offs2 = [json.loads((out2 / "SEP2021" / str(s) / "multi_building_config.json").read_text())
+             ["buildings"][0]["overrides"]["building_load.weather_temp_offset_c"] for s in (0, 1, 2)]
+    assert offs2 == offsets
+
+
 def test_regenerate_from_config(tmp_path, config_dir, stub_weather):
     cfg = MultiConfig(_three_specs(), output_mode="shared", dr_program="CBP")
     out1 = tmp_path / "run1"
