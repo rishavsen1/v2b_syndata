@@ -32,9 +32,17 @@ const PLOT_FEATURES = {
     "grid_prices.csv": [
         { value: "price_per_kwh",    label: "price ($/kWh)" },
     ],
+    "weather_data.csv": [
+        { value: "dry_bulb_temp_c",        label: "dry-bulb temperature (°C)" },
+        { value: "global_horizontal_w_m2", label: "solar GHI (W/m²)" },
+        { value: "relative_humidity_pct",  label: "relative humidity (%)" },
+        { value: "wind_speed_m_s",         label: "wind speed (m/s)" },
+    ],
 };
 // CSVs that carry per-building distributions worth plotting.
-const PLOTTABLE_CSVS = ["building_load.csv", "sessions.csv", "cars.csv", "grid_prices.csv"];
+const PLOTTABLE_CSVS = ["building_load.csv", "weather_data.csv", "sessions.csv", "cars.csv", "grid_prices.csv"];
+// Time-series CSVs (datetime axis) — support the daily-profile / monthly toggle.
+const TIMESERIES_CSVS = new Set(["building_load.csv", "weather_data.csv", "grid_prices.csv"]);
 
 // Knobs promoted into the per-card Scenario Descriptors / quick-fields. They are
 // still regular knobs (override path + manifest source unchanged) — just
@@ -904,8 +912,18 @@ function showUnifiedAnalysis(manifest) {
         const feats = PLOT_FEATURES[csvSel.value] || [];
         document.getElementById("ua-feature").innerHTML =
             feats.map(f => `<option value="${f.value}">${f.label}</option>`).join("");
+        // Time-series CSVs use the daily/monthly Aggregation toggle; distribution
+        // CSVs use the box/violin/histogram Shape toggle. Show only the relevant one.
+        const isTS = TIMESERIES_CSVS.has(csvSel.value);
+        const aggLbl = document.getElementById("ua-agg")?.closest("label");
+        const shapeLbl = document.getElementById("ua-shape")?.closest("label");
+        if (aggLbl) aggLbl.style.display = isTS ? "" : "none";
+        if (shapeLbl) shapeLbl.style.display = isTS ? "none" : "";
     };
     csvSel.onchange = syncFeat; syncFeat();
+    const aggEl = document.getElementById("ua-agg");
+    if (aggEl) aggEl.onchange = () => runUnifiedAnalysis(manifest);
+    document.getElementById("ua-shape").onchange = () => runUnifiedAnalysis(manifest);
     document.getElementById("ua-run").onclick = () => runUnifiedAnalysis(manifest);
     runUnifiedAnalysis(manifest);
 }
@@ -935,7 +953,8 @@ async function runUnifiedAnalysis(manifest) {
     if (!nB) { st.textContent = "no data"; return; }
     st.textContent = `${nB} building(s) · ${samples.length} sample(s)`;
     const shape = document.getElementById("ua-shape").value;
-    plotOptimus("unified-plot", csv, byBuilding, feature, shape);
+    const aggEl = document.getElementById("ua-agg");
+    plotOptimus("unified-plot", csv, byBuilding, feature, shape, aggEl ? aggEl.value : "daily");
 }
 
 const BCOLORS = ["#2c7fb8", "#d8853b", "#31a354", "#756bb1", "#c51b8a", "#636363"];
@@ -946,46 +965,56 @@ function rgba(hex, a) {
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
-function plotOptimus(divId, csvName, byBuilding, feature, shape = "box") {
+function plotOptimus(divId, csvName, byBuilding, feature, shape = "box", agg = "daily") {
     const ids = Object.keys(byBuilding).sort((a, b) => a - b);
     const traces = [];
-    const isProfile = csvName === "building_load.csv";
-    const isLine = isProfile || csvName === "grid_prices.csv";
+    const isTimeSeries = TIMESERIES_CSVS.has(csvName);
+    const isMonthly = agg === "monthly";
 
     ids.forEach((bid, i) => {
         const rows = byBuilding[bid];
         const color = BCOLORS[i % BCOLORS.length];
         const name = `building ${bid}`;
 
-        if (isProfile) {
-            // mean daily 15-min profile + ±1σ variance band (spread across the
-            // days × samples pooled into each time-of-day slot).
+        if (isTimeSeries) {
+            // Pool rows into slots, then plot the per-slot mean + ±1σ band.
+            //   daily   → key = time-of-day (folds every day × sample into a
+            //             mean diurnal profile);
+            //   monthly → key = full timestamp (folds samples only, preserving
+            //             the month-long timeline).
+            // With a single sample the band collapses onto the mean line.
             const slot = {};
             rows.forEach(r => {
                 const d = new Date(r.datetime);
                 if (isNaN(d)) return;
-                const t = d.getHours() + d.getMinutes() / 60;
-                (slot[t] = slot[t] || []).push(Number(r[feature] ?? r.power_kw));
+                const key = isMonthly ? r.datetime : d.getHours() + d.getMinutes() / 60;
+                const y = Number(r[feature]);
+                if (isNaN(y)) return;
+                (slot[key] = slot[key] || []).push(y);
             });
-            const xs = Object.keys(slot).map(Number).sort((a, b) => a - b);
+            const keys = Object.keys(slot);
+            // numeric sort for hour-of-day; lexical (= chronological) for timestamps
+            keys.sort(isMonthly ? undefined : (a, b) => a - b);
+            const xs = isMonthly ? keys : keys.map(Number);
             const mean = [], lo = [], hi = [];
-            xs.forEach(t => {
-                const v = slot[t];
+            let anyBand = false;
+            keys.forEach(k => {
+                const v = slot[k];
                 const m = v.reduce((a, b) => a + b, 0) / v.length;
                 const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
+                if (sd > 0) anyBand = true;
                 mean.push(m); lo.push(m - sd); hi.push(m + sd);
             });
-            // band = upper then lower with fill:'tonexty'
-            traces.push({ x: xs, y: hi, type: "scatter", mode: "lines",
-                          line: { width: 0 }, showlegend: false, hoverinfo: "skip" });
-            traces.push({ x: xs, y: lo, type: "scatter", mode: "lines",
-                          line: { width: 0 }, fill: "tonexty", fillcolor: rgba(color, 0.18),
-                          name: `${name} ±1σ`, hoverinfo: "skip" });
+            // band = upper then lower with fill:'tonexty' (only when >1 sample)
+            if (anyBand) {
+                traces.push({ x: xs, y: hi, type: "scatter", mode: "lines",
+                              line: { width: 0 }, showlegend: false, hoverinfo: "skip" });
+                traces.push({ x: xs, y: lo, type: "scatter", mode: "lines",
+                              line: { width: 0 }, fill: "tonexty", fillcolor: rgba(color, 0.18),
+                              name: `${name} ±1σ`, hoverinfo: "skip" });
+            }
             traces.push({ x: xs, y: mean, type: "scatter", mode: "lines",
                           line: { color, width: 2 }, name });
-        } else if (csvName === "grid_prices.csv") {
-            traces.push({ x: rows.map(r => r.datetime), y: rows.map(r => r.price_per_kwh),
-                          name, type: "scatter", mode: "lines", line: { color } });
         } else {
             // distribution → box / violin / histogram per building (toggle).
             const vals = extractOptimusFeature(rows, csvName, feature);
@@ -1003,23 +1032,25 @@ function plotOptimus(divId, csvName, byBuilding, feature, shape = "box") {
         }
     });
 
-    const isHistShape = !isLine && shape === "histogram";
+    const isHistShape = !isTimeSeries && shape === "histogram";
+    const yTitle = csvName === "building_load.csv" ? "power_kw"
+                 : csvName === "grid_prices.csv" ? "$/kWh"
+                 : feature;
+    const aggNote = isMonthly ? "monthly series" : "daily profile";
     const layout = {
-        title: `${csvName} — ${feature} by building`,
+        title: `${csvName} — ${feature} by building` + (isTimeSeries ? ` (${aggNote})` : ""),
         margin: { t: 40, l: 60, r: 10, b: 50 },
         xaxis: {
-            title: isProfile ? "hour of day"
-                 : isLine ? ""
+            title: isTimeSeries ? (isMonthly ? "" : "hour of day")
                  : isHistShape ? feature : "building",
         },
         yaxis: {
-            title: isProfile ? "power_kw"
-                 : csvName === "grid_prices.csv" ? "$/kWh"
+            title: isTimeSeries ? yTitle
                  : isHistShape ? "count" : feature,
         },
     };
     if (isHistShape) layout.barmode = "overlay";
-    else if (!isLine) layout.boxmode = "group";   // box + violin group by building
+    else if (!isTimeSeries) layout.boxmode = "group";   // box + violin group by building
     Plotly.newPlot(divId, traces, layout);
 }
 

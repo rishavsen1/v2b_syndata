@@ -96,3 +96,23 @@ def test_ui_full_generate(page, server, tmp_path):
         "document.getElementById('ua-status').textContent.includes('building')",
         timeout=20000,
     )
+    # weather_data is plottable and the daily/monthly aggregation toggle drives it.
+    assert page.locator("#ua-csv option[value='weather_data.csv']").count() == 1
+    page.select_option("#ua-csv", "weather_data.csv")
+    assert page.locator("#ua-agg").is_visible()        # time-series → Aggregation shown
+    assert not page.locator("#ua-shape").is_visible()  # …Shape hidden
+    page.select_option("#ua-feature", "dry_bulb_temp_c")
+    page.select_option("#ua-agg", "monthly")
+    page.click("#ua-run")
+    page.wait_for_function(
+        "document.getElementById('ua-status').textContent.includes('building')",
+        timeout=20000,
+    )
+    # building_load monthly full-series view
+    page.select_option("#ua-csv", "building_load.csv")
+    page.select_option("#ua-agg", "monthly")
+    page.click("#ua-run")
+    page.wait_for_function(
+        "document.getElementById('ua-status').textContent.includes('building')",
+        timeout=20000,
+    )

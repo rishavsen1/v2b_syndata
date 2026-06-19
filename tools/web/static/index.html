@@ -72,11 +72,15 @@
         <div id="output-meta"></div>
 
         <div id="unified-analysis">
-            <h3>Distributions</h3>
+            <h3>Distributions &amp; profiles</h3>
             <div class="analysis-controls">
                 <label>Month <select id="ua-month"></select></label>
                 <label>CSV <select id="ua-csv"></select></label>
                 <label>Feature <select id="ua-feature"></select></label>
+                <label>Aggregation <select id="ua-agg">
+                    <option value="daily">daily profile (mean ±1σ)</option>
+                    <option value="monthly">monthly (full series)</option>
+                </select></label>
                 <label>Shape <select id="ua-shape">
                     <option value="box">box</option>
                     <option value="violin">violin</option>
