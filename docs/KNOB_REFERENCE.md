@@ -20,37 +20,51 @@ Each resolved knob carries one of:
 |---|---|
 | `arrival.mu` | `[6.0, 20.0]` |
 | `arrival.sigma` | `[0.01, 6.0]` |
+| `arrival.w1` | `[0.0, 1.0]` |
+| `arrival.mu1` | `[6.0, 20.0]` |
+| `arrival.sigma1` | `[0.01, 6.0]` |
+| `arrival.mu2` | `[6.0, 20.0]` |
+| `arrival.sigma2` | `[0.01, 6.0]` |
 | `dwell.k` | `[0.01, 5.0]` |
 | `dwell.lambda` | `[0.01, 24.0]` |
 | `soc_arrival.alpha` | `[0.01, 50.0]` |
 | `soc_arrival.beta` | `[0.01, 50.0]` |
+| `soc_depart.alpha` | `[0.01, 50.0]` |
+| `soc_depart.beta` | `[0.01, 50.0]` |
 | `copula.rho_gaussian` | `[-0.99, 0.99]` |
 
 ## Registry knobs
 | path | type | default | range / choices |
 |---|---|---|---|
-| `ev_fleet.ev_count` | `int` | `20` | `[1, 200]` |
+| `ev_fleet.ev_count` | `int` | `20` | `[1, 1000]` |
 | `ev_fleet.battery_mix` | `simplex` | `[0.2, 0.3, 0.4, 0.1]` | `` |
 | `ev_fleet.battery_heterogeneity` | `categorical` | `'mixed'` | `['homog', 'mixed']` |
-| `charging_infra.charger_count` | `int` | `20` | `[1, 100]` |
+| `ev_fleet.battery_mix_dirichlet_alpha` | `float` | `1000000.0` | `[1.0, 1000000.0]` |
+| `ev_fleet.min_allowed_soc` | `float` | `10.0` | `[0.0, 100.0]` |
+| `ev_fleet.max_allowed_soc` | `float` | `100.0` | `[0.0, 100.0]` |
+| `charging_infra.charger_count` | `int` | `20` | `[1, 500]` |
 | `charging_infra.directionality_frac` | `float` | `0.5` | `[0.0, 1.0]` |
 | `charging_infra.uni_rate_kw` | `float` | `20.0` | `[3.3, 350.0]` |
 | `charging_infra.bi_rate_kw` | `float` | `20.0` | `[3.3, 350.0]` |
 | `user_behavior.axes_distribution` | `list[region]` | `[{'name': 'stable_commuter', 'freq': [0.85, 1.0], 'consist': [0.75, 1.0], 'dist_km': [40, 80], 'weight': 0.35}, {'name': 'flexible_local', 'freq': [0.7, 0.95], 'consist': [0.5, 0.8], 'dist_km': [5, 15], 'weight': 0.25}, {'name': 'irregular_distant', 'freq': [0.4, 0.7], 'consist': [0.2, 0.5], 'dist_km': [40, 100], 'weight': 0.2}, {'name': 'occasional_visitor', 'freq': [0.05, 0.2], 'consist': [0.1, 0.4], 'dist_km': [3, 50], 'weight': 0.1}, {'name': 'erratic', 'freq': [0.3, 0.7], 'consist': [0.05, 0.3], 'dist_km': [5, 80], 'weight': 0.1}]` | `` |
 | `user_behavior.negotiation_mix` | `simplex` | `[0.107, 0.536, 0.321, 0.036]` | `` |
 | `user_behavior.w_multiplier` | `vec2` | `[1.0, 1.0]` | `[[0.1, 5.0], [0.1, 5.0]]` |
-| `user_behavior.min_depart_soc` | `float` | `0.8` | `[0.5, 1.0]` |
+| `user_behavior.min_depart_soc` | `float` | `0.4` | `[0.0, 1.0]` |
+| `user_behavior.depart_soc_mu` | `float` | `50.0` | `[0.0, 100.0]` |
+| `user_behavior.depart_soc_sigma` | `float` | `5.0` | `[0.1, 50.0]` |
+| `user_behavior.weekend_activity_factor` | `float` | `1.0` | `[0.0, 5.0]` |
+| `user_behavior.axes_distribution_dirichlet_alpha` | `float` | `1000000.0` | `[1.0, 1000000.0]` |
 | `user_behavior.external_charge_cost` | `float` | `0.3` | `[0.1, 1.0]` |
 | `user_behavior.menu_levels` | `list[vec2]` | `[[0.0, 0], [0.0625, 30], [0.1, 15], [0.2, 105]]` | `` |
 | `building_load.climate` | `categorical` | `'temperate'` | `['temperate', 'cold', 'tropical', 'subtropical']` |
-| `building_load.weather_lat` | `float` | `36.1627` | `[-90.0, 90.0]` |
-| `building_load.weather_lon` | `float` | `-86.7816` | `[-180.0, 180.0]` |
-| `building_load.weather_year` | `int` | `2020` | `[1990, 2024]` |
 | `building_load.tmyx_station` | `path` | `'USA_TN_Nashville.Intl.AP.723270_TMYx'` | `` |
+| `building_load.weather_temp_offset_c` | `float` | `0.0` | `[-15.0, 15.0]` |
+| `building_load.weather_solar_scale` | `float` | `1.0` | `[0.5, 1.5]` |
 | `building_load.archetype` | `categorical` | `'office'` | `['office', 'retail', 'mixed']` |
 | `building_load.size` | `categorical` | `'med'` | `['small', 'med', 'large']` |
 | `building_load.occupancy_source` | `categorical` | `'ashrae_90_1_office'` | `['ashrae_90_1_office', 'ashrae_90_1_retail', 'ashrae_90_1_mixed', 'custom_path']` |
 | `building_load.peak_kw` | `float` | `500.0` | `[50.0, 5000.0]` |
+| `building_load.peak_kw_scaling` | `bool` | `True` | `` |
 | `utility_rate.tariff_type` | `categorical` | `'TOU'` | `['flat', 'TOU', 'demand_charge', 'DR']` |
 | `utility_rate.energy_price_offpeak` | `float` | `0.137` | `[0.05, 0.5]` |
 | `utility_rate.energy_price_peak` | `float` | `0.178` | `[0.05, 0.8]` |
@@ -58,133 +72,20 @@ Each resolved knob carries one of:
 | `utility_rate.demand_charge_per_kw` | `float` | `11.67` | `[0.0, 50.0]` |
 | `utility_rate.dr_program` | `categorical` | `'none'` | `['none', 'CBP', 'BIP', 'ELRP']` |
 | `utility_rate.dr_magnitude_kw_range` | `vec2` | `[50.0, 200.0]` | `[[0.0, 1000.0], [0.0, 1000.0]]` |
-| `utility_rate.dr_lambda_base` | `float` | `0.05` | `[0.0, 1.0]` |
+| `utility_rate.dr_lambda_base` | `float` | `0.05` | `[0.0, 10.0]` |
+| `utility_rate.dr_incentive_per_kw` | `float` | `1.0` | `[0.0, 100.0]` |
+| `utility_rate.dr_penalty_per_kwh` | `float` | `1.0` | `[0.0, 100.0]` |
 | `sim_window.mode` | `categorical` | `'month'` | `['month', 'full_year', 'custom']` |
 | `sim_window.weekdays_only` | `bool` | `True` | `` |
 | `sim_window.start` | `timestamp` | `None` | `` |
 | `sim_window.custom_end` | `timestamp` | `None` | `` |
-| `noise.profile` | `categorical` | `'clean'` | `['clean', 'light_noise', 'realistic_noise', 'adversarial', 'custom']` |
+| `noise.profile` | `categorical` | `'clean'` | `['clean', 'light_noise', 'tmyx_stochastic', 'realistic_noise', 'adversarial', 'custom']` |
 | `noise.building_load_jitter_pct` | `float` | `0.0` | `[0.0, 0.5]` |
 | `noise.arrival_time_jitter_min` | `float` | `0.0` | `[0.0, 60.0]` |
 | `noise.soc_arrival_jitter_pct` | `float` | `0.0` | `[0.0, 0.3]` |
 | `noise.dr_notification_dropout_prob` | `float` | `0.0` | `[0.0, 1.0]` |
 | `noise.price_jitter_pct` | `float` | `0.0` | `[0.0, 0.3]` |
 | `noise.occupancy_jitter_pct` | `float` | `0.0` | `[0.0, 0.3]` |
+| `noise.load_flex_jitter_pct` | `float` | `0.0` | `[0.0, 0.5]` |
+| `noise.load_inflex_jitter_pct` | `float` | `0.0` | `[0.0, 0.5]` |
 
-
----
-
-# Hand-written usage guide
-
-> Manually maintained. The auto-generated section above is regenerated by
-> `v2b-syndata docs-gen`; this section is not.
-
-## Distribution knob reference
-
-Each population's calibrated `region_distributions` block carries fitted
-parameters per region per distribution. Override at any leaf via:
-
-```bash
-v2b-syndata generate \
-    --scenario S01 --seed 42 --output-dir /tmp/out \
-    --override 'user_behavior.region_distributions.<region>.<dist>.<param>=<value>'
-```
-
-| dist | param | meaning | effect of increasing |
-|---|---|---|---|
-| `arrival` | `mu` | TruncNorm mean of arrival hour (in `[6,20]`) | shifts mean arrival later |
-| `arrival` | `sigma` | TruncNorm spread of arrival hour | widens arrival distribution |
-| `dwell` | `k` | Weibull shape parameter | tail behavior; k>1 fewer extreme-long dwells |
-| `dwell` | `lambda` | Weibull scale parameter (hours) | longer mean dwell |
-| `soc_arrival` | `alpha` | Beta shape (left) on arrival SoC fraction | mass shifts toward 1.0 (high arrival SoC) |
-| `soc_arrival` | `beta` | Beta shape (right) on arrival SoC fraction | mass shifts toward 0.0 (low arrival SoC) |
-| `copula` | `rho_gaussian` | Gaussian-copula correlation between arrival and dwell | pulls arrival/dwell into negative or positive correlation |
-
-## Region weights vs region bounds
-
-- **Region weights (`weight` in `axes_distribution[i]`)**: overridable
-  wholesale via `--override 'user_behavior.axes_distribution=<list[region]>'`.
-- **Region bounds (`freq`, `consist`, `dist_km`)**: also overridable via the
-  same wholesale knob, but NOT via the deep channel — there is no
-  `user_behavior.region_distributions.<region>.<bound>` path.
-- **Distribution leaves (the table above)**: deep-channel only.
-
-This split keeps the per-leaf override surface to fitted distribution
-parameters while preserving the existing whole-list knob for region
-restructuring.
-
-## Common tuning recipes
-
-### Long-dwell stable commuters
-
-```bash
---override 'user_behavior.region_distributions.stable_commuter.dwell.lambda=12.0'
-```
-
-### Strong morning peak
-
-```bash
---override 'user_behavior.region_distributions.stable_commuter.arrival.mu=8.0'
---override 'user_behavior.region_distributions.stable_commuter.arrival.sigma=0.5'
-```
-
-### Test independent vs correlated arrivals/dwells
-
-```bash
-# Force independent sampling (preserves Step 4 RNG draw order)
---override 'user_behavior.region_distributions.stable_commuter.copula.rho_gaussian=0.0'
-
-# Strong negative correlation (early arrivers stay longer)
---override 'user_behavior.region_distributions.stable_commuter.copula.rho_gaussian=-0.5'
-```
-
-## Source provenance
-
-Every leaf in `manifest.json::knob_resolution` carries one of:
-
-- `explicit` — set on the command line or scenario YAML.
-- `descriptor:<name>` — supplied by Tier 0 descriptor expansion.
-- `calibration:acn_data_<years>_<date>` — from a calibration run on a
-  population with `calibration_policy: acn_data`. Provenance string is
-  recorded on the population's `calibration_metadata.source` and propagates
-  to every fitted leaf. Example: `calibration:acn_data_2019_2021_20260506`.
-- `hand_specified:<population_name>` — from hand-authored `region_distributions`
-  on a population with `calibration_policy: synthetic`. Example:
-  `hand_specified:consent_default`.
-- `default` — `knobs.yaml::default` fallback. Should be RARE for
-  `region_distributions.*` paths; means the population's hand-authored
-  block is missing the leaf and the sampler will use a placeholder formula.
-
-Use `python -c "import json; m = json.load(open('out/manifest.json')); ..."` to
-audit which leaves were calibrated vs explicitly overridden.
-
-## Calibration policy
-
-Each population in `configs/populations.yaml` declares `calibration_policy`:
-
-| policy | meaning | who fills `region_distributions` |
-|---|---|---|
-| `acn_data` | ACN-Data fitted; region grid is ACN-anchored | `v2b-syndata calibrate` |
-| `synthetic` | hand-authored region distributions | the YAML author |
-
-`v2b-syndata calibrate` honors the policy and only fits `acn_data`
-populations. Synthetic populations are reported as skipped — no fetch.
-
-### Example overrides per policy
-
-```bash
-# Override a calibrated leaf — replaces calibration:* with explicit.
-v2b-syndata generate --scenario S_acn --seed 42 --output-dir /tmp/o \
-    --override 'user_behavior.region_distributions.regular_charger.dwell.lambda=12.0'
-
-# Override a hand-authored leaf — replaces hand_specified:* with explicit.
-v2b-syndata generate --scenario S01 --seed 42 --output-dir /tmp/o \
-    --override 'user_behavior.region_distributions.stable_commuter.arrival.mu=8.0'
-```
-
-## Reproducibility contract
-
-`(scenario_id, seed, override_set)` → bitwise-identical CSVs (D53). Calibrated
-leaves are part of the resolved manifest, so a calibration-run change is a
-new override set. To pin output to a specific calibration vintage, snapshot
-`configs/populations.yaml` with the calibrated block at that revision in git.

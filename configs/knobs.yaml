@@ -126,15 +126,15 @@ user_behavior:
   min_depart_soc:
     type: float
     range: [0.0, 1.0]
-    default: 0.80
-    description: "Behavioral floor on required_soc_at_depart (D7). A discretionary prior, NOT a hard constraint — the only structural rule is required_soc_at_depart > arrival_soc (D6). Default 0.80 for hand-authored populations; data-calibrated cohorts set it to 0.0 so the empirical departure-SoC (region_distributions.soc_depart) is not clamped by an arbitrary floor."
+    default: 0.40
+    description: "Behavioral floor on required_soc_at_depart (D7). A discretionary prior, NOT a hard constraint — the only structural rule is required_soc_at_depart > arrival_soc (D6). Default 0.40 (paired with depart_soc_mu=50): synthetic EVs leave roughly half-charged with a 40% floor on the low tail. Data-calibrated cohorts set it to 0.0 so the empirical departure-SoC (region_distributions.soc_depart) is not clamped by an arbitrary floor."
     affects_csv: [sessions.csv]
 
   depart_soc_mu:
     type: float
     range: [0.0, 100.0]
-    default: 85.0
-    description: "Mean (%) of the fallback TruncNorm for required_soc_at_depart, used only by uncalibrated/synthetic populations (no region_distributions.soc_depart). Calibrated cohorts use the fitted soc_depart Beta and ignore this. Default 85 reproduces the prior hardcoded value."
+    default: 50.0
+    description: "Mean (%) of the fallback TruncNorm for required_soc_at_depart, used only by uncalibrated/synthetic populations (no region_distributions.soc_depart). Calibrated cohorts use the fitted soc_depart Beta and ignore this. Default 50 → synthetic EVs depart roughly half-charged (paired with min_depart_soc=0.40). (Pre-2026-06 default was 85.)"
     affects_csv: [sessions.csv]
 
   depart_soc_sigma:

@@ -688,7 +688,7 @@ function createBuildingCard() {
         const ov = card._ctx.overrides, res = card._ctx.resolved;
         const floor = ("user_behavior.min_depart_soc" in ov)
             ? Number(ov["user_behavior.min_depart_soc"])
-            : ((res["user_behavior.min_depart_soc"] || {}).value ?? 0.80);
+            : ((res["user_behavior.min_depart_soc"] || {}).value ?? 0.40);
         const floorPct = floor * 100;
         if (!isNaN(mx) && mx <= floorPct) {
             w.style.display = "";

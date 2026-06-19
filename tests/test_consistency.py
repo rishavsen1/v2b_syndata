@@ -135,19 +135,18 @@ def test_d7_required_above_min_depart(baseline_dir, tmp_path):
     df = pd.read_csv(d / "sessions.csv")
     if len(df) == 0:
         pytest.skip("baseline has no sessions")
-    # min_depart_soc default is 0.80 → 80%. Force required to be just below floor.
-    # Pick a row where arrival is low enough that required can drop below 80
-    # without colliding with D6 (required > arrival). Otherwise inject after
-    # raising arrival downward too.
+    # min_depart_soc default is 0.40 → 40%. Force required below the floor while
+    # keeping D6 (required > arrival): pick/seed a row with arrival well under
+    # the floor, then set required between arrival and the floor.
     target_idx = None
     for i in range(len(df)):
-        if float(df.loc[i, "arrival_soc"]) < 70:
+        if float(df.loc[i, "arrival_soc"]) < 30:
             target_idx = i
             break
     if target_idx is None:
-        df.loc[0, "arrival_soc"] = 50.0
+        df.loc[0, "arrival_soc"] = 20.0
         target_idx = 0
-    df.loc[target_idx, "required_soc_at_depart"] = 75.0  # below 80% floor, above arrival
+    df.loc[target_idx, "required_soc_at_depart"] = 35.0  # below 40% floor, above arrival
     df.to_csv(d / "sessions.csv", index=False, lineterminator="\n")
     rep = validate(d)
     assert any("D7" in e for e in rep.errors), f"D7 not caught: {rep.errors}"

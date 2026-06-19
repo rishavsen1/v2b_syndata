@@ -190,11 +190,14 @@ don't exceed arrival are dropped; the rest are fit with `fit_beta_soc(...,
 leaf_prefix="soc_depart")` (`calibration/api.py`).
 
 **Why TruncNorm fallback.** For hand-authored populations and sources without
-the data, there is no `soc_depart` block. The fallback is a high-SoC prior:
+the data, there is no `soc_depart` block. The fallback is
 `TruncNorm(μ, σ)` with mean/std from the knobs `user_behavior.depart_soc_mu`
-(default 85) and `user_behavior.depart_soc_sigma` (default 5) — a narrow bump
-near "nearly full," which is a reasonable default target and is now tunable
-(previously hardcoded 85/5). Truncation keeps it inside the valid band.
+(**default 50**) and `user_behavior.depart_soc_sigma` (default 5), floored at
+`user_behavior.min_depart_soc` (**default 0.40**) — i.e. synthetic EVs depart
+roughly half-charged with a 40% low-tail floor. (The default was 85/0.80 before
+2026-06; lowered so the synthetic prior isn't an arbitrarily high "nearly full"
+target. Calibrated cohorts ignore these and use the fitted `soc_depart` Beta
+with `min_depart_soc=0`.) Truncation keeps it inside the valid band.
 
 **Constraints at generation.** The draw is clamped to `[floor, ceiling]` where
 `floor = max(min_depart_soc%, arrival + ε)` (enforces D7 behavioral floor and
