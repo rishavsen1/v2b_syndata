@@ -202,22 +202,26 @@ def test_weather_sigma_drives_per_sample_realizations(tmp_path, config_dir, stub
                      overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4}, seed=1),
     ]
     kw = dict(start_month="2021-09", end_month="2021-09", samples_per_month=3,
-              workers=1, noise_profile="clean", weather_sigma_c=3.0)
+              workers=1, noise_profile="clean", weather_sigma_c=3.0, weather_solar_sigma=0.05)
     out = tmp_path / "wx"
     manifest = generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir, **kw)
     assert manifest["weather_sigma_c"] == 3.0
+    assert manifest["weather_solar_sigma"] == 0.05
 
-    offsets, wx_means, load_sums = [], [], []
+    offsets, scales, wx_means, load_sums = [], [], [], []
     for s in (0, 1, 2):
         cfg = json.loads((out / "SEP2021" / str(s) / "multi_building_config.json").read_text())
-        off = cfg["buildings"][0]["overrides"]["building_load.weather_temp_offset_c"]
+        ov = cfg["buildings"][0]["overrides"]
+        off = ov["building_load.weather_temp_offset_c"]
         offsets.append(off)
+        scales.append(ov["building_load.weather_solar_scale"])
         wdf = pd.read_csv(out / "SEP2021" / str(s) / "weather_data.csv")
         wx_means.append(round(wdf["dry_bulb_temp_c"].mean(), 6))
         bl = pd.read_csv(out / "SEP2021" / str(s) / "building_load.csv")
         load_sums.append(round(bl["power_kw_flexible"].sum(), 6))
-    # distinct realizations across samples
+    # distinct realizations across samples (both temp offset and solar scale)
     assert len(set(offsets)) == 3, f"offsets not distinct: {offsets}"
+    assert len(set(scales)) == 3, f"solar scales not distinct: {scales}"
     assert len(set(wx_means)) == 3, "exported weather identical across samples"
     assert len(set(load_sums)) == 3, "load did not respond to per-sample weather"
 

@@ -75,7 +75,9 @@ def test_ui_perturbations_panel_and_high_low_sync(page, server):
     page.wait_for_selector(".building-card")
     card = page.locator(".building-card").first
 
-    # noise profile lives in the Perturbations panel (not the generic Advanced one)
+    # weather perturbation is a run-level profile dropdown (input-side layer)
+    assert page.locator("#u-weather-profile option[value='moderate']").count() == 1
+    # the noise layer lives in the per-card Perturbations panel (not generic Advanced)
     card.locator(".mb-perturb > summary").click()
     assert card.locator(".mb-perturb .mb-noise").count() == 1
     assert card.locator(".card-perturb-knobs .knob[data-path='noise.building_load_jitter_pct']").count() == 1

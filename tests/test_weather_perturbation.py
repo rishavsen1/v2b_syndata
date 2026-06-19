@@ -101,6 +101,21 @@ def test_epw_perturb_matches_frame_perturb(tmp_path):
     assert perturbed.read_text().splitlines()[0].startswith("LOCATION,Test")
 
 
+# ── weather perturbation profiles ─────────────────────────────────────────────
+
+def test_weather_profile_loader():
+    from v2b_syndata.descriptor_loader import load_weather_profile
+    assert load_weather_profile(CONFIG_DIR, "none") == {"temp_sigma_c": 0.0, "solar_sigma": 0.0}
+    mod = load_weather_profile(CONFIG_DIR, "moderate")
+    assert mod["temp_sigma_c"] == 2.5 and mod["solar_sigma"] == 0.05
+    # strength is monotone across presets
+    sigs = [load_weather_profile(CONFIG_DIR, p)["temp_sigma_c"]
+            for p in ("none", "slight", "moderate", "strong")]
+    assert sigs == sorted(sigs) and sigs[0] == 0.0 and sigs[-1] > 0
+    with pytest.raises(KeyError):
+        load_weather_profile(CONFIG_DIR, "nonexistent")
+
+
 # ── A: the `clean` profile makes load a deterministic f(weather) ──────────────
 
 def test_clean_profile_load_is_seed_independent(tmp_path):

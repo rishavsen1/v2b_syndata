@@ -32,6 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from . import __version__
@@ -279,16 +280,20 @@ class _MultiUnitSpec:
 
 def _unit_config(
     base: MultiConfig, month_iso: str, sample: int, noise_profile: str | None,
-    seed_base: int, weather_sigma_c: float = 0.0,
+    seed_base: int, weather_sigma_c: float = 0.0, weather_solar_sigma: float = 0.0,
 ) -> MultiConfig:
     """Clone the base config for one (month, sample): pin the month window, the
     per-sample seed offset, and the per-sample noise on every building.
 
-    When ``weather_sigma_c > 0`` each building draws a per-sample dry-bulb offset
-    ``N(0, weather_sigma_c)`` (seeded by its per-sample seed) and pins it as an
-    explicit ``building_load.weather_temp_offset_c`` override. EnergyPlus then
-    simulates the perturbed weather and the exported weather_data.csv matches —
-    so cross-sample load variance is weather-driven and physically faithful.
+    The weather realization layer: when ``weather_sigma_c > 0`` each building
+    draws a per-sample dry-bulb offset ``N(0, weather_sigma_c)`` °C; when
+    ``weather_solar_sigma > 0`` it draws a per-sample solar scale
+    ``N(1, weather_solar_sigma)`` (clipped to the knob range). Both are seeded by
+    the building's per-sample seed and pinned as explicit overrides
+    (``building_load.weather_temp_offset_c`` / ``weather_solar_scale``).
+    EnergyPlus then simulates the perturbed weather and the exported
+    weather_data.csv matches — cross-sample load variance is weather-driven and
+    physically faithful.
     """
     cfg = copy.deepcopy(base)
     for spec in cfg.buildings:
@@ -305,13 +310,18 @@ def _unit_config(
             spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
         spec.noise_profile = eff_noise
         spec.seed = spec.seed + seed_base + sample
-        # Weather realization: per-sample dry-bulb offset (explicit overrides
-        # win, so a building can pin its own fixed offset).
+        # Weather realization: per-sample dry-bulb offset + solar scale (explicit
+        # overrides win, so a building can pin its own fixed values).
         if weather_sigma_c > 0.0 and \
            "building_load.weather_temp_offset_c" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization")
             offset = float(rng.normal(0.0, weather_sigma_c))
             spec.overrides["building_load.weather_temp_offset_c"] = round(offset, 4)
+        if weather_solar_sigma > 0.0 and \
+           "building_load.weather_solar_scale" not in spec.overrides:
+            rng = rng_for_node(spec.seed, "weather_realization_solar")
+            scale = float(np.clip(rng.normal(1.0, weather_solar_sigma), 0.5, 1.5))
+            spec.overrides["building_load.weather_solar_scale"] = round(scale, 4)
     return cfg
 
 
@@ -343,6 +353,7 @@ def generate_multi_batch(
     workers: int = 4,
     noise_profile: str | None = "tmyx_stochastic",
     weather_sigma_c: float = 0.0,
+    weather_solar_sigma: float = 0.0,
     force: bool = False,
     progress_callback=None,
 ) -> dict[str, Any]:
@@ -368,7 +379,8 @@ def generate_multi_batch(
         iso = dt.strftime("%Y-%m-%d")
         for s in range(samples_per_month):
             specs.append(_MultiUnitSpec(
-                cfg=_unit_config(cfg, iso, s, noise_profile, seed_base, weather_sigma_c),
+                cfg=_unit_config(cfg, iso, s, noise_profile, seed_base,
+                                 weather_sigma_c, weather_solar_sigma),
                 month_label=label, sample_idx=s, seed=seed_base + s,
                 unit_dir=output_dir / label / str(s), config_dir=Path(config_dir),
             ))
@@ -386,6 +398,7 @@ def generate_multi_batch(
         "seed_strategy": "building.seed + seed_base + sample",
         "noise_profile": noise_profile,
         "weather_sigma_c": weather_sigma_c,
+        "weather_solar_sigma": weather_solar_sigma,
         "workers": workers,
         "started_at": datetime.utcnow().isoformat() + "Z",
         "completed_at": None,

@@ -1,0 +1,36 @@
+# weather_profiles.yaml — Weather perturbation profile library
+#
+# The INPUT-side perturbation layer: presets for the per-sample weather
+# *realization* applied to the EPW EnergyPlus simulates (and exported to
+# weather_data.csv, in sync). Distinct from the post-generation "noise layer"
+# (noise_profiles.yaml), which perturbs the produced CSVs and never touches the
+# weather.
+#
+# Each profile sets the per-sample draw std-devs used by generate-multi:
+#   temp_sigma_c  — dry-bulb offset ~ N(0, temp_sigma_c) °C, one constant offset
+#                   per sample (the whole month shifted; diurnal shape preserved)
+#   solar_sigma   — solar scale ~ N(1, solar_sigma), clipped to the knob range,
+#                   one constant factor per sample
+# Both are 0 in `none` → unmodified TMYx weather. Pair with samples/month > 1 so
+# the draws produce cross-sample variance; with the `clean` noise layer this
+# gives a weather-driven, physically-faithful load distribution for learning.
+
+none:
+  description: "No weather perturbation. EnergyPlus uses the unmodified TMYx weather."
+  temp_sigma_c: 0.0
+  solar_sigma: 0.0
+
+slight:
+  description: "Slight realization: ~±1°C per-sample dry-bulb, ~±2% solar."
+  temp_sigma_c: 1.0
+  solar_sigma: 0.02
+
+moderate:
+  description: "Moderate realization: ~±2.5°C per-sample dry-bulb, ~±5% solar."
+  temp_sigma_c: 2.5
+  solar_sigma: 0.05
+
+strong:
+  description: "Strong realization: ~±5°C per-sample dry-bulb, ~±10% solar."
+  temp_sigma_c: 5.0
+  solar_sigma: 0.10

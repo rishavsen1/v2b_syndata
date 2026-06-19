@@ -185,6 +185,21 @@ def test_cli_generate_multi_batch(tmp_path: Path, _stub_weather):
         assert (out / "SEP2021" / str(s) / "cars.csv").exists()
 
 
+def test_cli_generate_multi_weather_profile(tmp_path: Path, _stub_weather):
+    """--weather-profile resolves to the profile's per-sample σ's in the manifest."""
+    import json
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    out = tmp_path / "wxprof"
+    rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg),
+              "--output-dir", str(out), "--start-month", "2021-09", "--end-month", "2021-09",
+              "--samples-per-month", "2", "--workers", "1", "--noise-profile", "clean",
+              "--weather-profile", "moderate")
+    assert rc == 0
+    manifest = json.loads((out / "batch_manifest.json").read_text())
+    assert manifest["weather_sigma_c"] == 2.5      # moderate temp σ
+    assert manifest["weather_solar_sigma"] == 0.05  # moderate solar σ
+
+
 def test_cli_generate_multi_from_config(tmp_path: Path, _stub_weather):
     import filecmp
     cfg = _write_multi_cfg(tmp_path / "mb.json")

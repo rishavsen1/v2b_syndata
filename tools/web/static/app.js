@@ -659,9 +659,9 @@ function createBuildingCard() {
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
         <details class="mb-perturb">
-            <summary>Perturbations — noise + weather (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">All randomness/realism for this building in one place. Pick a <strong>Noise profile</strong> (high-level) — the jitter dials below snap to it; change any dial to override. The fixed weather offset shifts this building's simulated &amp; exported weather together; for <em>per-sample</em> weather variation use “Weather variation σ” in Run settings.</p>
-            <label class="mb-perturb-profile"><span class="field-name">Noise profile</span><select class="mb-noise"></select></label>
+            <summary>Perturbations (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">Two layers. <strong>Noise layer</strong> (below) perturbs this building's <em>produced</em> CSVs (load, sessions, prices) after generation — pick a profile and the jitter dials snap to it; change any to override. The fixed <strong>weather offset</strong> shifts this building's simulated &amp; exported weather together (a physical, input-side change). For <em>per-sample</em> weather realizations use the “Weather perturbation” profile in Run settings.</p>
+            <label class="mb-perturb-profile"><span class="field-name">Noise layer</span><select class="mb-noise"></select></label>
             <div class="card-perturb-knobs"></div>
         </details>
         <details class="mb-adv">
@@ -833,7 +833,7 @@ function applyConfig(cfg) {
     const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
     set("u-output-path", cfg.output_path); set("u-start-month", cfg.start_month);
     set("u-end-month", cfg.end_month); set("u-samples", cfg.samples);
-    set("u-weather-sigma", cfg.weather_sigma_c); set("u-workers", cfg.workers);
+    set("u-weather-profile", cfg.weather_profile); set("u-workers", cfg.workers);
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
     if (cfg.output_mode) {
@@ -862,7 +862,7 @@ function buildUnifiedPayload() {
         start_month: val("u-start-month"),
         end_month: val("u-end-month") || val("u-start-month"),
         samples: parseInt(val("u-samples"), 10) || 1,
-        weather_sigma_c: parseFloat(val("u-weather-sigma")) || 0,
+        weather_profile: val("u-weather-profile") || "none",
         workers: parseInt(val("u-workers"), 10) || 4,
         force: document.getElementById("u-force").checked,
         default_policy: val("u-default-policy") || "ILP-MPCFIXEDFSL",

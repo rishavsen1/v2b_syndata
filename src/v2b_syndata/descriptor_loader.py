@@ -160,6 +160,25 @@ def expand_descriptors(
     return out
 
 
+def load_weather_profile(config_dir: Path, name: str) -> dict[str, float]:
+    """Resolve a weather-perturbation profile (weather_profiles.yaml) to its
+    per-sample realization std-devs ``{temp_sigma_c, solar_sigma}``.
+
+    The weather layer is INPUT-side (perturbs the EPW EnergyPlus simulates),
+    distinct from the post-generation noise layer. ``none`` → all zeros.
+    """
+    profiles = _load(config_dir / "weather_profiles.yaml")
+    if name not in profiles:
+        raise KeyError(
+            f"weather profile {name!r} not in weather_profiles.yaml "
+            f"(have: {', '.join(sorted(profiles))})")
+    p = profiles[name]
+    return {
+        "temp_sigma_c": float(p.get("temp_sigma_c", 0.0)),
+        "solar_sigma": float(p.get("solar_sigma", 0.0)),
+    }
+
+
 def load_scenario(path: Path) -> dict[str, Any]:
     """Load a scenario YAML; normalize fields."""
     with path.open() as f:

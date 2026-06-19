@@ -80,7 +80,7 @@ def test_generate_unified_builds_per_building_config(client, tmp_path):
         ],
         "output_mode": "shared", "output_path": str(tmp_path / "o"),
         "start_month": "2024-04", "end_month": "2024-04", "samples": 3, "workers": 1,
-        "weather_sigma_c": 2.5, "dr_program": "CBP",
+        "weather_profile": "moderate", "dr_program": "CBP",
     }
     r = client.post("/api/generate-unified", json=payload)
     assert r.status_code == 200
@@ -96,9 +96,9 @@ def test_generate_unified_builds_per_building_config(client, tmp_path):
         assert cfg["buildings"][1]["noise_profile"] == "tmyx_stochastic"
         assert cfg["dr_program"] == "CBP"
         assert "shared_overrides" not in cfg
-        # weather realization flag propagates to the CLI invocation
+        # weather perturbation profile propagates to the CLI invocation
         cmd = webapp.BATCH_JOBS[job]["cmd"]
-        assert "--weather-sigma-c" in cmd and cmd[cmd.index("--weather-sigma-c") + 1] == "2.5"
+        assert "--weather-profile" in cmd and cmd[cmd.index("--weather-profile") + 1] == "moderate"
     finally:
         webapp.BATCH_JOBS[job]["process"].terminate()
 

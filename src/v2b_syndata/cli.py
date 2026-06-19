@@ -232,6 +232,13 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
     if args.output_mode:
         cfg.output_mode = args.output_mode
 
+    # Resolve the weather-perturbation profile → per-sample realization σ's.
+    # An explicit --weather-sigma-c (>0) overrides the profile's temperature σ.
+    from .descriptor_loader import load_weather_profile
+    wx = load_weather_profile(Path(args.config_dir), args.weather_profile)
+    weather_sigma_c = args.weather_sigma_c if args.weather_sigma_c > 0 else wx["temp_sigma_c"]
+    weather_solar_sigma = wx["solar_sigma"]
+
     # Batch mode: buildings × samples × months when --start-month is given.
     if args.start_month:
         def _progress(res, m):
@@ -246,7 +253,8 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
             seed_base=args.seed_base,
             workers=args.workers,
             noise_profile=args.noise_profile,
-            weather_sigma_c=args.weather_sigma_c,
+            weather_sigma_c=weather_sigma_c,
+            weather_solar_sigma=weather_solar_sigma,
             force=args.force,
             progress_callback=_progress,
         )
@@ -476,11 +484,15 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--seed-base", type=int, default=0)
     gm.add_argument("--noise-profile", default="tmyx_stochastic",
                     help="batch noise profile (default tmyx_stochastic; clean = deterministic)")
+    gm.add_argument("--weather-profile", default="none",
+                    help="weather perturbation profile from configs/weather_profiles.yaml "
+                         "(none/slight/moderate/strong): per-sample weather realization "
+                         "(dry-bulb + solar σ). The INPUT-side layer — EnergyPlus re-runs "
+                         "the perturbed weather and weather_data.csv matches. Pair with "
+                         "--noise-profile clean for a pure weather→load signal.")
     gm.add_argument("--weather-sigma-c", type=float, default=0.0,
-                    help="per-sample dry-bulb temperature offset std (°C). >0 makes "
-                         "cross-sample load variance weather-driven (EnergyPlus re-runs "
-                         "the perturbed weather; exported weather_data.csv matches). "
-                         "Pair with --noise-profile clean for a pure weather→load signal.")
+                    help="explicit per-sample dry-bulb σ (°C); overrides the temperature "
+                         "σ of --weather-profile when > 0.")
     gm.add_argument("--force", action="store_true", help="overwrite output-dir if it exists")
     gm.set_defaults(func=cmd_generate_multi)
 
