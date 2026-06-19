@@ -54,6 +54,20 @@ const SHORTCUT_KNOBS = new Set([
     "building_load.peak_kw_scaling",
 ]);
 
+// Perturbation knobs are surfaced together in the per-card "Perturbations"
+// panel (with the noise-profile dropdown), NOT in the generic Advanced panel —
+// so every dial that adds randomness/realism lives in one place. The whole
+// `noise` bucket plus the two fixed weather-offset knobs move there.
+//   - noise.profile is represented by the .mb-noise dropdown (not a duplicate widget)
+//   - the per-sample stochastic weather σ is a run-level control (#u-weather-sigma)
+const PERTURB_WEATHER_KNOBS = new Set([
+    "building_load.weather_temp_offset_c",
+    "building_load.weather_solar_scale",
+]);
+function isPerturbKnob(path) {
+    return path.startsWith("noise.") || PERTURB_WEATHER_KNOBS.has(path);
+}
+
 // `resolved` is a per-card {path: {value, source}} map from /api/resolve.
 function getEffectiveDefault(path, spec, resolved) {
     if (resolved && resolved[path] && resolved[path].value !== undefined) {
@@ -143,18 +157,55 @@ function populateCardKnobs(card) {
     const ctx = card._ctx;
     container.innerHTML = "";
     for (const [bucket, knobs] of Object.entries(KNOBS)) {
+        if (bucket === "noise") continue;  // → Perturbations panel
         const section = document.createElement("section");
         section.className = "knob-bucket";
         const h3 = document.createElement("h3");
         h3.textContent = bucket;
         section.appendChild(h3);
+        let n = 0;
         for (const [knobName, spec] of Object.entries(knobs)) {
             const path = `${bucket}.${knobName}`;
             if (SHORTCUT_KNOBS.has(path)) continue;  // promoted to per-card quick-fields
+            if (isPerturbKnob(path)) continue;       // → Perturbations panel
             section.appendChild(createKnobWidget(path, spec, ctx));
+            n++;
         }
-        container.appendChild(section);
+        if (n > 0) container.appendChild(section);
     }
+}
+
+// Render the consolidated Perturbations panel: every noise.* jitter knob plus
+// the fixed weather-offset knobs, bound to the card's ctx (the .mb-noise
+// dropdown above them is the high-level profile control). Changing the profile
+// re-resolves and snaps these widgets (see refreshCardKnobs) — high→low sync.
+function populateCardPerturbations(card) {
+    const container = card.querySelector(".card-perturb-knobs");
+    const ctx = card._ctx;
+    container.innerHTML = "";
+
+    const wx = document.createElement("section");
+    wx.className = "knob-bucket";
+    const wxh = document.createElement("h3");
+    wxh.textContent = "weather (fixed offset — per-sample σ is in Run settings)";
+    wx.appendChild(wxh);
+    for (const path of PERTURB_WEATHER_KNOBS) {
+        const [bucket, knobName] = path.split(/\.(.+)/);
+        const spec = (KNOBS[bucket] || {})[knobName];
+        if (spec) wx.appendChild(createKnobWidget(path, spec, ctx));
+    }
+    container.appendChild(wx);
+
+    const ns = document.createElement("section");
+    ns.className = "knob-bucket";
+    const nsh = document.createElement("h3");
+    nsh.textContent = "noise jitter (set by the profile above; override any below)";
+    ns.appendChild(nsh);
+    for (const [knobName, spec] of Object.entries(KNOBS.noise || {})) {
+        if (knobName === "profile") continue;  // the .mb-noise dropdown is the profile control
+        ns.appendChild(createKnobWidget(`noise.${knobName}`, spec, ctx));
+    }
+    container.appendChild(ns);
 }
 
 // POST the card's base + descriptors to /api/resolve; refresh that card's knob
@@ -166,6 +217,10 @@ async function refreshCardKnobs(card) {
         const v = card.querySelector(".mb-" + k).value;
         if (v) descriptors[k] = v;
     });
+    // Include the noise profile so the resolved noise.* values reflect the
+    // chosen profile → the Perturbations widgets snap to it (high→low sync).
+    const noiseVal = card.querySelector(".mb-noise").value;
+    if (noiseVal) descriptors.noise = noiseVal;
     try {
         const r = await fetch("/api/resolve", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -174,8 +229,9 @@ async function refreshCardKnobs(card) {
         const data = await safeJson(r);
         if (!data.error) ctx.resolved = data;
     } catch (e) { /* keep prior resolved */ }
-    // refresh each widget that the user hasn't overridden
-    card.querySelectorAll(".card-knob-buckets .knob").forEach(widget => {
+    // refresh every widget (both the Advanced and Perturbations panels) that the
+    // user hasn't overridden
+    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob").forEach(widget => {
         const path = widget.dataset.path;
         const [bucket, knobName] = path.split(/\.(.+)/);
         const spec = (KNOBS[bucket] || {})[knobName];
@@ -192,7 +248,7 @@ async function refreshCardKnobs(card) {
 // Set the card's knob widgets to reflect ctx.overrides (used by config load).
 function syncCardKnobWidgets(card) {
     const ctx = card._ctx;
-    card.querySelectorAll(".card-knob-buckets .knob").forEach(widget => {
+    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob").forEach(widget => {
         const path = widget.dataset.path;
         const [bucket, knobName] = path.split(/\.(.+)/);
         const spec = (KNOBS[bucket] || {})[knobName];
@@ -592,7 +648,6 @@ function createBuildingCard() {
             <label><span class="field-name">Building</span><select class="mb-building"></select></label>
             <label><span class="field-name">Population</span><select class="mb-population"></select></label>
             <label><span class="field-name">Equipment</span><select class="mb-equipment"></select></label>
-            <label><span class="field-name">Noise profile</span><select class="mb-noise"></select></label>
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="scenario default"></label>
@@ -603,9 +658,15 @@ function createBuildingCard() {
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
+        <details class="mb-perturb">
+            <summary>Perturbations — noise + weather (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">All randomness/realism for this building in one place. Pick a <strong>Noise profile</strong> (high-level) — the jitter dials below snap to it; change any dial to override. The fixed weather offset shifts this building's simulated &amp; exported weather together; for <em>per-sample</em> weather variation use “Weather variation σ” in Run settings.</p>
+            <label class="mb-perturb-profile"><span class="field-name">Noise profile</span><select class="mb-noise"></select></label>
+            <div class="card-perturb-knobs"></div>
+        </details>
         <details class="mb-adv">
             <summary>Advanced — knobs (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">Every <code>configs/knobs.yaml</code> knob, scoped to this building. Defaults show the resolved value for this card's base scenario + descriptors; change any to override (the quick-fields above take precedence for EV/charger/peak/SoC).</p>
+            <p class="hint" style="margin:0.3rem 0">Every other <code>configs/knobs.yaml</code> knob, scoped to this building (noise + weather perturbations are in the Perturbations panel above). Defaults show the resolved value for this card's base scenario + descriptors; change any to override (the quick-fields above take precedence for EV/charger/peak/SoC).</p>
             <div class="card-knob-buckets"></div>
         </details>
     `;
@@ -615,7 +676,8 @@ function createBuildingCard() {
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
-    populateCardKnobs(card);   // render the per-card knob panel bound to card._ctx
+    populateCardKnobs(card);          // generic Advanced panel
+    populateCardPerturbations(card);  // consolidated noise + weather panel
 
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
     // sessions for this building. Warn live. Floor = this card's min_depart_soc
@@ -668,7 +730,9 @@ function createBuildingCard() {
         checkSoc();
     };
     card._refresh = refreshCard;
-    [baseSel, ".mb-location", ".mb-building", ".mb-population", ".mb-equipment"]
+    // Changing the noise profile (.mb-noise) re-resolves too → the Perturbations
+    // jitter widgets snap to the selected profile's values (high→low sync).
+    [baseSel, ".mb-location", ".mb-building", ".mb-population", ".mb-equipment", ".mb-noise"]
         .forEach(s => (typeof s === "string" ? card.querySelector(s) : s)
                  .addEventListener("change", refreshCard));
     refreshCard();

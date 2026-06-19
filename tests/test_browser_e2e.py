@@ -67,6 +67,37 @@ def test_ui_cards_knobs_and_duplicate(page, server):
 
 
 @pytest.mark.browser
+def test_ui_perturbations_panel_and_high_low_sync(page, server):
+    """The consolidated Perturbations panel holds the noise-profile dropdown +
+    all jitter/weather dials, and picking a profile (high-level) snaps the
+    individual jitter widgets (low-level) to that profile's values."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # noise profile lives in the Perturbations panel (not the generic Advanced one)
+    card.locator(".mb-perturb > summary").click()
+    assert card.locator(".mb-perturb .mb-noise").count() == 1
+    assert card.locator(".card-perturb-knobs .knob[data-path='noise.building_load_jitter_pct']").count() == 1
+    assert card.locator(".card-perturb-knobs .knob[data-path='building_load.weather_temp_offset_c']").count() == 1
+    # …and those perturbation knobs are NOT duplicated in the generic Advanced panel
+    assert card.locator(".card-knob-buckets .knob[data-path='noise.building_load_jitter_pct']").count() == 0
+    assert card.locator(".card-knob-buckets .knob[data-path='building_load.weather_temp_offset_c']").count() == 0
+
+    # high→low: choosing 'adversarial' resolves the profile and snaps the dials
+    jitter = ".card-perturb-knobs .knob[data-path='noise.building_load_jitter_pct'] input"
+    flex = ".card-perturb-knobs .knob[data-path='noise.load_flex_jitter_pct'] input"
+    card.locator(".mb-noise").select_option("adversarial")
+    page.wait_for_function(
+        f"document.querySelector(\"{jitter}\").value === '0.15'", timeout=10000)
+    assert card.locator(flex).input_value() == "0.05"
+    # back to clean → dials snap to 0
+    card.locator(".mb-noise").select_option("clean")
+    page.wait_for_function(
+        f"document.querySelector(\"{jitter}\").value === '0'", timeout=10000)
+
+
+@pytest.mark.browser
 @pytest.mark.real_energyplus
 def test_ui_full_generate(page, server, tmp_path):
     page.goto(server + "/", wait_until="networkidle")
@@ -76,6 +107,7 @@ def test_ui_full_generate(page, server, tmp_path):
     for i in (0, 1):
         cards.nth(i).locator(".mb-ev-count").fill(str(3 + i * 4))   # 3 and 7
         cards.nth(i).locator(".mb-charger-count").fill(str(3 + i * 4))
+        cards.nth(i).locator(".mb-perturb > summary").click()      # noise lives here now
         cards.nth(i).locator(".mb-noise").select_option("clean")
     page.fill("#u-output-path", str(tmp_path / "run"))
     page.fill("#u-samples", "1")

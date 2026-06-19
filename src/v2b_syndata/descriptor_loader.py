@@ -149,8 +149,13 @@ def expand_descriptors(
         "dr_notification_dropout_prob",
         "price_jitter_pct",
         "occupancy_jitter_pct",
+        "load_flex_jitter_pct",
+        "load_inflex_jitter_pct",
     ):
-        out[f"noise.{key}"] = (float(noise[key]), noise_name)
+        # .get keeps a profile that omits an (optional) jitter field from
+        # crashing — the knob default (0.0) applies, matching knobs.yaml.
+        if key in noise:
+            out[f"noise.{key}"] = (float(noise[key]), noise_name)
 
     return out
 

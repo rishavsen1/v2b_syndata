@@ -251,9 +251,16 @@ buildings:
   faithful to the weather you train on. `building_load.weather_temp_offset_c` /
   `building_load.weather_solar_scale` set a fixed perturbation directly.
 - The webapp exposes the same feature: each **building card** carries its own
-  full descriptor + knob (Advanced) panel + noise + a Duplicate button, while
-  Run settings hold the common levers (date range, samples, workers, output
-  mode/path, DR); one **Generate** runs buildings × samples × months.
+  full descriptor + knob (Advanced) panel + a Duplicate button, while Run
+  settings hold the common levers (date range, samples, workers, output
+  mode/path, DR, per-sample **Weather variation σ**); one **Generate** runs
+  buildings × samples × months.
+- **Perturbations panel** (per card): every randomness/realism control in one
+  place — the **Noise profile** dropdown (high-level) plus each individual
+  `noise.*` jitter dial and the fixed weather offset (`weather_temp_offset_c` /
+  `weather_solar_scale`). Picking a profile live-updates the jitter dials to that
+  profile's values (high→low sync via `/api/resolve`); change any dial to
+  override it.
 
 ## Architecture
 

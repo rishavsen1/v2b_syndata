@@ -103,6 +103,8 @@ def test_clean_noise_idempotent_when_overrides_zero(tmp_path, config_dir):
             "noise.dr_notification_dropout_prob": 0.0,
             "noise.price_jitter_pct": 0.0,
             "noise.occupancy_jitter_pct": 0.0,
+            "noise.load_flex_jitter_pct": 0.0,
+            "noise.load_inflex_jitter_pct": 0.0,
         },
     )
     for n in ("building_load", "sessions", "grid_prices", "dr_events"):
