@@ -455,6 +455,7 @@ def api_generate_unified():
             "overrides": ov,
             "seed": int(b.get("seed", 42)),
             "noise_profile": b.get("noise_profile"),
+            "weather_profile": b.get("weather_profile"),
             "policy": b.get("policy"),
         })
     config = {
@@ -494,16 +495,8 @@ def api_generate_unified():
         "--workers", str(int(payload.get("workers", 4))),
         "--noise-profile", payload.get("noise_profile") or "tmyx_stochastic",
     ]
-    wx_profile = payload.get("weather_profile") or "none"
-    if wx_profile and wx_profile != "none":
-        cmd += ["--weather-profile", wx_profile]
-    else:
-        try:  # back-compat: explicit per-sample σ
-            wx_sigma = float(payload.get("weather_sigma_c") or 0.0)
-        except (TypeError, ValueError):
-            wx_sigma = 0.0
-        if wx_sigma > 0:
-            cmd += ["--weather-sigma-c", str(wx_sigma)]
+    # Weather perturbation is per-building (each spec carries its own
+    # weather_profile, written into the config above); no run-level flag needed.
     if payload.get("force", True):
         cmd.append("--force")
 

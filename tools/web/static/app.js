@@ -661,7 +661,15 @@ function createBuildingCard() {
         <details class="mb-perturb">
             <summary>Perturbations (this building)</summary>
             <p class="hint" style="margin:0.3rem 0">Two layers. <strong>Noise layer</strong> (below) perturbs this building's <em>produced</em> CSVs (load, sessions, prices) after generation — pick a profile and the jitter dials snap to it; change any to override. The fixed <strong>weather offset</strong> shifts this building's simulated &amp; exported weather together (a physical, input-side change). For <em>per-sample</em> weather realizations use the “Weather perturbation” profile in Run settings.</p>
-            <label class="mb-perturb-profile"><span class="field-name">Noise layer</span><select class="mb-noise"></select></label>
+            <div class="mb-perturb-profiles">
+                <label class="mb-perturb-profile"><span class="field-name">Noise layer (output)</span><select class="mb-noise"></select></label>
+                <label class="mb-perturb-profile"><span class="field-name">Weather perturbation (input)</span><select class="mb-weather">
+                    <option value="none">none</option>
+                    <option value="slight">slight (±1°C)</option>
+                    <option value="moderate">moderate (±2.5°C)</option>
+                    <option value="strong">strong (±5°C)</option>
+                </select></label>
+            </div>
             <div class="card-perturb-knobs"></div>
         </details>
         <details class="mb-adv">
@@ -795,6 +803,7 @@ function cardToSpec(card) {
         overrides,
         seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
         noise_profile: card.querySelector(".mb-noise").value || null,
+        weather_profile: card.querySelector(".mb-weather").value || null,
         policy: card.querySelector(".mb-policy").value || null,
     };
 }
@@ -806,7 +815,7 @@ function setCardValues(card, b) {
     set(".mb-location", d.location); set(".mb-building", d.building);
     set(".mb-population", d.population); set(".mb-equipment", d.equipment);
     set(".mb-noise", b.noise_profile); set(".mb-seed", b.seed);
-    set(".mb-policy", b.policy);
+    set(".mb-weather", b.weather_profile); set(".mb-policy", b.policy);
     const o = { ...(b.overrides || {}) };
     // quick-field keys → their inputs; remove from the knob-panel overrides
     for (const [key, sel] of Object.entries(QUICK_KEYS)) {
@@ -833,7 +842,7 @@ function applyConfig(cfg) {
     const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
     set("u-output-path", cfg.output_path); set("u-start-month", cfg.start_month);
     set("u-end-month", cfg.end_month); set("u-samples", cfg.samples);
-    set("u-weather-profile", cfg.weather_profile); set("u-workers", cfg.workers);
+    set("u-workers", cfg.workers);
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
     if (cfg.output_mode) {
@@ -862,7 +871,6 @@ function buildUnifiedPayload() {
         start_month: val("u-start-month"),
         end_month: val("u-end-month") || val("u-start-month"),
         samples: parseInt(val("u-samples"), 10) || 1,
-        weather_profile: val("u-weather-profile") || "none",
         workers: parseInt(val("u-workers"), 10) || 4,
         force: document.getElementById("u-force").checked,
         default_policy: val("u-default-policy") || "ILP-MPCFIXEDFSL",

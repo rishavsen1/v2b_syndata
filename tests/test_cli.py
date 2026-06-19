@@ -186,7 +186,8 @@ def test_cli_generate_multi_batch(tmp_path: Path, _stub_weather):
 
 
 def test_cli_generate_multi_weather_profile(tmp_path: Path, _stub_weather):
-    """--weather-profile resolves to the profile's per-sample σ's in the manifest."""
+    """--weather-profile is the batch default; it resolves per-building to a
+    per-sample weather realization (logged as overrides in each unit config)."""
     import json
     cfg = _write_multi_cfg(tmp_path / "mb.json")
     out = tmp_path / "wxprof"
@@ -196,8 +197,12 @@ def test_cli_generate_multi_weather_profile(tmp_path: Path, _stub_weather):
               "--weather-profile", "moderate")
     assert rc == 0
     manifest = json.loads((out / "batch_manifest.json").read_text())
-    assert manifest["weather_sigma_c"] == 2.5      # moderate temp σ
-    assert manifest["weather_solar_sigma"] == 0.05  # moderate solar σ
+    assert manifest["weather_profile"] == "moderate"
+    # the resolved per-sample realization is pinned per building in the unit config
+    unit = json.loads((out / "SEP2021" / "0" / "multi_building_config.json").read_text())
+    ov = unit["buildings"][0]["overrides"]
+    assert "building_load.weather_temp_offset_c" in ov
+    assert "building_load.weather_solar_scale" in ov
 
 
 def test_cli_generate_multi_from_config(tmp_path: Path, _stub_weather):

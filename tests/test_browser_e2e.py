@@ -75,11 +75,11 @@ def test_ui_perturbations_panel_and_high_low_sync(page, server):
     page.wait_for_selector(".building-card")
     card = page.locator(".building-card").first
 
-    # weather perturbation is a run-level profile dropdown (input-side layer)
-    assert page.locator("#u-weather-profile option[value='moderate']").count() == 1
-    # the noise layer lives in the per-card Perturbations panel (not generic Advanced)
+    # both perturbation layers are per-card, in the Perturbations panel
     card.locator(".mb-perturb > summary").click()
-    assert card.locator(".mb-perturb .mb-noise").count() == 1
+    assert card.locator(".mb-perturb .mb-noise").count() == 1     # noise layer (output)
+    assert card.locator(".mb-perturb .mb-weather option[value='moderate']").count() == 1  # weather (input)
+    assert page.locator("#u-weather-profile").count() == 0        # not in Run settings anymore
     assert card.locator(".card-perturb-knobs .knob[data-path='noise.building_load_jitter_pct']").count() == 1
     assert card.locator(".card-perturb-knobs .knob[data-path='building_load.weather_temp_offset_c']").count() == 1
     # …and those perturbation knobs are NOT duplicated in the generic Advanced panel

@@ -37,12 +37,6 @@
             <label><span class="field-name">Start month</span><input type="month" id="u-start-month" value="2024-04"></label>
             <label><span class="field-name">End month</span><input type="month" id="u-end-month" value="2024-04"></label>
             <label><span class="field-name">Samples / month</span><input type="number" id="u-samples" min="1" max="100" value="1"></label>
-            <label><span class="field-name">Weather perturbation</span><select id="u-weather-profile" title="INPUT-side weather realization (perturbs the EPW EnergyPlus simulates AND the exported weather; load responds physically). Per-sample → pair with >1 sample/month. Distinct from the per-building Noise layer, which perturbs the produced CSVs.">
-                <option value="none">none</option>
-                <option value="slight">slight (±1°C)</option>
-                <option value="moderate">moderate (±2.5°C)</option>
-                <option value="strong">strong (±5°C)</option>
-            </select></label>
             <label><span class="field-name">Workers</span><input type="number" id="u-workers" min="1" max="16" value="4"></label>
             <label><span class="field-name">DR program (global)</span>
                 <select id="u-dr-program">

@@ -241,28 +241,29 @@ buildings:
   relative_humidity_pct, wind_speed_m_s, global_horizontal_w_m2,
   direct_normal_w_m2, diffuse_horizontal_w_m2` (+ `building_id` in shared mode) —
   the three solar-irradiance channels come from the EPW (GHI/DNI/DHI).
-- **Two perturbation layers** (kept distinct):
+- **Two per-building perturbation layers** (kept distinct):
   - **Weather layer** (`weather_profiles.yaml`, input-side): perturbs the EPW
     EnergyPlus simulates **and** the exported `weather_data.csv` together, so the
-    load stays physically faithful to the weather. `generate-multi
-    --weather-profile {slight|moderate|strong}` (or the webapp "Weather
-    perturbation" dropdown) draws a per-sample temp + solar realization;
-    `building_load.weather_temp_offset_c` / `weather_solar_scale` set a fixed
-    offset directly. Pair with the `clean` noise layer for a pure weather→load
-    signal.
-  - **Noise layer** (`noise_profiles.yaml`, output-side): perturbs the *produced*
-    CSVs after generation (load/sessions/prices/DR), never the weather. The
-    historical ±5%/±3% load noise is profile-gated (`noise.load_flex_jitter_pct`
-    / `load_inflex_jitter_pct`); `clean` → 0 makes `building_load` a deterministic
+    load stays physically faithful to the weather. Each building picks its own
+    profile (`BuildingSpec.weather_profile`, e.g. `slight|moderate|strong`),
+    drawing a per-sample temp + solar realization; `generate-multi
+    --weather-profile` sets the batch default, and `building_load.weather_*` set
+    a fixed offset directly. Pair with the `clean` noise layer for a pure
+    weather→load signal.
+  - **Noise layer** (`noise_profiles.yaml`, output-side): per-building
+    `noise_profile` perturbing the *produced* CSVs after generation
+    (load/sessions/prices/DR), never the weather. The historical ±5%/±3% load
+    noise is profile-gated (`noise.load_flex_jitter_pct` /
+    `load_inflex_jitter_pct`); `clean` → 0 makes `building_load` a deterministic
     `f(weather)`.
-- The webapp exposes both: each **building card** carries its own full descriptor
-  + knob (Advanced) panel + a **Perturbations** panel (the per-building Noise
-  layer + fixed weather offset) + a Duplicate button; Run settings hold the
-  common levers (date range, samples, workers, output mode/path, DR, the
-  run-level **Weather perturbation** profile); one **Generate** runs buildings ×
-  samples × months. In the Perturbations panel, picking a Noise-layer profile
-  live-updates the individual jitter dials (high→low sync via `/api/resolve`);
-  change any dial to override it.
+- The webapp exposes both per-building: each **building card** carries its own
+  full descriptor + knob (Advanced) panel + a **Perturbations** panel — the
+  card's **Noise layer** and **Weather perturbation** profile dropdowns plus the
+  fixed weather offset — and a Duplicate button; Run settings hold only the
+  common levers (date range, samples, workers, output mode/path, DR); one
+  **Generate** runs buildings × samples × months. In the Perturbations panel,
+  picking a Noise-layer profile live-updates the individual jitter dials
+  (high→low sync via `/api/resolve`); change any dial to override it.
 
 ## Architecture
 

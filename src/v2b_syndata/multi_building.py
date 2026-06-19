@@ -58,6 +58,7 @@ class BuildingSpec:
     overrides: dict[str, Any] = field(default_factory=dict)
     seed: int = 42
     noise_profile: str | None = None
+    weather_profile: str | None = None  # per-building; falls back to the batch default
     policy: str | None = None  # falls back to MultiConfig.default_policy
 
 
@@ -242,6 +243,7 @@ def config_from_dict(data: dict[str, Any]) -> MultiConfig:
             overrides=b.get("overrides") or {},
             seed=int(b.get("seed", 42)),
             noise_profile=b.get("noise_profile"),
+            weather_profile=b.get("weather_profile"),
             policy=b.get("policy"),
         ))
     return MultiConfig(
@@ -280,23 +282,23 @@ class _MultiUnitSpec:
 
 def _unit_config(
     base: MultiConfig, month_iso: str, sample: int, noise_profile: str | None,
-    seed_base: int, weather_sigma_c: float = 0.0, weather_solar_sigma: float = 0.0,
+    seed_base: int, per_building_sigma: list[tuple[float, float]] | None = None,
 ) -> MultiConfig:
     """Clone the base config for one (month, sample): pin the month window, the
     per-sample seed offset, and the per-sample noise on every building.
 
-    The weather realization layer: when ``weather_sigma_c > 0`` each building
-    draws a per-sample dry-bulb offset ``N(0, weather_sigma_c)`` °C; when
-    ``weather_solar_sigma > 0`` it draws a per-sample solar scale
-    ``N(1, weather_solar_sigma)`` (clipped to the knob range). Both are seeded by
-    the building's per-sample seed and pinned as explicit overrides
-    (``building_load.weather_temp_offset_c`` / ``weather_solar_scale``).
-    EnergyPlus then simulates the perturbed weather and the exported
-    weather_data.csv matches — cross-sample load variance is weather-driven and
-    physically faithful.
+    The weather realization layer is **per-building**: ``per_building_sigma[i] =
+    (temp_sigma_c, solar_sigma)`` for building ``i`` (resolved from each
+    building's own weather profile, with the batch default as fallback). When a
+    σ > 0 the building draws a per-sample dry-bulb offset ``N(0, σ_T)`` °C and/or
+    solar scale ``N(1, σ_s)`` (clipped), seeded by its per-sample seed and pinned
+    as explicit overrides (``building_load.weather_temp_offset_c`` /
+    ``weather_solar_scale``). EnergyPlus then simulates the perturbed weather and
+    the exported weather_data.csv matches — variance is weather-driven and
+    physically faithful. Explicit per-building offsets in the spec win.
     """
     cfg = copy.deepcopy(base)
-    for spec in cfg.buildings:
+    for i, spec in enumerate(cfg.buildings):
         spec.overrides = dict(spec.overrides)
         spec.overrides["sim_window.mode"] = "month"
         spec.overrides["sim_window.start"] = month_iso
@@ -310,17 +312,17 @@ def _unit_config(
             spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
         spec.noise_profile = eff_noise
         spec.seed = spec.seed + seed_base + sample
-        # Weather realization: per-sample dry-bulb offset + solar scale (explicit
-        # overrides win, so a building can pin its own fixed values).
-        if weather_sigma_c > 0.0 and \
+        # Per-building weather realization (explicit spec offsets win).
+        sigma_c, solar_sigma = (per_building_sigma[i] if per_building_sigma else (0.0, 0.0))
+        if sigma_c > 0.0 and \
            "building_load.weather_temp_offset_c" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization")
-            offset = float(rng.normal(0.0, weather_sigma_c))
+            offset = float(rng.normal(0.0, sigma_c))
             spec.overrides["building_load.weather_temp_offset_c"] = round(offset, 4)
-        if weather_solar_sigma > 0.0 and \
+        if solar_sigma > 0.0 and \
            "building_load.weather_solar_scale" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization_solar")
-            scale = float(np.clip(rng.normal(1.0, weather_solar_sigma), 0.5, 1.5))
+            scale = float(np.clip(rng.normal(1.0, solar_sigma), 0.5, 1.5))
             spec.overrides["building_load.weather_solar_scale"] = round(scale, 4)
     return cfg
 
@@ -352,6 +354,7 @@ def generate_multi_batch(
     seed_base: int = 0,
     workers: int = 4,
     noise_profile: str | None = "tmyx_stochastic",
+    weather_profile: str = "none",
     weather_sigma_c: float = 0.0,
     weather_solar_sigma: float = 0.0,
     force: bool = False,
@@ -373,6 +376,18 @@ def generate_multi_batch(
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
 
+    # Resolve the per-building weather realization σ's: each building's own
+    # weather_profile wins, else the batch-default `weather_profile`. An explicit
+    # weather_sigma_c / weather_solar_sigma (> 0) overrides the resolved σ's for
+    # every building (power-user knob).
+    from .descriptor_loader import load_weather_profile
+    per_building_sigma: list[tuple[float, float]] = []
+    for spec in cfg.buildings:
+        wx = load_weather_profile(Path(config_dir), spec.weather_profile or weather_profile)
+        sc = weather_sigma_c if weather_sigma_c > 0 else wx["temp_sigma_c"]
+        ss = weather_solar_sigma if weather_solar_sigma > 0 else wx["solar_sigma"]
+        per_building_sigma.append((sc, ss))
+
     months = _months_between(start_month, end_month)
     specs: list[_MultiUnitSpec] = []
     for label, dt in months:
@@ -380,7 +395,7 @@ def generate_multi_batch(
         for s in range(samples_per_month):
             specs.append(_MultiUnitSpec(
                 cfg=_unit_config(cfg, iso, s, noise_profile, seed_base,
-                                 weather_sigma_c, weather_solar_sigma),
+                                 per_building_sigma),
                 month_label=label, sample_idx=s, seed=seed_base + s,
                 unit_dir=output_dir / label / str(s), config_dir=Path(config_dir),
             ))
@@ -397,6 +412,7 @@ def generate_multi_batch(
         "seed_base": seed_base,
         "seed_strategy": "building.seed + seed_base + sample",
         "noise_profile": noise_profile,
+        "weather_profile": weather_profile,
         "weather_sigma_c": weather_sigma_c,
         "weather_solar_sigma": weather_solar_sigma,
         "workers": workers,

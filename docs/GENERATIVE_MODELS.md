@@ -334,14 +334,14 @@ These are part of the generator but are not fit to data:
     `weather_solar_scale` (×GHI/DNI/DHI) perturb the EPW EnergyPlus *simulates*
     **and** the exported `weather_data.csv` via one shared transform
     (`weather.perturb_weather_frame` / `perturb_epw_file`), so the exported
-    weather always matches the load it produced. For a weather-driven,
-    physically-faithful per-sample load distribution, run `generate-multi
-    --weather-profile {slight|moderate|strong}` (or the web "Weather
-    perturbation" dropdown): each sample draws `temp_offset ~ N(0, σ_T)` and
-    `solar_scale ~ N(1, σ_s)` from its seed, logged as explicit overrides
-    (`--weather-sigma-c` still sets σ_T directly). Pair with `--noise-profile
-    clean` for a pure weather→load signal — cross-sample variance then comes from
-    weather, not decoupled output noise.
+    weather always matches the load it produced. It's **per-building** like the
+    noise layer: each building picks its own `weather_profile`
+    (`slight|moderate|strong`, batch default via `generate-multi
+    --weather-profile`, web dropdown in the card's Perturbations panel), and each
+    sample draws `temp_offset ~ N(0, σ_T)` and `solar_scale ~ N(1, σ_s)` from its
+    seed, logged as explicit overrides (`--weather-sigma-c` still sets σ_T
+    directly). Pair with the `clean` noise layer for a pure weather→load signal —
+    cross-sample variance then comes from weather, not decoupled output noise.
 - **Grid prices** (`renderers/grid_prices.py`) — a deterministic
   time-of-use tape from the `energy_price_peak/offpeak` and `peak_window` knobs.
   Tariffs are schedules, not random variables.
