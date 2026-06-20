@@ -207,6 +207,20 @@ building_load:
     description: "Weather realization: multiplicative scale on the EPW solar channels (GHI/DNI/DHI) EnergyPlus simulates AND the exported weather_data.csv. 1.0 = unchanged."
     affects_csv: [building_load.csv, weather_data.csv]
 
+  weather_dewpoint_offset_c:
+    type: float
+    range: [-15.0, 15.0]
+    default: 0.0
+    description: "Weather realization (humidity): additive °C offset on the EPW dew-point — the moisture variable EnergyPlus uses for latent load. relative_humidity_pct is recomputed (Magnus) from the perturbed dry-bulb + dew-point so the exported weather stays consistent. 0 = unchanged."
+    affects_csv: [building_load.csv, weather_data.csv]
+
+  weather_wind_scale:
+    type: float
+    range: [0.0, 3.0]
+    default: 1.0
+    description: "Weather realization: multiplicative scale on EPW wind speed EnergyPlus simulates (drives infiltration) AND the exported weather_data.csv. 1.0 = unchanged."
+    affects_csv: [building_load.csv, weather_data.csv]
+
   archetype:
     type: categorical
     choices: [office, retail, mixed]

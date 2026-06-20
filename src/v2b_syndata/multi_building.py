@@ -117,6 +117,8 @@ def _build_building_tables(
             str(knobs["building_load.tmyx_station"]), sim_start, sim_end, building_id,
             temp_offset_c=float(knobs.get("building_load.weather_temp_offset_c", 0.0)),
             solar_scale=float(knobs.get("building_load.weather_solar_scale", 1.0)),
+            dewpoint_offset_c=float(knobs.get("building_load.weather_dewpoint_offset_c", 0.0)),
+            wind_scale=float(knobs.get("building_load.weather_wind_scale", 1.0)),
         ),
         "occupancy.csv": exp.build_occupancy(
             str(knobs["building_load.occupancy_source"]), int(sim_start.year), building_id,
@@ -312,18 +314,30 @@ def _unit_config(
             spec.overrides.setdefault("ev_fleet.battery_mix_dirichlet_alpha", 30.0)
         spec.noise_profile = eff_noise
         spec.seed = spec.seed + seed_base + sample
-        # Per-building weather realization (explicit spec offsets win).
-        sigma_c, solar_sigma = (per_building_sigma[i] if per_building_sigma else (0.0, 0.0))
+        # Per-building weather realization (explicit spec offsets win). Each
+        # channel draws from its own seeded node so they're independent.
+        sigmas = per_building_sigma[i] if per_building_sigma else (0.0, 0.0, 0.0, 0.0)
+        sigma_c, solar_sigma, dewpoint_sigma, wind_sigma = sigmas
         if sigma_c > 0.0 and \
            "building_load.weather_temp_offset_c" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization")
-            offset = float(rng.normal(0.0, sigma_c))
-            spec.overrides["building_load.weather_temp_offset_c"] = round(offset, 4)
+            spec.overrides["building_load.weather_temp_offset_c"] = \
+                round(float(rng.normal(0.0, sigma_c)), 4)
+        if dewpoint_sigma > 0.0 and \
+           "building_load.weather_dewpoint_offset_c" not in spec.overrides:
+            rng = rng_for_node(spec.seed, "weather_realization_dewpoint")
+            spec.overrides["building_load.weather_dewpoint_offset_c"] = \
+                round(float(rng.normal(0.0, dewpoint_sigma)), 4)
         if solar_sigma > 0.0 and \
            "building_load.weather_solar_scale" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization_solar")
-            scale = float(np.clip(rng.normal(1.0, solar_sigma), 0.5, 1.5))
-            spec.overrides["building_load.weather_solar_scale"] = round(scale, 4)
+            spec.overrides["building_load.weather_solar_scale"] = \
+                round(float(np.clip(rng.normal(1.0, solar_sigma), 0.5, 1.5)), 4)
+        if wind_sigma > 0.0 and \
+           "building_load.weather_wind_scale" not in spec.overrides:
+            rng = rng_for_node(spec.seed, "weather_realization_wind")
+            spec.overrides["building_load.weather_wind_scale"] = \
+                round(float(np.clip(rng.normal(1.0, wind_sigma), 0.0, 3.0)), 4)
     return cfg
 
 
@@ -376,17 +390,17 @@ def generate_multi_batch(
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
 
-    # Resolve the per-building weather realization σ's: each building's own
-    # weather_profile wins, else the batch-default `weather_profile`. An explicit
-    # weather_sigma_c / weather_solar_sigma (> 0) overrides the resolved σ's for
-    # every building (power-user knob).
+    # Resolve the per-building weather realization σ's (temp, solar, dew-point,
+    # wind): each building's own weather_profile wins, else the batch-default
+    # `weather_profile`. An explicit weather_sigma_c / weather_solar_sigma (> 0)
+    # overrides the resolved temp/solar σ for every building (power-user knob).
     from .descriptor_loader import load_weather_profile
-    per_building_sigma: list[tuple[float, float]] = []
+    per_building_sigma: list[tuple[float, float, float, float]] = []
     for spec in cfg.buildings:
         wx = load_weather_profile(Path(config_dir), spec.weather_profile or weather_profile)
         sc = weather_sigma_c if weather_sigma_c > 0 else wx["temp_sigma_c"]
         ss = weather_solar_sigma if weather_solar_sigma > 0 else wx["solar_sigma"]
-        per_building_sigma.append((sc, ss))
+        per_building_sigma.append((sc, ss, wx["dewpoint_sigma_c"], wx["wind_sigma"]))
 
     months = _months_between(start_month, end_month)
     specs: list[_MultiUnitSpec] = []

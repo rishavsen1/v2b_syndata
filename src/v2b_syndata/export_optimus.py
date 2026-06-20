@@ -167,6 +167,8 @@ def build_weather(
     *,
     temp_offset_c: float = 0.0,
     solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0,
+    wind_scale: float = 1.0,
     fetcher: Callable[[str], bytes] | None = None,
 ) -> pd.DataFrame:
     """Reconstruct hourly weather over [sim_start, sim_end) from the same EPW
@@ -190,7 +192,8 @@ def build_weather(
     else:
         wx = weather.parse_epw_weather(epw_path, year=year)
 
-    wx = weather.perturb_weather_frame(wx, temp_offset_c, solar_scale)
+    wx = weather.perturb_weather_frame(
+        wx, temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale)
     wx = wx[(wx.index >= sim_start) & (wx.index < sim_end)]
     out = pd.DataFrame({
         "datetime": wx.index.strftime("%Y-%m-%d %H:%M:%S"),

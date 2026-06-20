@@ -176,6 +176,8 @@ def load_weather_profile(config_dir: Path, name: str) -> dict[str, float]:
     return {
         "temp_sigma_c": float(p.get("temp_sigma_c", 0.0)),
         "solar_sigma": float(p.get("solar_sigma", 0.0)),
+        "dewpoint_sigma_c": float(p.get("dewpoint_sigma_c", 0.0)),
+        "wind_sigma": float(p.get("wind_sigma", 0.0)),
     }
 
 

@@ -15,22 +15,36 @@
 # the draws produce cross-sample variance; with the `clean` noise layer this
 # gives a weather-driven, physically-faithful load distribution for learning.
 
+#   temp_sigma_c     — dry-bulb offset ~ N(0, σ) °C
+#   solar_sigma      — solar scale ~ N(1, σ) (×GHI/DNI/DHI)
+#   dewpoint_sigma_c — dew-point offset ~ N(0, σ) °C (the EnergyPlus moisture
+#                      driver; relative_humidity_pct is recomputed to match)
+#   wind_sigma       — wind-speed scale ~ N(1, σ) (drives infiltration)
+
 none:
   description: "No weather perturbation. EnergyPlus uses the unmodified TMYx weather."
   temp_sigma_c: 0.0
   solar_sigma: 0.0
+  dewpoint_sigma_c: 0.0
+  wind_sigma: 0.0
 
 slight:
-  description: "Slight realization: ~±1°C per-sample dry-bulb, ~±2% solar."
+  description: "Slight realization: ~±1°C dry-bulb, ~±2% solar, ~±0.5°C dew-point, ~±5% wind."
   temp_sigma_c: 1.0
   solar_sigma: 0.02
+  dewpoint_sigma_c: 0.5
+  wind_sigma: 0.05
 
 moderate:
-  description: "Moderate realization: ~±2.5°C per-sample dry-bulb, ~±5% solar."
+  description: "Moderate realization: ~±2.5°C dry-bulb, ~±5% solar, ~±1.5°C dew-point, ~±10% wind."
   temp_sigma_c: 2.5
   solar_sigma: 0.05
+  dewpoint_sigma_c: 1.5
+  wind_sigma: 0.10
 
 strong:
-  description: "Strong realization: ~±5°C per-sample dry-bulb, ~±10% solar."
+  description: "Strong realization: ~±5°C dry-bulb, ~±10% solar, ~±3°C dew-point, ~±20% wind."
   temp_sigma_c: 5.0
   solar_sigma: 0.10
+  dewpoint_sigma_c: 3.0
+  wind_sigma: 0.20

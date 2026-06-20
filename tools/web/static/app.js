@@ -63,6 +63,8 @@ const SHORTCUT_KNOBS = new Set([
 const PERTURB_WEATHER_KNOBS = new Set([
     "building_load.weather_temp_offset_c",
     "building_load.weather_solar_scale",
+    "building_load.weather_dewpoint_offset_c",
+    "building_load.weather_wind_scale",
 ]);
 function isPerturbKnob(path) {
     return path.startsWith("noise.") || PERTURB_WEATHER_KNOBS.has(path);

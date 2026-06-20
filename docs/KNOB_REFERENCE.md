@@ -60,6 +60,8 @@ Each resolved knob carries one of:
 | `building_load.tmyx_station` | `path` | `'USA_TN_Nashville.Intl.AP.723270_TMYx'` | `` |
 | `building_load.weather_temp_offset_c` | `float` | `0.0` | `[-15.0, 15.0]` |
 | `building_load.weather_solar_scale` | `float` | `1.0` | `[0.5, 1.5]` |
+| `building_load.weather_dewpoint_offset_c` | `float` | `0.0` | `[-15.0, 15.0]` |
+| `building_load.weather_wind_scale` | `float` | `1.0` | `[0.0, 3.0]` |
 | `building_load.archetype` | `categorical` | `'office'` | `['office', 'retail', 'mixed']` |
 | `building_load.size` | `categorical` | `'med'` | `['small', 'med', 'large']` |
 | `building_load.occupancy_source` | `categorical` | `'ashrae_90_1_office'` | `['ashrae_90_1_office', 'ashrae_90_1_retail', 'ashrae_90_1_mixed', 'custom_path']` |

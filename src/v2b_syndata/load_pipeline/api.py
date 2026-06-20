@@ -111,6 +111,8 @@ def _simulate_single(
     sim_window_end: pd.Timestamp,
     temp_offset_c: float = 0.0,
     solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0,
+    wind_scale: float = 1.0,
 ) -> tuple[pd.Series, pd.Series]:
     proto_idf = get_prototype_idf(archetype, size)
     year = pd.Timestamp(sim_window_start).year
@@ -133,6 +135,7 @@ def _simulate_single(
             f"meters={','.join(_REQUIRED_METERS)};rp=annual;ts=4;year={year}"
             f";leap={int(leap_weather.is_leap(year))}"
             f";dT={float(temp_offset_c)!r};ssc={float(solar_scale)!r}"
+            f";dTd={float(dewpoint_offset_c)!r};wsc={float(wind_scale)!r}"
         ),
     )
     cached = cache_mod.get_cached(key)
@@ -155,6 +158,7 @@ def _simulate_single(
         # No-op when temp_offset_c == 0 and solar_scale == 1.
         run_epw = weather.perturb_epw_file(
             run_epw, tmp / "perturbed.epw", temp_offset_c, solar_scale,
+            dewpoint_offset_c, wind_scale,
         )
         ep_out = tmp / "ep_run"
         meter_csv = ep_runner.run_energyplus(runtime, run_epw, ep_out)
@@ -177,6 +181,8 @@ def simulate_building_load(
     weather_year: int | None = None,
     temp_offset_c: float = 0.0,
     solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0,
+    wind_scale: float = 1.0,
 ) -> tuple[pd.Series, pd.Series]:
     """Return ``(L_flex_kw, L_inflex_kw)`` for the requested building over sim window.
 
@@ -201,17 +207,17 @@ def simulate_building_load(
         retail_size = size if (("retail", size) in _retail_keys()) else "med"
         flex_o, inflex_o = _simulate_single(
             "office", size, epw_path, occupancy, sim_window_start, sim_window_end,
-            temp_offset_c, solar_scale,
+            temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale,
         )
         flex_r, inflex_r = _simulate_single(
             "retail", retail_size, epw_path, occupancy, sim_window_start, sim_window_end,
-            temp_offset_c, solar_scale,
+            temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale,
         )
         return 0.5 * (flex_o + flex_r), 0.5 * (inflex_o + inflex_r)
 
     return _simulate_single(
         archetype, size, epw_path, occupancy, sim_window_start, sim_window_end,
-        temp_offset_c, solar_scale,
+        temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale,
     )
 
 

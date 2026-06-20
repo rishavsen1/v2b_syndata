@@ -7,6 +7,7 @@ import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -166,43 +167,74 @@ def parse_epw_temperatures(
 _SOLAR_COLS = ("global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2")
 
 
+def _sat_vapor_pressure(t_c):
+    """Saturation vapour pressure (hPa) via the Magnus formula. Accepts scalar
+    or numpy/pandas; uses np.exp so it vectorizes."""
+    return 6.112 * np.exp(17.62 * t_c / (243.12 + t_c))
+
+
+def _rh_from_t_td(t_c, td_c):
+    """Relative humidity (%) from dry-bulb and dew-point (Magnus), clipped to
+    [0, 100]. Keeps the exported RH consistent after a dew-point/temp shift."""
+    rh = 100.0 * _sat_vapor_pressure(td_c) / _sat_vapor_pressure(t_c)
+    return min(100.0, max(0.0, rh)) if np.isscalar(rh) else np.clip(rh, 0.0, 100.0)
+
+
+def _wx_is_noop(temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale) -> bool:
+    return (float(temp_offset_c) == 0.0 and float(solar_scale) == 1.0
+            and float(dewpoint_offset_c) == 0.0 and float(wind_scale) == 1.0)
+
+
 def perturb_weather_frame(
     df: pd.DataFrame, temp_offset_c: float = 0.0, solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0, wind_scale: float = 1.0,
 ) -> pd.DataFrame:
     """Apply the weather *realization* transform to a parsed weather frame:
-    additive °C offset on dry-bulb, multiplicative scale on the three solar
-    channels (clipped at 0). This is the SAME transform applied to the EPW the
-    EnergyPlus load sim consumes (`perturb_epw_file`), so the exported
-    `weather_data.csv` stays faithful to the load it produced.
+    additive °C offset on dry-bulb, additive °C offset on dew-point (the
+    moisture driver), multiplicative scale on the three solar channels and on
+    wind speed (both clipped at 0). When dry-bulb or dew-point shift,
+    relative_humidity_pct is recomputed (Magnus) from the perturbed pair so the
+    export stays internally consistent. This is the SAME transform applied to the
+    EPW the EnergyPlus load sim consumes (`perturb_epw_file`).
 
-    Returns the frame unchanged (same object) when both knobs are no-ops.
+    Returns the frame unchanged (same object) when every knob is a no-op.
     """
-    if float(temp_offset_c) == 0.0 and float(solar_scale) == 1.0:
+    if _wx_is_noop(temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale):
         return df
     out = df.copy()
     if float(temp_offset_c) != 0.0:
         out["dry_bulb_temp_c"] = out["dry_bulb_temp_c"] + float(temp_offset_c)
+    if float(dewpoint_offset_c) != 0.0:
+        out["dew_point_temp_c"] = out["dew_point_temp_c"] + float(dewpoint_offset_c)
     if float(solar_scale) != 1.0:
         for c in _SOLAR_COLS:
             if c in out.columns:
                 out[c] = (out[c] * float(solar_scale)).clip(lower=0.0)
+    if float(wind_scale) != 1.0 and "wind_speed_m_s" in out.columns:
+        out["wind_speed_m_s"] = (out["wind_speed_m_s"] * float(wind_scale)).clip(lower=0.0)
+    # Recompute RH from the (perturbed) dry-bulb + dew-point so it stays consistent.
+    if (float(temp_offset_c) != 0.0 or float(dewpoint_offset_c) != 0.0) \
+       and "relative_humidity_pct" in out.columns:
+        out["relative_humidity_pct"] = _rh_from_t_td(
+            out["dry_bulb_temp_c"].to_numpy(), out["dew_point_temp_c"].to_numpy())
     return out
 
 
 def perturb_epw_file(
     epw_path: Path, out_path: Path,
     temp_offset_c: float = 0.0, solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0, wind_scale: float = 1.0,
 ) -> Path:
     """Rewrite an EPW with the weather realization transform so EnergyPlus
     *simulates* the perturbed weather. Mirrors `perturb_weather_frame`: dry-bulb
-    (col 6) gets the additive offset; solar (cols 13/14/15) the multiplicative
-    scale (clipped ≥0). Header (first 8 lines) and all other columns are copied
-    verbatim. Data rows are detected exactly as `parse_epw_weather` does
-    (len ≥ 22, parseable month/day/hour).
+    (col 6) += temp offset, dew-point (col 7) += dew-point offset, RH (col 8)
+    recomputed from the pair when either shifts, solar (cols 13/14/15) ×scale,
+    wind (col 21) ×scale (all clipped ≥0). Header (first 8 lines) and other
+    columns are copied verbatim; data rows detected as in `parse_epw_weather`.
 
     No-op transform → returns `epw_path` unchanged (no rewrite).
     """
-    if float(temp_offset_c) == 0.0 and float(solar_scale) == 1.0:
+    if _wx_is_noop(temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale):
         return Path(epw_path)
     src = Path(epw_path).read_text().splitlines(keepends=True)
     out_lines = src[:8]  # headers verbatim
@@ -214,9 +246,15 @@ def perturb_epw_file(
             continue
         try:
             int(parts[1]); int(parts[2]); int(parts[3])
-            parts[6] = repr(float(parts[6]) + float(temp_offset_c))
+            t = float(parts[6]) + float(temp_offset_c)
+            td = float(parts[7]) + float(dewpoint_offset_c)
+            parts[6] = repr(t)
+            parts[7] = repr(td)
+            if float(temp_offset_c) != 0.0 or float(dewpoint_offset_c) != 0.0:
+                parts[8] = repr(float(_rh_from_t_td(t, td)))
             for ci in (13, 14, 15):
                 parts[ci] = repr(max(0.0, float(parts[ci]) * float(solar_scale)))
+            parts[21] = repr(max(0.0, float(parts[21]) * float(wind_scale)))
         except (ValueError, IndexError):
             out_lines.append(line)
             continue

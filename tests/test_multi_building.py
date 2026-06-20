@@ -39,6 +39,8 @@ def _write_epw(path: Path, year: int = 2021) -> Path:
         cols = ["0"] * 22
         cols[1], cols[2], cols[3] = str(ts.month), str(ts.day), str(ts.hour + 1)
         cols[6], cols[7], cols[8], cols[21] = "15.0", "5.0", "50.0", "2.5"
+        if 6 <= ts.hour <= 20:  # daytime solar so GHI/DNI/DHI are non-zero
+            cols[13] = cols[14] = cols[15] = "300"
         lines.append(",".join(cols))
     path.write_text("\n".join(lines) + "\n")
     return path
@@ -247,12 +249,20 @@ def test_weather_profile_changes_weather_and_load(tmp_path, config_dir, stub_wea
                              workers=1, noise_profile="clean")
         wx = pd.read_csv(out / "SEP2021" / "0" / "weather_data.csv")
         bl = pd.read_csv(out / "SEP2021" / "0" / "building_load.csv")
-        return wx["dry_bulb_temp_c"].mean(), bl["power_kw_flexible"].sum()
+        return {
+            "temp": wx["dry_bulb_temp_c"].mean(),
+            "rh": wx["relative_humidity_pct"].mean(),
+            "wind": wx["wind_speed_m_s"].mean(),
+            "ghi": wx["global_horizontal_w_m2"].mean(),
+            "load": bl["power_kw_flexible"].sum(),
+        }
 
-    t_none, l_none = run("none")
-    t_strong, l_strong = run("strong")
-    assert abs(t_strong - t_none) > 0.5, f"weather NOT perturbed: none={t_none} strong={t_strong}"
-    assert abs(l_strong - l_none) > 1.0, f"load did NOT respond: none={l_none} strong={l_strong}"
+    n, s = run("none"), run("strong")
+    # all four weather channels move (temp + humidity + wind + solar) …
+    for k in ("temp", "rh", "wind", "ghi"):
+        assert abs(s[k] - n[k]) > 1e-6, f"{k} NOT perturbed: none={n[k]} strong={s[k]}"
+    # … and the (stubbed) load responds
+    assert abs(s["load"] - n["load"]) > 1.0, f"load did NOT respond: {n['load']} vs {s['load']}"
 
 
 def test_per_building_weather_profile(tmp_path, config_dir, stub_weather):

@@ -330,8 +330,11 @@ These are part of the generator but are not fit to data:
     — the faithful target for learning `load ← weather`. Other profiles keep
     0.05/0.03 (unchanged).
   - **Weather layer** (`weather_profiles.yaml`, `building_load.weather_*` knobs) —
-    the INPUT side. `weather_temp_offset_c` (additive °C on dry-bulb) and
-    `weather_solar_scale` (×GHI/DNI/DHI) perturb the EPW EnergyPlus *simulates*
+    the INPUT side. Four channels: `weather_temp_offset_c` (additive °C dry-bulb),
+    `weather_dewpoint_offset_c` (additive °C dew-point — the moisture driver;
+    relative-humidity is recomputed via Magnus to stay consistent),
+    `weather_solar_scale` (×GHI/DNI/DHI) and `weather_wind_scale` (×wind speed,
+    drives infiltration). These perturb the EPW EnergyPlus *simulates*
     **and** the exported `weather_data.csv` via one shared transform
     (`weather.perturb_weather_frame` / `perturb_epw_file`), so the exported
     weather always matches the load it produced. It's **per-building** like the

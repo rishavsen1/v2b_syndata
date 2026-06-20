@@ -82,6 +82,8 @@ def _resolve_loads(ctx: ScenarioContext) -> tuple[pd.Series, pd.Series]:
     occupancy_source = ctx.knobs.get("building_load.occupancy_source")
     temp_offset_c = float(ctx.knobs.get("building_load.weather_temp_offset_c"))
     solar_scale = float(ctx.knobs.get("building_load.weather_solar_scale"))
+    dewpoint_offset_c = float(ctx.knobs.get("building_load.weather_dewpoint_offset_c"))
+    wind_scale = float(ctx.knobs.get("building_load.weather_wind_scale"))
     idx = ctx.datetime_index()
     occupancy = _build_occupancy_series(str(occupancy_source), idx)
 
@@ -94,6 +96,8 @@ def _resolve_loads(ctx: ScenarioContext) -> tuple[pd.Series, pd.Series]:
         sim_window_end=pd.Timestamp(ctx.sim_end),
         temp_offset_c=temp_offset_c,
         solar_scale=solar_scale,
+        dewpoint_offset_c=dewpoint_offset_c,
+        wind_scale=wind_scale,
     )
     # Reindex to the canonical sim window grid; fill missing with 0 (rare,
     # only at year boundaries when EP emits one fewer/extra row).
