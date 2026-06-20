@@ -648,7 +648,7 @@ function createBuildingCard() {
             <label><span class="field-name">Building</span><select class="mb-building"></select></label>
             <label><span class="field-name">Population</span><select class="mb-population"></select></label>
             <label><span class="field-name">Equipment</span><select class="mb-equipment"></select></label>
-            <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
+            <label><span class="field-name">Seed</span><input type="number" class="mb-seed" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="scenario default"></label>
             <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="blank = no scaling; enter to scale max→this"></label>
@@ -681,6 +681,10 @@ function createBuildingCard() {
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
+    // Default seed = the card's monotonic index → 1st building is 0, each new
+    // one increments (0, 1, 2, …). Distinct seeds give independent realizations;
+    // the user can still edit it, and loading a config restores the saved seed.
+    card.querySelector(".mb-seed").value = idx;
     populateCardKnobs(card);          // generic Advanced panel
     populateCardPerturbations(card);  // consolidated noise + weather panel
 
@@ -744,7 +748,9 @@ function createBuildingCard() {
     card.querySelector(".mb-dup").addEventListener("click", () => {
         const clone = createBuildingCard();
         document.getElementById("building-cards").appendChild(clone);
-        setCardValues(clone, cardToSpec(card));
+        const spec = cardToSpec(card);
+        spec.seed = parseInt(clone.dataset.cardId, 10);  // distinct seed, not the source's
+        setCardValues(clone, spec);
         renumberBuildingCards();
     });
     card.querySelector(".mb-remove").addEventListener("click", () => {
@@ -800,7 +806,7 @@ function cardToSpec(card) {
         base_scenario: card.querySelector(".mb-base").value,
         descriptors,
         overrides,
-        seed: parseInt(card.querySelector(".mb-seed").value, 10) || 42,
+        seed: (v => Number.isNaN(v) ? 0 : v)(parseInt(card.querySelector(".mb-seed").value, 10)),
         noise_profile: card.querySelector(".mb-noise").value || null,
         weather_profile: card.querySelector(".mb-weather").value || null,
         policy: card.querySelector(".mb-policy").value || null,

@@ -55,15 +55,22 @@ def test_ui_cards_knobs_and_duplicate(page, server):
     assert page.locator("#u-noise").count() == 0           # noise removed from Run settings
     assert first.locator(".mb-noise").count() == 1         # noise is per-card
 
-    # add a 2nd building
+    # seed defaults to 0 for the first building
+    assert first.locator(".mb-seed").input_value() == "0"
+
+    # add a 2nd building → its seed increments
     page.click("#add-building")
     assert page.locator(".building-card").count() == 2
+    assert page.locator(".building-card").nth(1).locator(".mb-seed").input_value() == "1"
 
-    # set a distinctive value on card 0, duplicate → clone carries it
+    # set a distinctive value on card 0, duplicate → clone carries it but gets a
+    # fresh (distinct) seed, not the source's 0
     page.locator(".building-card").first.locator(".mb-ev-count").fill("17")
     page.locator(".building-card").first.locator(".mb-dup").click()
     assert page.locator(".building-card").count() == 3
-    assert page.locator(".building-card").last.locator(".mb-ev-count").input_value() == "17"
+    last = page.locator(".building-card").last
+    assert last.locator(".mb-ev-count").input_value() == "17"
+    assert last.locator(".mb-seed").input_value() != "0"
 
 
 @pytest.mark.browser
