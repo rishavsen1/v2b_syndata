@@ -653,7 +653,7 @@ function createBuildingCard() {
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="scenario default"></label>
-            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="blank = no scaling; enter to scale max→this"></label>
+            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="enter to scale peak"></label>
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(90)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
