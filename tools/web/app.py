@@ -66,13 +66,15 @@ def load_descriptors() -> dict:
                 entry["tmyx_station"] = v["tmyx_station"]
             entries.append(entry)
         out[category] = entries
-    # noise descriptors are a simpler shape (noise_profiles.yaml)
-    with open(CONFIGS / "noise_profiles.yaml") as f:
-        nd = yaml.safe_load(f) or {}
-    out["noise"] = [
-        {"id": k, "description": (v.get("description") or "") if isinstance(v, dict) else ""}
-        for k, v in nd.items()
-    ]
+    # noise + weather profiles are a simpler shape (one yaml each); their
+    # descriptions carry the per-channel breakdown shown in the UI dropdowns.
+    for cat, fname in (("noise", "noise_profiles.yaml"), ("weather", "weather_profiles.yaml")):
+        with open(CONFIGS / fname) as f:
+            pd_ = yaml.safe_load(f) or {}
+        out[cat] = [
+            {"id": k, "description": (v.get("description") or "") if isinstance(v, dict) else ""}
+            for k, v in pd_.items()
+        ]
     return out
 
 

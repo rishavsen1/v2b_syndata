@@ -657,12 +657,7 @@ function createBuildingCard() {
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(90)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
-            <label><span class="field-name">Weather noise (pre-generation)</span><select class="mb-weather">
-                <option value="none">none</option>
-                <option value="slight">slight (±1°C)</option>
-                <option value="moderate">moderate (±2.5°C)</option>
-                <option value="strong">strong (±5°C)</option>
-            </select></label>
+            <label><span class="field-name">Weather noise (pre-generation)</span><select class="mb-weather"></select></label>
             <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
@@ -683,6 +678,9 @@ function createBuildingCard() {
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
+    // Weather profiles: options + their per-channel breakdown come from
+    // weather_profiles.yaml (descriptions), so the UI never drifts from config.
+    mbFillSelect(card.querySelector(".mb-weather"), DESCRIPTORS.weather, null);
     // Default seed = the card's monotonic index → 1st building is 0, each new
     // one increments (0, 1, 2, …). Distinct seeds give independent realizations;
     // the user can still edit it, and loading a config restores the saved seed.
