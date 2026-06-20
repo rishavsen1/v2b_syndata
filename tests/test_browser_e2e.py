@@ -68,18 +68,20 @@ def test_ui_cards_knobs_and_duplicate(page, server):
 
 @pytest.mark.browser
 def test_ui_perturbations_panel_and_high_low_sync(page, server):
-    """The consolidated Perturbations panel holds the noise-profile dropdown +
-    all jitter/weather dials, and picking a profile (high-level) snaps the
-    individual jitter widgets (low-level) to that profile's values."""
+    """Both noise selectors are per-card inputs (weather before building-load);
+    the detail panel holds the jitter/weather dials, and picking a building-load
+    noise profile snaps the individual jitter dials to its values."""
     page.goto(server + "/", wait_until="networkidle")
     page.wait_for_selector(".building-card")
     card = page.locator(".building-card").first
 
-    # both perturbation layers are per-card, in the Perturbations panel
+    # both noise selectors live in the building's input grid (not the detail panel)
+    assert card.locator(".descriptor-grid .mb-noise").count() == 1     # building load noise (output)
+    assert card.locator(".descriptor-grid .mb-weather option[value='moderate']").count() == 1  # weather (input)
+    assert page.locator("#u-weather-profile").count() == 0            # not in Run settings anymore
+    assert card.locator(".mb-peak-scaling").count() == 0              # scaling checkbox removed
+    # the dials live in the detail panel
     card.locator(".mb-perturb > summary").click()
-    assert card.locator(".mb-perturb .mb-noise").count() == 1     # noise layer (output)
-    assert card.locator(".mb-perturb .mb-weather option[value='moderate']").count() == 1  # weather (input)
-    assert page.locator("#u-weather-profile").count() == 0        # not in Run settings anymore
     assert card.locator(".card-perturb-knobs .knob[data-path='noise.building_load_jitter_pct']").count() == 1
     assert card.locator(".card-perturb-knobs .knob[data-path='building_load.weather_temp_offset_c']").count() == 1
     # …and those perturbation knobs are NOT duplicated in the generic Advanced panel
@@ -109,8 +111,7 @@ def test_ui_full_generate(page, server, tmp_path):
     for i in (0, 1):
         cards.nth(i).locator(".mb-ev-count").fill(str(3 + i * 4))   # 3 and 7
         cards.nth(i).locator(".mb-charger-count").fill(str(3 + i * 4))
-        cards.nth(i).locator(".mb-perturb > summary").click()      # noise lives here now
-        cards.nth(i).locator(".mb-noise").select_option("clean")
+        cards.nth(i).locator(".mb-noise").select_option("clean")    # now a grid input
     page.fill("#u-output-path", str(tmp_path / "run"))
     page.fill("#u-samples", "1")
     page.click("#generate-btn")

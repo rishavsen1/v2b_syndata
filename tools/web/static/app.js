@@ -651,30 +651,27 @@ function createBuildingCard() {
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" value="42" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
             <label><span class="field-name">Charger count</span><input type="number" class="mb-charger-count" min="1" placeholder="scenario default"></label>
-            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="scenario default"></label>
-            <label><span class="field-name">Peak kW scaling</span><span style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" class="mb-peak-scaling" checked><span class="small" style="color:#666">lock max→peak_kw</span></span></label>
+            <label><span class="field-name">Peak kW</span><input type="number" class="mb-peak-kw" min="50" step="10" placeholder="blank = no scaling; enter to scale max→this"></label>
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
-            <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(100)"></label>
+            <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(90)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
+            <label><span class="field-name">Weather noise (pre-generation)</span><select class="mb-weather">
+                <option value="none">none</option>
+                <option value="slight">slight (±1°C)</option>
+                <option value="moderate">moderate (±2.5°C)</option>
+                <option value="strong">strong (±5°C)</option>
+            </select></label>
+            <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
         <details class="mb-perturb">
-            <summary>Perturbations (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">Two layers. <strong>Noise layer</strong> (below) perturbs this building's <em>produced</em> CSVs (load, sessions, prices) after generation — pick a profile and the jitter dials snap to it; change any to override. The fixed <strong>weather offset</strong> shifts this building's simulated &amp; exported weather together (a physical, input-side change). For <em>per-sample</em> weather realizations use the “Weather perturbation” profile in Run settings.</p>
-            <div class="mb-perturb-profiles">
-                <label class="mb-perturb-profile"><span class="field-name">Noise layer (output)</span><select class="mb-noise"></select></label>
-                <label class="mb-perturb-profile"><span class="field-name">Weather perturbation (input)</span><select class="mb-weather">
-                    <option value="none">none</option>
-                    <option value="slight">slight (±1°C)</option>
-                    <option value="moderate">moderate (±2.5°C)</option>
-                    <option value="strong">strong (±5°C)</option>
-                </select></label>
-            </div>
+            <summary>Perturbation details (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">Fine-grained dials behind the two noise selectors above. <strong>Building load noise</strong> jitters the <em>produced</em> CSVs (load/sessions/prices) post-generation — the dials snap to the selected profile; change any to override. <strong>Weather noise</strong>'s fixed offset shifts this building's simulated &amp; exported weather (the selector above instead draws a per-sample offset).</p>
             <div class="card-perturb-knobs"></div>
         </details>
         <details class="mb-adv">
             <summary>Advanced — knobs (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">Every other <code>configs/knobs.yaml</code> knob, scoped to this building (noise + weather perturbations are in the Perturbations panel above). Defaults show the resolved value for this card's base scenario + descriptors; change any to override (the quick-fields above take precedence for EV/charger/peak/SoC).</p>
+            <p class="hint" style="margin:0.3rem 0">Every other <code>configs/knobs.yaml</code> knob, scoped to this building (noise + weather perturbations are in the inputs + Perturbation details above). Defaults show the resolved value for this card's base scenario + descriptors; change any to override (the quick-fields above take precedence for EV/charger/peak/SoC).</p>
             <div class="card-knob-buckets"></div>
         </details>
     `;
@@ -796,7 +793,9 @@ function cardToSpec(card) {
         const v = parseFloat(raw);
         if (!isNaN(v)) overrides[key] = v;
     }
-    overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-scaling").checked;
+    // Peak-kW scaling is off unless a Peak kW value is entered — then we scale
+    // the load so its max hits that value (no separate toggle).
+    overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-kw").value !== "";
     return {
         base_scenario: card.querySelector(".mb-base").value,
         descriptors,
@@ -821,10 +820,8 @@ function setCardValues(card, b) {
     for (const [key, sel] of Object.entries(QUICK_KEYS)) {
         if (key in o) { card.querySelector(sel).value = o[key]; delete o[key]; }
     }
-    if ("building_load.peak_kw_scaling" in o) {
-        card.querySelector(".mb-peak-scaling").checked = !!o["building_load.peak_kw_scaling"];
-        delete o["building_load.peak_kw_scaling"];
-    }
+    // peak_kw_scaling is derived from whether Peak kW is set (no widget); drop it.
+    delete o["building_load.peak_kw_scaling"];
     card._ctx.overrides = o;            // remaining → per-card knob panel
     syncCardKnobWidgets(card);
     if (card._refresh) card._refresh();  // re-resolve + placeholders + SoC check

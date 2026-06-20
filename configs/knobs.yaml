@@ -57,8 +57,8 @@ ev_fleet:
   max_allowed_soc:
     type: float
     range: [0.0, 100.0]
-    default: 100.0
-    description: "Upper SoC bound (%) applied to EVERY car in cars.csv, overriding the per-battery-class default. Default 100 matches the battery-class spec (bit-identical). Caps required_soc_at_depart and the arrival-SoC band."
+    default: 90.0
+    description: "Upper SoC bound (%) applied to EVERY car in cars.csv, overriding the per-battery-class default. Default 90 (typical real-world charge ceiling; was 100 pre-2026-06). Caps required_soc_at_depart and the arrival-SoC band."
     affects_csv: [cars.csv, sessions.csv]
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ def test_default_band_unchanged(fast_generate):
     out, _ = fast_generate(seed=5, overrides={"ev_fleet.ev_count": 8})
     cars = pd.read_csv(out / "cars.csv")
     assert sorted(cars["min_allowed_soc"].unique()) == [10.0]
-    assert sorted(cars["max_allowed_soc"].unique()) == [100.0]
+    assert sorted(cars["max_allowed_soc"].unique()) == [90.0]  # default lowered 100→90
 
 
 def test_override_band_applies_to_all_cars(fast_generate):
@@ -33,7 +33,7 @@ def test_explicit_default_is_bit_identical(fast_generate):
     b, _ = fast_generate(seed=5, overrides={
         "ev_fleet.ev_count": 8,
         "ev_fleet.min_allowed_soc": 10.0,
-        "ev_fleet.max_allowed_soc": 100.0,
+        "ev_fleet.max_allowed_soc": 90.0,  # match the new default
     })
     for name in ("cars.csv", "sessions.csv"):
         assert filecmp.cmp(a / name, b / name, shallow=False), name
