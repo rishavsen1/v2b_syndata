@@ -233,6 +233,28 @@ def test_weather_sigma_drives_per_sample_realizations(tmp_path, config_dir, stub
     assert offs2 == offsets
 
 
+def test_weather_profile_changes_weather_and_load(tmp_path, config_dir, stub_weather):
+    """End-to-end guard: a non-trivial weather profile actually changes the
+    EXPORTED weather_data.csv AND the simulated load vs `none` — not just the
+    pinned override. (The autouse load stub carries a +3%/°C sensitivity.)"""
+    def run(profile):
+        out = tmp_path / profile
+        specs = [BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                              overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4},
+                              seed=1, weather_profile=profile)]
+        generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir,
+                             start_month="2021-09", end_month="2021-09", samples_per_month=1,
+                             workers=1, noise_profile="clean")
+        wx = pd.read_csv(out / "SEP2021" / "0" / "weather_data.csv")
+        bl = pd.read_csv(out / "SEP2021" / "0" / "building_load.csv")
+        return wx["dry_bulb_temp_c"].mean(), bl["power_kw_flexible"].sum()
+
+    t_none, l_none = run("none")
+    t_strong, l_strong = run("strong")
+    assert abs(t_strong - t_none) > 0.5, f"weather NOT perturbed: none={t_none} strong={t_strong}"
+    assert abs(l_strong - l_none) > 1.0, f"load did NOT respond: none={l_none} strong={l_strong}"
+
+
 def test_per_building_weather_profile(tmp_path, config_dir, stub_weather):
     """Each building's own weather_profile wins over the batch default — building 0
     (none) gets no weather offset, building 1 (strong) does."""
