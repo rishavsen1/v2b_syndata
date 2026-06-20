@@ -442,6 +442,13 @@ pre {
 .mb-globals .field-name { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
 .mb-globals select, .mb-globals input { width: 100%; }
 
+/* Perturbations panel: the two profile dropdowns (Noise layer / Weather) sit
+   side by side, each a stacked label→select column, wrapping when narrow. */
+.mb-perturb-profiles { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.4rem 0 0.6rem; }
+.mb-perturb-profile { display: flex; flex-direction: column; gap: 0.25rem; min-width: 220px; flex: 1; }
+.mb-perturb-profile .field-name { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.mb-perturb-profile select { width: 100%; }
+
 .building-card {
     border: 1px solid var(--border, #ddd);
     border-radius: 8px;
