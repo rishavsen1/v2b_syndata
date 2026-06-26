@@ -18,12 +18,13 @@ that section's prefix. Keep `Source/Ref` pointing at the authoritative doc or
 | `docs/GENERATIVE_MODELS.md` | Why each distribution family was chosen. |
 | **`docs/PROJECT_TRACKER.md`** | **This file — the live to-do / conventions list.** |
 
-`docs/KNOB_REFERENCE.md`, `docs/MODEL_SELECTION.md`, `docs/PAIRWISE_AUDIT.md`,
-`docs/KNOB_AUDIT_S1.md`, `docs/KNOB_AUDIT_S2.md` are **auto-generated** — do not
-edit by hand and do not track their internal numbers here; rerun their
-generators (see DESIGN_NOTES / tool headers) and treat them as source-of-truth
-for their own metrics. Items below *mirror* their open conclusions for
-visibility only.
+`docs/CALIBRATION_RESULTS.md`, `docs/KNOB_REFERENCE.md`, `docs/MODEL_SELECTION.md`,
+`docs/PAIRWISE_AUDIT.md`, `docs/KNOB_AUDIT_S1.md`, `docs/KNOB_AUDIT_S2.md` are
+**auto-generated** — do not edit by hand and do not track their internal numbers
+here; rerun their generators (see DESIGN_NOTES / tool headers) and treat them as
+source-of-truth for their own metrics. (`CALIBRATION_RESULTS.md` is emitted by
+`tools/validate_calibration.py`; rebuild it cheaply from existing CSVs with
+`--md-only`.) Items below *mirror* their open conclusions for visibility only.
 
 _Last updated: 2026-06-26._
 
@@ -116,6 +117,7 @@ New, dated decisions go here; the **historical numbered decision log lives in
 | Date | Decision | Ref |
 |---|---|---|
 | 2026-06-26 | Consolidated docs to 5 hand-written files (README + DESIGN_NOTES + CALIBRATION_NOTES + GENERATIVE_MODELS + this tracker); auto-generated docs kept in place; point-in-time reports moved to `docs/archive/`. | this file |
+| 2026-06-26 | `tools/validate_calibration.py` now emits `docs/CALIBRATION_RESULTS.md` (faithfulness S1–S6 summary) as a committed auto-generated doc; bulky CSVs/PNGs stay git-ignored. | validate_calibration.py |
 
 ---
 

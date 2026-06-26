@@ -7,7 +7,9 @@ parameters in `configs/populations.yaml`.
 > number** from `populations.yaml`, scenario configs, and code — do not
 > renumber. Renderer / noise / building-load engineering notes that used to
 > live here moved to [`DESIGN_NOTES.md`](DESIGN_NOTES.md); open items live in
-> [`PROJECT_TRACKER.md`](PROJECT_TRACKER.md).
+> [`PROJECT_TRACKER.md`](PROJECT_TRACKER.md). The faithfulness **results** — how
+> closely generated data matches each source — are auto-generated in
+> [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md) by `tools/validate_calibration.py`.
 
 ## 1. Filter chain
 
