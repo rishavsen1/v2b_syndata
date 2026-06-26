@@ -25,7 +25,7 @@ def fetch_all_sessions(
 
     Caches to cache_dir/<site>_<start>_<end>.json. Re-uses cache if present.
     Token only required when an actual HTTP fetch is needed; cache hits
-    bypass token resolution entirely (B1 fix from AUDIT_REPORT.md).
+    bypass token resolution entirely (B1 fix from docs/archive/AUDIT_REPORT.md).
     """
     cache_path: Path | None = None
     if cache_dir is not None:

@@ -69,7 +69,7 @@ def populated_cache(tmp_path: Path, monkeypatch) -> Path:
 
     NOTE: also sets a dummy ACN_API_TOKEN — workaround for B1 bug
     (acn_fetcher reads token at function entry even when cache hits).
-    See AUDIT_REPORT.md.
+    See docs/archive/AUDIT_REPORT.md.
     """
     monkeypatch.setenv("ACN_API_TOKEN", "dummy_for_cache_only")
     cache = tmp_path / "acn_cache"

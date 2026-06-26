@@ -275,9 +275,9 @@ For *why* each random quantity uses the distribution family it does, and which
 ground-truth features fit each parameter, see
 [`docs/GENERATIVE_MODELS.md`](docs/GENERATIVE_MODELS.md).
 
-## Step 3 status
+## Status
 
-This implementation uses **stubs** for EnergyPlus (sinusoid building load) and DR events (deterministic mock events). Real integrations land in Steps 4 and 6. See `docs/DESIGN_NOTES.md` for non-trivial implementation choices.
+EnergyPlus building load and DR events are fully integrated (not stubs). See `docs/DESIGN_NOTES.md` for non-trivial implementation choices and `docs/PROJECT_TRACKER.md` for the live backlog (open items, conventions, deferred work).
 
 ## Tests
 

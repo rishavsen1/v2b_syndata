@@ -1,0 +1,130 @@
+# Project Tracker
+
+The single live, hand-maintained backlog for `v2b_syndata`: conventions
+(dos & don'ts), open items, wanted improvements, consciously-deferred work,
+items blocked on external data, a forward decision log, and a done log.
+
+**How to add a row:** append to the right section's table with the next ID in
+that section's prefix. Keep `Source/Ref` pointing at the authoritative doc or
+`file:line` so a reader can reconcile.
+
+**How this relates to the other docs (the consolidated set):**
+
+| Doc | Role |
+|---|---|
+| `README.md` | Entry point — install, run, schema, model overview. |
+| `docs/DESIGN_NOTES.md` | Historical, numbered implementation-decision log (cited *by section number* from source — never renumber). |
+| `docs/CALIBRATION_NOTES.md` | How the fit is run and what it biases (cited *by item number* from configs/scenarios/code — never renumber). |
+| `docs/GENERATIVE_MODELS.md` | Why each distribution family was chosen. |
+| **`docs/PROJECT_TRACKER.md`** | **This file — the live to-do / conventions list.** |
+
+`docs/KNOB_REFERENCE.md`, `docs/MODEL_SELECTION.md`, `docs/PAIRWISE_AUDIT.md`,
+`docs/KNOB_AUDIT_S1.md`, `docs/KNOB_AUDIT_S2.md` are **auto-generated** — do not
+edit by hand and do not track their internal numbers here; rerun their
+generators (see DESIGN_NOTES / tool headers) and treat them as source-of-truth
+for their own metrics. Items below *mirror* their open conclusions for
+visibility only.
+
+_Last updated: 2026-06-26._
+
+---
+
+## Conventions — Dos & Don'ts
+
+Load-bearing invariants and habits that must not be silently violated.
+
+| ID | Rule | Area | Source/Ref |
+|---|---|---|---|
+| C1 | **DON'T** downgrade D3 to a soft-check for noisy outputs — keep D3 a hard invariant and clamp at noise-injection time. | noise | AUDIT_REPORT (O-series), DESIGN_NOTES D25 |
+| C2 | **DON'T** generally clip post-jitter values — accepting that real noise can break invariants is the D25 design; only the specific C4/D6/D5 bounds are enforced. | noise | EDGE_CASE_REPORT |
+| C3 | **DON'T** treat E5 concurrency as a sampler guarantee — the sampler enforces only D5 reachability; size charger pools to the fleet or scenarios silently emit E5-infeasible CSVs (`--strict-e5` to fail loudly). | sampler | DESIGN_NOTES #30, EDGE_CASE_REPORT |
+| C4 | **DON'T** derive arrival-SoC from `kWhRequested` (`1 − req/cap`) — ACN delivered/requested ≈ 0.58 contradicts it; arrival SoC is a fixed Beta(4,6) prior. | calibration | README, GENERATIVE_MODELS |
+| C5 | **DON'T** mix INL legacy-fleet data with modern-battery scenarios (battery-capacity assumptions diverge). | calibration | CALIBRATION_NOTES |
+| C6 | **DON'T** `>`-redirect `docs-gen` over a `KNOB_REFERENCE.md` that has a hand-written tail — `docs-gen` prints only the auto section to stdout, so a naive redirect clobbers the tail. | docs | cli.py docs-gen |
+| C7 | **DO** document that `lat`/`lon` are metadata-only/decorative without `tmyx_station`; weather signal comes from the EPW/TMYx. | calibration | AUDIT_REPORT N1, KNOB_REFERENCE |
+| C8 | **DO** treat line-coverage as advisory; re-run if it segfaults under `--cov` (pandas/yaml C-ext); clear the 90% gate without chasing EnergyPlus-gated infrastructure lines. | testing | COVERAGE_REPORT |
+| C9 | **DO** investigate whenever `unassigned_user_rate > 20%`. | calibration | CALIBRATION_NOTES |
+| C10 | **DO** keep the web server off the public internet (no auth); LAN exposure requires an explicit `app.py` host change. Same base+seed+no-overrides must stay bitwise-identical to the CLI. | web | tools/web/README.md |
+
+---
+
+## Open Items
+
+Active bugs / gaps currently in scope.
+
+| ID | Item | Area | Source/Ref |
+|---|---|---|---|
+| O1 | **B2:** EnergyPlus SIGSEGV on `mixed_use_v1` × hot climate (houston_tx, atlanta_ga) — check `mixed_use_v1.idf` cooling-coil sizing / condenser temps. Transient / not always reproducible. | energyplus | AUDIT_REPORT |
+| O2 | **O3:** multi-population calibration not audited — run real ACN-Data calibration per `--population` for `stable_commuter_heavy` and `occasional_visitor_dominant`. | calibration | AUDIT_REPORT |
+| O3 | **O2:** CLI auto-validate skips when any jitter knob is non-zero (`cli.py:33-43`) — either auto-validate noisy outputs with relaxed thresholds or enforce hard-invariant clamps at noise-injection time. | validation | AUDIT_REPORT |
+| O4 | `GENERATIVE_MODELS.md` internal inconsistency: summary-table `depart_soc_mu` default (85, L54) disagrees with prose default (50, L196) — reconcile. | modeling | GENERATIVE_MODELS |
+| O5 | Coverage low-hanging tests: `cli.py` cmd_generate/cmd_validate/list-knobs/list-scenarios subprocess tests; `knob_loader._check_type_and_range` malformed-value; `validate._load_csv/_load_manifest` empty-dir; `dag.py` duplicate-register raise (L78); `runner.py` custom sim_window missing start/end; ~5 `validate.py` error-branch fault-injection. | tests | COVERAGE_REPORT |
+
+---
+
+## Wanted
+
+Modeling/feature improvements not yet scheduled.
+
+| ID | Item | Area | Source/Ref |
+|---|---|---|---|
+| W1 | Arrival-hour `TruncNorm[6,20]` is the weakest link: unimodal model of a bimodal quantity; clips ~8.3% of arrivals at the 6:00/20:00 bounds. GaussMix-2 fits far better (KS 0.029 vs 0.108). *(Partly addressed — ACN now ships a 2-component `truncnorm_mixture`; this tracks generalizing it.)* | arrival | GENERATIVE_MODELS, README, MODEL_SELECTION |
+| W2 | KDE/GMM beat the current TruncNorm (arrival) and Weibull (dwell) marginals on the large datasets — pilot GMM-2 for arrival+dwell on ONE region behind a flag and re-run `model_eval` before any generator change. | modeling | MODEL_SELECTION |
+| W3 | Arrival distributions are pooled per population, not per region — `stable_commuter_heavy` and `visitor_heavy` `region_distributions` still TODO. | calibration | CALIBRATION_NOTES |
+| W4 | `kappa` metric is origin-dependent — make it origin-invariant (circular or std-based) and re-tune the `axes_distribution` grid. | metric | MODEL_SELECTION, CALIBRATION_NOTES |
+| W5 | Frank copula fits arrival × dwell better than the chosen Gaussian copula (kept for closed-form marginal-inverse-CDF coupling); copula transform bias documented but not corrected (needs likelihood-based per-region fit). | copula | GENERATIVE_MODELS, CALIBRATION_NOTES |
+| W6 | `required_soc_at_depart` is still hardcoded `TruncNorm(85,5)` — split into its own `f_required_soc` distribution with copula linkage to arrival SoC. | soc | CALIBRATION_NOTES, DESIGN_NOTES #22 |
+| W7 | Departure-SoC Beta fit is partly synthetic (real signal is delivered/capacity, mean ~0.30) and inherits the arrival prior's shape. | soc | GENERATIVE_MODELS |
+| W8 | `axes_distribution` region weights are stale vs the corrected ACN cohort mix after the 2026-06 UTC→Pacific fix; re-anchor regions on the empirical (φ,κ) joint observed in ACN. | validation | MODEL_SELECTION, CALIBRATION_NOTES, AUDIT_REPORT |
+| W9 | Revisit parametric family choice (TruncNorm/Weibull/Beta) — several marginal fits are poor. | family | CALIBRATION_NOTES |
+| W10 | Tighten `F_SHARE_TOL` from 0.20 back toward the spec 0.05 as larger-fleet scenarios land. | validation | DESIGN_NOTES |
+
+---
+
+## Deferred
+
+Consciously postponed, with the gating condition.
+
+| ID | Item | Gate | Source/Ref |
+|---|---|---|---|
+| F1 | NHTS-anchored δ calibration (region re-anchor). | consent_default region match improving past 2/5 regions | CALIBRATION_NOTES, AUDIT_REPORT |
+| F2 | Held-out KS validation (train/test split or bootstrap); `ks_fit_quality` is currently training-set only and S2 emits a placeholder warning. | — | CALIBRATION_NOTES, AUDIT_REPORT |
+| F3 | S3 holdout currently evaluates a single TruncNorm (not the shipped mixture) — broaden once held-out KS lands. | F2 | MODEL_SELECTION, CALIBRATION_NOTES |
+| F4 | AMY weather support for DR sweeps (D37); ASHRAE climate-zone prototype-variant switch is a one-line `PROTOTYPE_MAP` change. | — | DESIGN_NOTES |
+| F5 | D5 energy-reachability may still fail at max `arrival_time_jitter`; H2 fails under `price_jitter` — both accepted as legitimate noise-contract skips, no fix. | — (documented boundary) | DESIGN_NOTES, EDGE_CASE_REPORT |
+| F6 | Full Stage-2 knob-audit re-run for the Dirichlet/`region_distributions` knobs (skipped in favor of the test suite; `occasional_visitor` deep-channel leaves pass only via counter-flip tolerance). | — | CALIBRATION_NOTES, KNOB_AUDIT_S2 |
+
+---
+
+## Blocked — external data / access
+
+| ID | Item | Area | Source/Ref |
+|---|---|---|---|
+| K1 | EV WATTS is fixture-only (~64 synthetic sessions) — confirm columns vs the real livewire release & bump `SCHEMA_VERSION`; real bulk behind portal/NDA (`EVWATTS_BULK_URL` hook). | evwatts | CALIBRATION_NOTES |
+| K2 | INL is fixture-only (~65 synthetic sessions) — confirm columns vs avt.inl.gov Phase 1 & bump `SCHEMA_VERSION`; session CSV not public (`INL_BULK_URL` hook, needs direct INL contact). | inl | CALIBRATION_NOTES |
+| K3 | Arrival SoC is unobservable — no charger records SoC, so no model comparison is possible (honest Beta(4,6) prior, not a fit). | soc | GENERATIVE_MODELS |
+| K4 | DR per-event reduction magnitudes use a flat Uniform prior — no published per-event reduction targets available. | dr | GENERATIVE_MODELS |
+| K5 | Source residential / transit-fleet populations from additional datasets to replace synthetic stand-ins. | calibration | CALIBRATION_NOTES |
+
+---
+
+## Decisions Log (forward-looking)
+
+New, dated decisions go here; the **historical numbered decision log lives in
+`docs/DESIGN_NOTES.md`** (cited by section number from source code).
+
+| Date | Decision | Ref |
+|---|---|---|
+| 2026-06-26 | Consolidated docs to 5 hand-written files (README + DESIGN_NOTES + CALIBRATION_NOTES + GENERATIVE_MODELS + this tracker); auto-generated docs kept in place; point-in-time reports moved to `docs/archive/`. | this file |
+
+---
+
+## Done
+
+Closed items kept for provenance.
+
+| ID | Item | Source/Ref |
+|---|---|---|
+| ✔1 | C4 forward-shift jitter bound, D6 arrival_soc clamp to required−0.1, D5 post-jitter truncation (`_enforce_d5_post_jitter`) + manifest stats — all landed in `noise.py`. | EDGE_CASE_REPORT (V2-followup) |
+| ✔2 | E5 hybrid enforcement (warning + manifest + `--strict-e5`, `e5_metrics.py`) landed. | EDGE_CASE_REPORT, DESIGN_NOTES #30 |
+| ✔3 | Arrival/dwell/departure-SoC fit issues from the README known-issues list addressed (mixture-aware fits, clamp-artifact and over-pile-at-100% corrections). | README (FIXED items) |

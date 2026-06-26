@@ -64,7 +64,7 @@ Every test asserts:
   sampler enforces. **E5 concurrency** (active ≤ chargers) is a *validator*
   invariant — the sampler does not pre-allocate slots; under
   pathological knob combinations (massive ev_count vs tiny chargers) E5 can
-  trip. Documented in `CALIBRATION_NOTES.md #12`.
+  trip. Documented in `DESIGN_NOTES.md` #12 (moved from CALIBRATION_NOTES, 2026-06).
 - **Degenerate population fractions** (single negotiation type / single
   battery class / 1 EV) cleanly violate F1-F5 share invariants by
   construction. The sampler generates correctly; only the validator's
@@ -229,7 +229,7 @@ allows users to opt out for stress-testing or calibration scenarios.
 ## V2-followup status (applied)
 
 Both jitter fixes and E5 hybrid enforcement landed; see DESIGN_NOTES
-#30 + #31 and CALIBRATION_NOTES #13 + #14.
+#30 + #31 and DESIGN_NOTES #13 + #14 (moved from CALIBRATION_NOTES, 2026-06).
 
 | Item | Status |
 |---|---|
