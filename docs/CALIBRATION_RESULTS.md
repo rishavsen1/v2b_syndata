@@ -10,12 +10,12 @@ _Generated 2026-06-27._ Generated sessions are pooled across seeds and compared,
 
 ## At a glance
 
-- **S0 assignment** — drivers matching no region box (unassigned): acn 0%, elaadnl 76%.
-- **S1 marginals** — mean |Δμ| 0.32 h across all region×variable cells; KS ≤ 0.22.
-- **S2 joint** — max Spearman ρ-gap 0.029; the arrival×dwell copula is reproduced.
-- **S3 held-out** — median Δ(holdout − train KS) 0.001; no systematic overfit.
+- **S0 assignment** — drivers matching no region box (unassigned): acn 0%, elaadnl 0%.
+- **S1 marginals** — mean |Δμ| 0.33 h across all region×variable cells; KS ≤ 0.22.
+- **S2 joint** — max Spearman ρ-gap 0.032; the arrival×dwell copula is reproduced.
+- **S3 held-out** — median Δ(holdout − train KS) 0.002; no systematic overfit.
 - **S5 building load** — 1/4 within the PNNL peak/off-peak band, 3/4 within the weekday/weekend band.
-- **S6 weekly rhythm** — max weekday/weekend ratio gap 0.04 dex.
+- **S6 weekly rhythm** — max weekday/weekend ratio gap 0.06 dex.
 
 ## S0 — How real drivers are grouped into regions
 
@@ -29,10 +29,11 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 | acn | regular charger | 146 | 23.0% |
 | acn | erratic | 0 | 0.0% |
 | acn |   unassigned   | 3 | 0.5% |
-| elaadnl | daily commuter | 64 | 5.2% |
-| elaadnl | weekday only | 229 | 18.6% |
-| elaadnl | sparse | 0 | 0.0% |
-| elaadnl |   unassigned   | 938 | 76.2% |
+| elaadnl | erratic | 0 | 0.0% |
+| elaadnl | occasional consistent | 413 | 33.6% |
+| elaadnl | weekly consistent | 409 | 33.2% |
+| elaadnl | regular commuter | 409 | 33.2% |
+| elaadnl |   unassigned   | 0 | 0.0% |
 
 ## S1 — Per-region marginals
 
@@ -44,10 +45,12 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 | acn | rare consistent | dwell hours | 4,723 | 380 | 5.29/5.91 | 5.51/3.69 | 0.21 | 0.121 | 0.87 |
 | acn | regular charger | arrival hour | 18,724 | 3,696 | 9.44/3.64 | 9.95/3.15 | 0.50 | 0.191 | 0.68 |
 | acn | regular charger | dwell hours | 18,724 | 3,696 | 6.98/3.59 | 6.93/3.33 | 0.05 | 0.130 | 0.83 |
-| elaadnl | daily commuter | arrival hour | 8,029 | 3,116 | 8.89/1.67 | 8.90/1.67 | 0.00 | 0.176 | 0.48 |
-| elaadnl | daily commuter | dwell hours | 8,029 | 3,116 | 7.34/2.59 | 7.23/2.40 | 0.11 | 0.159 | 0.58 |
-| elaadnl | weekday only | arrival hour | 19,266 | 6,083 | 9.12/1.79 | 9.09/1.79 | 0.02 | 0.160 | 0.48 |
-| elaadnl | weekday only | dwell hours | 19,266 | 6,083 | 6.83/2.50 | 6.76/2.36 | 0.08 | 0.135 | 0.48 |
+| elaadnl | occasional consistent | arrival hour | 5,660 | 254 | 9.72/2.03 | 9.41/2.06 | 0.31 | 0.171 | 0.33 |
+| elaadnl | occasional consistent | dwell hours | 5,660 | 254 | 5.69/2.54 | 5.58/2.19 | 0.11 | 0.117 | 0.45 |
+| elaadnl | regular commuter | arrival hour | 32,549 | 4,697 | 9.00/1.71 | 9.23/1.84 | 0.23 | 0.114 | 0.24 |
+| elaadnl | regular commuter | dwell hours | 32,549 | 4,697 | 7.04/2.50 | 6.96/2.37 | 0.08 | 0.135 | 0.49 |
+| elaadnl | weekly consistent | arrival hour | 13,623 | 943 | 9.31/1.82 | 9.16/1.82 | 0.15 | 0.124 | 0.17 |
+| elaadnl | weekly consistent | dwell hours | 13,623 | 943 | 6.41/2.47 | 6.35/2.32 | 0.06 | 0.123 | 0.45 |
 
 ## S2 — Joint structure (arrival × dwell)
 
@@ -56,8 +59,9 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 | acn | occasional consistent | 17,313 | -0.627 | -0.624 | 0.002 |
 | acn | rare consistent | 4,723 | -0.544 | -0.515 | 0.029 |
 | acn | regular charger | 18,724 | -0.572 | -0.562 | 0.010 |
-| elaadnl | daily commuter | 8,029 | -0.494 | -0.480 | 0.014 |
-| elaadnl | weekday only | 19,266 | -0.518 | -0.513 | 0.005 |
+| elaadnl | occasional consistent | 5,660 | -0.583 | -0.576 | 0.008 |
+| elaadnl | regular commuter | 32,549 | -0.519 | -0.488 | 0.032 |
+| elaadnl | weekly consistent | 13,623 | -0.553 | -0.549 | 0.004 |
 
 ## S3 — Held-out generalization (80/20 by user)
 
@@ -71,10 +75,12 @@ _Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival rows
 | acn | rare consistent | dwell hours | 4,134 | 589 | 0.068 | 0.262 | +0.194 |
 | acn | regular charger | arrival hour | 16,864 | 1,860 | 0.213 | 0.085 | -0.128 |
 | acn | regular charger | dwell hours | 16,864 | 1,860 | 0.124 | 0.134 | +0.011 |
-| elaadnl | daily commuter | arrival hour | 6,622 | 1,407 | 0.163 | 0.254 | +0.092 |
-| elaadnl | daily commuter | dwell hours | 6,622 | 1,407 | 0.128 | 0.118 | -0.010 |
-| elaadnl | weekday only | arrival hour | 15,030 | 4,236 | 0.145 | 0.137 | -0.007 |
-| elaadnl | weekday only | dwell hours | 15,030 | 4,236 | 0.099 | 0.086 | -0.013 |
+| elaadnl | occasional consistent | arrival hour | 4,472 | 1,188 | 0.136 | 0.114 | -0.022 |
+| elaadnl | occasional consistent | dwell hours | 4,472 | 1,188 | 0.080 | 0.081 | +0.000 |
+| elaadnl | regular commuter | arrival hour | 24,360 | 8,189 | 0.149 | 0.153 | +0.004 |
+| elaadnl | regular commuter | dwell hours | 24,360 | 8,189 | 0.104 | 0.103 | -0.000 |
+| elaadnl | weekly consistent | arrival hour | 10,513 | 3,110 | 0.141 | 0.197 | +0.056 |
+| elaadnl | weekly consistent | dwell hours | 10,513 | 3,110 | 0.105 | 0.068 | -0.037 |
 
 ## S5 — Building load vs PNNL design intent
 
@@ -90,7 +96,7 @@ _Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival rows
 | source | source ratio | generated ratio | gap (log₁₀) |
 |---|--:|--:|--:|
 | acn | 5.95× | 5.73× | 0.017 |
-| elaadnl | 45.59× | 41.45× | 0.041 |
+| elaadnl | 45.59× | 40.08× | 0.056 |
 
 ## Caveats
 
