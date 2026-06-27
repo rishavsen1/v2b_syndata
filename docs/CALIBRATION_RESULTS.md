@@ -4,17 +4,35 @@
 > Regenerate: `uv run python tools/validate_calibration.py --seeds 50 --workers 16`  
 > Rebuild only this doc from existing CSVs: add `--md-only`.
 
-_Generated 2026-06-26._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. EV WATTS and INL are fixture-only and excluded; see [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
+_Generated 2026-06-27._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. EV WATTS and INL are fixture-only and excluded; see [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
 
 **Reading the numbers.** With sample sizes in the thousands the two-sample KS *p*-value is ~0 everywhere and carries no signal — judge by effect size: mean error |Δμ|, the KS statistic, Wasserstein W₁, and the copula ρ-gap.
 
 ## At a glance
 
+- **S0 assignment** — drivers matching no region box (unassigned): acn 0%, elaadnl 76%.
 - **S1 marginals** — mean |Δμ| 0.32 h across all region×variable cells; KS ≤ 0.22.
 - **S2 joint** — max Spearman ρ-gap 0.029; the arrival×dwell copula is reproduced.
 - **S3 held-out** — median Δ(holdout − train KS) 0.001; no systematic overfit.
 - **S5 building load** — 1/4 within the PNNL peak/off-peak band, 3/4 within the weekday/weekend band.
 - **S6 weekly rhythm** — max weekday/weekend ratio gap 0.04 dex.
+
+## S0 — How real drivers are grouped into regions
+
+Each driver is summarised by (φ frequency, κ consistency) and dropped into the **first** region box that contains it; `assignment/<source>.png` shows the scatter with the box overlays. Per-region driver counts:
+
+| source | region | drivers | share |
+|---|---|--:|--:|
+| acn | rare consistent | 229 | 36.1% |
+| acn | rare inconsistent | 4 | 0.6% |
+| acn | occasional consistent | 253 | 39.8% |
+| acn | regular charger | 146 | 23.0% |
+| acn | erratic | 0 | 0.0% |
+| acn |   unassigned   | 3 | 0.5% |
+| elaadnl | daily commuter | 64 | 5.2% |
+| elaadnl | weekday only | 229 | 18.6% |
+| elaadnl | sparse | 0 | 0.0% |
+| elaadnl |   unassigned   | 938 | 76.2% |
 
 ## S1 — Per-region marginals
 

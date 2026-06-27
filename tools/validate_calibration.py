@@ -139,6 +139,7 @@ class SourceData:
     sessions_df: pd.DataFrame    # session-level
     region_axes: list[dict]
     user_to_region: dict[str, str]
+    users: list                  # UserFeatures (per-driver phi / kappa / delta_km)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -191,7 +192,87 @@ def load_source(source_key: str) -> SourceData:
         sessions_df=sessions_df,
         region_axes=region_axes,
         user_to_region=user_to_region,
+        users=users,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# S0: region-assignment diagnostic — how real drivers map to regions
+# ──────────────────────────────────────────────────────────────────────
+
+def s0_assignment(
+    source_key: str,
+    source_data: SourceData,
+    output_root: Path,
+) -> pd.DataFrame:
+    """Scatter source drivers in (φ, κ) space, coloured by assigned region, with
+    the axes_distribution boxes overlaid and the unassigned fraction annotated.
+
+    This visualises the grouping step itself: each real driver is a point at its
+    (frequency φ, consistency κ); each dashed rectangle is a region definition;
+    a point's colour is the region it first-matches (grey = matched no box).
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    out_dir = output_root / "assignment"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    users = source_data.users
+    axes = source_data.region_axes
+    u2r = source_data.user_to_region
+    n_total = len(users)
+
+    region_names = [r["name"] for r in axes]
+    cmap = plt.get_cmap("tab10")
+    color = {name: cmap(i % 10) for i, name in enumerate(region_names)}
+    color["__unassigned__"] = (0.72, 0.72, 0.72, 1.0)
+
+    by_region: dict[str, list] = {}
+    for u in users:
+        by_region.setdefault(u2r.get(u.user_id, "__unassigned__"), []).append(u)
+
+    fig, ax = plt.subplots(figsize=(7.2, 6.2))
+    # region boxes (skip zero-area / zero-weight that still define a box)
+    for r in axes:
+        phi_lo, phi_hi = r["freq"]
+        kap_lo, kap_hi = r["consist"]
+        ax.add_patch(Rectangle(
+            (phi_lo, kap_lo), phi_hi - phi_lo, kap_hi - kap_lo,
+            fill=False, edgecolor=color[r["name"]], linewidth=2.0,
+            linestyle="--", zorder=2,
+        ))
+
+    rows = []
+    for name in region_names + ["__unassigned__"]:
+        us = by_region.get(name, [])
+        if us:
+            ax.scatter([u.phi for u in us], [u.kappa for u in us],
+                       s=16, alpha=0.5, color=color[name], edgecolors="none",
+                       label=f"{name} (n={len(us)})", zorder=3)
+        rows.append({
+            "source": source_key, "region": name, "n_users": len(us),
+            "user_share": round(len(us) / n_total, 4) if n_total else 0.0,
+        })
+
+    n_unassigned = len(by_region.get("__unassigned__", []))
+    pct_un = (n_unassigned / n_total * 100) if n_total else 0.0
+    ax.set_xlabel("φ  —  charging frequency (fraction of active weekdays the driver shows up)")
+    ax.set_ylabel("κ  —  arrival-time consistency (1 = same time every day, 0 = scattered)")
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_title(
+        f"{source_key}: how {n_total} real drivers map to regions\n"
+        f"dashed boxes = region definitions · {n_unassigned} unassigned ({pct_un:.0f}%)"
+    )
+    ax.legend(loc="lower left", fontsize=7, framealpha=0.92)
+    ax.grid(True, alpha=0.15, zorder=0)
+    fig.tight_layout()
+    fig.savefig(out_dir / f"{source_key}.png", dpi=140)
+    plt.close(fig)
+    return pd.DataFrame(rows)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -635,6 +716,7 @@ def write_results_md(output_root: Path) -> None:
     s3 = _read("S3_holdout.csv")
     s5 = _read("S5_buildingload.csv")
     s6 = _read("S6_weekly.csv")
+    s0 = _read("S0_assignment.csv")
 
     def f(x, nd: int = 2) -> str:
         try:
@@ -666,6 +748,14 @@ def write_results_md(output_root: Path) -> None:
 
     w("## At a glance")
     w("")
+    if not s0.empty:
+        un = s0[s0["region"] == "__unassigned__"]
+        if not un.empty:
+            frags = ", ".join(
+                f"{r['source']} {float(r['user_share']) * 100:.0f}%"
+                for _, r in un.iterrows()
+            )
+            w(f"- **S0 assignment** — drivers matching no region box (unassigned): {frags}.")
     if not s1.empty:
         mean_err = (s1["source_mean"] - s1["generated_mean"]).abs().mean()
         w(f"- **S1 marginals** — mean |Δμ| {f(mean_err)} h across all region×variable "
@@ -685,6 +775,20 @@ def write_results_md(output_root: Path) -> None:
         w(f"- **S6 weekly rhythm** — max weekday/weekend ratio gap "
           f"{f(s6['gap_ratio_log10'].max(), 2)} dex.")
     w("")
+
+    if not s0.empty:
+        w("## S0 — How real drivers are grouped into regions")
+        w("")
+        w("Each driver is summarised by (φ frequency, κ consistency) and dropped into "
+          "the **first** region box that contains it; `assignment/<source>.png` shows "
+          "the scatter with the box overlays. Per-region driver counts:")
+        w("")
+        w("| source | region | drivers | share |")
+        w("|---|---|--:|--:|")
+        for _, r in s0.iterrows():
+            w(f"| {r['source']} | {reg(r['region'])} | {int(r['n_users']):,} | "
+              f"{f(float(r['user_share']) * 100, 1)}% |")
+        w("")
 
     if not s1.empty:
         w("## S1 — Per-region marginals")
@@ -797,7 +901,7 @@ def main() -> int:
 
     t_total = time.perf_counter()
 
-    s1_all, s2_all, s3_all, s6_all = [], [], [], []
+    s0_all, s1_all, s2_all, s3_all, s6_all = [], [], [], [], []
 
     for source_key in source_keys:
         if source_key not in SOURCE_SPECS:
@@ -807,6 +911,11 @@ def main() -> int:
         log.info("Source: %s", source_key)
 
         source_data = load_source(source_key)
+
+        # S0 — region-assignment diagnostic (source-only; no generation needed)
+        log.info("  S0 region assignment…")
+        s0_all.append(s0_assignment(source_key, source_data, output_root))
+
         seed_dirs = generate_seed_set(source_key, args.seeds, output_root, args.workers)
         generated = load_generated(source_key, seed_dirs)
 
@@ -843,6 +952,7 @@ def main() -> int:
     pd.concat(s2_all, ignore_index=True).to_csv(output_root / "S2_joint.csv", index=False) if s2_all else None
     pd.concat(s3_all, ignore_index=True).to_csv(output_root / "S3_holdout.csv", index=False) if s3_all else None
     pd.concat(s6_all, ignore_index=True).to_csv(output_root / "S6_weekly.csv", index=False) if s6_all else None
+    pd.concat(s0_all, ignore_index=True).to_csv(output_root / "S0_assignment.csv", index=False) if s0_all else None
 
     write_results_md(output_root)
 
