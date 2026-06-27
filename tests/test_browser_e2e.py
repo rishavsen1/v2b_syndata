@@ -156,7 +156,20 @@ def test_ui_der_info_and_preset_sync(page, server):
     card.locator(".der-info[data-der='pv']").click()
     pop = page.locator(".der-popover")
     assert pop.count() == 1
-    assert "rooftop_small" in pop.inner_text() and "30 kW" in pop.inner_text()
+    txt = pop.inner_text()
+    assert "rooftop_small" in txt and "30 kW" in txt
+    # entries sorted by size ascending (small 30 < medium 100 < carport 200 < large 250 < xl 600)
+    order = [txt.index(k) for k in
+             ("rooftop_small", "rooftop_medium", "carport", "rooftop_large", "rooftop_xl")]
+    assert order == sorted(order)
+
+    # battery popover also sorted by capacity (2h=200 kWh before 4h=400 kWh)
+    card.locator(".der-info[data-der='battery']").click()
+    btxt = page.locator(".der-popover").inner_text()
+    assert btxt.index("lfp_2h") < btxt.index("lfp_4h")
+    assert btxt.index("nmc_2h") < btxt.index("nmc_4h")
+    card.locator(".der-info[data-der='battery']").click()  # toggle popover closed
+    assert page.locator(".der-popover").count() == 0
 
     # picking a PV preset fills the advanced dc_capacity_kw dial
     card.locator(".mb-pv-type").select_option("rooftop_large")

@@ -315,7 +315,14 @@ function toggleDerPopover(btn, kind) {
     pop.style.cssText = "position:absolute;z-index:1000;background:#fff;border:1px solid #c9d3dc;"
         + "border-radius:6px;padding:8px 11px;box-shadow:0 3px 10px rgba(0,0,0,.16);"
         + "font-size:.78rem;max-width:360px;line-height:1.5;color:#1f2933";
-    pop.innerHTML = Object.entries(DER_CATALOG[kind]).map(([t, info]) => {
+    // Sort by size ascending (PV by kW rating, battery by kWh capacity), then by
+    // power as a tiebreak; 'none' (size 0) stays first.
+    const sizeOf = (info) => kind === "pv"
+        ? (info.dc_capacity_kw || 0)
+        : (info.capacity_kwh || 0) * 1e6 + (info.power_kw || 0);
+    const entries = Object.entries(DER_CATALOG[kind])
+        .sort((a, b) => sizeOf(a[1]) - sizeOf(b[1]));
+    pop.innerHTML = entries.map(([t, info]) => {
         let detail;
         if (t === "none") detail = "off";
         else if (kind === "pv") detail = `${info.dc_capacity_kw} kW DC — ${info.label}`;
