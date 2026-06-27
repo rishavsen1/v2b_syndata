@@ -54,6 +54,14 @@ const SHORTCUT_KNOBS = new Set([
     "building_load.peak_kw_scaling",
 ]);
 
+// PV/battery "major" knobs promoted to dedicated main-grid selectors (string
+// values, so handled separately from the numeric QUICK_KEYS). Hidden from the
+// DER panel so they aren't shown twice. `none` = off.
+const DER_GRID_KNOBS = new Map([
+    ["pv.pv_type", ".mb-pv-type"],
+    ["battery.battery_type", ".mb-battery-type"],
+]);
+
 // Perturbation knobs are surfaced together in the per-card "Perturbations"
 // panel (with the noise-profile dropdown), NOT in the generic Advanced panel —
 // so every dial that adds randomness/realism lives in one place. The whole
@@ -230,10 +238,14 @@ function populateCardDer(card) {
         const h3 = document.createElement("h3");
         h3.textContent = bucket === "pv" ? "PV (rooftop / carport)" : "Battery (stationary)";
         section.appendChild(h3);
+        let n = 0;
         for (const [knobName, spec] of Object.entries(knobs)) {
-            section.appendChild(createKnobWidget(`${bucket}.${knobName}`, spec, ctx));
+            const path = `${bucket}.${knobName}`;
+            if (DER_GRID_KNOBS.has(path)) continue;  // promoted to the main-grid selectors
+            section.appendChild(createKnobWidget(path, spec, ctx));
+            n++;
         }
-        container.appendChild(section);
+        if (n > 0) container.appendChild(section);
     }
 }
 
@@ -683,13 +695,15 @@ function createBuildingCard() {
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(90)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
+            <label><span class="field-name">PV system</span><select class="mb-pv-type"></select></label>
+            <label><span class="field-name">Battery</span><select class="mb-battery-type"></select></label>
             <label><span class="field-name">Weather noise (pre-generation)</span><select class="mb-weather"></select></label>
             <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
-        <details class="mb-der" open>
-            <summary>Distributed energy resources — PV &amp; battery (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">Per-building rooftop/carport <strong>PV</strong> and stationary <strong>battery</strong>, off by default. Set <code>pv.enabled</code> + <code>pv.pv_type</code> (or an explicit <code>pv.dc_capacity_kw</code>) and <code>battery.enabled</code> + <code>battery.battery_type</code>. The PV generation curve uses the <em>same</em> (perturbed) weather as this building's load.</p>
+        <details class="mb-der">
+            <summary>PV &amp; battery — advanced (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">The <strong>PV system</strong> and <strong>Battery</strong> selectors in the inputs above are the on/off + sizing controls (a preset other than <code>none</code> enables it). These dials fine-tune the selected system: explicit <code>pv.dc_capacity_kw</code>, tilt/azimuth, module, derate; battery <code>capacity_kwh</code>/<code>power_kw</code>, efficiency, SoC window. The PV curve uses the <em>same</em> (perturbed) weather as this building's load.</p>
             <div class="card-der-knobs"></div>
         </details>
         <details class="mb-perturb">
@@ -709,6 +723,13 @@ function createBuildingCard() {
     mbFillSelect(card.querySelector(".mb-population"), DESCRIPTORS.population, "");
     mbFillSelect(card.querySelector(".mb-equipment"), DESCRIPTORS.equipment, "");
     mbFillSelect(card.querySelector(".mb-noise"), DESCRIPTORS.noise, "");
+    // PV + battery: major per-building knobs surfaced in the main grid. Options
+    // are the knob choices (none = off); explicit kW / advanced dials live in the
+    // DER panel below.
+    mbFillSelect(card.querySelector(".mb-pv-type"),
+                 ((KNOBS.pv || {}).pv_type || {}).choices?.map(c => ({ id: c })) || [], null);
+    mbFillSelect(card.querySelector(".mb-battery-type"),
+                 ((KNOBS.battery || {}).battery_type || {}).choices?.map(c => ({ id: c })) || [], null);
     // Weather profiles: options + their per-channel breakdown come from
     // weather_profiles.yaml (descriptions), so the UI never drifts from config.
     mbFillSelect(card.querySelector(".mb-weather"), DESCRIPTORS.weather, null);
@@ -831,6 +852,12 @@ function cardToSpec(card) {
         const v = parseFloat(raw);
         if (!isNaN(v)) overrides[key] = v;
     }
+    // PV / battery major selectors (string-valued). Record only a non-'none'
+    // pick as an override; 'none' is the default (off) and needs no override.
+    for (const [key, sel] of DER_GRID_KNOBS) {
+        const v = card.querySelector(sel).value;
+        if (v && v !== "none") overrides[key] = v;
+    }
     // Peak-kW scaling is off unless a Peak kW value is entered — then we scale
     // the load so its max hits that value (no separate toggle).
     overrides["building_load.peak_kw_scaling"] = card.querySelector(".mb-peak-kw").value !== "";
@@ -856,6 +883,10 @@ function setCardValues(card, b) {
     const o = { ...(b.overrides || {}) };
     // quick-field keys → their inputs; remove from the knob-panel overrides
     for (const [key, sel] of Object.entries(QUICK_KEYS)) {
+        if (key in o) { card.querySelector(sel).value = o[key]; delete o[key]; }
+    }
+    // PV/battery major selectors (string quick-fields)
+    for (const [key, sel] of DER_GRID_KNOBS) {
         if (key in o) { card.querySelector(sel).value = o[key]; delete o[key]; }
     }
     // peak_kw_scaling is derived from whether Peak kW is set (no widget); drop it.

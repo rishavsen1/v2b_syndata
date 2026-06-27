@@ -358,8 +358,9 @@ These are part of the generator but are not fit to data:
   irradiance/temperature (including any `weather_solar_scale` perturbation).
   Solar geometry is evaluated at each 15-min tick midpoint and solar time is
   longitude- and standard-meridian-corrected. Pure deterministic physics — no
-  RNG. **Default OFF** (`pv.enabled=false`) → an all-zeros `pv_generation.csv`
-  with no EPW read. Ratings come from the `pv.*` knobs or the `der_catalog`
+  RNG. **Default OFF** (`pv.pv_type=none` → zero capacity) → an all-zeros
+  `pv_generation.csv` with no EPW read; any preset other than `none` (or an
+  explicit `pv.dc_capacity_kw`) turns it on. Ratings come from the `pv.*` knobs or the `der_catalog`
   presets (rooftop_small … rooftop_xl, carport; sized by usable roof area, not
   building peak). Emits `pv_generation.csv` (curve) + `pv.csv` (specs).
 - **Stationary battery** (`renderers/battery.py`) — **specs only** (capacity,

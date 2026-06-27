@@ -49,16 +49,15 @@ BATTERY_TYPES = tuple(BATTERY_PARAMS.keys())
 
 
 def resolve_pv(
-    *, enabled: bool, pv_type: str, dc_capacity_kw: float, module_type: str,
+    *, pv_type: str, dc_capacity_kw: float, module_type: str,
     dc_ac_ratio: float, tilt_deg: float, azimuth_deg: float,
     system_derate: float, albedo: float,
 ) -> dict[str, object]:
-    """Resolve PV knobs into a concrete spec dict. Inactive (enabled False or
-    zero effective capacity) yields a zero-capacity spec. Explicit
-    ``dc_capacity_kw`` > 0 overrides the ``pv_type`` preset."""
+    """Resolve PV knobs into a concrete spec dict. PV is active when its
+    effective capacity > 0 — i.e. ``pv_type`` is not ``none`` OR an explicit
+    ``dc_capacity_kw`` > 0 is given (the explicit kW overrides the preset).
+    ``pv_type='none'`` with no explicit kW yields a zero-capacity (inactive) spec."""
     eff_dc = float(dc_capacity_kw) if float(dc_capacity_kw) > 0.0 else PV_CAPACITY_KW.get(pv_type, 0.0)
-    if not enabled:
-        eff_dc = 0.0
     mod = MODULE_PARAMS.get(module_type, MODULE_PARAMS["standard"])
     ratio = float(dc_ac_ratio) if float(dc_ac_ratio) > 0.0 else 1.20
     return {
@@ -78,18 +77,17 @@ def resolve_pv(
 
 
 def resolve_battery(
-    *, enabled: bool, battery_type: str, capacity_kwh: float, power_kw: float,
+    *, battery_type: str, capacity_kwh: float, power_kw: float,
     round_trip_efficiency: float, min_soc_pct: float, max_soc_pct: float,
     initial_soc_pct: float,
 ) -> dict[str, object]:
-    """Resolve battery knobs into a concrete spec dict. Explicit capacity/power
-    knobs (> 0) override the ``battery_type`` preset."""
+    """Resolve battery knobs into a concrete spec dict. Active when effective
+    capacity > 0 — i.e. ``battery_type`` is not ``none`` OR an explicit
+    ``capacity_kwh``/``power_kw`` > 0 is given (explicit values override the
+    preset). ``battery_type='none'`` with no explicit value → inactive."""
     base = BATTERY_PARAMS.get(battery_type, BATTERY_PARAMS["none"])
     eff_cap = float(capacity_kwh) if float(capacity_kwh) > 0.0 else float(base["capacity_kwh"])
     eff_pow = float(power_kw) if float(power_kw) > 0.0 else float(base["power_kw"])
-    if not enabled:
-        eff_cap = 0.0
-        eff_pow = 0.0
     return {
         "battery_id": "batt_0",
         "battery_type": battery_type if eff_cap > 0.0 else "none",

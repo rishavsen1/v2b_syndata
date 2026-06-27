@@ -751,9 +751,11 @@ Key decisions:
 - **Battery is specs-only** (`battery.csv`): capacity/power/efficiency/SoC
   window, no dispatch schedule — dispatch is a downstream optimizer's job, the
   same way `cars.csv` ships specs not trips.
-- **Default OFF** (`pv.enabled`/`battery.enabled` false): the PV sampler
-  early-returns an all-zeros series WITHOUT reading the EPW, so the clean-profile
-  bitwise contract holds and no cached weather is required for default runs.
+- **Default OFF** (`pv_type`/`battery_type` = `none` → zero effective capacity):
+  the PV sampler early-returns an all-zeros series WITHOUT reading the EPW, so the
+  clean-profile bitwise contract holds and no cached weather is required for
+  default runs. There is no separate `enabled` flag — a preset other than `none`
+  (or an explicit `dc_capacity_kw`/`capacity_kwh`) is what turns the resource on.
 - **PV weather is identical to the building-load weather.** Both call the shared
   `weather.parsed_perturbed_weather` (leap-inject → parse → perturb with the same
   four `building_load.weather_*` knobs), so the PVWatts model sees the exact

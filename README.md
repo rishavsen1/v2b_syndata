@@ -189,10 +189,12 @@ Per scenario seed — deterministic CSVs (bitwise-identical for a given seed) + 
 
 Rooftop **PV** and stationary **battery** are per-building distributed-energy
 resources, **off by default** (clean-profile bitwise output is unchanged).
-Enable + size them per building from the CLI (`--override pv.enabled=true
---override pv.pv_type=rooftop_medium --override battery.enabled=true
---override battery.battery_type=lfp_4h`) or the web tool (per-card `pv` /
-`battery` knob sections). The PV generation curve is a deterministic
+Enable + size them per building from the CLI (`--override
+pv.pv_type=rooftop_medium --override battery.battery_type=lfp_4h` — a preset
+other than `none` turns it on; `--override pv.dc_capacity_kw=…` overrides the
+preset rating) or the web tool (the **PV system** / **Battery** selectors in
+each building card, with advanced dials in the card's DER panel). The PV
+generation curve is a deterministic
 PVWatts-style function of the *same* (optionally perturbed) TMYx weather fed to
 EnergyPlus for the building load — see `docs/GENERATIVE_MODELS.md`. Presets live
 in `src/v2b_syndata/der_catalog.py`.

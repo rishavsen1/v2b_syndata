@@ -18,7 +18,6 @@ BATTERY_SPEC_COLUMNS = [
 
 def battery_spec_from_ctx(ctx: ScenarioContext) -> dict:
     return resolve_battery(
-        enabled=bool(ctx.knobs.get("battery.enabled")) if ctx.knobs.has("battery.enabled") else False,
         battery_type=str(ctx.knobs.get("battery.battery_type")),
         capacity_kwh=float(ctx.knobs.get("battery.capacity_kwh")),
         power_kw=float(ctx.knobs.get("battery.power_kw")),

@@ -19,7 +19,6 @@ from ..types import ScenarioContext
 def pv_spec_from_ctx(ctx: ScenarioContext) -> dict:
     """Resolve the per-building PV spec from the resolved knobs."""
     return resolve_pv(
-        enabled=bool(ctx.knobs.get("pv.enabled")) if ctx.knobs.has("pv.enabled") else False,
         pv_type=str(ctx.knobs.get("pv.pv_type")),
         dc_capacity_kw=float(ctx.knobs.get("pv.dc_capacity_kw")),
         module_type=str(ctx.knobs.get("pv.module_type")),

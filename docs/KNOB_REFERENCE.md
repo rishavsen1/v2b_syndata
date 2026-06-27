@@ -90,7 +90,6 @@ Each resolved knob carries one of:
 | `noise.occupancy_jitter_pct` | `float` | `0.0` | `[0.0, 0.3]` |
 | `noise.load_flex_jitter_pct` | `float` | `0.0` | `[0.0, 0.5]` |
 | `noise.load_inflex_jitter_pct` | `float` | `0.0` | `[0.0, 0.5]` |
-| `pv.enabled` | `bool` | `False` | `` |
 | `pv.pv_type` | `categorical` | `'none'` | `['none', 'rooftop_small', 'rooftop_medium', 'rooftop_large', 'rooftop_xl', 'carport']` |
 | `pv.dc_capacity_kw` | `float` | `0.0` | `[0.0, 5000.0]` |
 | `pv.module_type` | `categorical` | `'standard'` | `['standard', 'premium', 'thin_film']` |
@@ -99,7 +98,6 @@ Each resolved knob carries one of:
 | `pv.azimuth_deg` | `float` | `180.0` | `[0.0, 360.0]` |
 | `pv.system_derate` | `float` | `0.86` | `[0.5, 1.0]` |
 | `pv.albedo` | `float` | `0.2` | `[0.0, 0.9]` |
-| `battery.enabled` | `bool` | `False` | `` |
 | `battery.battery_type` | `categorical` | `'none'` | `['none', 'lfp_2h', 'lfp_4h', 'nmc_2h', 'nmc_4h']` |
 | `battery.capacity_kwh` | `float` | `0.0` | `[0.0, 20000.0]` |
 | `battery.power_kw` | `float` | `0.0` | `[0.0, 10000.0]` |

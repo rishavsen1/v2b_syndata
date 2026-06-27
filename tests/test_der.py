@@ -74,33 +74,33 @@ def _gen(out: Path, overrides=None, seed=0):
 # ── der_catalog (pure) ─────────────────────────────────────────────────────
 
 def test_resolve_pv_preset_and_override():
-    spec = resolve_pv(enabled=True, pv_type="rooftop_medium", dc_capacity_kw=0.0,
+    spec = resolve_pv(pv_type="rooftop_medium", dc_capacity_kw=0.0,
                       module_type="standard", dc_ac_ratio=1.2, tilt_deg=10.0,
                       azimuth_deg=180.0, system_derate=0.86, albedo=0.2)
     assert spec["dc_capacity_kw"] == 100.0           # preset
     assert spec["ac_capacity_kw"] == pytest.approx(100.0 / 1.2, abs=1e-3)
     # explicit kW overrides the preset
-    spec2 = resolve_pv(enabled=True, pv_type="rooftop_medium", dc_capacity_kw=333.0,
+    spec2 = resolve_pv(pv_type="rooftop_medium", dc_capacity_kw=333.0,
                        module_type="premium", dc_ac_ratio=1.2, tilt_deg=10.0,
                        azimuth_deg=180.0, system_derate=0.86, albedo=0.2)
     assert spec2["dc_capacity_kw"] == 333.0
     assert spec2["temp_coeff_per_c"] == -0.0030      # premium module
 
 
-def test_resolve_pv_disabled_is_zero():
-    spec = resolve_pv(enabled=False, pv_type="rooftop_xl", dc_capacity_kw=600.0,
+def test_resolve_pv_none_is_zero():
+    spec = resolve_pv(pv_type="none", dc_capacity_kw=0.0,
                       module_type="standard", dc_ac_ratio=1.2, tilt_deg=10.0,
                       azimuth_deg=180.0, system_derate=0.86, albedo=0.2)
     assert spec["dc_capacity_kw"] == 0.0 and spec["pv_type"] == "none"
 
 
 def test_resolve_battery_preset_and_override():
-    b = resolve_battery(enabled=True, battery_type="lfp_4h", capacity_kwh=0.0,
+    b = resolve_battery(battery_type="lfp_4h", capacity_kwh=0.0,
                         power_kw=0.0, round_trip_efficiency=0.9, min_soc_pct=10.0,
                         max_soc_pct=95.0, initial_soc_pct=50.0)
     assert (b["capacity_kwh"], b["power_kw"]) == (400.0, 100.0)
-    b2 = resolve_battery(enabled=False, battery_type="lfp_4h", capacity_kwh=999.0,
-                         power_kw=99.0, round_trip_efficiency=0.9, min_soc_pct=10.0,
+    b2 = resolve_battery(battery_type="none", capacity_kwh=0.0,
+                         power_kw=0.0, round_trip_efficiency=0.9, min_soc_pct=10.0,
                          max_soc_pct=95.0, initial_soc_pct=50.0)
     assert (b2["capacity_kwh"], b2["power_kw"]) == (0.0, 0.0)
 
@@ -201,8 +201,7 @@ def test_pv_does_not_change_other_csvs(tmp_path, epw_cache):
     off = tmp_path / "off"
     on = tmp_path / "on"
     _gen(off)
-    _gen(on, overrides={"pv.enabled": True, "pv.pv_type": "rooftop_large",
-                        "battery.enabled": True, "battery.battery_type": "lfp_4h"})
+    _gen(on, overrides={"pv.pv_type": "rooftop_large", "battery.battery_type": "lfp_4h"})
     for name in ("building_load", "cars", "users", "chargers", "grid_prices",
                  "dr_events", "sessions"):
         a = (off / f"{name}.csv").read_bytes()
@@ -213,7 +212,7 @@ def test_pv_does_not_change_other_csvs(tmp_path, epw_cache):
 def test_pv_reproducible(tmp_path, epw_cache):
     a = tmp_path / "a"
     b = tmp_path / "b"
-    ov = {"pv.enabled": True, "pv.dc_capacity_kw": 250.0}
+    ov = {"pv.dc_capacity_kw": 250.0}
     _gen(a, overrides=ov, seed=7)
     _gen(b, overrides=ov, seed=7)
     assert (a / "pv_generation.csv").read_bytes() == (b / "pv_generation.csv").read_bytes()
@@ -221,7 +220,7 @@ def test_pv_reproducible(tmp_path, epw_cache):
 
 def test_pv_enabled_generates_curve(tmp_path, epw_cache):
     out = tmp_path / "on"
-    _gen(out, overrides={"pv.enabled": True, "pv.pv_type": "rooftop_medium"})
+    _gen(out, overrides={"pv.pv_type": "rooftop_medium"})
     pg = pd.read_csv(out / "pv_generation.csv", parse_dates=["datetime"])
     assert pg["power_pv_kw"].sum() > 0
     spec = pd.read_csv(out / "pv.csv").iloc[0]
@@ -234,8 +233,7 @@ def test_pv_enabled_generates_curve(tmp_path, epw_cache):
 def test_validate_passes_with_pv(tmp_path, epw_cache):
     from v2b_syndata.validate import validate
     out = tmp_path / "on"
-    _gen(out, overrides={"pv.enabled": True, "pv.pv_type": "carport",
-                         "battery.enabled": True, "battery.battery_type": "nmc_2h"})
+    _gen(out, overrides={"pv.pv_type": "carport", "battery.battery_type": "nmc_2h"})
     rep = validate(out)
     assert not rep.errors, rep.errors
 
@@ -247,8 +245,7 @@ def test_multibuilding_per_building_pv(tmp_path, epw_cache):
     out = tmp_path / "mb"
     cfg = MultiConfig(buildings=[
         BuildingSpec(base_scenario="S01", seed=1, overrides={
-            "sim_window.start": "2021-04-01", "pv.enabled": True,
-            "pv.pv_type": "rooftop_medium", "battery.enabled": True,
+            "sim_window.start": "2021-04-01", "pv.pv_type": "rooftop_medium",
             "battery.battery_type": "lfp_2h"}),
         BuildingSpec(base_scenario="S01", seed=2,
                      overrides={"sim_window.start": "2021-04-01"}),
@@ -271,5 +268,5 @@ def test_web_serves_pv_battery_knobs():
     from app import app
     k = app.test_client().get("/api/knobs").get_json()
     assert "pv" in k and "battery" in k
-    assert "enabled" in k["pv"] and "pv_type" in k["pv"]
+    assert "pv_type" in k["pv"] and "dc_capacity_kw" in k["pv"]
     assert "battery_type" in k["battery"] and "capacity_kwh" in k["battery"]

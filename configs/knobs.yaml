@@ -433,17 +433,11 @@ noise:
 # ──────────────────────────────────────────────────────────────────────────
 pv:
 
-  enabled:
-    type: bool
-    default: false
-    description: "Master switch for rooftop/carport PV. Default false → all-zeros PV curve, zero-capacity pv.csv, no EPW read. Set true and pick pv_type (or pv.dc_capacity_kw) to generate a weather-driven curve."
-    affects_csv: [pv_generation.csv, pv.csv]
-
   pv_type:
     type: categorical
     choices: [none, rooftop_small, rooftop_medium, rooftop_large, rooftop_xl, carport]
     default: none
-    description: "PV preset → nameplate DC kW (rooftop_small 30, rooftop_medium 100, rooftop_large 250, rooftop_xl 600, carport 200). Anchored on usable roof area, NOT building peak. Overridden by pv.dc_capacity_kw when > 0."
+    description: "PV preset → nameplate DC kW (none=off; rooftop_small 30, rooftop_medium 100, rooftop_large 250, rooftop_xl 600, carport 200). Anchored on usable roof area, NOT building peak. This is the PV on/off + sizing control: anything other than 'none' enables PV. Overridden by pv.dc_capacity_kw when > 0."
     affects_csv: [pv_generation.csv, pv.csv]
 
   dc_capacity_kw:
@@ -502,17 +496,11 @@ pv:
 # ──────────────────────────────────────────────────────────────────────────
 battery:
 
-  enabled:
-    type: bool
-    default: false
-    description: "Master switch for stationary battery storage. Default false → zero-capacity battery.csv. Set true and pick battery_type (or capacity_kwh/power_kw)."
-    affects_csv: [battery.csv]
-
   battery_type:
     type: categorical
     choices: [none, lfp_2h, lfp_4h, nmc_2h, nmc_4h]
     default: none
-    description: "Battery preset → capacity/power/efficiency (lfp_2h 200kWh/100kW/0.90, lfp_4h 400/100/0.90, nmc_2h 200/100/0.92, nmc_4h 400/100/0.92). '_2h'/'_4h' = energy duration at rated power. Overridden by capacity_kwh/power_kw when > 0."
+    description: "Battery preset → capacity/power/efficiency (none=off; lfp_2h 200kWh/100kW/0.90, lfp_4h 400/100/0.90, nmc_2h 200/100/0.92, nmc_4h 400/100/0.92). '_2h'/'_4h' = energy duration at rated power. This is the battery on/off + sizing control: anything other than 'none' enables storage. Overridden by capacity_kwh/power_kw when > 0."
     affects_csv: [battery.csv]
 
   capacity_kwh:

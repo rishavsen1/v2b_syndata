@@ -110,30 +110,38 @@ def test_ui_perturbations_panel_and_high_low_sync(page, server):
 
 @pytest.mark.browser
 def test_ui_der_panel(page, server):
-    """PV + battery are surfaced in a dedicated DER panel in the main card
-    (open by default), NOT buried in the generic Advanced panel."""
+    """PV + battery: the major knob (type/sizing preset) is a selector in the
+    MAIN grid; advanced dials live in the collapsible DER panel; neither appears
+    in the generic Advanced panel."""
     page.goto(server + "/", wait_until="networkidle")
     page.wait_for_selector(".building-card")
     card = page.locator(".building-card").first
 
-    # DER panel exists and renders the key PV + battery widgets
-    assert card.locator(".mb-der").count() == 1
-    der = card.locator(".card-der-knobs")
-    assert der.locator(".knob[data-path='pv.enabled']").count() == 1
-    assert der.locator(".knob[data-path='pv.pv_type']").count() == 1
-    assert der.locator(".knob[data-path='pv.dc_capacity_kw']").count() == 1
-    assert der.locator(".knob[data-path='battery.enabled']").count() == 1
-    assert der.locator(".knob[data-path='battery.battery_type']").count() == 1
+    # major knobs are selectors in the main grid
+    pv_sel = card.locator(".descriptor-grid .mb-pv-type")
+    bt_sel = card.locator(".descriptor-grid .mb-battery-type")
+    assert pv_sel.count() == 1 and bt_sel.count() == 1
+    assert pv_sel.locator("option[value='rooftop_medium']").count() == 1
+    assert pv_sel.input_value() == "none"  # off by default
+    assert bt_sel.locator("option[value='lfp_4h']").count() == 1
 
-    # …and they are NOT duplicated in the generic Advanced panel
+    # advanced dials are in the DER panel; the major knobs are NOT duplicated there
+    card.locator(".mb-der > summary").click()
+    der = card.locator(".card-der-knobs")
+    assert der.locator(".knob[data-path='pv.dc_capacity_kw']").count() == 1
+    assert der.locator(".knob[data-path='battery.capacity_kwh']").count() == 1
+    assert der.locator(".knob[data-path='pv.pv_type']").count() == 0
+    assert der.locator(".knob[data-path='battery.battery_type']").count() == 0
+
+    # …and nothing PV/battery in the generic Advanced panel
     card.locator(".mb-adv > summary").click()
     adv = card.locator(".card-knob-buckets")
-    assert adv.locator(".knob[data-path='pv.enabled']").count() == 0
-    assert adv.locator(".knob[data-path='battery.enabled']").count() == 0
+    assert adv.locator(".knob[data-path^='pv.']").count() == 0
+    assert adv.locator(".knob[data-path^='battery.']").count() == 0
 
-    # toggling pv.enabled records the override on the card (marks widget modified)
-    der.locator(".knob[data-path='pv.enabled'] input[type='checkbox']").check()
-    assert der.locator(".knob[data-path='pv.enabled'].modified").count() == 1
+    # picking a PV preset is the on switch (selectable, value sticks)
+    pv_sel.select_option("rooftop_large")
+    assert pv_sel.input_value() == "rooftop_large"
 
 
 @pytest.mark.browser
