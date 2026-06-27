@@ -28,6 +28,23 @@ def client():
 # ── read-only + resolve (fast) ───────────────────────────────────────────────
 
 @pytest.mark.webapp
+def test_der_panel_wired_in_app_js():
+    """PV + battery are surfaced in the main-card DER panel (not the generic
+    Advanced auto-render). Fast static guard for the wiring the browser test
+    exercises live."""
+    app_js = (Path(__file__).resolve().parents[1]
+              / "tools" / "web" / "static" / "app.js").read_text()
+    assert "card-der-knobs" in app_js and "populateCardDer" in app_js
+    assert 'bucket === "pv" || bucket === "battery"' in app_js  # excluded from Advanced
+
+
+@pytest.mark.webapp
+def test_api_knobs_serves_der_buckets(client):
+    k = client.get("/api/knobs").get_json()
+    assert "pv" in k and "battery" in k
+
+
+@pytest.mark.webapp
 def test_descriptors_knobs_scenarios(client):
     for route, key in [("/api/descriptors", "location"), ("/api/knobs", "ev_fleet")]:
         d = client.get(route).get_json()

@@ -159,7 +159,8 @@ function populateCardKnobs(card) {
     const ctx = card._ctx;
     container.innerHTML = "";
     for (const [bucket, knobs] of Object.entries(KNOBS)) {
-        if (bucket === "noise") continue;  // → Perturbations panel
+        if (bucket === "noise") continue;                      // → Perturbations panel
+        if (bucket === "pv" || bucket === "battery") continue; // → DER panel (main card)
         const section = document.createElement("section");
         section.className = "knob-bucket";
         const h3 = document.createElement("h3");
@@ -212,6 +213,31 @@ function populateCardPerturbations(card) {
 
 // POST the card's base + descriptors to /api/resolve; refresh that card's knob
 // widgets (non-overridden ones snap to the resolved value) + numeric placeholders.
+// Render the per-card DER panel: the `pv` + `battery` buckets surfaced
+// prominently in the main card (not the generic Advanced panel), bound to the
+// card's ctx. Uses the same createKnobWidget factory, so refresh/sync/serialize
+// all work via the shared `.knob` selectors + ctx.overrides.
+function populateCardDer(card) {
+    const container = card.querySelector(".card-der-knobs");
+    if (!container) return;
+    const ctx = card._ctx;
+    container.innerHTML = "";
+    for (const bucket of ["pv", "battery"]) {
+        const knobs = KNOBS[bucket];
+        if (!knobs) continue;
+        const section = document.createElement("section");
+        section.className = "knob-bucket";
+        const h3 = document.createElement("h3");
+        h3.textContent = bucket === "pv" ? "PV (rooftop / carport)" : "Battery (stationary)";
+        section.appendChild(h3);
+        for (const [knobName, spec] of Object.entries(knobs)) {
+            section.appendChild(createKnobWidget(`${bucket}.${knobName}`, spec, ctx));
+        }
+        container.appendChild(section);
+    }
+}
+
+
 async function refreshCardKnobs(card) {
     const ctx = card._ctx;
     const descriptors = {};
@@ -233,7 +259,7 @@ async function refreshCardKnobs(card) {
     } catch (e) { /* keep prior resolved */ }
     // refresh every widget (both the Advanced and Perturbations panels) that the
     // user hasn't overridden
-    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob").forEach(widget => {
+    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob, .card-der-knobs .knob").forEach(widget => {
         const path = widget.dataset.path;
         const [bucket, knobName] = path.split(/\.(.+)/);
         const spec = (KNOBS[bucket] || {})[knobName];
@@ -250,7 +276,7 @@ async function refreshCardKnobs(card) {
 // Set the card's knob widgets to reflect ctx.overrides (used by config load).
 function syncCardKnobWidgets(card) {
     const ctx = card._ctx;
-    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob").forEach(widget => {
+    card.querySelectorAll(".card-knob-buckets .knob, .card-perturb-knobs .knob, .card-der-knobs .knob").forEach(widget => {
         const path = widget.dataset.path;
         const [bucket, knobName] = path.split(/\.(.+)/);
         const spec = (KNOBS[bucket] || {})[knobName];
@@ -661,6 +687,11 @@ function createBuildingCard() {
             <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
+        <details class="mb-der" open>
+            <summary>Distributed energy resources — PV &amp; battery (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">Per-building rooftop/carport <strong>PV</strong> and stationary <strong>battery</strong>, off by default. Set <code>pv.enabled</code> + <code>pv.pv_type</code> (or an explicit <code>pv.dc_capacity_kw</code>) and <code>battery.enabled</code> + <code>battery.battery_type</code>. The PV generation curve uses the <em>same</em> (perturbed) weather as this building's load.</p>
+            <div class="card-der-knobs"></div>
+        </details>
         <details class="mb-perturb">
             <summary>Perturbation details (this building)</summary>
             <p class="hint" style="margin:0.3rem 0">Fine-grained dials behind the two noise selectors above. <strong>Building load noise</strong> jitters the <em>produced</em> CSVs (load/sessions/prices) post-generation — the dials snap to the selected profile; change any to override. <strong>Weather noise</strong>'s fixed offset shifts this building's simulated &amp; exported weather (the selector above instead draws a per-sample offset).</p>
@@ -687,6 +718,7 @@ function createBuildingCard() {
     card.querySelector(".mb-seed").value = idx;
     populateCardKnobs(card);          // generic Advanced panel
     populateCardPerturbations(card);  // consolidated noise + weather panel
+    populateCardDer(card);            // PV + battery, surfaced in the main card
 
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
     // sessions for this building. Warn live. Floor = this card's min_depart_soc

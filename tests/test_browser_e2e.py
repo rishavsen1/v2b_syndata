@@ -109,6 +109,34 @@ def test_ui_perturbations_panel_and_high_low_sync(page, server):
 
 
 @pytest.mark.browser
+def test_ui_der_panel(page, server):
+    """PV + battery are surfaced in a dedicated DER panel in the main card
+    (open by default), NOT buried in the generic Advanced panel."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # DER panel exists and renders the key PV + battery widgets
+    assert card.locator(".mb-der").count() == 1
+    der = card.locator(".card-der-knobs")
+    assert der.locator(".knob[data-path='pv.enabled']").count() == 1
+    assert der.locator(".knob[data-path='pv.pv_type']").count() == 1
+    assert der.locator(".knob[data-path='pv.dc_capacity_kw']").count() == 1
+    assert der.locator(".knob[data-path='battery.enabled']").count() == 1
+    assert der.locator(".knob[data-path='battery.battery_type']").count() == 1
+
+    # …and they are NOT duplicated in the generic Advanced panel
+    card.locator(".mb-adv > summary").click()
+    adv = card.locator(".card-knob-buckets")
+    assert adv.locator(".knob[data-path='pv.enabled']").count() == 0
+    assert adv.locator(".knob[data-path='battery.enabled']").count() == 0
+
+    # toggling pv.enabled records the override on the card (marks widget modified)
+    der.locator(".knob[data-path='pv.enabled'] input[type='checkbox']").check()
+    assert der.locator(".knob[data-path='pv.enabled'].modified").count() == 1
+
+
+@pytest.mark.browser
 @pytest.mark.real_energyplus
 def test_ui_full_generate(page, server, tmp_path):
     page.goto(server + "/", wait_until="networkidle")
