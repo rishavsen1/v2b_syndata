@@ -46,6 +46,7 @@ from .seeding import rng_for_node
 _PER_BUILDING_FILES = [
     "building_load.csv", "cars.csv", "chargers.csv", "sessions.csv",
     "grid_prices.csv", "weather_data.csv", "occupancy.csv",
+    "pv_generation.csv", "pv.csv", "battery.csv",
 ]
 _DEFAULT_POLICY = "ILP-MPCFIXEDFSL"
 
@@ -123,6 +124,9 @@ def _build_building_tables(
         "occupancy.csv": exp.build_occupancy(
             str(knobs["building_load.occupancy_source"]), int(sim_start.year), building_id,
         ),
+        "pv_generation.csv": exp.build_pv_generation(native["pv_generation.csv"], building_id),
+        "pv.csv": exp.build_pv_specs(native["pv.csv"], building_id),
+        "battery.csv": exp.build_battery(native["battery.csv"], building_id),
     }
 
 

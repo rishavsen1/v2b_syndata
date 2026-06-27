@@ -72,6 +72,38 @@ def build_building_load(native_bl: pd.DataFrame, building_id: int) -> pd.DataFra
     })
 
 
+def build_pv_generation(native_pv: pd.DataFrame, building_id: int) -> pd.DataFrame:
+    """native (datetime, power_pv_kw) → optimus pv_generation with derived
+    energy + time_seconds + building_id (mirrors build_building_load)."""
+    dt = pd.to_datetime(native_pv["datetime"])
+    year_start = datetime(dt.iloc[0].year, 1, 1)
+    time_seconds = ((dt - pd.Timestamp(year_start)).dt.total_seconds()
+                    + _TICK_SECONDS).astype("int64")
+    power = native_pv["power_pv_kw"].astype(float)
+    h = _TICK_SECONDS / 3600.0  # 0.25 h
+    return pd.DataFrame({
+        "datetime": native_pv["datetime"].values,
+        "time_seconds": time_seconds.values,
+        "power_pv_kw": power.values,
+        "energy_kwh_pv": (power * h).values,
+        "building_id": building_id,
+    })
+
+
+def build_pv_specs(native_pv_specs: pd.DataFrame, building_id: int) -> pd.DataFrame:
+    """native pv specs (no building_id) → optimus pv specs + building_id."""
+    out = native_pv_specs.copy()
+    out["building_id"] = building_id
+    return out
+
+
+def build_battery(native_battery: pd.DataFrame, building_id: int) -> pd.DataFrame:
+    """native battery specs (no building_id) → optimus battery specs + building_id."""
+    out = native_battery.copy()
+    out["building_id"] = building_id
+    return out
+
+
 def build_cars(
     native_cars: pd.DataFrame,
     native_users: pd.DataFrame,
