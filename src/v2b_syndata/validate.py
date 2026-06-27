@@ -31,6 +31,13 @@ _SCHEMAS: dict[str, list[str]] = {
     "sessions": ["session_id", "car_id", "building_id", "arrival", "departure",
                  "duration_sec", "arrival_soc", "required_soc_at_depart",
                  "previous_day_external_use_soc"],
+    "pv_generation": ["datetime", "power_pv_kw"],
+    "pv": ["pv_id", "pv_type", "dc_capacity_kw", "ac_capacity_kw", "dc_ac_ratio",
+           "tilt_deg", "azimuth_deg", "module_type", "system_derate",
+           "temp_coeff_per_c", "noct_c", "albedo"],
+    "battery": ["battery_id", "battery_type", "capacity_kwh", "power_kw",
+                "round_trip_efficiency", "min_soc_pct", "max_soc_pct",
+                "initial_soc_pct"],
 }
 
 _BATTERY_CLASSES = {"leaf_24", "bolt_40", "m3_75", "rivian_100"}

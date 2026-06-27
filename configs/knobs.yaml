@@ -423,3 +423,136 @@ noise:
     default: 0.0
     description: "Multiplicative Gaussian std on the EnergyPlus inflex (lights+plug) load, post-simulation. Default 0.0 → deterministic; non-clean profiles set 0.03."
     affects_csv: [building_load.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Rooftop / carport PV. Per-building. Default OFF → pv_generation.csv is all
+# zeros and pv.csv carries zero capacity (no EnergyPlus/EPW read), preserving
+# the clean-profile bitwise contract. The PV generation curve is a deterministic
+# PVWatts-style function of the SAME (perturbed) EPW weather EnergyPlus consumed
+# for the building load. Presets in src/v2b_syndata/der_catalog.py.
+# ──────────────────────────────────────────────────────────────────────────
+pv:
+
+  enabled:
+    type: bool
+    default: false
+    description: "Master switch for rooftop/carport PV. Default false → all-zeros PV curve, zero-capacity pv.csv, no EPW read. Set true and pick pv_type (or pv.dc_capacity_kw) to generate a weather-driven curve."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  pv_type:
+    type: categorical
+    choices: [none, rooftop_small, rooftop_medium, rooftop_large, rooftop_xl, carport]
+    default: none
+    description: "PV preset → nameplate DC kW (rooftop_small 30, rooftop_medium 100, rooftop_large 250, rooftop_xl 600, carport 200). Anchored on usable roof area, NOT building peak. Overridden by pv.dc_capacity_kw when > 0."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  dc_capacity_kw:
+    type: float
+    range: [0.0, 5000.0]
+    default: 0.0
+    description: "Explicit PV nameplate DC capacity (kW). 0 → use the pv_type preset; > 0 → overrides it. Drives the PVWatts curve; ac_capacity_kw = dc/dc_ac_ratio."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  module_type:
+    type: categorical
+    choices: [standard, premium, thin_film]
+    default: standard
+    description: "Module family → temperature characteristics (standard c-Si temp_coeff -0.0035/°C NOCT 45; premium -0.0030/44; thin_film -0.0025/47)."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  dc_ac_ratio:
+    type: float
+    range: [1.0, 1.6]
+    default: 1.2
+    description: "DC/AC inverter loading ratio. ac_capacity_kw = dc_capacity_kw / dc_ac_ratio; midday DC above AC rating is clipped. PVWatts v5 default 1.2."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  tilt_deg:
+    type: float
+    range: [0.0, 60.0]
+    default: 10.0
+    description: "Array tilt from horizontal (°). 10° typical for ballasted commercial flat roofs."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  azimuth_deg:
+    type: float
+    range: [0.0, 360.0]
+    default: 180.0
+    description: "Array azimuth, compass degrees (180 = due South, N-hemisphere optimum)."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  system_derate:
+    type: float
+    range: [0.5, 1.0]
+    default: 0.86
+    description: "PVWatts total DC→AC derate (soiling/wiring/mismatch/inverter). PVWatts v5 default ≈ 0.86 (14% losses)."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+  albedo:
+    type: float
+    range: [0.0, 0.9]
+    default: 0.2
+    description: "Ground reflectance for the POA ground-reflected term. 0.2 typical."
+    affects_csv: [pv_generation.csv, pv.csv]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Stationary battery storage. Per-building. SPECS ONLY — no dispatch schedule
+# (downstream simulators decide charge/discharge). Default OFF → battery.csv
+# carries zero capacity/power.
+# ──────────────────────────────────────────────────────────────────────────
+battery:
+
+  enabled:
+    type: bool
+    default: false
+    description: "Master switch for stationary battery storage. Default false → zero-capacity battery.csv. Set true and pick battery_type (or capacity_kwh/power_kw)."
+    affects_csv: [battery.csv]
+
+  battery_type:
+    type: categorical
+    choices: [none, lfp_2h, lfp_4h, nmc_2h, nmc_4h]
+    default: none
+    description: "Battery preset → capacity/power/efficiency (lfp_2h 200kWh/100kW/0.90, lfp_4h 400/100/0.90, nmc_2h 200/100/0.92, nmc_4h 400/100/0.92). '_2h'/'_4h' = energy duration at rated power. Overridden by capacity_kwh/power_kw when > 0."
+    affects_csv: [battery.csv]
+
+  capacity_kwh:
+    type: float
+    range: [0.0, 20000.0]
+    default: 0.0
+    description: "Explicit usable energy capacity (kWh). 0 → use the battery_type preset; > 0 → overrides it."
+    affects_csv: [battery.csv]
+
+  power_kw:
+    type: float
+    range: [0.0, 10000.0]
+    default: 0.0
+    description: "Explicit rated power (kW, charge/discharge). 0 → use the battery_type preset; > 0 → overrides it. For demand-charge management this is typically ~10–30% of facility peak."
+    affects_csv: [battery.csv]
+
+  round_trip_efficiency:
+    type: float
+    range: [0.5, 1.0]
+    default: 0.9
+    description: "AC-AC round-trip efficiency. LFP ≈ 0.90, NMC ≈ 0.92."
+    affects_csv: [battery.csv]
+
+  min_soc_pct:
+    type: float
+    range: [0.0, 100.0]
+    default: 10.0
+    description: "Minimum usable state of charge (%) — lower cycling bound."
+    affects_csv: [battery.csv]
+
+  max_soc_pct:
+    type: float
+    range: [0.0, 100.0]
+    default: 95.0
+    description: "Maximum usable state of charge (%). 95 reflects a realistic C&I LFP cycling window (full 100 allowed)."
+    affects_csv: [battery.csv]
+
+  initial_soc_pct:
+    type: float
+    range: [0.0, 100.0]
+    default: 50.0
+    description: "State of charge (%) at the start of the sim window."
+    affects_csv: [battery.csv]

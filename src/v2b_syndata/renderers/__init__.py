@@ -1,2 +1,12 @@
 """Tier 3 renderers."""
-from . import building_load, cars, chargers, dr_events, grid_prices, sessions, users  # noqa: F401
+from . import (  # noqa: F401
+    battery,
+    building_load,
+    cars,
+    chargers,
+    dr_events,
+    grid_prices,
+    pv,
+    sessions,
+    users,
+)

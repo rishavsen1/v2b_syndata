@@ -41,6 +41,13 @@ NODE_TOPOLOGY: list[tuple[str, list[str]]] = [
     ("cars.csv", ["A_fleet"]),
     ("building_load.csv", ["L_flex", "L_inflex"]),
     ("sessions.csv", ["f_arr", "f_dwell", "f_soc", "A_user", "A_fleet", "X", "building_load.csv"]),
+    # DER (PV + battery). PV_gen is a deterministic weather-driven latent; the
+    # three CSVs are independent of building_load (PV is a separate file, not
+    # netted into power_kw). Default-off → all zeros, no EnergyPlus/EPW I/O.
+    ("PV_gen", ["X"]),
+    ("pv_generation.csv", ["PV_gen"]),
+    ("pv.csv", ["PV_gen"]),
+    ("battery.csv", ["X"]),
 ]
 
 

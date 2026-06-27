@@ -129,6 +129,37 @@ def get_weather_epw(
     return _fetch_tmyx(tmyx_station, cached, fetcher=fetcher)
 
 
+def parse_epw_location(epw_path: Path) -> tuple[float, float, float]:
+    """Parse the EPW header LOCATION record (line 1) → (latitude, longitude,
+    timezone_hours). Needed by the PV solar-position model.
+
+    EPW LOCATION line (0-indexed, comma-separated):
+      0:'LOCATION' 1:City 2:State 3:Country 4:Source 5:WMO
+      6:Latitude[°, +N] 7:Longitude[°, +E] 8:TimeZone[hours from GMT, +E] 9:Elevation
+
+    Raises ValueError on a malformed header or out-of-range latitude/timezone —
+    a silent default would yield a physically plausible but WRONG PV curve.
+    """
+    with Path(epw_path).open() as f:
+        header = f.readline()
+    parts = header.strip().split(",")
+    if len(parts) < 9 or parts[0].strip().upper() != "LOCATION":
+        raise ValueError(f"EPW first line is not a LOCATION record: {header[:80]!r}")
+    try:
+        lat = float(parts[6])
+        lon = float(parts[7])
+        tz = float(parts[8])
+    except (ValueError, IndexError) as exc:
+        raise ValueError(f"EPW LOCATION lat/lon/tz unparseable: {header[:80]!r}") from exc
+    if not (-90.0 <= lat <= 90.0):
+        raise ValueError(f"EPW latitude out of range: {lat}")
+    if not (-180.0 <= lon <= 180.0):
+        raise ValueError(f"EPW longitude out of range: {lon}")
+    if not (-12.0 <= tz <= 14.0):
+        raise ValueError(f"EPW timezone out of range: {tz}")
+    return lat, lon, tz
+
+
 def parse_epw_temperatures(
     epw_path: Path, *, year: int = 2020,
 ) -> pd.Series:
@@ -320,3 +351,27 @@ def parse_epw_weather(
     ]].copy()
     out.index = timestamps
     return out
+
+
+def parsed_perturbed_weather(
+    tmyx_station: str, year: int,
+    temp_offset_c: float = 0.0, solar_scale: float = 1.0,
+    dewpoint_offset_c: float = 0.0, wind_scale: float = 1.0,
+    *, fetcher: Callable[[str], bytes] | None = None,
+) -> pd.DataFrame:
+    """Full-year hourly weather frame matching exactly what EnergyPlus simulated:
+    resolve the station EPW → leap-inject Feb 29 for leap years → parse the
+    weather fields → apply the realization perturbation (same four knobs the load
+    sim used). Both the optimus ``weather_data.csv`` export and the PV model build
+    from this single helper, so the irradiance/temperature driving PV is
+    byte-identical to the building-load weather. Caller slices to its window."""
+    from . import leap_weather  # local import; leap_weather does not import weather
+    epw_path = get_weather_epw(tmyx_station, "tmyx", None, fetcher=fetcher)
+    if leap_weather.is_leap(year):
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="v2b_wx_") as tmp:
+            leap_epw = leap_weather.make_leap_epw(epw_path, Path(tmp) / "weather.epw", year)
+            wx = parse_epw_weather(leap_epw, year=year)
+    else:
+        wx = parse_epw_weather(epw_path, year=year)
+    return perturb_weather_frame(wx, temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale)

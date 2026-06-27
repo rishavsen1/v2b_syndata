@@ -19,6 +19,9 @@ CSV_NAMES = [
     "grid_prices",
     "dr_events",
     "sessions",
+    "pv_generation",
+    "pv",
+    "battery",
 ]
 
 

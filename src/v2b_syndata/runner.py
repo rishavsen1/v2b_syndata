@@ -21,15 +21,18 @@ from .descriptor_loader import expand_descriptors, load_scenario
 from .e5_metrics import InfeasibilityError, compute_concurrency
 from .knob_loader import _normalize, load_knob_registry, resolve_knobs
 from .manifest import CSV_NAMES, write_manifest
+from .renderers import battery as r_battery
 from .renderers import building_load as r_building_load
 from .renderers import cars as r_cars
 from .renderers import chargers as r_chargers
 from .renderers import dr_events as r_dr
 from .renderers import grid_prices as r_grid
+from .renderers import pv as r_pv
 from .renderers import sessions as r_sessions
 from .renderers import users as r_users
 from .samplers import exogenous, per_entity, sessions_dist
 from .samplers import load as load_sampler
+from .samplers import pv as pv_sampler
 from .types import ResolvedKnobs, ScenarioContext
 
 logger = logging.getLogger(__name__)
@@ -61,6 +64,10 @@ def build_registry() -> SamplerRegistry:
     reg.register("cars.csv", r_cars.render)
     reg.register("building_load.csv", r_building_load.render)
     reg.register("sessions.csv", r_sessions.render)
+    reg.register("PV_gen", pv_sampler.sample_pv_gen)
+    reg.register("pv_generation.csv", r_pv.render_generation)
+    reg.register("pv.csv", r_pv.render_specs)
+    reg.register("battery.csv", r_battery.render)
     reg.validate(build_graph())
     return reg
 

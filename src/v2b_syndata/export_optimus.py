@@ -17,14 +17,12 @@ Layout / index conventions (see `multi_building.generate_multi`):
 """
 from __future__ import annotations
 
-import tempfile
 from collections.abc import Callable
 from datetime import datetime
-from pathlib import Path
 
 import pandas as pd
 
-from .load_pipeline import leap_weather, weather
+from .load_pipeline import weather
 
 # Optimizer loaders read these four with read_csv(index_col=0): they MUST be
 # written with a leading (unnamed) index column.
@@ -182,18 +180,11 @@ def build_weather(
     sim_start = pd.Timestamp(sim_start)
     sim_end = pd.Timestamp(sim_end)
     year = sim_start.year
-    epw_path = weather.get_weather_epw(tmyx_station, "tmyx", None, fetcher=fetcher)
-    if leap_weather.is_leap(year):
-        with tempfile.TemporaryDirectory(prefix="v2b_wx_") as tmp:
-            leap_epw = leap_weather.make_leap_epw(
-                epw_path, Path(tmp) / "weather.epw", year
-            )
-            wx = weather.parse_epw_weather(leap_epw, year=year)
-    else:
-        wx = weather.parse_epw_weather(epw_path, year=year)
-
-    wx = weather.perturb_weather_frame(
-        wx, temp_offset_c, solar_scale, dewpoint_offset_c, wind_scale)
+    # Shared helper (also used by the PV model) so exported weather + PV
+    # generation are driven by byte-identical perturbed irradiance/temperature.
+    wx = weather.parsed_perturbed_weather(
+        tmyx_station, year, temp_offset_c, solar_scale, dewpoint_offset_c,
+        wind_scale, fetcher=fetcher)
     wx = wx[(wx.index >= sim_start) & (wx.index < sim_end)]
     out = pd.DataFrame({
         "datetime": wx.index.strftime("%Y-%m-%d %H:%M:%S"),
