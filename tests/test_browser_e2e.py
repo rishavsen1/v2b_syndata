@@ -202,6 +202,7 @@ def test_ui_full_generate(page, server, tmp_path):
         cards.nth(i).locator(".mb-ev-count").fill(str(3 + i * 4))   # 3 and 7
         cards.nth(i).locator(".mb-charger-count").fill(str(3 + i * 4))
         cards.nth(i).locator(".mb-noise").select_option("clean")    # now a grid input
+    cards.nth(0).locator(".mb-pv-type").select_option("rooftop_medium")  # PV on building 0
     page.fill("#u-output-path", str(tmp_path / "run"))
     page.fill("#u-samples", "1")
     page.click("#generate-btn")
@@ -236,6 +237,18 @@ def test_ui_full_generate(page, server, tmp_path):
     # building_load monthly full-series view
     page.select_option("#ua-csv", "building_load.csv")
     page.select_option("#ua-agg", "monthly")
+    page.click("#ua-run")
+    page.wait_for_function(
+        "document.getElementById('ua-status').textContent.includes('building')",
+        timeout=20000,
+    )
+    # PV generation is plottable just like building load (daily profile + monthly)
+    assert page.locator("#ua-csv option[value='pv_generation.csv']").count() == 1
+    page.select_option("#ua-csv", "pv_generation.csv")
+    assert page.locator("#ua-feature option[value='power_pv_kw']").count() == 1
+    page.select_option("#ua-feature", "power_pv_kw")
+    page.select_option("#ua-agg", "daily")
+    assert page.locator("#ua-agg").is_visible()        # time-series → Aggregation toggle
     page.click("#ua-run")
     page.wait_for_function(
         "document.getElementById('ua-status').textContent.includes('building')",

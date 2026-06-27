@@ -16,6 +16,10 @@ const PLOT_FEATURES = {
         { value: "power_kw_flexible",   label: "power_kw_flexible (HVAC)" },
         { value: "power_kw_inflexible", label: "power_kw_inflexible (lights + plug)" },
     ],
+    "pv_generation.csv": [
+        { value: "power_pv_kw",   label: "PV power (kW)" },
+        { value: "energy_kwh_pv", label: "PV energy (kWh / 15-min)" },
+    ],
     "sessions.csv": [
         { value: "arrival_hour",                  label: "arrival hour" },
         { value: "duration",                      label: "dwell (hours)" },
@@ -41,9 +45,9 @@ const PLOT_FEATURES = {
     ],
 };
 // CSVs that carry per-building distributions worth plotting.
-const PLOTTABLE_CSVS = ["building_load.csv", "weather_data.csv", "sessions.csv", "cars.csv", "grid_prices.csv"];
+const PLOTTABLE_CSVS = ["building_load.csv", "pv_generation.csv", "weather_data.csv", "sessions.csv", "cars.csv", "grid_prices.csv"];
 // Time-series CSVs (datetime axis) — support the daily-profile / monthly toggle.
-const TIMESERIES_CSVS = new Set(["building_load.csv", "weather_data.csv", "grid_prices.csv"]);
+const TIMESERIES_CSVS = new Set(["building_load.csv", "pv_generation.csv", "weather_data.csv", "grid_prices.csv"]);
 
 // Knobs promoted into the per-card Scenario Descriptors / quick-fields. They are
 // still regular knobs (override path + manifest source unchanged) — just
