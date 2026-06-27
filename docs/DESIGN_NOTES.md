@@ -737,3 +737,37 @@ targets rather than impossible ones.
 
 H2 (price tier consistency) under price_jitter remains a LEGITIMATE
 break per D25 — prices aren't physical-feasibility constrained.
+
+## 32. PV + battery (DER): separate files, specs-only battery, weather-consistent PV
+
+Per-building rooftop/carport PV and stationary battery storage, added 2026-06-27.
+Key decisions:
+
+- **PV is a separate file, not netted into `power_kw`.** `building_load.csv`
+  stays gross load (`power_flex + power_inflex`); PV generation is its own
+  `pv_generation.csv`. This preserves every existing CSV byte-for-byte (no
+  redefinition for `dr_events`/`bench`/`sessions` consumers) and lets downstream
+  tools net PV however they want.
+- **Battery is specs-only** (`battery.csv`): capacity/power/efficiency/SoC
+  window, no dispatch schedule — dispatch is a downstream optimizer's job, the
+  same way `cars.csv` ships specs not trips.
+- **Default OFF** (`pv.enabled`/`battery.enabled` false): the PV sampler
+  early-returns an all-zeros series WITHOUT reading the EPW, so the clean-profile
+  bitwise contract holds and no cached weather is required for default runs.
+- **PV weather is identical to the building-load weather.** Both call the shared
+  `weather.parsed_perturbed_weather` (leap-inject → parse → perturb with the same
+  four `building_load.weather_*` knobs), so the PVWatts model sees the exact
+  GHI/DNI/DHI EnergyPlus simulated and `weather_data.csv` exports — including any
+  `weather_solar_scale` perturbation. `build_weather` was refactored onto this
+  helper to guarantee no drift.
+- **Time-axis correctness:** hourly EPW irradiance is forward-filled to the
+  15-min grid, but solar geometry is evaluated at each tick MIDPOINT, and solar
+  time is corrected for both longitude and the standard meridian (`15·tz`) — so
+  the curve peaks at true solar noon rather than drifting tens of minutes early.
+- **No new RNG** in the default/single-shot path; the curve and specs are pure
+  `f(knobs, weather)`. Reserved node names for any future per-sample sizing
+  jitter (`pv_realization`/`battery_realization`) are off in v1.
+- **Per-building** in single (`pv.*`/`battery.*` overrides), batch, and
+  multi-building (`BuildingSpec.overrides`); the optimus export adds `building_id`
+  + energy columns, mirroring `build_building_load`/`build_cars`. Presets
+  (ratings/sizes) live in `src/v2b_syndata/der_catalog.py`.

@@ -180,9 +180,22 @@ Per scenario seed — deterministic CSVs (bitwise-identical for a given seed) + 
 | `chargers.csv` | `charger_id, directionality, min_rate_kw, max_rate_kw` |
 | `sessions.csv` | `session_id, car_id, building_id, arrival, departure, duration_sec, arrival_soc, required_soc_at_depart, previous_day_external_use_soc` |
 | `building_load.csv` | `datetime, power_flex_kw, power_inflex_kw, power_kw` (15-min, EnergyPlus) |
+| `pv_generation.csv` | `datetime, power_pv_kw` (15-min PVWatts curve from the same weather as `building_load`; all-zeros when PV off) |
+| `pv.csv` | `pv_id, pv_type, dc_capacity_kw, ac_capacity_kw, dc_ac_ratio, tilt_deg, azimuth_deg, module_type, system_derate, temp_coeff_per_c, noct_c, albedo` |
+| `battery.csv` | `battery_id, battery_type, capacity_kwh, power_kw, round_trip_efficiency, min_soc_pct, max_soc_pct, initial_soc_pct` (specs only — no dispatch) |
 | `grid_prices.csv` | `datetime, price_per_kwh, type` |
 | `dr_events.csv` | `event_id, start, end, magnitude_kw, notified_at` (header-only if program=none) |
 | `manifest.json` | knob resolution + provenance (reproducibility record) |
+
+Rooftop **PV** and stationary **battery** are per-building distributed-energy
+resources, **off by default** (clean-profile bitwise output is unchanged).
+Enable + size them per building from the CLI (`--override pv.enabled=true
+--override pv.pv_type=rooftop_medium --override battery.enabled=true
+--override battery.battery_type=lfp_4h`) or the web tool (per-card `pv` /
+`battery` knob sections). The PV generation curve is a deterministic
+PVWatts-style function of the *same* (optionally perturbed) TMYx weather fed to
+EnergyPlus for the building load — see `docs/GENERATIVE_MODELS.md`. Presets live
+in `src/v2b_syndata/der_catalog.py`.
 
 `sessions.csv` SoC columns are *synthesized*: `arrival_soc` from the per-region
 calibrated Beta, and `required_soc_at_depart` from the calibrated departure-SoC

@@ -58,6 +58,8 @@ break generation (`distribution_fitter._drop_if_oor`).
 | battery capacity | deterministic inference | physics (range × efficiency), not a distribution | `milesRequested × WhPerMile × 1.5` (ACN only) | per-session inferred, else 60 kWh **fixed** |
 | battery mix | Dirichlet(p·α) | the conjugate distribution over a simplex (class shares sum to 1); α tunes per-sample dispersion | *not data-fit* — declared mix | `battery_mix`, `battery_mix_dirichlet_alpha` · **knobs** |
 | building load | EnergyPlus simulation | a calibrated building-physics engine, not a statistical model | TMYx weather + ASHRAE occupancy schedule | physical; `peak_kw` scaling · **knob** |
+| rooftop PV | PVWatts physics (not fit) | deterministic engineering model from the SAME (perturbed) EPW irradiance/temp EnergyPlus used → weather-consistent with the load | EPW GHI/DNI/DHI + dry-bulb | `pv.*` knobs / `der_catalog` presets · **knobs** |
+| stationary battery | specs only (no dispatch) | capacity/power/efficiency are equipment attributes, not a sampled process | *not fit* | `battery.*` knobs / `der_catalog` presets · **knobs** |
 | grid prices | rule-based TOU tape | tariffs are deterministic schedules, not random | *not fit* | peak/off-peak prices, window · **knobs** |
 | negotiation mix | categorical | survey-derived behavioral type shares | CONSENT survey (n=28) | `negotiation_mix` · **fixed prior / knob** |
 
@@ -345,6 +347,26 @@ These are part of the generator but are not fit to data:
     seed, logged as explicit overrides (`--weather-sigma-c` still sets σ_T
     directly). Pair with the `clean` noise layer for a pure weather→load signal —
     cross-sample variance then comes from weather, not decoupled output noise.
+- **Rooftop / carport PV** (`load_pipeline/pv_model.py`, `samplers/pv.py`,
+  `renderers/pv.py`) — a transparent **PVWatts-style** model: isotropic
+  plane-of-array transposition of the EPW GHI/DNI/DHI via a closed-form
+  NOAA/Spencer solar position, then a NOCT cell-temperature + temperature-
+  coefficient + DC/AC-clip conversion. It is **weather-consistent by
+  construction** — it consumes the *same* perturbed EPW (via the shared
+  `weather.parsed_perturbed_weather` helper) that EnergyPlus simulated and that
+  `weather_data.csv` exports, so PV and building load see identical
+  irradiance/temperature (including any `weather_solar_scale` perturbation).
+  Solar geometry is evaluated at each 15-min tick midpoint and solar time is
+  longitude- and standard-meridian-corrected. Pure deterministic physics — no
+  RNG. **Default OFF** (`pv.enabled=false`) → an all-zeros `pv_generation.csv`
+  with no EPW read. Ratings come from the `pv.*` knobs or the `der_catalog`
+  presets (rooftop_small … rooftop_xl, carport; sized by usable roof area, not
+  building peak). Emits `pv_generation.csv` (curve) + `pv.csv` (specs).
+- **Stationary battery** (`renderers/battery.py`) — **specs only** (capacity,
+  power, round-trip efficiency, SoC window); the generator does **not** produce
+  a dispatch schedule (that is a downstream simulator's job, like `cars.csv`
+  ships specs not trips). Driven by the `battery.*` knobs / `der_catalog`
+  presets (LFP/NMC, 2 h or 4 h). Default OFF → zero capacity. Emits `battery.csv`.
 - **Grid prices** (`renderers/grid_prices.py`) — a deterministic
   time-of-use tape from the `energy_price_peak/offpeak` and `peak_window` knobs.
   Tariffs are schedules, not random variables.

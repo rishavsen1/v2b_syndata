@@ -79,6 +79,7 @@ Modeling/feature improvements not yet scheduled.
 | W8 | Re-anchor `axes_distribution` boxes on each dataset's own empirical (φ,κ) cloud. **ElaadNL done (2026-06-27)** — unassigned 76%→0%. **ACN still pending** — weights stale vs the corrected cohort mix after the 2026-06 UTC→Pacific fix. | validation | MODEL_SELECTION, CALIBRATION_NOTES, S0 |
 | W9 | Revisit parametric family choice (TruncNorm/Weibull/Beta) — several marginal fits are poor. | family | CALIBRATION_NOTES |
 | W10 | Tighten `F_SHARE_TOL` from 0.20 back toward the spec 0.05 as larger-fleet scenarios land. | validation | DESIGN_NOTES |
+| W11 | Battery **dispatch** model (charge/discharge schedule + SoC timeseries) — v1 ships specs only. Plus optional per-sample PV/battery sizing jitter (node names `pv_realization`/`battery_realization` reserved, off in v1). | der | DESIGN_NOTES #32 |
 
 ---
 
@@ -119,6 +120,7 @@ New, dated decisions go here; the **historical numbered decision log lives in
 | 2026-06-26 | Consolidated docs to 5 hand-written files (README + DESIGN_NOTES + CALIBRATION_NOTES + GENERATIVE_MODELS + this tracker); auto-generated docs kept in place; point-in-time reports moved to `docs/archive/`. | this file |
 | 2026-06-26 | `tools/validate_calibration.py` now emits `docs/CALIBRATION_RESULTS.md` (faithfulness S1–S6 summary) as a committed auto-generated doc; bulky CSVs/PNGs stay git-ignored. | validate_calibration.py |
 | 2026-06-27 | Added the S0 region-assignment diagnostic, then re-anchored the ElaadNL grid on its own (φ,κ) cloud (judge-panel of 4 candidate grids). Confirms the datasets are modeled independently — ElaadNL's grid no longer borrows ACN's assumptions. | populations.yaml · S0 |
+| 2026-06-27 | Added per-building PV + battery (DER). PV is a separate weather-consistent PVWatts curve (not netted into power_kw); battery is specs-only (no dispatch); both default-off to keep the bitwise contract. Future work: battery dispatch model; optional per-sample PV/battery sizing jitter (node names reserved). | DESIGN_NOTES #32 |
 
 ---
 
@@ -132,3 +134,4 @@ Closed items kept for provenance.
 | ✔2 | E5 hybrid enforcement (warning + manifest + `--strict-e5`, `e5_metrics.py`) landed. | EDGE_CASE_REPORT, DESIGN_NOTES #30 |
 | ✔3 | Arrival/dwell/departure-SoC fit issues from the README known-issues list addressed (mixture-aware fits, clamp-artifact and over-pile-at-100% corrections). | README (FIXED items) |
 | ✔4 | ElaadNL region grid re-anchored on its own (φ,κ) cloud (4-box tiling: occasional_consistent / weekly_consistent / regular_commuter + erratic catch-all). Unassigned 76%→0%, 293→1231 drivers fit, near-even thirds; S1 KS 0.11–0.17, S2 ρ-gap ≤0.03. | S0, validate_calibration |
+| ✔5 | Per-building rooftop/carport PV + stationary battery (DER). PVWatts curve from the same perturbed EPW as building load (`pv_generation.csv`), PV + battery specs (`pv.csv`/`battery.csv`), `pv.*`/`battery.*` knobs (default off), CLI + web + multi-building, `der_catalog` presets. 15 new tests; 534 pass. | der_catalog, pv_model, DESIGN_NOTES #32, GENERATIVE_MODELS |
