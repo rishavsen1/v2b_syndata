@@ -45,6 +45,15 @@ def test_api_knobs_serves_der_buckets(client):
 
 
 @pytest.mark.webapp
+def test_api_der_catalog(client):
+    c = client.get("/api/der-catalog").get_json()
+    assert c["pv"]["rooftop_large"]["dc_capacity_kw"] == 250.0
+    assert "label" in c["pv"]["rooftop_small"]
+    b = c["battery"]["lfp_4h"]
+    assert b["capacity_kwh"] == 400.0 and b["power_kw"] == 100.0
+
+
+@pytest.mark.webapp
 def test_descriptors_knobs_scenarios(client):
     for route, key in [("/api/descriptors", "location"), ("/api/knobs", "ev_fleet")]:
         d = client.get(route).get_json()

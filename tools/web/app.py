@@ -193,6 +193,14 @@ def api_knobs():
     return jsonify(load_knobs())
 
 
+@app.route("/api/der-catalog")
+def api_der_catalog():
+    """PV + battery preset catalog (ratings, specs, labels) for the UI info
+    popovers + filling the advanced dials when a preset is chosen."""
+    from v2b_syndata.der_catalog import catalog_summary
+    return jsonify(catalog_summary())
+
+
 @app.route("/api/scenarios")
 def api_scenarios():
     return jsonify(load_scenarios())

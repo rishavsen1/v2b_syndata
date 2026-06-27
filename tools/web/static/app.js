@@ -6,6 +6,7 @@
 let DESCRIPTORS = null;   // {location: [...], building: [...], ...}
 let KNOBS = null;         // {bucket: {knob: spec}}
 let SCENARIOS = null;     // [{id, description, descriptors, overrides}, ...]
+let DER_CATALOG = null;   // {pv:{type:{dc_capacity_kw,label}}, battery:{type:{capacity_kwh,power_kw,round_trip_efficiency,label}}}
 
 // Feature picker for distribution plots, per-CSV — OPTIMUS schema (building_id
 // aware). Column names match export_optimus.py output.
@@ -110,10 +111,11 @@ async function safeJson(resp) {
 
 async function init() {
     try {
-        [DESCRIPTORS, KNOBS, SCENARIOS] = await Promise.all([
+        [DESCRIPTORS, KNOBS, SCENARIOS, DER_CATALOG] = await Promise.all([
             fetch("/api/descriptors").then(r => r.json()),
             fetch("/api/knobs").then(r => r.json()),
             fetch("/api/scenarios").then(r => r.json()),
+            fetch("/api/der-catalog").then(r => r.json()).catch(() => null),
         ]);
     } catch (e) {
         document.getElementById("status").textContent = "Failed to load config from backend: " + e;
@@ -247,6 +249,93 @@ function populateCardDer(card) {
         }
         if (n > 0) container.appendChild(section);
     }
+}
+
+
+// Set/clear a DER advanced-panel override and reflect it in its widget. Used to
+// fill the advanced dials when a main-grid preset is chosen.
+function _derWidget(card, path) {
+    return card.querySelector(`.card-der-knobs .knob[data-path='${path}']`);
+}
+function derSetOverride(card, path, value) {
+    const ctx = card._ctx;
+    ctx.overrides[path] = value;
+    const w = _derWidget(card, path);
+    if (!w) return;
+    const [bucket, knobName] = path.split(/\.(.+)/);
+    const spec = (KNOBS[bucket] || {})[knobName];
+    const input = w.querySelector(".knob-input-row > :first-child");
+    if (input && spec) resetWidgetValue(input, spec, value);
+    w.classList.add("modified");
+    updateSourceLabel(w, path, ctx);
+}
+function derClearOverride(card, path) {
+    const ctx = card._ctx;
+    delete ctx.overrides[path];
+    const w = _derWidget(card, path);
+    if (!w) return;
+    const [bucket, knobName] = path.split(/\.(.+)/);
+    const spec = (KNOBS[bucket] || {})[knobName];
+    const input = w.querySelector(".knob-input-row > :first-child");
+    if (input && spec) resetWidgetValue(input, spec, getEffectiveDefault(path, spec, ctx.resolved));
+    w.classList.remove("modified");
+    updateSourceLabel(w, path, ctx);
+}
+
+// Picking a main-grid PV/battery preset fills the advanced dials with its
+// catalog values (so they're visible + editable); 'none' clears them.
+function applyPvPreset(card) {
+    if (!DER_CATALOG || !DER_CATALOG.pv) return;
+    const t = card.querySelector(".mb-pv-type").value;
+    const info = DER_CATALOG.pv[t];
+    if (t && t !== "none" && info) derSetOverride(card, "pv.dc_capacity_kw", info.dc_capacity_kw);
+    else derClearOverride(card, "pv.dc_capacity_kw");
+}
+function applyBatteryPreset(card) {
+    if (!DER_CATALOG || !DER_CATALOG.battery) return;
+    const t = card.querySelector(".mb-battery-type").value;
+    const info = DER_CATALOG.battery[t];
+    const fields = ["capacity_kwh", "power_kw", "round_trip_efficiency"];
+    if (t && t !== "none" && info) {
+        fields.forEach(f => derSetOverride(card, `battery.${f}`, info[f]));
+    } else {
+        fields.forEach(f => derClearOverride(card, `battery.${f}`));
+    }
+}
+
+// Toggle a small popover listing what each preset in a dropdown means.
+function toggleDerPopover(btn, kind) {
+    const existing = document.querySelector(".der-popover");
+    const wasForThis = existing && existing._forBtn === btn;
+    if (existing) existing.remove();
+    if (wasForThis || !DER_CATALOG || !DER_CATALOG[kind]) return;
+    const pop = document.createElement("div");
+    pop.className = "der-popover";
+    pop._forBtn = btn;
+    pop.style.cssText = "position:absolute;z-index:1000;background:#fff;border:1px solid #c9d3dc;"
+        + "border-radius:6px;padding:8px 11px;box-shadow:0 3px 10px rgba(0,0,0,.16);"
+        + "font-size:.78rem;max-width:360px;line-height:1.5;color:#1f2933";
+    pop.innerHTML = Object.entries(DER_CATALOG[kind]).map(([t, info]) => {
+        let detail;
+        if (t === "none") detail = "off";
+        else if (kind === "pv") detail = `${info.dc_capacity_kw} kW DC — ${info.label}`;
+        else detail = `${info.capacity_kwh} kWh / ${info.power_kw} kW · `
+            + `${Math.round(info.round_trip_efficiency * 100)}% round-trip — ${info.label}`;
+        return `<div><strong>${t}</strong> — ${detail}</div>`;
+    }).join("");
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    pop.style.left = `${window.scrollX + r.left}px`;
+    pop.style.top = `${window.scrollY + r.bottom + 4}px`;
+    setTimeout(() => {
+        const close = (e) => {
+            if (!pop.contains(e.target) && e.target !== btn) {
+                pop.remove();
+                document.removeEventListener("click", close);
+            }
+        };
+        document.addEventListener("click", close);
+    }, 0);
 }
 
 
@@ -695,8 +784,8 @@ function createBuildingCard() {
             <label><span class="field-name">Min SoC %</span><input type="number" class="mb-min-soc" min="0" max="100" step="1" placeholder="(10)"></label>
             <label><span class="field-name">Max SoC %</span><input type="number" class="mb-max-soc" min="0" max="100" step="1" placeholder="(90)"></label>
             <label><span class="field-name">Policy</span><input type="text" class="mb-policy" placeholder="(default policy)"></label>
-            <label><span class="field-name">PV system</span><select class="mb-pv-type"></select></label>
-            <label><span class="field-name">Battery</span><select class="mb-battery-type"></select></label>
+            <label><span class="field-name">PV system <button type="button" class="der-info" data-der="pv" aria-label="PV preset meanings" style="background:none;border:none;cursor:pointer;color:#0e6e87;font-size:.85rem;padding:0 .15rem">&#9432;</button></span><select class="mb-pv-type"></select></label>
+            <label><span class="field-name">Battery <button type="button" class="der-info" data-der="battery" aria-label="Battery preset meanings" style="background:none;border:none;cursor:pointer;color:#0e6e87;font-size:.85rem;padding:0 .15rem">&#9432;</button></span><select class="mb-battery-type"></select></label>
             <label><span class="field-name">Weather noise (pre-generation)</span><select class="mb-weather"></select></label>
             <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
@@ -739,7 +828,18 @@ function createBuildingCard() {
     card.querySelector(".mb-seed").value = idx;
     populateCardKnobs(card);          // generic Advanced panel
     populateCardPerturbations(card);  // consolidated noise + weather panel
-    populateCardDer(card);            // PV + battery, surfaced in the main card
+    populateCardDer(card);            // PV + battery advanced dials
+
+    // Main-grid PV/battery selectors: picking a preset fills the advanced dials;
+    // the ⓘ buttons explain what each option means.
+    card.querySelector(".mb-pv-type").addEventListener("change", () => applyPvPreset(card));
+    card.querySelector(".mb-battery-type").addEventListener("change", () => applyBatteryPreset(card));
+    card.querySelectorAll(".der-info").forEach(btn =>
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDerPopover(btn, btn.dataset.der);
+        }));
 
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
     // sessions for this building. Warn live. Floor = this card's min_depart_soc

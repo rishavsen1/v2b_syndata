@@ -145,6 +145,40 @@ def test_ui_der_panel(page, server):
 
 
 @pytest.mark.browser
+def test_ui_der_info_and_preset_sync(page, server):
+    """The ⓘ buttons explain each preset, and picking a preset fills the
+    advanced dials with its catalog values."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # info popover lists what each PV preset means
+    card.locator(".der-info[data-der='pv']").click()
+    pop = page.locator(".der-popover")
+    assert pop.count() == 1
+    assert "rooftop_small" in pop.inner_text() and "30 kW" in pop.inner_text()
+
+    # picking a PV preset fills the advanced dc_capacity_kw dial
+    card.locator(".mb-pv-type").select_option("rooftop_large")
+    card.locator(".mb-der > summary").click()
+    dc = card.locator(".card-der-knobs .knob[data-path='pv.dc_capacity_kw'] input")
+    page.wait_for_function(
+        "document.querySelector(\".card-der-knobs .knob[data-path='pv.dc_capacity_kw'] input\").value === '250'",
+        timeout=5000)
+    assert dc.input_value() == "250"
+
+    # picking a battery preset fills capacity + power
+    card.locator(".mb-battery-type").select_option("lfp_4h")
+    cap = card.locator(".card-der-knobs .knob[data-path='battery.capacity_kwh'] input")
+    pwr = card.locator(".card-der-knobs .knob[data-path='battery.power_kw'] input")
+    assert cap.input_value() == "400" and pwr.input_value() == "100"
+
+    # back to 'none' clears the PV dial
+    card.locator(".mb-pv-type").select_option("none")
+    assert dc.input_value() == "0"
+
+
+@pytest.mark.browser
 @pytest.mark.real_energyplus
 def test_ui_full_generate(page, server, tmp_path):
     page.goto(server + "/", wait_until="networkidle")

@@ -47,6 +47,43 @@ PV_TYPES = tuple(PV_CAPACITY_KW.keys())
 MODULE_TYPES = tuple(MODULE_PARAMS.keys())
 BATTERY_TYPES = tuple(BATTERY_PARAMS.keys())
 
+# Human-readable labels for the UI dropdown / info popovers.
+PV_LABELS: dict[str, str] = {
+    "none": "off — no PV",
+    "rooftop_small": "small office / retail rooftop",
+    "rooftop_medium": "medium office rooftop (congested)",
+    "rooftop_large": "large office / mid retail rooftop",
+    "rooftop_xl": "big-box / warehouse flat roof",
+    "carport": "parking-canopy array",
+}
+BATTERY_LABELS: dict[str, str] = {
+    "none": "off — no battery",
+    "lfp_2h": "LFP, 2-hour duration",
+    "lfp_4h": "LFP, 4-hour duration",
+    "nmc_2h": "NMC, 2-hour duration",
+    "nmc_4h": "NMC, 4-hour duration",
+}
+
+
+def catalog_summary() -> dict[str, object]:
+    """JSON-friendly catalog for the web UI: each PV / battery preset's
+    nameplate values + a human label, plus the module-type parameters. The
+    frontend uses this for the info popovers and to fill the advanced dials when
+    a preset is picked (single source of truth — no duplicated constants in JS)."""
+    return {
+        "pv": {
+            t: {"dc_capacity_kw": kw, "label": PV_LABELS.get(t, t)}
+            for t, kw in PV_CAPACITY_KW.items()
+        },
+        "module": {
+            t: {**params, "label": t} for t, params in MODULE_PARAMS.items()
+        },
+        "battery": {
+            t: {**params, "label": BATTERY_LABELS.get(t, t)}
+            for t, params in BATTERY_PARAMS.items()
+        },
+    }
+
 
 def resolve_pv(
     *, pv_type: str, dc_capacity_kw: float, module_type: str,
