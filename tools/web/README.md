@@ -2,6 +2,10 @@
 
 Browser-based scenario configurator. Pick descriptors via dropdown, tweak individual knobs, generate, and preview CSVs + manifest inline.
 
+📖 **New here?** See [`OVERVIEW.md`](OVERVIEW.md) for a visual walkthrough of the
+interface, or click **▶ Take a tour** in the app header for an interactive
+guided tour.
+
 ## Run
 
 Flask is part of the project's main `uv sync` install — no separate requirements step.

@@ -45,6 +45,22 @@ def test_api_knobs_serves_der_buckets(client):
 
 
 @pytest.mark.webapp
+def test_tour_assets_wired():
+    web = Path(__file__).resolve().parents[1] / "tools" / "web"
+    assert (web / "static" / "vendor" / "driver.js.iife.js").exists()
+    assert (web / "static" / "vendor" / "driver.css").exists()
+    idx = (web / "static" / "index.html").read_text()
+    assert "start-tour" in idx and "tour.js" in idx and "driver.js.iife.js" in idx
+    assert "startTour" in (web / "static" / "tour.js").read_text()
+
+
+@pytest.mark.webapp
+def test_static_vendor_served(client):
+    assert client.get("/static/vendor/driver.js.iife.js").status_code == 200
+    assert client.get("/static/vendor/driver.css").status_code == 200
+
+
+@pytest.mark.webapp
 def test_api_der_catalog(client):
     c = client.get("/api/der-catalog").get_json()
     assert c["pv"]["rooftop_large"]["dc_capacity_kw"] == 250.0

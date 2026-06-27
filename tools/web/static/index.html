@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>V2B Synthetic Generator</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/vendor/driver.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 <body>
 <header>
     <h1>V2B Synthetic Dataset Generator</h1>
     <p class="subtitle">Configure one or more buildings, then generate a reproducible optimus-format dataset (buildings × samples × months).</p>
+    <p><button id="start-tour" type="button" class="secondary">▶ Take a tour</button></p>
 </header>
 
 <main>
@@ -99,6 +101,8 @@
     </section>
 </main>
 
+<script src="/static/vendor/driver.js.iife.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/tour.js"></script>
 </body>
 </html>

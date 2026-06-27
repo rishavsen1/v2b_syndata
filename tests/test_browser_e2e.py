@@ -192,6 +192,27 @@ def test_ui_der_info_and_preset_sync(page, server):
 
 
 @pytest.mark.browser
+def test_ui_tour(page, server):
+    """The '▶ Take a tour' button starts the driver.js guided tour and steps
+    through it."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    assert page.locator("#start-tour").count() == 1
+
+    page.click("#start-tour")
+    page.wait_for_selector(".driver-popover", timeout=5000)
+    assert "Welcome" in page.locator(".driver-popover-title").inner_text()
+
+    # advancing reaches the per-card step
+    page.click(".driver-popover-next-btn")
+    assert "building" in page.locator(".driver-popover-title").inner_text().lower()
+
+    # close it
+    page.click(".driver-popover-close-btn")
+    assert page.locator(".driver-popover").count() == 0
+
+
+@pytest.mark.browser
 @pytest.mark.real_energyplus
 def test_ui_full_generate(page, server, tmp_path):
     page.goto(server + "/", wait_until="networkidle")
