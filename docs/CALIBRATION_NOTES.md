@@ -193,13 +193,33 @@ programmatic API endpoint exposed in WebFetch / curl probing). Bulk
 download requires manual portal navigation + likely NDA for full
 attributes (per OSTI biblio 1970735, "researchers from partner
 national labs can request additional attributes via
-evwattsdata@energetics.com under a non-disclosure agreement"). Status:
-**fixture-only with documented `EVWATTS_BULK_URL` env-var hook**.
-Users with portal access can drop the bulk CSV into
-`data/calibration/evwatts_cache/evwatts_<tag>.csv` and re-run
-`v2b-syndata calibrate --population evwatts_workplace_public
---source-arg evwatts:release_tag=<tag>`. Real-data acquisition deferred
-to v2 follow-up.
+evwattsdata@energetics.com under a non-disclosure agreement").
+
+**Real-data calibration (2026-06-28).** The public release was obtained and
+calibrated. It is OCPI-relational (a `session` table joined to `evse` on
+`evse_id`, plus connector/vehicles tables); `tools/ingest_evwatts.py` joins
+`session ⋈ evse`, filters to the workplace cohort (`venue = "Business Office"`)
+and drops error-flagged sessions, writing the internal flat schema
+(`start_time_utc, end_time_utc, energy_kwh, evse_id, venue_type, rated_power_kw`)
+to `data/calibration/evwatts_cache/evwatts_<tag>.csv` (git-ignored; regenerate
+from the raw download). Reproduce with:
+```
+uv run python tools/ingest_evwatts.py --raw-dir <raw> --release-tag public_2026 \
+    --venue "Business Office" --cache-dir data/calibration/evwatts_cache
+uv run v2b-syndata calibrate --population evwatts_workplace_public \
+    --cache-dir data/calibration/evwatts_cache \
+    --source-arg evwatts:release_tag=public_2026 \
+    --source-arg evwatts:venue_filter=workplace_public
+```
+Result: 13.9M total sessions → **1.36M clean workplace sessions / 3,652 ports**;
+3,356 port-proxy users after the ≥5-session filter; **5/5 regions fit,
+unassigned 0.4%** (the ACN-anchored grid fits US workplace charging well — no
+re-anchor needed, unlike ElaadNL). `capacity_inference_fallback_rate = 1.0`
+(no requested-energy upstream → arrival-SoC uses the Beta prior). Caveats:
+timestamps are naive local clock time (per-region, US-wide; DST varies — the
+dataset even flags non-DST EVSEs), so arrival_hour mixes time zones; arrival is
+fit pooled per population (W3). `evwatts` is now a first-class source in
+`tools/validate_calibration.py` (`--sources …,evwatts`).
 
 Implemented: `inl_ev_project` policy adds INL EV Project Phase 1 (Idaho
 National Lab, avt.inl.gov, 2011–2013 ChargePoint+Blink fleet on ~24 kWh Leaf

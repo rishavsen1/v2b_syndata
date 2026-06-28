@@ -162,8 +162,13 @@ Raw per-session fields, by source:
 
 - **ACN-Data:** `sessionID, userID, siteID, stationID, connectionTime, disconnectTime, kWhDelivered, userInputs{milesRequested, WhPerMile, kWhRequested, minutesAvailable}`
 - **ElaadNL / 4TU:** `EV_id_x, start_datetime, end_datetime, total_energy, capacity_kwh, commute_km_range_min/max, EV_brand/model_selfreported, ownership`
-- **EV WATTS:** `evse_id, venue_type, rated_power_kw, start_time_utc, end_time_utc, energy_kwh`
+- **EV WATTS:** real public release is OCPI-relational (`session ⋈ evse` on `evse_id`); `tools/ingest_evwatts.py` joins + filters it to the internal schema `evse_id, venue_type, start_time_utc, end_time_utc, energy_kwh` (port-proxy user)
 - **INL:** `vehicle_id, evse_id, venue, evse_power_kw, start_time, end_time, energy_kwh`
+
+ACN-Data, ElaadNL, and **EV WATTS** are calibrated on real public releases.
+INL is currently **fixture-only** (the session-level CSV isn't public — needs
+direct INL contact); see `docs/CALIBRATION_NOTES.md` for how to wire it once
+obtained.
 
 All sources normalize into one internal record before calibration —
 `SessionFeatures{user_id, site, arrival_time, arrival_hour, dwell_hours, kwh_delivered, miles_requested?, wh_per_mile?, kwh_requested?, minutes_available?}`

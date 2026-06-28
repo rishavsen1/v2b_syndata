@@ -961,15 +961,15 @@ evwatts_workplace_public:
 
   axes_distribution:
     - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
-        50], weight: 0.40}
+        50], weight: 0.175397}
     - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
-        3, 80], weight: 0.20}
+        3, 80], weight: 0.005687}
     - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
-        dist_km: [5, 60], weight: 0.20}
+        dist_km: [5, 60], weight: 0.304999}
     - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.15}
+            10, 80], weight: 0.510626}
     - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
-        weight: 0.05}
+        weight: 0.003292}
 
   negotiation:
     cluster_mix: [0.107, 0.536, 0.321, 0.036]
@@ -992,37 +992,181 @@ evwatts_workplace_public:
 #   --source-arg evwatts:min_power_kw=50
 # ──────────────────────────────────────────────────────────────────────────
   region_distributions:
-    regular_charger:
+    rare_consistent:
       arrival:
-        dist: truncnorm
-        mu: 9.420491818260155
-        sigma: 2.924548607445841
-        n_samples: 64
-        ks_fit_quality: 0.36200510610462355
+        dist: truncnorm_mixture
+        w1: 0.44106949598718304
+        mu1: 8.07381217876135
+        sigma1: 0.9559632718055457
+        mu2: 13.579402164348037
+        sigma2: 3.0853376112699693
+        n_samples: 1143838
+        ks_fit_quality: 0.03133670822131718
       dwell:
         dist: weibull
-        k: 1.3102266556984286
-        lambda: 6.141017363645776
-        n_samples: 64
-        ks_fit_quality: 0.41481462935824487
+        k: 0.8604841289998982
+        lambda: 5.667345868431502
+        n_samples: 20482
+        ks_fit_quality: 0.11644791746485837
+      soc_arrival:
+        dist: beta
+        alpha: 3.6510081367547285
+        beta: 5.463450340389326
+        n_samples: 20482
+        ks_fit_quality: 0.031531912908832616
+      soc_depart:
+        dist: beta
+        alpha: 0.9465494549385959
+        beta: 0.3760261879588521
+        n_samples: 20414
+        ks_fit_quality: 0.2860579238914181
       copula:
-        rho_spearman: -0.42667622894968843
-        rho_gaussian: -0.4431067599883351
-        n_samples: 64
+        rho_spearman: -0.16599317180584472
+        rho_gaussian: -0.17360887631414937
+        n_samples: 20482
+    rare_inconsistent:
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.44106949598718304
+        mu1: 8.07381217876135
+        sigma1: 0.9559632718055457
+        mu2: 13.579402164348037
+        sigma2: 3.0853376112699693
+        n_samples: 1143838
+        ks_fit_quality: 0.03133670822131718
+      dwell:
+        dist: weibull
+        k: 0.9406493702587941
+        lambda: 6.222633151452151
+        n_samples: 467
+        ks_fit_quality: 0.08941091834428294
+      soc_arrival:
+        dist: beta
+        alpha: 3.5313193854253173
+        beta: 5.557827888869333
+        n_samples: 467
+        ks_fit_quality: 0.03586043616934753
+      soc_depart:
+        dist: beta
+        alpha: 1.0241775512856215
+        beta: 0.46187755183388635
+        n_samples: 466
+        ks_fit_quality: 0.2734381291085869
+      copula:
+        rho_spearman: -0.015561214563448007
+        rho_gaussian: -0.016295485481200855
+        n_samples: 467
+    occasional_consistent:
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.44106949598718304
+        mu1: 8.07381217876135
+        sigma1: 0.9559632718055457
+        mu2: 13.579402164348037
+        sigma2: 3.0853376112699693
+        n_samples: 1143838
+        ks_fit_quality: 0.03133670822131718
+      dwell:
+        dist: weibull
+        k: 0.8930751831276342
+        lambda: 6.56741049767475
+        n_samples: 152380
+        ks_fit_quality: 0.12187477942541247
+      soc_arrival:
+        dist: beta
+        alpha: 3.730535408625797
+        beta: 5.626523659029238
+        n_samples: 152380
+        ks_fit_quality: 0.031164908404212655
+      soc_depart:
+        dist: beta
+        alpha: 1.0227430656416607
+        beta: 0.4202669432065319
+        n_samples: 152093
+        ks_fit_quality: 0.27537953541792676
+      copula:
+        rho_spearman: -0.25173318607890854
+        rho_gaussian: -0.2628517374406497
+        n_samples: 152380
+    regular_charger:
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.44106949598718304
+        mu1: 8.07381217876135
+        sigma1: 0.9559632718055457
+        mu2: 13.579402164348037
+        sigma2: 3.0853376112699693
+        n_samples: 1143838
+        ks_fit_quality: 0.03133670822131718
+      dwell:
+        dist: weibull
+        k: 1.1428310211758186
+        lambda: 5.917019519565159
+        n_samples: 1084348
+        ks_fit_quality: 0.05836718188922511
+      soc_arrival:
+        dist: beta
+        alpha: 3.719324311845256
+        beta: 5.605378346743447
+        n_samples: 1084348
+        ks_fit_quality: 0.029983135241463565
+      soc_depart:
+        dist: beta
+        alpha: 1.058881385337084
+        beta: 0.4456649607019657
+        n_samples: 1083197
+        ks_fit_quality: 0.2698367273909252
+      copula:
+        rho_spearman: -0.25198699765508525
+        rho_gaussian: -0.2631152205102145
+        n_samples: 1084348
+    erratic:
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.44106949598718304
+        mu1: 8.07381217876135
+        sigma1: 0.9559632718055457
+        mu2: 13.579402164348037
+        sigma2: 3.0853376112699693
+        n_samples: 1143838
+        ks_fit_quality: 0.03133670822131718
+      dwell:
+        dist: weibull
+        k: 1.1221757218635788
+        lambda: 8.765281727083803
+        n_samples: 2031
+        ks_fit_quality: 0.05322331726076468
+      soc_arrival:
+        dist: beta
+        alpha: 3.7471937707953455
+        beta: 5.6114984928515215
+        n_samples: 2031
+        ks_fit_quality: 0.036039599005377426
+      soc_depart:
+        dist: beta
+        alpha: 0.8611121212079285
+        beta: 0.2719739560463287
+        n_samples: 2029
+        ks_fit_quality: 0.28480461078298797
+      copula:
+        rho_spearman: 0.03315607379245004
+        rho_gaussian: 0.034719215239057126
+        n_samples: 2031
   calibration_metadata:
-    source: calibration:evwatts_fixture_20260601
+    source: calibration:evwatts_public_2026_20260628
     dataset: EV WATTS (DOE/EPRI)
     user_id_strategy: port_proxy
-    release_tag: fixture
+    release_tag: public_2026
     venue_filter: workplace_public
     schema_version: v1
-    calibration_date: '2026-06-01'
-    n_users_total: 6
-    n_sessions_total: 64
-    n_users_assigned_in_population: 6
-    n_users_with_userinputs: 0
+    calibration_date: '2026-06-28'
+    n_users_total: 3356
+    n_sessions_total: 1265017
+    n_users_assigned_in_population: 3341
+    n_users_with_userinputs: 3341
     capacity_inference_fallback_rate: 1.0
-    unassigned_user_rate: 0.0
+    unassigned_user_rate: 0.004469606674612634
+    weekend_activity_factor: 0.3429
 evwatts_dcfc_public:
   description: "EV WATTS-anchored public DCFC cohort (rated_power_kw ≥ 50)"
   calibration_policy: evwatts

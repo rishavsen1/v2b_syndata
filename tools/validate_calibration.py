@@ -130,6 +130,18 @@ SOURCE_SPECS = {
         },
         "population": "elaadnl_public_eu",
     },
+    # EV WATTS (DOE/EPRI) workplace cohort — real public data ingested via
+    # tools/ingest_evwatts.py (session⋈evse, venue="Business Office").
+    "evwatts": {
+        "policy": "evwatts",
+        "scenario": "S_evwatts_workplace",
+        "source_args": {
+            "release_tag": "public_2026",
+            "venue_filter": "workplace_public",
+            "cache_dir": REPO / "data" / "calibration" / "evwatts_cache",
+        },
+        "population": "evwatts_workplace_public",
+    },
 }
 
 

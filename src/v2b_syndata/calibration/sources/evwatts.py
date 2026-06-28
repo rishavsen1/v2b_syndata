@@ -12,7 +12,10 @@ from ..feature_extractor import MIN_DWELL_HOURS, SessionFeatures
 
 SCHEMA_VERSION = "v1"
 
-# TODO confirm column names against real livewire release.
+# Internal flat schema. The real EV WATTS public release is OCPI-relational
+# (session ⋈ evse on evse_id); `tools/ingest_evwatts.py` joins + filters it to
+# these columns and writes the cache file this source reads. EV WATTS timestamps
+# are naive LOCAL clock time and there is no driver ID upstream (port-proxy).
 COL_START = "start_time_utc"
 COL_END = "end_time_utc"
 COL_ENERGY_KWH = "energy_kwh"

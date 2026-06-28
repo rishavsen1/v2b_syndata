@@ -102,7 +102,7 @@ Consciously postponed, with the gating condition.
 
 | ID | Item | Area | Source/Ref |
 |---|---|---|---|
-| K1 | EV WATTS is fixture-only (~64 synthetic sessions) — confirm columns vs the real livewire release & bump `SCHEMA_VERSION`; real bulk behind portal/NDA (`EVWATTS_BULK_URL` hook). | evwatts | CALIBRATION_NOTES |
+| ~~K1~~ | **DONE (2026-06-28):** EV WATTS now calibrated on the real public release (13.9M sessions → 1.36M workplace / 3,652 ports via `tools/ingest_evwatts.py`). See ✔6. | evwatts | CALIBRATION_NOTES |
 | K2 | INL is fixture-only (~65 synthetic sessions) — confirm columns vs avt.inl.gov Phase 1 & bump `SCHEMA_VERSION`; session CSV not public (`INL_BULK_URL` hook, needs direct INL contact). | inl | CALIBRATION_NOTES |
 | K3 | Arrival SoC is unobservable — no charger records SoC, so no model comparison is possible (honest Beta(4,6) prior, not a fit). | soc | GENERATIVE_MODELS |
 | K4 | DR per-event reduction magnitudes use a flat Uniform prior — no published per-event reduction targets available. | dr | GENERATIVE_MODELS |
@@ -134,4 +134,5 @@ Closed items kept for provenance.
 | ✔2 | E5 hybrid enforcement (warning + manifest + `--strict-e5`, `e5_metrics.py`) landed. | EDGE_CASE_REPORT, DESIGN_NOTES #30 |
 | ✔3 | Arrival/dwell/departure-SoC fit issues from the README known-issues list addressed (mixture-aware fits, clamp-artifact and over-pile-at-100% corrections). | README (FIXED items) |
 | ✔4 | ElaadNL region grid re-anchored on its own (φ,κ) cloud (4-box tiling: occasional_consistent / weekly_consistent / regular_commuter + erratic catch-all). Unassigned 76%→0%, 293→1231 drivers fit, near-even thirds; S1 KS 0.11–0.17, S2 ρ-gap ≤0.03. | S0, validate_calibration |
+| ✔6 | EV WATTS upgraded from fixture-only to **real-data calibrated**: ingested the public release (session⋈evse, venue=Business Office) via `tools/ingest_evwatts.py` → 1.36M workplace sessions / 3,356 users; `evwatts_workplace_public` fits 5/5 regions, unassigned 0.4% (no re-anchor needed). Registered in the validation harness. INL remains fixture-only. | tools/ingest_evwatts.py, populations.yaml |
 | ✔5 | Per-building rooftop/carport PV + stationary battery (DER). PVWatts curve from the same perturbed EPW as building load (`pv_generation.csv`), PV + battery specs (`pv.csv`/`battery.csv`), `pv.*`/`battery.*` knobs (default off), CLI + web + multi-building, `der_catalog` presets. 15 new tests; 534 pass. | der_catalog, pv_model, DESIGN_NOTES #32, GENERATIVE_MODELS |
