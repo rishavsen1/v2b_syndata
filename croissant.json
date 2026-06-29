@@ -1,0 +1,1204 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "cr": "http://mlcommons.org/croissant/",
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataBiases": "cr:dataBiases",
+    "dataCollection": "cr:dataCollection",
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "dct": "http://purl.org/dc/terms/",
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "personalSensitiveInformation": "cr:personalSensitiveInformation",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "sc": "https://schema.org/",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform"
+  },
+  "@type": "sc:Dataset",
+  "conformsTo": "http://mlcommons.org/croissant/1.0",
+  "name": "v2b_syndata",
+  "description": "Configurable synthetic Vehicle-to-Building (V2B) EV-charging dataset GENERATOR. A (scenario YAML, knob overrides, seed) triple forward-samples bitwise-identical CSVs: EV users, cars, chargers, charging sessions, EnergyPlus building load, rooftop PV, stationary battery specs, grid tariffs, and demand-response events. Behavioral distributions are calibrated from public ACN-Data and ElaadNL charging logs; state-of-charge is modeled from a prior (never observed). This record describes one generated dataset instance (one scenario-seed output directory). See docs/DATASHEET.md, docs/ETHICS.md, docs/CALIBRATION_RESULTS.md.",
+  "version": "0.1.0",
+  "isLiveDataset": true,
+  "datePublished": "2026-06-29",
+  "keywords": [
+    "synthetic data",
+    "electric vehicles",
+    "EV charging",
+    "vehicle-to-building",
+    "V2B",
+    "building energy",
+    "EnergyPlus",
+    "demand response",
+    "load forecasting"
+  ],
+  "creator": {
+    "@type": "sc:Organization",
+    "name": "Vanderbilt University"
+  },
+  "publisher": {
+    "@type": "sc:Organization",
+    "name": "Vanderbilt University"
+  },
+  "license": "https://spdx.org/licenses/MIT.html",
+  "url": "https://github.com/rishavsen1/v2b_syndata",
+  "citeAs": "v2b_syndata: a configurable synthetic Vehicle-to-Building EV-charging dataset generator (KDD 2027 Datasets & Benchmarks submission).",
+  "dataBiases": "Calibration rests on US workplace charging (ACN-Data: Caltech/JPL/Office001) and one Netherlands site (ElaadNL); EV WATTS and INL are tiny synthetic fixtures excluded from all fidelity numbers. Building load ships a single ASHRAE 90.1-2019 efficient prototype in one climate zone (Denver CZ-5B), running ~30-50% below the ComStock stock-weighted average. Not representative of residential charging, non-US/EU behavior, or older building stock. See docs/ETHICS.md.",
+  "dataCollection": "Two-stage: (1) offline calibration fits per-region distribution parameters from real public charging logs (ACN-Data, ElaadNL) into configs/populations.yaml, with a MIN_SAMPLES=30 floor before a region is marked calibrated; (2) generation forward-samples CSVs under a SHA-keyed RNG so a (scenario, overrides, seed) triple is bitwise-reproducible. Building load is computed with EnergyPlus 23.x at generation time. State-of-charge is never recorded in any source and is drawn from a Beta/normal prior (mean approx 0.40), not fit. See docs/GENERATIVE_MODELS.md.",
+  "personalSensitiveInformation": "None. Output is fully synthetic; identifiers are sequential synthetic keys. Calibration corpora are public aggregates consumed only as distribution parameters; no raw source record is redistributed. See docs/ETHICS.md.",
+  "distribution": [
+    {
+      "@type": "cr:FileObject",
+      "@id": "users.csv",
+      "name": "users.csv",
+      "description": "One row per EV driver: behavioral profile (region, phi frequency, kappa consistency, delta_km commute, negotiation type, scheduler weights).",
+      "contentUrl": "users.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "cars.csv",
+      "name": "cars.csv",
+      "description": "One row per vehicle: battery capacity and allowed-SoC window, battery class.",
+      "contentUrl": "cars.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "chargers.csv",
+      "name": "chargers.csv",
+      "description": "One row per charging port: directionality and power-rate bounds (negative min_rate_kw for bidirectional).",
+      "contentUrl": "chargers.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "sessions.csv",
+      "name": "sessions.csv",
+      "description": "One row per charging session: arrival/departure, duration, and modeled SoC fields (arrival_soc and required_soc_at_depart are priors, not observed).",
+      "contentUrl": "sessions.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "building_load.csv",
+      "name": "building_load.csv",
+      "description": "15-minute building power time series from EnergyPlus: flexible, inflexible, and total kW.",
+      "contentUrl": "building_load.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "pv_generation.csv",
+      "name": "pv_generation.csv",
+      "description": "15-minute rooftop-PV power time series (deterministic PVWatts-style curve from the same TMYx weather as building_load; all zeros when PV disabled).",
+      "contentUrl": "pv_generation.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "pv.csv",
+      "name": "pv.csv",
+      "description": "Rooftop-PV system specification (capacities, orientation, derate, temperature coefficients). Off by default.",
+      "contentUrl": "pv.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "battery.csv",
+      "name": "battery.csv",
+      "description": "Stationary-battery specification only (capacity, power, efficiency, SoC bounds). No dispatch / SoC time series. Off by default.",
+      "contentUrl": "battery.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "grid_prices.csv",
+      "name": "grid_prices.csv",
+      "description": "Tariff time series: price_per_kwh and peak/off-peak label.",
+      "contentUrl": "grid_prices.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "dr_events.csv",
+      "name": "dr_events.csv",
+      "description": "Demand-response events (start, end, magnitude_kw, notified_at). Header-only when program=none.",
+      "contentUrl": "dr_events.csv",
+      "encodingFormat": "text/csv"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "manifest.json",
+      "name": "manifest.json",
+      "description": "Run provenance and reproducibility record: resolved knobs and per-knob provenance (calibrated / knob / fixed).",
+      "contentUrl": "manifest.json",
+      "encodingFormat": "application/json"
+    }
+  ],
+  "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "@id": "users",
+      "name": "users",
+      "description": "EV drivers. One record per driver.",
+      "key": {
+        "@id": "users/car_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "users/car_id",
+          "name": "car_id",
+          "description": "Driver/vehicle identifier (joins to cars.car_id, sessions.car_id).",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "car_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/region",
+          "name": "region",
+          "description": "Calibrated behavioral region label (e.g. regular_charger, occasional_consistent, rare_consistent, erratic).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "region"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/phi",
+          "name": "phi",
+          "description": "Charging frequency axis (weekday usage rate).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "phi"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/kappa",
+          "name": "kappa",
+          "description": "Behavioral consistency axis (1 - coefficient of variation of arrival).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "kappa"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/delta_km",
+          "name": "delta_km",
+          "description": "Daily commute distance in km.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "delta_km"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/negotiation_type",
+          "name": "negotiation_type",
+          "description": "Scheduler negotiation behavior, one of type_i, type_ii, type_iii, type_iv.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "negotiation_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/w1",
+          "name": "w1",
+          "description": "Scheduler objective weight 1.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "w1"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "users/w2",
+          "name": "w2",
+          "description": "Scheduler objective weight 2.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "users.csv"
+            },
+            "extract": {
+              "column": "w2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "cars",
+      "name": "cars",
+      "description": "Vehicle battery specifications. One record per vehicle.",
+      "key": {
+        "@id": "cars/car_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "cars/car_id",
+          "name": "car_id",
+          "description": "Vehicle identifier (joins to users.car_id).",
+          "dataType": "sc:Integer",
+          "references": {
+            "field": {
+              "@id": "users/car_id"
+            }
+          },
+          "source": {
+            "fileObject": {
+              "@id": "cars.csv"
+            },
+            "extract": {
+              "column": "car_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "cars/capacity_kwh",
+          "name": "capacity_kwh",
+          "description": "Usable battery capacity in kWh.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "cars.csv"
+            },
+            "extract": {
+              "column": "capacity_kwh"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "cars/min_allowed_soc",
+          "name": "min_allowed_soc",
+          "description": "Minimum allowed state of charge.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "cars.csv"
+            },
+            "extract": {
+              "column": "min_allowed_soc"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "cars/max_allowed_soc",
+          "name": "max_allowed_soc",
+          "description": "Maximum allowed state of charge.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "cars.csv"
+            },
+            "extract": {
+              "column": "max_allowed_soc"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "cars/battery_class",
+          "name": "battery_class",
+          "description": "Battery archetype, one of leaf_24, bolt_40, m3_75, rivian_100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "cars.csv"
+            },
+            "extract": {
+              "column": "battery_class"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "chargers",
+      "name": "chargers",
+      "description": "Charging ports. One record per charger.",
+      "key": {
+        "@id": "chargers/charger_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "chargers/charger_id",
+          "name": "charger_id",
+          "description": "Charger identifier.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "chargers.csv"
+            },
+            "extract": {
+              "column": "charger_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "chargers/directionality",
+          "name": "directionality",
+          "description": "unidirectional (V1G) or bidirectional (V2B/V2G capable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "chargers.csv"
+            },
+            "extract": {
+              "column": "directionality"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "chargers/min_rate_kw",
+          "name": "min_rate_kw",
+          "description": "Minimum power rate in kW (negative for bidirectional discharge).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "chargers.csv"
+            },
+            "extract": {
+              "column": "min_rate_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "chargers/max_rate_kw",
+          "name": "max_rate_kw",
+          "description": "Maximum charge power rate in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "chargers.csv"
+            },
+            "extract": {
+              "column": "max_rate_kw"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "sessions",
+      "name": "sessions",
+      "description": "Charging sessions. One record per session. SoC fields are modeled priors, not observed measurements.",
+      "key": {
+        "@id": "sessions/session_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/session_id",
+          "name": "session_id",
+          "description": "Session identifier.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "session_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/car_id",
+          "name": "car_id",
+          "description": "Vehicle identifier (joins to cars.car_id / users.car_id).",
+          "dataType": "sc:Integer",
+          "references": {
+            "field": {
+              "@id": "cars/car_id"
+            }
+          },
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "car_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/building_id",
+          "name": "building_id",
+          "description": "Building identifier the session occurred at (e.g. B001).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "building_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/arrival",
+          "name": "arrival",
+          "description": "Arrival (connection) timestamp.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "arrival"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/departure",
+          "name": "departure",
+          "description": "Departure (disconnection) timestamp.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "departure"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/duration_sec",
+          "name": "duration_sec",
+          "description": "Session dwell duration in seconds.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "duration_sec"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/arrival_soc",
+          "name": "arrival_soc",
+          "description": "Modeled state of charge at arrival. NOT OBSERVED: drawn from a Beta/normal prior (mean approx 0.40); no charger records SoC.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "arrival_soc"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/required_soc_at_depart",
+          "name": "required_soc_at_depart",
+          "description": "Modeled required SoC at departure = arrival_soc + kWhDelivered/capacity. The only real per-session signal is delivered energy. Hard invariant: required_soc_at_depart > arrival_soc.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "required_soc_at_depart"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "sessions/previous_day_external_use_soc",
+          "name": "previous_day_external_use_soc",
+          "description": "Modeled SoC consumed by prior-day external (off-site) driving.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "sessions.csv"
+            },
+            "extract": {
+              "column": "previous_day_external_use_soc"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "building_load",
+      "name": "building_load",
+      "description": "15-minute EnergyPlus building load time series. One record per timestep.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "building_load/datetime",
+          "name": "datetime",
+          "description": "Timestep start (15-minute resolution).",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "building_load.csv"
+            },
+            "extract": {
+              "column": "datetime"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "building_load/power_flex_kw",
+          "name": "power_flex_kw",
+          "description": "Flexible (schedulable) building power in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "building_load.csv"
+            },
+            "extract": {
+              "column": "power_flex_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "building_load/power_inflex_kw",
+          "name": "power_inflex_kw",
+          "description": "Inflexible (base) building power in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "building_load.csv"
+            },
+            "extract": {
+              "column": "power_inflex_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "building_load/power_kw",
+          "name": "power_kw",
+          "description": "Total building power in kW (flex + inflex).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "building_load.csv"
+            },
+            "extract": {
+              "column": "power_kw"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "pv_generation",
+      "name": "pv_generation",
+      "description": "15-minute PV generation time series. One record per timestep; all zeros when PV is disabled.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "pv_generation/datetime",
+          "name": "datetime",
+          "description": "Timestep start (15-minute resolution).",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "pv_generation.csv"
+            },
+            "extract": {
+              "column": "datetime"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv_generation/power_pv_kw",
+          "name": "power_pv_kw",
+          "description": "PV AC power output in kW (deterministic PVWatts-style curve).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv_generation.csv"
+            },
+            "extract": {
+              "column": "power_pv_kw"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "pv",
+      "name": "pv",
+      "description": "Rooftop-PV system specifications. One record per PV system (off by default).",
+      "key": {
+        "@id": "pv/pv_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "pv/pv_id",
+          "name": "pv_id",
+          "description": "PV system identifier.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "pv_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/pv_type",
+          "name": "pv_type",
+          "description": "PV preset name (e.g. rooftop_medium; none means disabled).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "pv_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/dc_capacity_kw",
+          "name": "dc_capacity_kw",
+          "description": "DC nameplate capacity in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "dc_capacity_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/ac_capacity_kw",
+          "name": "ac_capacity_kw",
+          "description": "AC (inverter) capacity in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "ac_capacity_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/dc_ac_ratio",
+          "name": "dc_ac_ratio",
+          "description": "DC-to-AC ratio.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "dc_ac_ratio"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/tilt_deg",
+          "name": "tilt_deg",
+          "description": "Array tilt in degrees.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "tilt_deg"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/azimuth_deg",
+          "name": "azimuth_deg",
+          "description": "Array azimuth in degrees.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "azimuth_deg"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/module_type",
+          "name": "module_type",
+          "description": "PV module technology label.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "module_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/system_derate",
+          "name": "system_derate",
+          "description": "System derate (loss) factor.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "system_derate"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/temp_coeff_per_c",
+          "name": "temp_coeff_per_c",
+          "description": "Power temperature coefficient per degree C.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "temp_coeff_per_c"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/noct_c",
+          "name": "noct_c",
+          "description": "Nominal operating cell temperature in degrees C.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "noct_c"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "pv/albedo",
+          "name": "albedo",
+          "description": "Ground albedo.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "pv.csv"
+            },
+            "extract": {
+              "column": "albedo"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "battery",
+      "name": "battery",
+      "description": "Stationary-battery specifications only (no dispatch / SoC time series). One record per battery (off by default).",
+      "key": {
+        "@id": "battery/battery_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "battery/battery_id",
+          "name": "battery_id",
+          "description": "Battery identifier.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "battery_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/battery_type",
+          "name": "battery_type",
+          "description": "Battery preset name (e.g. lfp_4h; none means disabled).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "battery_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/capacity_kwh",
+          "name": "capacity_kwh",
+          "description": "Energy capacity in kWh.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "capacity_kwh"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/power_kw",
+          "name": "power_kw",
+          "description": "Power rating in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "power_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/round_trip_efficiency",
+          "name": "round_trip_efficiency",
+          "description": "Round-trip efficiency (0-1).",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "round_trip_efficiency"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/min_soc_pct",
+          "name": "min_soc_pct",
+          "description": "Minimum SoC percentage.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "min_soc_pct"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/max_soc_pct",
+          "name": "max_soc_pct",
+          "description": "Maximum SoC percentage.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "max_soc_pct"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "battery/initial_soc_pct",
+          "name": "initial_soc_pct",
+          "description": "Initial SoC percentage.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "battery.csv"
+            },
+            "extract": {
+              "column": "initial_soc_pct"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "grid_prices",
+      "name": "grid_prices",
+      "description": "Tariff time series. One record per timestep.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "grid_prices/datetime",
+          "name": "datetime",
+          "description": "Timestep start.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "grid_prices.csv"
+            },
+            "extract": {
+              "column": "datetime"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "grid_prices/price_per_kwh",
+          "name": "price_per_kwh",
+          "description": "Electricity price in $/kWh.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "grid_prices.csv"
+            },
+            "extract": {
+              "column": "price_per_kwh"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "grid_prices/type",
+          "name": "type",
+          "description": "Tariff period label, one of peak, off-peak.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "grid_prices.csv"
+            },
+            "extract": {
+              "column": "type"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "dr_events",
+      "name": "dr_events",
+      "description": "Demand-response events. One record per event; file is header-only when program=none. Magnitudes are a Uniform prior (no real-data fit).",
+      "key": {
+        "@id": "dr_events/event_id"
+      },
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "dr_events/event_id",
+          "name": "event_id",
+          "description": "DR event identifier.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "dr_events.csv"
+            },
+            "extract": {
+              "column": "event_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dr_events/start",
+          "name": "start",
+          "description": "Event start timestamp.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "dr_events.csv"
+            },
+            "extract": {
+              "column": "start"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dr_events/end",
+          "name": "end",
+          "description": "Event end timestamp.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "dr_events.csv"
+            },
+            "extract": {
+              "column": "end"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dr_events/magnitude_kw",
+          "name": "magnitude_kw",
+          "description": "Requested load reduction in kW.",
+          "dataType": "sc:Float",
+          "source": {
+            "fileObject": {
+              "@id": "dr_events.csv"
+            },
+            "extract": {
+              "column": "magnitude_kw"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "dr_events/notified_at",
+          "name": "notified_at",
+          "description": "Timestamp the event was notified to participants.",
+          "dataType": "sc:DateTime",
+          "source": {
+            "fileObject": {
+              "@id": "dr_events.csv"
+            },
+            "extract": {
+              "column": "notified_at"
+            },
+            "transform": {
+              "format": "%Y-%m-%d %H:%M:%S"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
