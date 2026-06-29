@@ -55,9 +55,10 @@ from __future__ import annotations
 import argparse
 import json
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -67,7 +68,7 @@ CAL = REPO / "data" / "calibration"
 OUT_DIR = REPO / "data" / "tstr"
 
 SEED = 1234
-LAGS = (1, 2, 3, 24)  # hourly lags; auto-scaled for sub-hourly freq
+LAGS = (1, 2, 3, 24)  # lags in BINS (at the headline 1h freq: t-1,2,3h + t-24h)
 TRAIN_FRAC = 0.6  # of the REAL series: first 60% train, last 40% test (held-out)
 
 
