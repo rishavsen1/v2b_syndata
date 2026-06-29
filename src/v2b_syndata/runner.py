@@ -22,7 +22,6 @@ from .e5_metrics import InfeasibilityError, compute_concurrency
 from .knob_loader import _normalize, load_knob_registry, resolve_knobs
 from .manifest import CSV_NAMES, write_manifest
 from .renderers import battery as r_battery
-from .renderers import battery_dispatch as r_battery_dispatch
 from .renderers import building_load as r_building_load
 from .renderers import cars as r_cars
 from .renderers import chargers as r_chargers
@@ -69,7 +68,6 @@ def build_registry() -> SamplerRegistry:
     reg.register("pv_generation.csv", r_pv.render_generation)
     reg.register("pv.csv", r_pv.render_specs)
     reg.register("battery.csv", r_battery.render)
-    reg.register("battery_dispatch.csv", r_battery_dispatch.render)
     reg.validate(build_graph())
     return reg
 

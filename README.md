@@ -187,9 +187,7 @@ Per scenario seed — deterministic CSVs (bitwise-identical for a given seed) + 
 | `building_load.csv` | `datetime, power_flex_kw, power_inflex_kw, power_kw` (15-min, EnergyPlus) |
 | `pv_generation.csv` | `datetime, power_pv_kw` (15-min PVWatts curve from the same weather as `building_load`; all-zeros when PV off) |
 | `pv.csv` | `pv_id, pv_type, dc_capacity_kw, ac_capacity_kw, dc_ac_ratio, tilt_deg, azimuth_deg, module_type, system_derate, temp_coeff_per_c, noct_c, albedo` |
-| `battery.csv` | `battery_id, battery_type, capacity_kwh, power_kw, round_trip_efficiency, min_soc_pct, max_soc_pct, initial_soc_pct` (specs only) |
-| `battery_dispatch.csv` | `datetime, power_battery_kw, soc_kwh` (15-min operational dispatch on `building_load`'s grid; `power_battery_kw > 0` = discharge to building, `< 0` = charge from grid; `soc_kwh` = end-of-tick state of charge; header-only when battery off) |
-| `grid_prices.csv` | `datetime, price_per_kwh, type` |
+| `battery.csv` | `battery_id, battery_type, capacity_kwh, power_kw, round_trip_efficiency, min_soc_pct, max_soc_pct, initial_soc_pct` (specs only) || `grid_prices.csv` | `datetime, price_per_kwh, type` |
 | `dr_events.csv` | `event_id, start, end, magnitude_kw, notified_at` (header-only if program=none) |
 | `manifest.json` | knob resolution + provenance (reproducibility record) |
 

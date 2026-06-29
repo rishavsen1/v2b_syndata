@@ -22,7 +22,6 @@ CSV_NAMES = [
     "pv_generation",
     "pv",
     "battery",
-    "battery_dispatch",
 ]
 
 

@@ -318,7 +318,7 @@ Mirroring `docs/KDD_READINESS.md` and `docs/CALIBRATION_RESULTS.md`:
    excluded from every fidelity number (`docs/CALIBRATION_RESULTS.md`).
 5. **Single climate zone (Denver CZ-5B)** ships; geographic skew to US workplace
    + one NL site (`docs/KDD_READINESS.md`; see `docs/ETHICS.md` for bias detail).
-6. **Bundled benchmark is V1G-only**; PV is modeled but **not yet validated**
-   against PVWatts/SAM; DR magnitudes are a no-data Uniform prior
-   (`docs/KDD_READINESS.md`, actions #8–#10). _(Battery dispatch now ships —
-   `battery_dispatch.csv` — so the DER "→Building" path is no longer specs-only.)_
+6. **Bundled benchmark is V1G-only**; **battery is specs-only (no dispatch)** —
+   dispatch is a downstream control decision, not a generated artifact; PV is
+   modeled but **not yet validated** against PVWatts/SAM; DR magnitudes are a
+   no-data Uniform prior (`docs/KDD_READINESS.md`, actions #8–#10).

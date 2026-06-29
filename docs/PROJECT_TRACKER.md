@@ -121,6 +121,7 @@ New, dated decisions go here; the **historical numbered decision log lives in
 | 2026-06-26 | `tools/validate_calibration.py` now emits `docs/CALIBRATION_RESULTS.md` (faithfulness S1–S6 summary) as a committed auto-generated doc; bulky CSVs/PNGs stay git-ignored. | validate_calibration.py |
 | 2026-06-27 | Added the S0 region-assignment diagnostic, then re-anchored the ElaadNL grid on its own (φ,κ) cloud (judge-panel of 4 candidate grids). Confirms the datasets are modeled independently — ElaadNL's grid no longer borrows ACN's assumptions. | populations.yaml · S0 |
 | 2026-06-27 | Added per-building PV + battery (DER). PV is a separate weather-consistent PVWatts curve (not netted into power_kw); battery is specs-only (no dispatch); both default-off to keep the bitwise contract. Future work: battery dispatch model; optional per-sample PV/battery sizing jitter (node names reserved). | DESIGN_NOTES #32 |
+| 2026-06-29 | **Reverted** a briefly-merged `battery_dispatch.csv` generator output. Rationale: battery dispatch is a downstream control *decision* (endogenous to the V2B optimization), not exogenous data the platform should emit — PV generation belongs (weather→output, exogenous), battery dispatch does not. `battery.csv` ships specs only (cf. `cars.csv`). W11 stands but is reframed: a dispatch, if offered, belongs in `bench/` as a baseline, not a dataset CSV. | KDD_READINESS #7 |
 
 ---
 
