@@ -10,7 +10,13 @@ import pandas as pd
 import yaml
 
 from .battery_inference import infer_capacity, reconstruct_arrival_soc
-from .distribution_fitter import fit_region, fit_truncnorm_mixture_arrival
+from .distribution_fitter import (
+    MIN_SAMPLES,
+    MIXTURE_MIN_SAMPLES,
+    fit_region,
+    fit_truncnorm_arrival,
+    fit_truncnorm_mixture_arrival,
+)
 from .feature_extractor import (
     SessionFeatures,
     aggregate_user_features,
@@ -219,6 +225,44 @@ def calibrate_populations(
     return summary
 
 
+def _fit_region_arrivals(
+    region_arrivals: dict[str, np.ndarray],
+    pooled_arrivals: np.ndarray,
+) -> dict[str, dict[str, Any] | None]:
+    """Task 5 — per-region arrival fit with a pooled fallback for thin regions.
+
+    For each region:
+      * n >= MIXTURE_MIN_SAMPLES → fit the region's OWN arrival (2-comp mixture
+        when it beats the single TruncNorm by the KS margin; else single).
+      * n <  MIXTURE_MIN_SAMPLES → fall back to the POOLED arrival fit (mixture
+        if the pool justifies one; else the pooled single TruncNorm), so a thin
+        region is not modeled from noise.
+
+    Returns region_name → arrival fit dict (or None when even the single fit was
+    dropped, e.g. n < MIN_SAMPLES with no usable pool).
+    """
+    pooled_mix = fit_truncnorm_mixture_arrival(pooled_arrivals)
+    pooled_single = fit_truncnorm_arrival(pooled_arrivals)
+    pooled_fallback = pooled_mix or pooled_single
+
+    out: dict[str, dict[str, Any] | None] = {}
+    for rname, arr in region_arrivals.items():
+        n = int(len(arr))
+        if n >= MIXTURE_MIN_SAMPLES:
+            out[rname] = (
+                fit_truncnorm_mixture_arrival(arr)
+                or fit_truncnorm_arrival(arr)
+                or pooled_fallback
+            )
+        elif n >= MIN_SAMPLES:
+            # Enough to fit a single TruncNorm, but the pooled mixture is a
+            # stronger prior for the shape than a thin per-region fit — prefer it.
+            out[rname] = pooled_fallback or fit_truncnorm_arrival(arr)
+        else:
+            out[rname] = pooled_fallback
+    return out
+
+
 def _calibrate_one_population(
     pop_name: str,
     pops_yaml: dict[str, Any],
@@ -243,6 +287,7 @@ def _calibrate_one_population(
     unassigned_rate = n_unassigned / len(users) if users else 0.0
 
     region_fits: dict[str, dict[str, Any]] = {}
+    region_arrivals: dict[str, np.ndarray] = {}
     n_users_with_inputs = 0
     for region in axes:
         rname = region["name"]
@@ -267,28 +312,30 @@ def _calibrate_one_population(
         soc_arr = np.asarray(soc_list, dtype=float) if soc_list else None
         soc_dep = np.asarray(depart_list, dtype=float) if depart_list else None
         fit = fit_region(arrivals, dwells, soc_arr, soc_departs=soc_dep)
+        region_arrivals[rname] = arrivals
         clean: dict[str, Any] = {}
-        for key in ("arrival", "dwell", "soc_arrival", "soc_depart", "copula"):
+        # arrival is recomputed per-region below (Task 5); keep dwell/soc/copula.
+        for key in ("dwell", "soc_arrival", "soc_depart", "copula"):
             if fit.get(key) is not None:
                 clean[key] = fit[key]
-        if clean:
+        if clean or fit.get("arrival") is not None:
             region_fits[rname] = clean
 
-    # Arrival hour is ~independent of the (phi, kappa, delta) axes that DEFINE
-    # the regions, so a per-region arrival fit splinters the bimodal shape and
-    # mispools (each region's sharp early mode over-weights early arrivals).
-    # Fit ONE 2-component mixture on the POOLED population arrivals and broadcast
-    # it to every region. It only ships if it beats the single TruncNorm by a KS
-    # margin (see fit_truncnorm_mixture_arrival); otherwise the per-region single
-    # TruncNorm already in region_fits stands (bit-identical to before).
+    # Task 5: PER-REGION arrival fits replace the old pooled-broadcast. The worst
+    # ACN cell (rare_consistent, ~36% of drivers) arrives ~2h later than the
+    # pool, so one pooled mixture broadcast to every region mis-modeled it. We
+    # now fit each region's OWN arrival; only regions below MIXTURE_MIN_SAMPLES
+    # fall back to the pooled mixture (or the pooled single TruncNorm).
     pooled_arrivals = np.asarray(
         [s.arrival_hour for sess in sessions_by_uid.values() for s in sess],
         dtype=float,
     )
-    pooled_arr_mix = fit_truncnorm_mixture_arrival(pooled_arrivals)
-    if pooled_arr_mix is not None:
-        for rname in region_fits:
-            region_fits[rname]["arrival"] = pooled_arr_mix
+    arrival_fits = _fit_region_arrivals(region_arrivals, pooled_arrivals)
+    for rname, afit in arrival_fits.items():
+        if afit is not None:
+            region_fits.setdefault(rname, {})["arrival"] = afit
+    # Drop any region left genuinely empty (no arrival, no dwell, etc.).
+    region_fits = {r: d for r, d in region_fits.items() if d}
 
     metadata: dict[str, Any] = {
         "source": provenance,
