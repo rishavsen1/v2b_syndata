@@ -49,6 +49,14 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "arrival.sigma2": (0.01, 6.0),
     "dwell.k": (0.01, 5.0),
     "dwell.lambda": (0.01, 24.0),
+    # Optional 2-component Weibull dwell mixture (short top-up + long workday).
+    # Present only when calibration selects a mixture; w2 = 1 - w1. Single
+    # Weibull (k/lambda above) remains the default.
+    "dwell.w1": (0.0, 1.0),
+    "dwell.k1": (0.01, 5.0),
+    "dwell.lambda1": (0.01, 24.0),
+    "dwell.k2": (0.01, 5.0),
+    "dwell.lambda2": (0.01, 24.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
     "soc_depart.alpha": (0.01, 50.0),

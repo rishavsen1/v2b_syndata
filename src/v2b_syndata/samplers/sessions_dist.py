@@ -68,14 +68,25 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
     for car_id, u in ctx.a_user.items():
         dwell_cal = _region_dist(ctx, u.region, "dwell")
         copula_cal = _region_dist(ctx, u.region, "copula")
+        # Copula default 0.0 → independent sampling (Step 4 RNG-equivalent).
+        rho = float(copula_cal.get("rho_gaussian", 0.0))
         k = float(dwell_cal.get("k", 2.0))
         # YAML "lambda" → runtime "lam" rename.
         lam = float(dwell_cal.get("lambda", 8.0 * (0.5 + u.phi)))
-        # Copula default 0.0 → independent sampling (Step 4 RNG-equivalent).
-        rho = float(copula_cal.get("rho_gaussian", 0.0))
-        params[car_id] = {"k": k, "lam": lam,
-                          "clip_lo": 0.5, "clip_hi": 14.0,
-                          "rho": rho}
+        entry = {"k": k, "lam": lam,
+                 "clip_lo": 0.5, "clip_hi": 14.0,
+                 "rho": rho}
+        # A region whose calibrated `dwell` block carries the mixture leaves
+        # (w1, k1, lambda1, k2, lambda2) gets a 2-component Weibull mixture;
+        # otherwise the single Weibull above (default / hand-authored path,
+        # bit-identical to before). k/lam are still populated as a safe fallback.
+        if "w1" in dwell_cal and "k1" in dwell_cal:
+            w1 = float(dwell_cal["w1"])
+            entry["mixture"] = [
+                (w1, float(dwell_cal["k1"]), float(dwell_cal["lambda1"])),
+                (1.0 - w1, float(dwell_cal["k2"]), float(dwell_cal["lambda2"])),
+            ]
+        params[car_id] = entry
     ctx.latents["f_dwell"] = params
 
 
