@@ -59,7 +59,7 @@ break generation (`distribution_fitter._drop_if_oor`).
 | battery mix | Dirichlet(p·α) | the conjugate distribution over a simplex (class shares sum to 1); α tunes per-sample dispersion | *not data-fit* — declared mix | `battery_mix`, `battery_mix_dirichlet_alpha` · **knobs** |
 | building load | EnergyPlus simulation | a calibrated building-physics engine, not a statistical model | TMYx weather + ASHRAE occupancy schedule | physical; `peak_kw` scaling · **knob** |
 | rooftop PV | PVWatts physics (not fit) | deterministic engineering model from the SAME (perturbed) EPW irradiance/temp EnergyPlus used → weather-consistent with the load | EPW GHI/DNI/DHI + dry-bulb | `pv.*` knobs / `der_catalog` presets · **knobs** |
-| stationary battery | specs only (no dispatch) | capacity/power/efficiency are equipment attributes, not a sampled process | *not fit* | `battery.*` knobs / `der_catalog` presets · **knobs** |
+| stationary battery | specs (knobs) + deterministic dispatch heuristic | capacity/power/efficiency are equipment attributes; dispatch is a rule (peak-shave + TOU arbitrage), not a sampled process | *not fit* | `battery.*` knobs / `der_catalog` presets · **knobs** |
 | grid prices | rule-based TOU tape | tariffs are deterministic schedules, not random | *not fit* | peak/off-peak prices, window · **knobs** |
 | negotiation mix | categorical | survey-derived behavioral type shares | CONSENT survey (n=28) | `negotiation_mix` · **fixed prior / knob** |
 
@@ -363,11 +363,22 @@ These are part of the generator but are not fit to data:
   explicit `pv.dc_capacity_kw`) turns it on. Ratings come from the `pv.*` knobs or the `der_catalog`
   presets (rooftop_small … rooftop_xl, carport; sized by usable roof area, not
   building peak). Emits `pv_generation.csv` (curve) + `pv.csv` (specs).
-- **Stationary battery** (`renderers/battery.py`) — **specs only** (capacity,
-  power, round-trip efficiency, SoC window); the generator does **not** produce
-  a dispatch schedule (that is a downstream simulator's job, like `cars.csv`
-  ships specs not trips). Driven by the `battery.*` knobs / `der_catalog`
-  presets (LFP/NMC, 2 h or 4 h). Default OFF → zero capacity. Emits `battery.csv`.
+- **Stationary battery** (`renderers/battery.py`) — **specs** (capacity,
+  power, round-trip efficiency, SoC window). Driven by the `battery.*` knobs /
+  `der_catalog` presets (LFP/NMC, 2 h or 4 h). Default OFF → zero capacity.
+  Emits `battery.csv`.
+- **Battery dispatch** (`renderers/battery_dispatch.py`) — a **deterministic
+  operational dispatch** (no RNG) over the already-rendered `building_load`,
+  `grid_prices` and `dr_events`, on `building_load`'s 15-min grid. A
+  threshold-targeting heuristic: discharge to hold net grid import below a
+  peak-shave target (lowered during DR windows / price-peak ticks → TOU
+  arbitrage), charge during off-peak low-load ticks, clamped to rated power and
+  the `[min,max]·capacity` SoC band. The full round-trip loss is booked on the
+  charge leg. **Sign convention:** `power_battery_kw > 0` = discharge to the
+  building, `< 0` = charge from the grid; `soc_kwh` is end-of-tick state of
+  charge. Default OFF → header-only `battery_dispatch.csv` (other CSVs stay
+  byte-identical). A v1 greedy heuristic, not an optimal LP. Emits
+  `battery_dispatch.csv`.
 - **Grid prices** (`renderers/grid_prices.py`) — a deterministic
   time-of-use tape from the `energy_price_peak/offpeak` and `peak_window` knobs.
   Tariffs are schedules, not random variables.
