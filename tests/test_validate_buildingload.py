@@ -226,6 +226,61 @@ def test_validate_all_skips_missing_reference(tmp_path, monkeypatch):
 # Real EnergyPlus end-to-end (heavy; opt-in)
 # ──────────────────────────────────────────────────────────────────────
 
+# ──────────────────────────────────────────────────────────────────────
+# validate_calibration S5 — reference-band loading (deliverable 3)
+# ──────────────────────────────────────────────────────────────────────
+
+def _load_vc():
+    spec = importlib.util.spec_from_file_location(
+        "validate_calibration", REPO / "tools" / "validate_calibration.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["validate_calibration"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_s5_band_loader_missing_returns_none(tmp_path):
+    vc = _load_vc()
+    assert vc._load_reference_bands(tmp_path / "nope.json") is None
+
+
+def test_s5_band_loader_reads_and_widens(tmp_path):
+    import json
+    vc = _load_vc()
+    bands = {
+        "office|small|BAND": {
+            "weekday_weekend_ratio": [1.3, 1.7],
+            "load_factor": [0.35, 0.48],
+        }
+    }
+    p = tmp_path / "reference_bands.json"
+    p.write_text(json.dumps(bands))
+    loaded = vc._load_reference_bands(p)
+    assert loaded is not None
+    lo, hi = vc._ww_band_for(loaded, "office", "small")
+    # widened ±15%
+    assert lo == pytest.approx(1.3 * 0.85, rel=1e-3)
+    assert hi == pytest.approx(1.7 * 1.15, rel=1e-3)
+
+
+def test_s5_ww_band_falls_back_when_absent():
+    vc = _load_vc()
+    # no bands at all -> default
+    assert vc._ww_band_for(None, "office", "small") == (1.0, 9.0)
+    # bands present but missing this key -> default
+    assert vc._ww_band_for({}, "retail", "med") == (1.0, 9.0)
+
+
+def test_s5_reference_size_mapping():
+    vc = _load_vc()
+    assert vc.S5_REFERENCE_SIZE[("office", "medium")] == "med"
+    assert vc.S5_REFERENCE_SIZE[("retail", "standalone")] == "large"
+    # old self-derived bands are gone
+    assert not hasattr(vc, "PNNL_EXPECTED_PEAK_OFFPEAK")
+    assert not hasattr(vc, "PNNL_EXPECTED_WEEKDAY_WEEKEND")
+
+
 @pytest.mark.real_energyplus
 def test_generate_generator_load_real_ep():
     if shutil.which("energyplus") is None and not Path("/usr/local/bin/energyplus").exists():
