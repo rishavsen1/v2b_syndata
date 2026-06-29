@@ -332,7 +332,14 @@ def _calibrate_one_population(
     )
     arrival_fits = _fit_region_arrivals(region_arrivals, pooled_arrivals)
     for rname, afit in arrival_fits.items():
-        if afit is not None:
+        if afit is None:
+            continue
+        # Only attach an arrival fit to a region that already produced some other
+        # fit (dwell/soc/copula) OR has enough of its own arrivals to warrant one.
+        # This preserves the prior contract that genuinely zero-data regions get
+        # NO calibrated block (the old pooled-broadcast only touched fit regions).
+        has_data = len(region_arrivals.get(rname, [])) >= MIN_SAMPLES
+        if rname in region_fits or has_data:
             region_fits.setdefault(rname, {})["arrival"] = afit
     # Drop any region left genuinely empty (no arrival, no dwell, etc.).
     region_fits = {r: d for r, d in region_fits.items() if d}

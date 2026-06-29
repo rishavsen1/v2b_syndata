@@ -269,18 +269,6 @@ acn_workplace_baseline:
         trunc_hi: 22.0
         n_samples: 18504
         ks_fit_quality: 0.042192593680792756
-    erratic:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.513310402633164
-        mu1: 7.408913227278381
-        sigma1: 1.1448033730560172
-        mu2: 12.967947608433768
-        sigma2: 3.4731370394195147
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 41355
-        ks_fit_quality: 0.036217629701165044
   calibration_metadata:
     source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
@@ -472,18 +460,6 @@ acn_caltech_baseline:
         trunc_hi: 22.0
         n_samples: 5348
         ks_fit_quality: 0.027692963089647527
-    erratic:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.46149507492039055
-        mu1: 9.222871736854186
-        sigma1: 0.9464452186076698
-        mu2: 14.104465162434579
-        sigma2: 3.7354186945409396
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 13234
-        ks_fit_quality: 0.03180593475251303
   calibration_metadata:
     source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
@@ -635,30 +611,6 @@ acn_jpl_baseline:
         trunc_hi: 22.0
         n_samples: 12961
         ks_fit_quality: 0.01880218725608296
-    rare_inconsistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.6069257264191318
-        mu1: 6.9684397223540575
-        sigma1: 0.8216337036904638
-        mu2: 12.820837995909143
-        sigma2: 3.1466189384907604
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 27542
-        ks_fit_quality: 0.02468522801783468
-    erratic:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.6069257264191318
-        mu1: 6.9684397223540575
-        sigma1: 0.8216337036904638
-        mu2: 12.820837995909143
-        sigma2: 3.1466189384907604
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 27542
-        ks_fit_quality: 0.02468522801783468
   calibration_metadata:
     source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
@@ -807,30 +759,6 @@ acn_office001_baseline:
         trunc_hi: 22.0
         n_samples: 346
         ks_fit_quality: 0.03512145614829215
-    rare_inconsistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.45696825934312346
-        mu1: 8.891170860479807
-        sigma1: 0.8977059880252566
-        mu2: 12.093676662513227
-        sigma2: 2.255325442540467
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 579
-        ks_fit_quality: 0.030392607845816877
-    erratic:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.45696825934312346
-        mu1: 8.891170860479807
-        sigma1: 0.8977059880252566
-        mu2: 12.093676662513227
-        sigma2: 2.255325442540467
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 579
-        ks_fit_quality: 0.030392607845816877
   calibration_metadata:
     source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
@@ -1352,18 +1280,6 @@ elaadnl_public_eu:
         trunc_hi: 22.0
         n_samples: 32549
         ks_fit_quality: 0.03629316117567144
-    erratic:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.8126882494510718
-        mu1: 8.549381154982642
-        sigma1: 0.9097659471357509
-        mu2: 12.309348117528698
-        sigma2: 1.9193560925550774
-        trunc_lo: 4.0
-        trunc_hi: 22.0
-        n_samples: 55201
-        ks_fit_quality: 0.02672460973054852
   calibration_metadata:
     source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260628
     dataset: ElaadNL / 4TU Utrecht office parking (SmoothEMS met GridShield)

@@ -11,8 +11,8 @@ _Generated 2026-06-28._ Generated sessions are pooled across seeds and compared,
 ## At a glance
 
 - **S0 assignment** — drivers matching no region box (unassigned): acn 0%, elaadnl 0%.
-- **S1 marginals** — mean |Δμ| 0.31 h across all region×variable cells; KS ≤ 0.19.
-- **S2 joint** — max Spearman ρ-gap 0.055; the arrival×dwell copula is reproduced.
+- **S1 marginals** — mean |Δμ| 0.13 h across all region×variable cells; KS ≤ 0.13.
+- **S2 joint** — max Spearman ρ-gap 0.024; the arrival×dwell copula is reproduced.
 - **S3 held-out** — median Δ(holdout − train KS) 0.008; no systematic overfit.
 - **S5 building load** — 1/4 within the PNNL peak/off-peak band, 3/4 within the weekday/weekend band.
 - **S6 weekly rhythm** — max weekday/weekend ratio gap 0.12 dex.
@@ -39,29 +39,29 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 
 | source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \|Δμ\| | KS | W₁ |
 |---|---|---|--:|--:|--:|--:|--:|--:|--:|
-| acn | occasional consistent | arrival hour | 17,313 | 639 | 10.32/3.75 | 10.06/3.16 | 0.25 | 0.079 | 0.42 |
-| acn | occasional consistent | dwell hours | 17,313 | 639 | 6.49/3.93 | 6.49/3.50 | 0.00 | 0.097 | 0.66 |
-| acn | rare consistent | arrival hour | 4,723 | 138 | 11.95/4.31 | 10.16/3.14 | 1.79 | 0.179 | 1.82 |
-| acn | rare consistent | dwell hours | 4,723 | 138 | 5.29/5.91 | 5.31/3.59 | 0.02 | 0.110 | 0.75 |
-| acn | regular charger | arrival hour | 18,724 | 1,261 | 9.44/3.64 | 10.00/3.23 | 0.56 | 0.187 | 0.69 |
-| acn | regular charger | dwell hours | 18,724 | 1,261 | 6.98/3.59 | 6.94/3.34 | 0.03 | 0.124 | 0.81 |
-| elaadnl | occasional consistent | arrival hour | 5,660 | 95 | 9.72/2.03 | 9.34/1.85 | 0.37 | 0.143 | 0.37 |
+| acn | occasional consistent | arrival hour | 17,313 | 639 | 10.32/3.75 | 10.01/3.35 | 0.30 | 0.065 | 0.36 |
+| acn | occasional consistent | dwell hours | 17,313 | 639 | 6.49/3.93 | 6.49/3.51 | 0.01 | 0.097 | 0.66 |
+| acn | rare consistent | arrival hour | 4,723 | 138 | 11.95/4.31 | 11.50/3.84 | 0.45 | 0.068 | 0.49 |
+| acn | rare consistent | dwell hours | 4,723 | 138 | 5.29/5.91 | 5.24/3.63 | 0.06 | 0.110 | 0.80 |
+| acn | regular charger | arrival hour | 18,724 | 1,261 | 9.44/3.64 | 9.18/3.31 | 0.26 | 0.078 | 0.32 |
+| acn | regular charger | dwell hours | 18,724 | 1,261 | 6.98/3.59 | 6.97/3.35 | 0.01 | 0.119 | 0.80 |
+| elaadnl | occasional consistent | arrival hour | 5,660 | 95 | 9.72/2.03 | 9.81/2.02 | 0.10 | 0.117 | 0.21 |
 | elaadnl | occasional consistent | dwell hours | 5,660 | 95 | 5.69/2.54 | 5.64/2.14 | 0.04 | 0.113 | 0.46 |
-| elaadnl | regular commuter | arrival hour | 32,549 | 1,666 | 9.00/1.71 | 9.30/1.91 | 0.30 | 0.121 | 0.30 |
-| elaadnl | regular commuter | dwell hours | 32,549 | 1,666 | 7.04/2.50 | 6.97/2.37 | 0.07 | 0.129 | 0.48 |
-| elaadnl | weekly consistent | arrival hour | 13,623 | 277 | 9.31/1.82 | 9.19/1.79 | 0.11 | 0.099 | 0.14 |
+| elaadnl | regular commuter | arrival hour | 32,549 | 1,666 | 9.00/1.71 | 9.04/1.77 | 0.04 | 0.074 | 0.10 |
+| elaadnl | regular commuter | dwell hours | 32,549 | 1,666 | 7.04/2.50 | 6.97/2.37 | 0.07 | 0.130 | 0.48 |
+| elaadnl | weekly consistent | arrival hour | 13,623 | 277 | 9.31/1.82 | 9.24/1.75 | 0.07 | 0.073 | 0.13 |
 | elaadnl | weekly consistent | dwell hours | 13,623 | 277 | 6.41/2.47 | 6.27/2.43 | 0.13 | 0.108 | 0.35 |
 
 ## S2 — Joint structure (arrival × dwell)
 
 | source | region | n | ρ source | ρ generated | ρ-gap |
 |---|---|--:|--:|--:|--:|
-| acn | occasional consistent | 17,313 | -0.627 | -0.605 | 0.022 |
-| acn | rare consistent | 4,723 | -0.544 | -0.489 | 0.055 |
-| acn | regular charger | 18,724 | -0.572 | -0.585 | 0.014 |
-| elaadnl | occasional consistent | 5,660 | -0.583 | -0.582 | 0.002 |
-| elaadnl | regular commuter | 32,549 | -0.519 | -0.513 | 0.006 |
-| elaadnl | weekly consistent | 13,623 | -0.553 | -0.529 | 0.025 |
+| acn | occasional consistent | 17,313 | -0.627 | -0.608 | 0.019 |
+| acn | rare consistent | 4,723 | -0.544 | -0.540 | 0.004 |
+| acn | regular charger | 18,724 | -0.572 | -0.574 | 0.003 |
+| elaadnl | occasional consistent | 5,660 | -0.583 | -0.590 | 0.006 |
+| elaadnl | regular commuter | 32,549 | -0.519 | -0.514 | 0.005 |
+| elaadnl | weekly consistent | 13,623 | -0.553 | -0.530 | 0.024 |
 
 ## S3 — Held-out generalization (80/20 by user)
 
