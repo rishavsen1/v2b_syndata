@@ -227,6 +227,14 @@ def build_features(load: pd.Series, lags: Sequence[int] = LAGS) -> tuple[pd.Data
     """1-step-ahead supervised matrix: lagged load + hour-of-day + day-of-week.
 
     Returns (X, y) aligned and NaN-free (rows with incomplete lags dropped).
+
+    Passing `lags=()` yields the *calendar-only* feature set (hour + dow). This
+    is the more demanding generator-fidelity probe: with no autoregressive lag,
+    the model can only exploit the diurnal/weekly *shape* it learned from the
+    training distribution, so a good TSTR score here means the GENERATOR'S load
+    shape — not cheap persistence — transferred. The lagged setting is a
+    realistic operational forecaster; the calendar-only setting isolates what
+    the synthetic distribution itself contributes.
     """
     df = pd.DataFrame({"load_kw": load.astype(float)})
     idx = df.index
@@ -288,13 +296,14 @@ def split_real(load_real: pd.Series, train_frac: float = TRAIN_FRAC):
 
 def run_tstr(
     load_real: pd.Series, load_synth: pd.Series, seed: int = SEED,
+    lags: Sequence[int] = LAGS,
 ) -> dict[str, Any]:
     """Compute TRTR / TSTR / TRTS on a common held-out REAL test split."""
     real_train, real_test = split_real(load_real)
 
-    Xr_tr, yr_tr = build_features(real_train)
-    Xr_te, yr_te = build_features(real_test)
-    Xs, ys = build_features(load_synth)
+    Xr_tr, yr_tr = build_features(real_train, lags)
+    Xr_te, yr_te = build_features(real_test, lags)
+    Xs, ys = build_features(load_synth, lags)
 
     if min(len(Xr_tr), len(Xr_te), len(Xs)) < 10:
         raise ValueError(
@@ -392,8 +401,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     load_real = sessions_to_load_series(real_sessions, freq=args.freq)
     load_synth = sessions_to_load_series(synth_sessions, freq=args.freq)
 
-    print("[4/4] running TRTR / TSTR / TRTS ...")
-    res = run_tstr(load_real, load_synth, seed=args.seed)
+    print("[4/4] running TRTR / TSTR / TRTS (lagged + calendar-only) ...")
+    # Two feature sets: the operational forecaster (with lags) and the
+    # generator-fidelity probe (calendar-only). See build_features docstring.
+    res_lagged = run_tstr(load_real, load_synth, seed=args.seed, lags=LAGS)
+    res_calendar = run_tstr(load_real, load_synth, seed=args.seed, lags=())
 
     out = {
         "generator": gen_stamp,
@@ -405,21 +417,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "uniform constant-power spread of delivered energy over "
                 "connect->disconnect dwell window (energy-rectangle proxy); "
                 "identical rule applied to real and synthetic.",
+            "feature_sets": {
+                "lagged": "hour-of-day, day-of-week, lagged load "
+                          "(realistic operational forecaster; partly persistence)",
+                "calendar_only": "hour-of-day, day-of-week only "
+                                 "(isolates generator load-shape fidelity; no persistence)",
+            },
         },
         "real_series": _series_summary(load_real),
         "synth_series": _series_summary(load_synth),
-        "results": res,
+        "results_lagged": res_lagged,
+        "results_calendar_only": res_calendar,
     }
     Path(args.out).write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
 
     print()
     print("=" * 74)
     print(f"  TSTR UTILITY PROOF  —  test on REAL {args.real.upper()} held-out "
-          f"({res['sample_counts']['real_test']} bins @ {args.freq})")
+          f"({res_lagged['sample_counts']['real_test']} bins @ {args.freq})")
     print(f"  synthetic from generator v{gen_stamp['generator_version']} "
           f"@ {str(gen_stamp['generator_git_sha'])[:10]}")
+    print(f"  real series:  mean {load_real.mean():.2f} kW  peak {load_real.max():.1f} kW")
+    print(f"  synth series: mean {load_synth.mean():.2f} kW  peak {load_synth.max():.1f} kW")
     print("=" * 74)
-    print(format_table(res))
+    print("\n  [A] LAGGED features (operational forecaster):")
+    print(format_table(res_lagged))
+    print("\n  [B] CALENDAR-ONLY features (generator-shape fidelity probe):")
+    print(format_table(res_calendar))
     print("=" * 74)
     print(f"  results written -> {args.out}")
     return 0

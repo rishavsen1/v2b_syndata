@@ -138,6 +138,17 @@ def test_run_tstr_end_to_end_smoke():
     assert "TSTR_over_TRTR_ratio" in res
 
 
+def test_run_tstr_calendar_only_feature_set():
+    """lags=() => calendar-only probe; columns are just hour+dow."""
+    load = _toy_load(400, seed=0)
+    X, y = tstr.build_features(load, lags=())
+    assert list(X.columns) == ["hour", "dow"]
+    assert len(X) == len(load)  # nothing dropped without lags
+    res = tstr.run_tstr(load, _toy_load(400, seed=1), seed=tstr.SEED, lags=())
+    for setting in ("TRTR", "TSTR", "TRTS"):
+        assert res[setting]["mae"] >= 0
+
+
 def test_run_tstr_insufficient_samples_raises():
     load_real = _toy_load(30, seed=0)
     load_synth = _toy_load(30, seed=1)
