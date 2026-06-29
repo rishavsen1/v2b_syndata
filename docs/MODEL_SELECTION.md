@@ -16,14 +16,14 @@ Features: arrival_hour, dwell_hours. Split seed=0, min train=40/test=15.
 
 | model | held-out NLL | held-out KS |
 |---|---|---|
-| truncnorm[6,20]* | 4.6516 | 0.0668 |
+| truncnorm[4,22]* | 2.9596 | 0.0990 |
 | normal | 2.7882 | 0.1271 |
 | skewnorm | 2.6469 | 0.0931 |
 | kde | 2.5677 | 0.0186 |
 | gmm2 | 2.5898 | 0.0333 |
 | gmm3 | 2.6001 | 0.0328 |
 
-**Best by held-out NLL: `kde`**  (current `truncnorm[6,20]*` NLL=4.6516; **kde** better by 2.0839 NLL)
+**Best by held-out NLL: `kde`**  (current `truncnorm[4,22]*` NLL=2.9596; **kde** better by 0.3919 NLL)
 
 
 ### dwell_hours  (n=41774)
@@ -47,14 +47,14 @@ Features: arrival_hour, dwell_hours. Split seed=0, min train=40/test=15.
 
 | model | held-out NLL | held-out KS |
 |---|---|---|
-| truncnorm[6,20]* | 1.9821 | 0.1393 |
+| truncnorm[4,22]* | 2.0359 | 0.1660 |
 | normal | 2.0384 | 0.1678 |
 | skewnorm | 1.8978 | 0.1276 |
 | kde | 1.7899 | 0.0130 |
 | gmm2 | 1.8053 | 0.0273 |
 | gmm3 | 1.8021 | 0.0219 |
 
-**Best by held-out NLL: `kde`**  (current `truncnorm[6,20]*` NLL=1.9821; **kde** better by 0.1922 NLL)
+**Best by held-out NLL: `kde`**  (current `truncnorm[4,22]*` NLL=2.0359; **kde** better by 0.2459 NLL)
 
 
 ### dwell_hours  (n=55201)
@@ -71,75 +71,13 @@ Features: arrival_hour, dwell_hours. Split seed=0, min train=40/test=15.
 **Best by held-out NLL: `kde`**  (current `weibull*` NLL=2.3821; **kde** better by 0.1064 NLL)
 
 
-## evwatts  (n_sessions=64)  ⚠ small sample (< 500 sessions) — indicative only, GMM overfits
-
-
-### arrival_hour  (n=64)
-
-| model | held-out NLL | held-out KS |
-|---|---|---|
-| truncnorm[6,20]* | 2.2038 | 0.2588 |
-| normal | 2.2291 | 0.2956 |
-| skewnorm | 1.7831 | 0.5140 |
-| kde | 2.0919 | 0.2863 |
-| gmm2 | 0.8975 | 0.1667 |
-| gmm3 | 0.8840 | 0.1667 |
-
-**Best by held-out NLL: `gmm3`**  (current `truncnorm[6,20]*` NLL=2.2038; **gmm3** better by 1.3198 NLL)
-
-
-### dwell_hours  (n=64)
-
-| model | held-out NLL | held-out KS |
-|---|---|---|
-| weibull* | 2.7287 | 0.3827 |
-| lognorm | 2.7822 | 0.4458 |
-| gamma | 2.6919 | 0.4091 |
-| kde | 2.1045 | 0.3449 |
-| gmm2 | 0.5017 | 0.2206 |
-| gmm3 | 0.5224 | 0.2206 |
-
-**Best by held-out NLL: `gmm2`**  (current `weibull*` NLL=2.7287; **gmm2** better by 2.2270 NLL)
-
-
-## inl  (n_sessions=65)  ⚠ small sample (< 500 sessions) — indicative only, GMM overfits
-
-
-### arrival_hour  (n=65)
-
-| model | held-out NLL | held-out KS |
-|---|---|---|
-| truncnorm[6,20]* | -0.0018 | 0.2514 |
-| normal | -0.0018 | 0.2514 |
-| skewnorm | -0.2079 | 0.1609 |
-| kde | -0.0377 | 0.2021 |
-| gmm2 | -0.0724 | 0.1762 |
-| gmm3 | -0.1063 | 0.1978 |
-
-**Best by held-out NLL: `skewnorm`**  (current `truncnorm[6,20]*` NLL=-0.0018; **skewnorm** better by 0.2061 NLL)
-
-
-### dwell_hours  (n=65)
-
-| model | held-out NLL | held-out KS |
-|---|---|---|
-| weibull* | 0.5388 | 0.2167 |
-| lognorm | 0.5099 | 0.2117 |
-| gamma | 0.5102 | 0.2113 |
-| kde | 0.3498 | 0.1560 |
-| gmm2 | -0.4627 | 0.2121 |
-| gmm3 | -2.5806 | 0.1798 |
-
-**Best by held-out NLL: `gmm3`**  (current `weibull*` NLL=0.5388; **gmm3** better by 3.1195 NLL)
-
-
 ## Recommendation
 
 Weighted to the large real datasets (n ≥ 500: ACN, ElaadNL); fixture sources are too small to trust and GMM overfits them.
 
-- acn_all / arrival_hour: **kde** beats current `truncnorm[6,20]*`
+- acn_all / arrival_hour: **kde** beats current `truncnorm[4,22]*`
 - acn_all / dwell_hours: **kde** beats current `weibull*`
-- elaadnl / arrival_hour: **kde** beats current `truncnorm[6,20]*`
+- elaadnl / arrival_hour: **kde** beats current `truncnorm[4,22]*`
 - elaadnl / dwell_hours: **kde** beats current `weibull*`
 
 Across both large datasets and both features, **KDE** gives the lowest held-out KS (≈0.01–0.02 vs 0.07–0.14 for the parametric families) and the lowest NLL — the current truncnorm/Weibull marginals underfit the real multi-modal arrival/dwell shapes. GMM (2–3 comp.) is a close second and keeps a compact parametric form. **Trade-off before swapping:** KDE is non-parametric (must ship per-region samples + bandwidth, no μ/σ knobs, harder to perturb under the noise model); GMM preserves a knob-like parameterization. Recommend piloting GMM-2 for arrival+dwell on one region behind a flag and re-running this eval before any generator change.
@@ -147,14 +85,10 @@ Across both large datasets and both features, **KDE** gives the lowest held-out 
 
 ## Summary (all sources, incl. unreliable small ones)
 
-- acn_all/arrival_hour: best=kde (current=truncnorm[6,20]*)
+- acn_all/arrival_hour: best=kde (current=truncnorm[4,22]*)
 - acn_all/dwell_hours: best=kde (current=weibull*)
-- elaadnl/arrival_hour: best=kde (current=truncnorm[6,20]*)
+- elaadnl/arrival_hour: best=kde (current=truncnorm[4,22]*)
 - elaadnl/dwell_hours: best=kde (current=weibull*)
-- evwatts/arrival_hour: best=gmm3 (current=truncnorm[6,20]*)
-- evwatts/dwell_hours: best=gmm2 (current=weibull*)
-- inl/arrival_hour: best=skewnorm (current=truncnorm[6,20]*)
-- inl/dwell_hours: best=gmm3 (current=weibull*)
 
 ## Known modeling issues (beyond marginals)
 

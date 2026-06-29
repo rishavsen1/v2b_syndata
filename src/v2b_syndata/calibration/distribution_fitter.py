@@ -24,8 +24,14 @@ from scipy.optimize import minimize
 
 from ..knob_loader import DIST_PARAM_RANGES
 
-ARRIVAL_LO = 6.0
-ARRIVAL_HI = 20.0
+# Arrival-hour clip window. Widened from [6,20] → [4,22] (KDD task 6) to recover
+# the early-/late-shift tail mass the old window discarded (~8% of ACN arrivals),
+# which was the dominant cause of σ under-dispersion. The calibrated block now
+# carries these as `arrival.trunc_lo/trunc_hi` so generation reads them back; the
+# 6/20 default in sessions_dist keeps synthetic/hand-authored populations
+# bitwise-identical.
+ARRIVAL_LO = 4.0
+ARRIVAL_HI = 22.0
 MIN_SAMPLES = 30
 
 
@@ -54,8 +60,9 @@ def _drop_if_oor(name: str, fit: dict[str, Any], leaves: dict[str, str]) -> dict
 
 
 def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
-    """Fit TruncNorm(μ, σ) on [6, 20] via MLE. Returns canonical dict, or None
-    if any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """Fit TruncNorm(μ, σ) on [ARRIVAL_LO, ARRIVAL_HI] via MLE. Returns canonical
+    dict (incl. trunc_lo/trunc_hi), or None if any param falls outside
+    DIST_PARAM_RANGES (B4 guard).
     """
     n = int(len(arrival_hours))
     a, b = ARRIVAL_LO, ARRIVAL_HI
@@ -85,6 +92,7 @@ def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
     a_std, b_std = (a - mu) / sig, (b - mu) / sig
     ks = float(st.kstest(arr, "truncnorm", args=(a_std, b_std, mu, sig)).statistic)
     fit = {"dist": "truncnorm", "mu": mu, "sigma": sig,
+           "trunc_lo": ARRIVAL_LO, "trunc_hi": ARRIVAL_HI,
            "n_samples": n, "ks_fit_quality": ks}
     return _drop_if_oor("arrival", fit, {"mu": "arrival.mu", "sigma": "arrival.sigma"})
 
@@ -93,26 +101,59 @@ MIXTURE_MIN_SAMPLES = 60       # need enough data to justify 5 params
 MIXTURE_KS_MARGIN = 0.02       # keep the mixture only if its KS beats single by >= this
 
 
-def _gmm2_em(x: np.ndarray, iters: int = 300):
-    """2-component 1-D Gaussian mixture via EM (ported from the model-selection
-    study). Returns (mu[2], sd[2], w[2], loglik)."""
+def _gmm_em(x: np.ndarray, k: int, iters: int = 300):
+    """k-component 1-D Gaussian mixture via EM (generalized from the original
+    2-component study port). Returns (mu[k], sd[k], w[k], loglik).
+
+    Deterministic — no RNG. Initialization splits the data into `k` equal-mass
+    quantile chunks; for k=2 this reduces EXACTLY to the original median split
+    (comp 0 = x ≤ median, comp 1 = x > median), so the shipped 2-component
+    arrival mixture is byte-for-byte unchanged.
+    """
+    x = np.asarray(x, float)
     n = len(x)
-    m = float(np.median(x))
-    lo_mask = x <= m
-    mu = np.array([x[lo_mask].mean(), x[~lo_mask].mean() if (~lo_mask).any() else m + 1])
-    sd = np.array([max(x[lo_mask].std(), 0.5),
-                   max(x[~lo_mask].std() if (~lo_mask).any() else 1.0, 0.5)])
-    w = np.array([0.5, 0.5])
+    if k == 2:
+        # Preserve the original init verbatim (bitwise identity for the shipped
+        # arrival mixture). Quantile chunking would give the same partition but
+        # we keep the literal code path to be certain.
+        m = float(np.median(x))
+        lo_mask = x <= m
+        mu = np.array([x[lo_mask].mean(),
+                       x[~lo_mask].mean() if (~lo_mask).any() else m + 1])
+        sd = np.array([max(x[lo_mask].std(), 0.5),
+                       max(x[~lo_mask].std() if (~lo_mask).any() else 1.0, 0.5)])
+    else:
+        # k equal-mass quantile chunks of the sorted data → per-chunk mean/std.
+        xs = np.sort(x)
+        chunks = np.array_split(xs, k)
+        mu = np.array([float(c.mean()) if len(c) else float(xs.mean())
+                       for c in chunks])
+        sd = np.array([max(float(c.std()) if len(c) > 1 else 1.0, 0.5)
+                       for c in chunks])
+    w = np.full(k, 1.0 / k)
     for _ in range(iters):
-        p = np.array([w[j] * st.norm.pdf(x, mu[j], sd[j]) for j in range(2)])
+        p = np.array([w[j] * st.norm.pdf(x, mu[j], sd[j]) for j in range(k)])
         r = p / (p.sum(0) + 1e-300)
         nk = r.sum(1)
+        # Guard empty components: keep their previous params, weight → tiny.
+        nk_safe = np.where(nk > 0, nk, 1e-300)
         w = nk / n
-        mu = (r * x).sum(1) / nk
-        sd = np.maximum(np.sqrt((r * (x - mu[:, None]) ** 2).sum(1) / nk), 0.25)
+        mu = np.where(nk > 0, (r * x).sum(1) / nk_safe, mu)
+        sd = np.maximum(
+            np.where(nk > 0,
+                     np.sqrt((r * (x - mu[:, None]) ** 2).sum(1) / nk_safe),
+                     sd),
+            0.25,
+        )
     loglik = float(np.log(np.array([w[j] * st.norm.pdf(x, mu[j], sd[j])
-                                    for j in range(2)]).sum(0) + 1e-300).sum())
+                                    for j in range(k)]).sum(0) + 1e-300).sum())
     return mu, sd, w, loglik
+
+
+def _gmm2_em(x: np.ndarray, iters: int = 300):
+    """Back-compat thin wrapper: 2-component 1-D Gaussian mixture via EM.
+    Delegates to `_gmm_em(x, 2)`."""
+    return _gmm_em(x, 2, iters=iters)
 
 
 def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
@@ -157,6 +198,7 @@ def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] |
         "w1": float(w[0]),
         "mu1": float(mu[0]), "sigma1": float(sd[0]),
         "mu2": float(mu[1]), "sigma2": float(sd[1]),
+        "trunc_lo": ARRIVAL_LO, "trunc_hi": ARRIVAL_HI,
         "n_samples": n, "ks_fit_quality": ks_mix,
     }
     return _drop_if_oor("arrival_mixture", fit, {
@@ -184,6 +226,73 @@ def fit_weibull_dwell(dwell_hours: np.ndarray) -> dict[str, Any] | None:
     fit = {"dist": "weibull", "k": k, "lambda": lam,
            "n_samples": n, "ks_fit_quality": ks}
     return _drop_if_oor("dwell", fit, {"k": "dwell.k", "lambda": "dwell.lambda"})
+
+
+def fit_weibull_mixture_dwell(dwell_hours: np.ndarray) -> dict[str, Any] | None:
+    """Fit a 2-component Weibull dwell mixture and return it ONLY if its KS
+    (of the mixture CDF — the exact form generation inverts) beats the single
+    Weibull by `MIXTURE_KS_MARGIN` and both components pass DIST_PARAM_RANGES.
+    Else None → caller falls back to the single Weibull.
+
+    Mirrors `fit_truncnorm_mixture_arrival`: a Gaussian EM (`_gmm_em`) on the
+    dwell values supplies a deterministic 2-cluster soft partition; each cluster
+    is then fit with `weibull_min(floc=0)` and weighted by its responsibility
+    mass. Components ordered by scale (lambda1 <= lambda2). Captures the common
+    short-top-up / long-workday bimodality the single Weibull smears.
+    """
+    arr = np.asarray(dwell_hours, float)
+    arr = arr[arr > 0]
+    n = len(arr)
+    if n < MIXTURE_MIN_SAMPLES:
+        return None
+
+    mu, _sd, w_g, _ = _gmm_em(arr, 2)
+    # Responsibilities from the Gaussian mixture → soft per-component Weibull
+    # MLE via weighted resampling-free fit. weibull_min has no native weights,
+    # so hard-assign by max responsibility (deterministic; ties → comp 0).
+    resp = np.array([
+        w_g[j] * st.norm.pdf(arr, mu[j], max(_sd[j], 1e-6)) for j in range(2)
+    ])
+    assign = resp.argmax(0)
+    comps = []
+    for j in range(2):
+        cj = arr[assign == j]
+        if len(cj) < 2:
+            return None
+        kj, _, lamj = st.weibull_min.fit(cj, floc=0)
+        wj = float(len(cj) / n)
+        comps.append((wj, float(kj), float(lamj)))
+
+    # Order by scale (lambda) so lambda1 <= lambda2 (stable, like arrival's mu).
+    comps.sort(key=lambda c: c[2])
+    (w1, k1, lam1), (w2, k2, lam2) = comps
+    # Renormalize weights defensively (hard-assignment partitions sum to n).
+    wt = w1 + w2
+    w1 = w1 / wt if wt > 0 else 0.5
+
+    def mix_cdf(q):
+        q = np.asarray(q, float)
+        return (w1 * st.weibull_min.cdf(q, k1, scale=lam1)
+                + (1.0 - w1) * st.weibull_min.cdf(q, k2, scale=lam2))
+
+    ks_mix = float(st.kstest(arr, mix_cdf).statistic)
+
+    single = fit_weibull_dwell(arr)
+    if single is None or (single["ks_fit_quality"] - ks_mix) < MIXTURE_KS_MARGIN:
+        return None
+
+    fit = {
+        "dist": "weibull_mixture",
+        "w1": float(w1),
+        "k1": float(k1), "lambda1": float(lam1),
+        "k2": float(k2), "lambda2": float(lam2),
+        "n_samples": n, "ks_fit_quality": ks_mix,
+    }
+    return _drop_if_oor("dwell_mixture", fit, {
+        "w1": "dwell.w1",
+        "k1": "dwell.k1", "lambda1": "dwell.lambda1",
+        "k2": "dwell.k2", "lambda2": "dwell.lambda2",
+    })
 
 
 def fit_beta_soc(soc_fractions: np.ndarray, leaf_prefix: str = "soc_arrival") -> dict[str, Any] | None:
@@ -254,7 +363,13 @@ def fit_region(
     else:
         out["arrival"] = None
     if len(dwells) >= MIN_SAMPLES:
-        out["dwell"] = fit_weibull_dwell(dwells)
+        # Prefer a 2-component Weibull mixture when the dwell is meaningfully
+        # bimodal (KS beats single by the margin); else the single Weibull
+        # (unchanged behavior).
+        out["dwell"] = (
+            fit_weibull_mixture_dwell(dwells)
+            or fit_weibull_dwell(dwells)
+        )
     else:
         out["dwell"] = None
     if soc_arrivals is not None and len(soc_arrivals) >= MIN_SAMPLES:

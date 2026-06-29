@@ -32,18 +32,31 @@ class KnobValidationError(ValueError):
 # Lives here (not in validate.py) to avoid circular import — validate.py
 # already imports from knob_loader.
 DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
-    "arrival.mu": (6.0, 20.0),
+    # Arrival window widened [6,20] → [4,22] (KDD task 6); see ARRIVAL_LO/HI in
+    # distribution_fitter. trunc_lo/trunc_hi carry the per-region window so
+    # generation reads it back; bounds chosen to admit the [4,22] support.
+    "arrival.mu": (4.0, 22.0),
     "arrival.sigma": (0.01, 6.0),
+    "arrival.trunc_lo": (0.0, 24.0),
+    "arrival.trunc_hi": (0.0, 24.0),
     # Optional 2-component arrival mixture (bimodal commute + midday). Present
     # only when calibration selects a mixture; w2 = 1 - w1. Single TruncNorm
     # (mu/sigma above) remains the default.
     "arrival.w1": (0.0, 1.0),
-    "arrival.mu1": (6.0, 20.0),
+    "arrival.mu1": (4.0, 22.0),
     "arrival.sigma1": (0.01, 6.0),
-    "arrival.mu2": (6.0, 20.0),
+    "arrival.mu2": (4.0, 22.0),
     "arrival.sigma2": (0.01, 6.0),
     "dwell.k": (0.01, 5.0),
     "dwell.lambda": (0.01, 24.0),
+    # Optional 2-component Weibull dwell mixture (short top-up + long workday).
+    # Present only when calibration selects a mixture; w2 = 1 - w1. Single
+    # Weibull (k/lambda above) remains the default.
+    "dwell.w1": (0.0, 1.0),
+    "dwell.k1": (0.01, 5.0),
+    "dwell.lambda1": (0.01, 24.0),
+    "dwell.k2": (0.01, 5.0),
+    "dwell.lambda2": (0.01, 24.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
     "soc_depart.alpha": (0.01, 50.0),

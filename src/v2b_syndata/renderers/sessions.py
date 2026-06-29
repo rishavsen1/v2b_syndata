@@ -81,6 +81,25 @@ def _weibull_ppf_u(u: float, k: float, lam: float) -> float:
     return float(stats.weibull_min.ppf(u, k, scale=lam))
 
 
+def _mixture_ppf(u: float, cdf, a: float, b: float, iters: int = 60) -> float:
+    """Generic inverse of a monotone CDF on [a, b] via bisection at `u`.
+
+    Pure function of u — the copula's shared uniform is consumed once and
+    transformed deterministically, preserving the bitwise-determinism contract.
+    Used by every mixture marginal (TruncNorm arrival, Weibull dwell)."""
+    if b <= a:
+        return a
+    u = min(1.0 - 1e-9, max(1e-9, u))
+    lo, hi = a, b
+    for _ in range(iters):
+        m = 0.5 * (lo + hi)
+        if cdf(m) < u:
+            lo = m
+        else:
+            hi = m
+    return 0.5 * (lo + hi)
+
+
 def _mixture_ppf_u(u: float, comps: list, lo: float, hi: float) -> float:
     """Inverse CDF at `u` of a 2-component TruncNorm mixture, each component
     truncated to [lo, hi]. `comps` = [(w, mu, sigma), ...]. Pure function of u
@@ -96,15 +115,31 @@ def _mixture_ppf_u(u: float, comps: list, lo: float, hi: float) -> float:
             for (w, mu, sg) in comps
         )
 
-    u = min(1.0 - 1e-9, max(1e-9, u))
-    a, b = lo, hi
-    for _ in range(60):  # ~1e-18 resolution over a 14h window
-        m = 0.5 * (a + b)
-        if cdf(m) < u:
-            a = m
-        else:
-            b = m
-    return 0.5 * (a + b)
+    return _mixture_ppf(u, cdf, lo, hi)  # ~1e-18 resolution over a 14h window
+
+
+def _weibull_mixture_ppf_u(u: float, comps: list) -> float:
+    """Inverse CDF at `u` of a Weibull mixture. `comps` = [(w, k, lambda), ...].
+    Pure function of u (shared copula uniform → one transform → one draw), so the
+    dwell mixture preserves determinism exactly like the arrival mixture.
+
+    The upper bisection bound is the 1-1e-9 quantile of the heaviest component —
+    a finite, monotone-CDF-covering ceiling (the renderer clips to clip_hi after
+    this regardless)."""
+    if not comps:
+        return 0.0
+
+    def cdf(x: float) -> float:
+        return sum(
+            w * float(stats.weibull_min.cdf(x, k, scale=lam))
+            for (w, k, lam) in comps
+        )
+
+    hi = max(
+        float(stats.weibull_min.ppf(1.0 - 1e-9, k, scale=lam))
+        for (_w, k, lam) in comps
+    )
+    return _mixture_ppf(u, cdf, 0.0, hi)
 
 
 def render(ctx: ScenarioContext) -> None:
@@ -198,11 +233,13 @@ def render(ctx: ScenarioContext) -> None:
             required_soc: float | None = None
 
             arr_mix = arr_p.get("mixture")  # 2-component mixture, or None (single TruncNorm)
+            dw_mix = dw_p.get("mixture")    # 2-component Weibull mixture, or None (single Weibull)
             for _ in range(_MAX_RETRIES):
                 # 1. Sample arrival hour + dwell, build window. A calibrated
                 #    mixture region uses the mixture quantile on the SAME uniform
                 #    (copula path) or a single fresh draw (independent path); the
-                #    single-TruncNorm path is byte-identical to before.
+                #    single-TruncNorm / single-Weibull path is byte-identical to
+                #    before. Each draw still consumes EXACTLY ONE uniform.
                 if use_copula:
                     u_arr, u_dwell = _gaussian_copula_pair(rng, rho)
                     if arr_mix is not None:
@@ -213,7 +250,10 @@ def render(ctx: ScenarioContext) -> None:
                             u_arr, mu=arr_p["mu"], sigma=arr_p["sigma"],
                             lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
                         )
-                    dwell_hr = _weibull_ppf_u(u_dwell, k=dw_p["k"], lam=dw_p["lam"])
+                    if dw_mix is not None:
+                        dwell_hr = _weibull_mixture_ppf_u(u_dwell, dw_mix)
+                    else:
+                        dwell_hr = _weibull_ppf_u(u_dwell, k=dw_p["k"], lam=dw_p["lam"])
                 else:
                     if arr_mix is not None:
                         arr_hour = _mixture_ppf_u(float(rng.random()), arr_mix,
@@ -223,7 +263,12 @@ def render(ctx: ScenarioContext) -> None:
                             rng, mu=arr_p["mu"], sigma=arr_p["sigma"],
                             lo=arr_p["trunc_lo"], hi=arr_p["trunc_hi"],
                         )
-                    dwell_hr = float(rng.weibull(dw_p["k"]) * dw_p["lam"])
+                    if dw_mix is not None:
+                        # One fresh uniform → mixture quantile (NOT rng.weibull),
+                        # so RNG consumption stays one-draw-per-dwell.
+                        dwell_hr = _weibull_mixture_ppf_u(float(rng.random()), dw_mix)
+                    else:
+                        dwell_hr = float(rng.weibull(dw_p["k"]) * dw_p["lam"])
                 dwell_hr = max(dw_p["clip_lo"], min(dwell_hr, dw_p["clip_hi"]))
 
                 total_min = int(round(arr_hour * 60.0 / 15.0)) * 15

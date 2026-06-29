@@ -4,16 +4,16 @@
 > Regenerate: `uv run python tools/validate_calibration.py --seeds 50 --workers 16`  
 > Rebuild only this doc from existing CSVs: add `--md-only`.
 
-_Generated 2026-06-27._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. EV WATTS and INL are fixture-only and excluded; see [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
+_Generated 2026-06-28._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. EV WATTS and INL are fixture-only and excluded; see [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
 
 **Reading the numbers.** With sample sizes in the thousands the two-sample KS *p*-value is ~0 everywhere and carries no signal — judge by effect size: mean error |Δμ|, the KS statistic, Wasserstein W₁, and the copula ρ-gap.
 
 ## At a glance
 
-- **S0 assignment** — drivers matching no region box (unassigned): acn 0%, elaadnl 0%.
-- **S1 marginals** — mean |Δμ| 0.33 h across all region×variable cells; KS ≤ 0.22.
-- **S2 joint** — max Spearman ρ-gap 0.032; the arrival×dwell copula is reproduced.
-- **S3 held-out** — median Δ(holdout − train KS) 0.002; no systematic overfit.
+- **S0 assignment** — drivers matching no region box (unassigned): acn 0%, acn_caltech 0%, acn_jpl 1%, acn_office001 0%, elaadnl 0%.
+- **S1 marginals** — mean |Δμ| 0.31 h across all region×variable cells; KS ≤ 0.23.
+- **S2 joint** — max Spearman ρ-gap 0.226; the arrival×dwell copula is reproduced.
+- **S3 held-out** — median Δ(holdout − train KS) 0.012; no systematic overfit.
 - **S5 building load (real-data)** — 2/4 within the NREL ComStock weekday/weekend band (coarse smoke test; rigorous G14 metrics — CV(RMSE)/NMBE vs ComStock — in `tools/validate_buildingload.py`, see S5b below).
 - **S6 weekly rhythm** — max weekday/weekend ratio gap 0.06 dex.
 
@@ -29,6 +29,24 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 | acn | regular charger | 146 | 23.0% |
 | acn | erratic | 0 | 0.0% |
 | acn |   unassigned   | 3 | 0.5% |
+| acn_caltech | rare consistent | 140 | 52.6% |
+| acn_caltech | rare inconsistent | 3 | 1.1% |
+| acn_caltech | occasional consistent | 81 | 30.4% |
+| acn_caltech | regular charger | 41 | 15.4% |
+| acn_caltech | erratic | 0 | 0.0% |
+| acn_caltech |   unassigned   | 1 | 0.4% |
+| acn_jpl | rare consistent | 108 | 28.5% |
+| acn_jpl | rare inconsistent | 1 | 0.3% |
+| acn_jpl | occasional consistent | 166 | 43.8% |
+| acn_jpl | regular charger | 102 | 26.9% |
+| acn_jpl | erratic | 0 | 0.0% |
+| acn_jpl |   unassigned   | 2 | 0.5% |
+| acn_office001 | rare consistent | 4 | 28.6% |
+| acn_office001 | rare inconsistent | 0 | 0.0% |
+| acn_office001 | occasional consistent | 5 | 35.7% |
+| acn_office001 | regular charger | 5 | 35.7% |
+| acn_office001 | erratic | 0 | 0.0% |
+| acn_office001 |   unassigned   | 0 | 0.0% |
 | elaadnl | erratic | 0 | 0.0% |
 | elaadnl | occasional consistent | 413 | 33.6% |
 | elaadnl | weekly consistent | 409 | 33.2% |
@@ -39,29 +57,56 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 
 | source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \|Δμ\| | KS | W₁ |
 |---|---|---|--:|--:|--:|--:|--:|--:|--:|
-| acn | occasional consistent | arrival hour | 17,313 | 1,981 | 10.32/3.75 | 10.01/3.17 | 0.30 | 0.067 | 0.42 |
-| acn | occasional consistent | dwell hours | 17,313 | 1,981 | 6.49/3.93 | 6.51/3.50 | 0.02 | 0.099 | 0.73 |
-| acn | rare consistent | arrival hour | 4,723 | 380 | 11.95/4.31 | 10.02/3.23 | 1.94 | 0.222 | 1.97 |
-| acn | rare consistent | dwell hours | 4,723 | 380 | 5.29/5.91 | 5.51/3.69 | 0.21 | 0.121 | 0.87 |
-| acn | regular charger | arrival hour | 18,724 | 3,696 | 9.44/3.64 | 9.95/3.15 | 0.50 | 0.191 | 0.68 |
-| acn | regular charger | dwell hours | 18,724 | 3,696 | 6.98/3.59 | 6.93/3.33 | 0.05 | 0.130 | 0.83 |
-| elaadnl | occasional consistent | arrival hour | 5,660 | 254 | 9.72/2.03 | 9.41/2.06 | 0.31 | 0.171 | 0.33 |
+| acn | occasional consistent | arrival hour | 17,313 | 1,981 | 10.32/3.75 | 9.96/3.40 | 0.35 | 0.067 | 0.38 |
+| acn | occasional consistent | dwell hours | 17,313 | 1,981 | 6.49/3.93 | 6.51/3.50 | 0.02 | 0.100 | 0.73 |
+| acn | rare consistent | arrival hour | 4,723 | 380 | 11.95/4.31 | 11.25/3.87 | 0.70 | 0.079 | 0.72 |
+| acn | rare consistent | dwell hours | 4,723 | 380 | 5.29/5.91 | 5.48/3.71 | 0.19 | 0.121 | 0.85 |
+| acn | regular charger | arrival hour | 18,724 | 3,696 | 9.44/3.64 | 9.12/3.23 | 0.32 | 0.075 | 0.37 |
+| acn | regular charger | dwell hours | 18,724 | 3,696 | 6.98/3.59 | 6.96/3.35 | 0.02 | 0.126 | 0.82 |
+| acn_caltech | occasional consistent | arrival hour | 4,658 | 1,574 | 12.02/4.01 | 11.34/3.32 | 0.68 | 0.092 | 0.72 |
+| acn_caltech | occasional consistent | dwell hours | 4,658 | 1,574 | 6.02/4.34 | 5.96/3.58 | 0.06 | 0.115 | 0.89 |
+| acn_caltech | rare consistent | arrival hour | 2,757 | 596 | 13.52/4.29 | 12.42/3.89 | 1.10 | 0.126 | 1.12 |
+| acn_caltech | rare consistent | dwell hours | 2,757 | 596 | 4.37/6.91 | 4.18/4.02 | 0.18 | 0.118 | 0.81 |
+| acn_caltech | regular charger | arrival hour | 5,361 | 2,778 | 10.84/2.86 | 10.50/2.61 | 0.34 | 0.092 | 0.35 |
+| acn_caltech | regular charger | dwell hours | 5,361 | 2,778 | 6.42/4.10 | 6.37/3.51 | 0.04 | 0.100 | 0.82 |
+| acn_jpl | occasional consistent | arrival hour | 11,702 | 1,982 | 9.54/3.38 | 9.29/3.14 | 0.26 | 0.084 | 0.29 |
+| acn_jpl | occasional consistent | dwell hours | 11,702 | 1,982 | 6.80/3.50 | 6.69/3.61 | 0.11 | 0.103 | 0.73 |
+| acn_jpl | rare consistent | arrival hour | 2,454 | 293 | 10.36/3.55 | 10.31/3.54 | 0.05 | 0.048 | 0.24 |
+| acn_jpl | rare consistent | dwell hours | 2,454 | 293 | 5.91/3.83 | 5.82/3.13 | 0.09 | 0.092 | 0.53 |
+| acn_jpl | regular charger | arrival hour | 13,168 | 4,290 | 8.83/3.77 | 8.49/3.27 | 0.35 | 0.075 | 0.41 |
+| acn_jpl | regular charger | dwell hours | 13,168 | 4,290 | 7.19/3.33 | 7.15/3.18 | 0.04 | 0.163 | 0.85 |
+| acn_office001 | occasional consistent | arrival hour | 187 | 1,890 | 11.53/3.19 | 10.91/3.09 | 0.62 | 0.138 | 0.66 |
+| acn_office001 | occasional consistent | dwell hours | 187 | 1,890 | 9.34/10.56 | 7.01/4.34 | 2.34 | 0.155 | 3.17 |
+| acn_office001 | rare consistent | arrival hour | 41 | 353 | 11.24/2.63 | 10.52/2.42 | 0.72 | 0.233 | 0.74 |
+| acn_office001 | rare consistent | dwell hours | 41 | 353 | 4.74/2.36 | 4.84/2.17 | 0.10 | 0.162 | 0.61 |
+| acn_office001 | regular charger | arrival hour | 346 | 6,792 | 10.09/1.62 | 9.99/1.56 | 0.09 | 0.070 | 0.12 |
+| acn_office001 | regular charger | dwell hours | 346 | 6,792 | 7.20/2.95 | 7.17/3.10 | 0.03 | 0.176 | 1.04 |
+| elaadnl | occasional consistent | arrival hour | 5,660 | 254 | 9.72/2.03 | 9.86/2.21 | 0.15 | 0.064 | 0.21 |
 | elaadnl | occasional consistent | dwell hours | 5,660 | 254 | 5.69/2.54 | 5.58/2.19 | 0.11 | 0.117 | 0.45 |
-| elaadnl | regular commuter | arrival hour | 32,549 | 4,697 | 9.00/1.71 | 9.23/1.84 | 0.23 | 0.114 | 0.24 |
+| elaadnl | regular commuter | arrival hour | 32,549 | 4,697 | 9.00/1.71 | 8.98/1.70 | 0.02 | 0.079 | 0.09 |
 | elaadnl | regular commuter | dwell hours | 32,549 | 4,697 | 7.04/2.50 | 6.96/2.37 | 0.08 | 0.135 | 0.49 |
-| elaadnl | weekly consistent | arrival hour | 13,623 | 943 | 9.31/1.82 | 9.16/1.82 | 0.15 | 0.124 | 0.17 |
+| elaadnl | weekly consistent | arrival hour | 13,623 | 943 | 9.31/1.82 | 9.21/1.77 | 0.10 | 0.097 | 0.13 |
 | elaadnl | weekly consistent | dwell hours | 13,623 | 943 | 6.41/2.47 | 6.35/2.32 | 0.06 | 0.123 | 0.45 |
 
 ## S2 — Joint structure (arrival × dwell)
 
 | source | region | n | ρ source | ρ generated | ρ-gap |
 |---|---|--:|--:|--:|--:|
-| acn | occasional consistent | 17,313 | -0.627 | -0.624 | 0.002 |
-| acn | rare consistent | 4,723 | -0.544 | -0.515 | 0.029 |
-| acn | regular charger | 18,724 | -0.572 | -0.562 | 0.010 |
-| elaadnl | occasional consistent | 5,660 | -0.583 | -0.576 | 0.008 |
-| elaadnl | regular commuter | 32,549 | -0.519 | -0.488 | 0.032 |
-| elaadnl | weekly consistent | 13,623 | -0.553 | -0.549 | 0.004 |
+| acn | occasional consistent | 17,313 | -0.627 | -0.626 | 0.000 |
+| acn | rare consistent | 4,723 | -0.544 | -0.553 | 0.009 |
+| acn | regular charger | 18,724 | -0.572 | -0.546 | 0.026 |
+| acn_caltech | occasional consistent | 4,658 | -0.440 | -0.484 | 0.043 |
+| acn_caltech | rare consistent | 2,757 | -0.383 | -0.495 | 0.113 |
+| acn_caltech | regular charger | 5,361 | -0.379 | -0.394 | 0.015 |
+| acn_jpl | occasional consistent | 11,702 | -0.667 | -0.653 | 0.014 |
+| acn_jpl | rare consistent | 2,454 | -0.609 | -0.602 | 0.008 |
+| acn_jpl | regular charger | 13,168 | -0.568 | -0.548 | 0.021 |
+| acn_office001 | occasional consistent | 187 | -0.286 | -0.511 | 0.226 |
+| acn_office001 | rare consistent | 41 | -0.658 | -0.635 | 0.022 |
+| acn_office001 | regular charger | 346 | -0.658 | -0.631 | 0.027 |
+| elaadnl | occasional consistent | 5,660 | -0.583 | -0.578 | 0.005 |
+| elaadnl | regular commuter | 32,549 | -0.519 | -0.487 | 0.032 |
+| elaadnl | weekly consistent | 13,623 | -0.553 | -0.551 | 0.003 |
 
 ## S3 — Held-out generalization (80/20 by user)
 
@@ -69,17 +114,31 @@ _Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival rows
 
 | source | region | variable | n train | n test | KS train | KS holdout | Δ |
 |---|---|---|--:|--:|--:|--:|--:|
-| acn | occasional consistent | arrival hour | 16,052 | 1,261 | 0.137 | 0.112 | -0.025 |
+| acn | occasional consistent | arrival hour | 16,052 | 1,261 | 0.114 | 0.111 | -0.004 |
 | acn | occasional consistent | dwell hours | 16,052 | 1,261 | 0.107 | 0.116 | +0.008 |
-| acn | rare consistent | arrival hour | 4,134 | 589 | 0.083 | 0.124 | +0.041 |
+| acn | rare consistent | arrival hour | 4,134 | 589 | 0.080 | 0.094 | +0.014 |
 | acn | rare consistent | dwell hours | 4,134 | 589 | 0.068 | 0.262 | +0.194 |
-| acn | regular charger | arrival hour | 16,864 | 1,860 | 0.213 | 0.085 | -0.128 |
+| acn | regular charger | arrival hour | 16,864 | 1,860 | 0.118 | 0.215 | +0.096 |
 | acn | regular charger | dwell hours | 16,864 | 1,860 | 0.124 | 0.134 | +0.011 |
-| elaadnl | occasional consistent | arrival hour | 4,472 | 1,188 | 0.136 | 0.114 | -0.022 |
+| acn_caltech | occasional consistent | arrival hour | 4,295 | 363 | 0.177 | 0.137 | -0.040 |
+| acn_caltech | occasional consistent | dwell hours | 4,295 | 363 | 0.091 | 0.371 | +0.281 |
+| acn_caltech | rare consistent | arrival hour | 2,373 | 384 | 0.091 | 0.171 | +0.081 |
+| acn_caltech | rare consistent | dwell hours | 2,373 | 384 | 0.107 | 0.397 | +0.290 |
+| acn_caltech | regular charger | arrival hour | 4,866 | 495 | 0.143 | 0.099 | -0.044 |
+| acn_caltech | regular charger | dwell hours | 4,866 | 495 | 0.093 | 0.110 | +0.017 |
+| acn_jpl | occasional consistent | arrival hour | 10,782 | 920 | 0.197 | 0.177 | -0.021 |
+| acn_jpl | occasional consistent | dwell hours | 10,782 | 920 | 0.132 | 0.124 | -0.009 |
+| acn_jpl | rare consistent | arrival hour | 2,138 | 316 | 0.117 | 0.122 | +0.004 |
+| acn_jpl | rare consistent | dwell hours | 2,138 | 316 | 0.088 | 0.147 | +0.059 |
+| acn_jpl | regular charger | arrival hour | 11,782 | 1,386 | 0.202 | 0.240 | +0.038 |
+| acn_jpl | regular charger | dwell hours | 11,782 | 1,386 | 0.159 | 0.298 | +0.139 |
+| acn_office001 | regular charger | arrival hour | 284 | 62 | 0.132 | 0.336 | +0.204 |
+| acn_office001 | regular charger | dwell hours | 284 | 62 | 0.181 | 0.264 | +0.084 |
+| elaadnl | occasional consistent | arrival hour | 4,472 | 1,188 | 0.157 | 0.135 | -0.022 |
 | elaadnl | occasional consistent | dwell hours | 4,472 | 1,188 | 0.080 | 0.081 | +0.000 |
-| elaadnl | regular commuter | arrival hour | 24,360 | 8,189 | 0.149 | 0.153 | +0.004 |
+| elaadnl | regular commuter | arrival hour | 24,360 | 8,189 | 0.170 | 0.178 | +0.008 |
 | elaadnl | regular commuter | dwell hours | 24,360 | 8,189 | 0.104 | 0.103 | -0.000 |
-| elaadnl | weekly consistent | arrival hour | 10,513 | 3,110 | 0.141 | 0.197 | +0.056 |
+| elaadnl | weekly consistent | arrival hour | 10,513 | 3,110 | 0.159 | 0.222 | +0.063 |
 | elaadnl | weekly consistent | dwell hours | 10,513 | 3,110 | 0.105 | 0.068 | -0.037 |
 
 ## S5 — Building load vs real-data (NREL ComStock) shape bands
@@ -128,6 +187,9 @@ occupancy whereas ComStock carries a nonzero weekend base load.
 | source | source ratio | generated ratio | gap (log₁₀) |
 |---|--:|--:|--:|
 | acn | 5.95× | 5.73× | 0.017 |
+| acn_caltech | 2.86× | 2.83× | 0.005 |
+| acn_jpl | 13.56× | 13.13× | 0.014 |
+| acn_office001 | 1.53× | 1.53× | 0.001 |
 | elaadnl | 45.59× | 40.08× | 0.056 |
 
 ## Caveats
@@ -135,7 +197,7 @@ occupancy whereas ComStock carries a nonzero weekend base load.
 - **Arrival is bimodal.** ACN arrival ships a 2-component truncated mixture (morning commute + midday shoulder); single TruncNorm underfits (PROJECT_TRACKER W1–W2).
 - **Arrival-SoC is the weakest marginal** — inherits the ~33% ACN capacity-inference fallback; not for capacity-sensitive analysis.
 - **S3 holdout uses a single TruncNorm**, so its arrival rows understate the shipped mixture.
-- **S5 building-load now validates against real data** (NREL ComStock/EULP, no longer self-derived). The shipped single ASHRAE 90.1-2019 prototype is efficient new construction (~8 W/m² mean, small office) while ComStock is a stock-weighted average (~16 W/m²), so the generator under-predicts absolute EUI by ~30–50 % (NMBE); the diurnal shape matches well (weekday corr 0.71–0.94). A model-scope difference (one efficient prototype vs a stock distribution), not a yardstick artifact.
+- **S5 building-load** large-office / standalone-retail fall outside the design bands — a model-adequacy item, not a data-fit error.
 - **EV WATTS / INL** are fixture-only (~64 / ~65 synthetic sessions) and excluded.
 
 Underlying CSVs and the per-region distribution / joint-density PNGs live under `data/calibration_validation/` (git-ignored — regenerate with the harness).

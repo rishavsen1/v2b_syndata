@@ -37,6 +37,12 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
     params = {}
     for car_id, u in ctx.a_user.items():
         cal = _region_dist(ctx, u.region, "arrival")
+        # Truncation window: read the calibrated block's trunc_lo/trunc_hi when
+        # present (KDD task 6 widened the fit window to [4,22]); default to the
+        # historical 6/20 so synthetic / hand-authored populations — which carry
+        # no trunc_lo/hi leaf — stay BITWISE-IDENTICAL.
+        trunc_lo = float(cal.get("trunc_lo", 6.0))
+        trunc_hi = float(cal.get("trunc_hi", 20.0))
         if "w1" in cal and "mu1" in cal:
             w1 = float(cal["w1"])
             params[car_id] = {
@@ -44,14 +50,14 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
                     (w1, float(cal["mu1"]), float(cal["sigma1"])),
                     (1.0 - w1, float(cal["mu2"]), float(cal["sigma2"])),
                 ],
-                "trunc_lo": 6.0, "trunc_hi": 20.0, "phi": u.phi,
+                "trunc_lo": trunc_lo, "trunc_hi": trunc_hi, "phi": u.phi,
             }
         else:
             mu = float(cal.get("mu", 8.5))
             sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
             sigma = float(cal.get("sigma", sigma_default))
-            params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": 6.0,
-                              "trunc_hi": 20.0, "phi": u.phi}
+            params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": trunc_lo,
+                              "trunc_hi": trunc_hi, "phi": u.phi}
     ctx.latents["f_arr"] = params
 
 
@@ -62,14 +68,25 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
     for car_id, u in ctx.a_user.items():
         dwell_cal = _region_dist(ctx, u.region, "dwell")
         copula_cal = _region_dist(ctx, u.region, "copula")
+        # Copula default 0.0 → independent sampling (Step 4 RNG-equivalent).
+        rho = float(copula_cal.get("rho_gaussian", 0.0))
         k = float(dwell_cal.get("k", 2.0))
         # YAML "lambda" → runtime "lam" rename.
         lam = float(dwell_cal.get("lambda", 8.0 * (0.5 + u.phi)))
-        # Copula default 0.0 → independent sampling (Step 4 RNG-equivalent).
-        rho = float(copula_cal.get("rho_gaussian", 0.0))
-        params[car_id] = {"k": k, "lam": lam,
-                          "clip_lo": 0.5, "clip_hi": 14.0,
-                          "rho": rho}
+        entry = {"k": k, "lam": lam,
+                 "clip_lo": 0.5, "clip_hi": 14.0,
+                 "rho": rho}
+        # A region whose calibrated `dwell` block carries the mixture leaves
+        # (w1, k1, lambda1, k2, lambda2) gets a 2-component Weibull mixture;
+        # otherwise the single Weibull above (default / hand-authored path,
+        # bit-identical to before). k/lam are still populated as a safe fallback.
+        if "w1" in dwell_cal and "k1" in dwell_cal:
+            w1 = float(dwell_cal["w1"])
+            entry["mixture"] = [
+                (w1, float(dwell_cal["k1"]), float(dwell_cal["lambda1"])),
+                (1.0 - w1, float(dwell_cal["k2"]), float(dwell_cal["lambda2"])),
+            ]
+        params[car_id] = entry
     ctx.latents["f_dwell"] = params
 
 

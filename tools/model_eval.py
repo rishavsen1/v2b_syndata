@@ -83,9 +83,11 @@ def _frozen(dist, train, **fitkw):
     return (lambda x: fz.logpdf(x)), (lambda x: fz.pdf(x))
 
 
-def _truncnorm_6_20(train):
-    # Mirror distribution_fitter.fit_truncnorm_arrival: MLE of (mu,sigma) on [6,20].
-    a, b = 6.0, 20.0
+def _truncnorm_window(train):
+    # Mirror distribution_fitter.fit_truncnorm_arrival: MLE of (mu,sigma) on the
+    # generator's arrival window (widened [6,20] → [4,22], KDD task 6).
+    from v2b_syndata.calibration.distribution_fitter import ARRIVAL_HI, ARRIVAL_LO
+    a, b = ARRIVAL_LO, ARRIVAL_HI
     tr = np.clip(train, a + 1e-6, b - 1e-6)
     mu0, s0 = float(tr.mean()), float(tr.std() or 1.0)
 
@@ -124,7 +126,7 @@ def _gmm_model(n):
 
 
 ARRIVAL_MODELS = {
-    "truncnorm[6,20]*": _truncnorm_6_20,
+    "truncnorm[4,22]*": _truncnorm_window,
     "normal": lambda tr: _frozen(st.norm, tr),
     "skewnorm": lambda tr: _frozen(st.skewnorm, tr),
     "kde": _kde,

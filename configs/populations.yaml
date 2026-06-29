@@ -131,15 +131,6 @@ acn_workplace_baseline:
 # ──────────────────────────────────────────────────────────────────────────
   region_distributions:
     rare_consistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.46384652041209823
-        mu1: 7.47885961375071
-        sigma1: 0.8858769157778844
-        mu2: 12.59814570642455
-        sigma2: 3.1317565333518416
-        n_samples: 38299
-        ks_fit_quality: 0.05145149980074243
       dwell:
         dist: weibull
         k: 1.1724350564177057
@@ -162,22 +153,27 @@ acn_workplace_baseline:
         rho_spearman: -0.5441642060816433
         rho_gaussian: -0.5621684796733354
         n_samples: 4723
-    rare_inconsistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.46384652041209823
-        mu1: 7.47885961375071
-        sigma1: 0.8858769157778844
-        mu2: 12.59814570642455
-        sigma2: 3.1317565333518416
-        n_samples: 38299
-        ks_fit_quality: 0.05145149980074243
+        w1: 0.4204982963411578
+        mu1: 8.213772992083234
+        sigma1: 1.2521110311959613
+        mu2: 14.535984217727185
+        sigma2: 3.521755456865216
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 4676
+        ks_fit_quality: 0.03961971120811125
+    rare_inconsistent:
       dwell:
-        dist: weibull
-        k: 0.8195937860121927
-        lambda: 6.194507767089793
+        dist: weibull_mixture
+        w1: 0.4875
+        k1: 3.862046112836521
+        lambda1: 0.9544545034950698
+        k2: 2.3545509473249275
+        lambda2: 14.226371358674392
         n_samples: 80
-        ks_fit_quality: 0.23567210132849203
+        ks_fit_quality: 0.060620759636325516
       soc_arrival:
         dist: beta
         alpha: 4.2279048451488475
@@ -194,16 +190,18 @@ acn_workplace_baseline:
         rho_spearman: 0.052590556673176116
         rho_gaussian: 0.05506574260954844
         n_samples: 80
-    occasional_consistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.46384652041209823
-        mu1: 7.47885961375071
-        sigma1: 0.8858769157778844
-        mu2: 12.59814570642455
-        sigma2: 3.1317565333518416
-        n_samples: 38299
-        ks_fit_quality: 0.05145149980074243
+        w1: 0.513310402633164
+        mu1: 7.408913227278381
+        sigma1: 1.1448033730560172
+        mu2: 12.967947608433768
+        sigma2: 3.4731370394195147
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 41355
+        ks_fit_quality: 0.036217629701165044
+    occasional_consistent:
       dwell:
         dist: weibull
         k: 1.7204205391189364
@@ -226,16 +224,18 @@ acn_workplace_baseline:
         rho_spearman: -0.6268781855343101
         rho_gaussian: -0.6447410712502466
         n_samples: 17313
-    regular_charger:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.46384652041209823
-        mu1: 7.47885961375071
-        sigma1: 0.8858769157778844
-        mu2: 12.59814570642455
-        sigma2: 3.1317565333518416
-        n_samples: 38299
-        ks_fit_quality: 0.05145149980074243
+        w1: 0.49520144828284507
+        mu1: 7.561325395434455
+        sigma1: 0.9479097589779246
+        mu2: 12.980272768097889
+        sigma2: 3.3925523114427483
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 17245
+        ks_fit_quality: 0.04471611665373526
+    regular_charger:
       dwell:
         dist: weibull
         k: 1.9816342759194332
@@ -258,8 +258,19 @@ acn_workplace_baseline:
         rho_spearman: -0.5716755787245417
         rho_gaussian: -0.5897575175466935
         n_samples: 18724
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.4818895068954559
+        mu1: 6.903305640945067
+        sigma1: 0.954844026172623
+        mu2: 11.764453834075654
+        sigma2: 3.348502704883273
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 18504
+        ks_fit_quality: 0.042192593680792756
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260618
+    source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
     sites:
       - caltech
@@ -268,7 +279,7 @@ acn_workplace_baseline:
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-18'
+    calibration_date: '2026-06-28'
     n_users_total: 635
     n_sessions_total: 41774
     n_users_assigned_in_population: 632
@@ -308,21 +319,15 @@ acn_caltech_baseline:
 
   region_distributions:
     rare_consistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.5055906925353449
-        mu1: 9.201409577637577
-        sigma1: 1.0027249812024048
-        mu2: 13.9472245675881
-        sigma2: 3.1950667937030444
-        n_samples: 12717
-        ks_fit_quality: 0.036095078610036135
       dwell:
-        dist: weibull
-        k: 0.9666716944393348
-        lambda: 4.286336643763553
+        dist: weibull_mixture
+        w1: 0.5749002538991658
+        k1: 2.3963852077737293
+        lambda1: 1.5734567811752687
+        k2: 1.336764230414141
+        lambda2: 9.28576568719199
         n_samples: 2757
-        ks_fit_quality: 0.11829613743470038
+        ks_fit_quality: 0.0834364775647144
       soc_arrival:
         dist: beta
         alpha: 3.665699556102154
@@ -339,22 +344,27 @@ acn_caltech_baseline:
         rho_spearman: -0.38257011810429364
         rho_gaussian: -0.39795264481953246
         n_samples: 2757
-    rare_inconsistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.5055906925353449
-        mu1: 9.201409577637577
-        sigma1: 1.0027249812024048
-        mu2: 13.9472245675881
-        sigma2: 3.1950667937030444
-        n_samples: 12717
-        ks_fit_quality: 0.036095078610036135
+        w1: 0.3898407343323195
+        mu1: 9.306796383269273
+        sigma1: 1.237012075795938
+        mu2: 16.054454725631263
+        sigma2: 3.0440335874622475
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 2713
+        ks_fit_quality: 0.05408060546610949
+    rare_inconsistent:
       dwell:
-        dist: weibull
-        k: 0.8186467917098169
-        lambda: 6.372141870745379
+        dist: weibull_mixture
+        w1: 0.4864864864864865
+        k1: 3.802429032896108
+        lambda1: 0.9562208968296744
+        k2: 2.479309866897286
+        lambda2: 14.630727610890728
         n_samples: 74
-        ks_fit_quality: 0.2381142496620444
+        ks_fit_quality: 0.06968246204150386
       soc_arrival:
         dist: beta
         alpha: 4.4177776500946
@@ -371,16 +381,18 @@ acn_caltech_baseline:
         rho_spearman: 0.12072655110698317
         rho_gaussian: 0.12634037114434313
         n_samples: 74
-    occasional_consistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.5055906925353449
-        mu1: 9.201409577637577
-        sigma1: 1.0027249812024048
-        mu2: 13.9472245675881
-        sigma2: 3.1950667937030444
-        n_samples: 12717
-        ks_fit_quality: 0.036095078610036135
+        w1: 0.46149507492039055
+        mu1: 9.222871736854186
+        sigma1: 0.9464452186076698
+        mu2: 14.104465162434579
+        sigma2: 3.7354186945409396
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 13234
+        ks_fit_quality: 0.03180593475251303
+    occasional_consistent:
       dwell:
         dist: weibull
         k: 1.4690957477206565
@@ -403,16 +415,18 @@ acn_caltech_baseline:
         rho_spearman: -0.44044809683664815
         rho_gaussian: -0.45715857556514855
         n_samples: 4658
-    regular_charger:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.5055906925353449
-        mu1: 9.201409577637577
-        sigma1: 1.0027249812024048
-        mu2: 13.9472245675881
-        sigma2: 3.1950667937030444
-        n_samples: 12717
-        ks_fit_quality: 0.036095078610036135
+        w1: 0.5446168580082728
+        mu1: 9.262128951387472
+        sigma1: 0.8290875704192762
+        mu2: 15.228063663358814
+        sigma2: 3.5725997635135553
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 4609
+        ks_fit_quality: 0.043832901770126775
+    regular_charger:
       dwell:
         dist: weibull
         k: 1.6636666943490575
@@ -435,15 +449,26 @@ acn_caltech_baseline:
         rho_spearman: -0.3792615829607139
         rho_gaussian: -0.39455663839432986
         n_samples: 5361
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.43739286307877917
+        mu1: 9.209263617423684
+        sigma1: 0.8746061289908252
+        mu2: 12.0748272682406
+        sigma2: 3.1258595159811904
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 5348
+        ks_fit_quality: 0.027692963089647527
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260618
+    source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
     sites:
       - caltech
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-18'
+    calibration_date: '2026-06-28'
     n_users_total: 266
     n_sessions_total: 13395
     n_users_assigned_in_population: 265
@@ -482,15 +507,6 @@ acn_jpl_baseline:
 
   region_distributions:
     rare_consistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.5648900144056337
-        mu1: 7.12656573575676
-        sigma1: 0.586821961088822
-        mu2: 12.675893789457781
-        sigma2: 2.8982839933618405
-        n_samples: 25004
-        ks_fit_quality: 0.03658554324852378
       dwell:
         dist: weibull
         k: 1.6626537653510574
@@ -513,22 +529,27 @@ acn_jpl_baseline:
         rho_spearman: -0.6093194764107155
         rho_gaussian: -0.6273082710078218
         n_samples: 2454
-    occasional_consistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.5648900144056337
-        mu1: 7.12656573575676
-        sigma1: 0.586821961088822
-        mu2: 12.675893789457781
-        sigma2: 2.8982839933618405
-        n_samples: 25004
-        ks_fit_quality: 0.03658554324852378
+        w1: 0.4924521711240168
+        mu1: 7.602282483644802
+        sigma1: 0.9595432547797277
+        mu2: 13.000008934325464
+        sigma2: 3.018727763925945
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 2449
+        ks_fit_quality: 0.020714367106960563
+    occasional_consistent:
       dwell:
-        dist: weibull
-        k: 1.97987761725707
-        lambda: 7.62833237797885
+        dist: weibull_mixture
+        w1: 0.24149717996923603
+        k1: 3.1359303536469225
+        lambda1: 2.7700765317079856
+        k2: 2.4604356721469287
+        lambda2: 9.005567204470125
         n_samples: 11702
-        ks_fit_quality: 0.12330992580175049
+        ks_fit_quality: 0.10044592695591859
       soc_arrival:
         dist: beta
         alpha: 3.5866534929057745
@@ -545,16 +566,18 @@ acn_jpl_baseline:
         rho_spearman: -0.6667288392908075
         rho_gaussian: -0.6841014668748994
         n_samples: 11702
-    regular_charger:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.5648900144056337
-        mu1: 7.12656573575676
-        sigma1: 0.586821961088822
-        mu2: 12.675893789457781
-        sigma2: 2.8982839933618405
-        n_samples: 25004
-        ks_fit_quality: 0.03658554324852378
+        w1: 0.5678644569720885
+        mu1: 7.171121616240032
+        sigma1: 0.619962604856538
+        mu2: 12.643946468666506
+        sigma2: 2.9409131823267094
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 11687
+        ks_fit_quality: 0.02367414461920092
+    regular_charger:
       dwell:
         dist: weibull
         k: 2.2022909989057657
@@ -577,15 +600,26 @@ acn_jpl_baseline:
         rho_spearman: -0.5684087869918644
         rho_gaussian: -0.5864877949094701
         n_samples: 13168
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.6644135641138333
+        mu1: 6.7172571940056525
+        sigma1: 0.8274907704725524
+        mu2: 12.927894553586102
+        sigma2: 3.342097039331207
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 12961
+        ks_fit_quality: 0.01880218725608296
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260618
+    source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
     sites:
       - jpl
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-18'
+    calibration_date: '2026-06-28'
     n_users_total: 379
     n_sessions_total: 27799
     n_users_assigned_in_population: 377
@@ -624,15 +658,6 @@ acn_office001_baseline:
 
   region_distributions:
     rare_consistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.46365761945763
-        mu1: 8.88241978146195
-        sigma1: 0.8980488843936746
-        mu2: 12.105800158783767
-        sigma2: 2.167142064216042
-        n_samples: 578
-        ks_fit_quality: 0.03034096875516268
       dwell:
         dist: weibull
         k: 2.13549326197764
@@ -655,16 +680,18 @@ acn_office001_baseline:
         rho_spearman: -0.6576655052264809
         rho_gaussian: -0.6751751851778541
         n_samples: 41
-    occasional_consistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.46365761945763
-        mu1: 8.88241978146195
-        sigma1: 0.8980488843936746
-        mu2: 12.105800158783767
-        sigma2: 2.167142064216042
-        n_samples: 578
-        ks_fit_quality: 0.03034096875516268
+        w1: 0.45696825934312346
+        mu1: 8.891170860479807
+        sigma1: 0.8977059880252566
+        mu2: 12.093676662513227
+        sigma2: 2.255325442540467
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 579
+        ks_fit_quality: 0.030392607845816877
+    occasional_consistent:
       dwell:
         dist: weibull
         k: 1.1603649681080652
@@ -687,16 +714,18 @@ acn_office001_baseline:
         rho_spearman: -0.28559919620860036
         rho_gaussian: -0.29796535648767564
         n_samples: 187
-    regular_charger:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.46365761945763
-        mu1: 8.88241978146195
-        sigma1: 0.8980488843936746
-        mu2: 12.105800158783767
-        sigma2: 2.167142064216042
-        n_samples: 578
-        ks_fit_quality: 0.03034096875516268
+        w1: 0.42606625688652483
+        mu1: 8.324963780216232
+        sigma1: 0.8758822466639977
+        mu2: 13.805549730725797
+        sigma2: 1.8324655797118823
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 186
+        ks_fit_quality: 0.07179916475799131
+    regular_charger:
       dwell:
         dist: weibull
         k: 2.316023133426543
@@ -719,15 +748,26 @@ acn_office001_baseline:
         rho_spearman: -0.6578952762281177
         rho_gaussian: -0.6754016703686238
         n_samples: 346
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.35026594703906133
+        mu1: 8.817344078805656
+        sigma1: 0.49462723046090973
+        mu2: 10.771938344695432
+        sigma2: 1.6031377198254178
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 346
+        ks_fit_quality: 0.03512145614829215
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260618
+    source: calibration:acn_data_2019_2021_20260628
     dataset: ACN-Data
     sites:
       - office001
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-06-18'
+    calibration_date: '2026-06-28'
     n_users_total: 14
     n_sessions_total: 580
     n_users_assigned_in_population: 14
@@ -1283,15 +1323,6 @@ elaadnl_public_eu:
   # `v2b-syndata calibrate --population elaadnl_public_eu`.
   region_distributions:
     occasional_consistent:
-      arrival:
-        dist: truncnorm_mixture
-        w1: 0.8124423081954248
-        mu1: 8.549681583815538
-        sigma1: 0.9085060062357075
-        mu2: 12.30680678456024
-        sigma2: 1.9200945471226591
-        n_samples: 55190
-        ks_fit_quality: 0.025237009894905515
       dwell:
         dist: weibull
         k: 2.414202773695162
@@ -1314,16 +1345,18 @@ elaadnl_public_eu:
         rho_spearman: -0.5833250887919074
         rho_gaussian: -0.6014033649316278
         n_samples: 5660
-    weekly_consistent:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.8124423081954248
-        mu1: 8.549681583815538
-        sigma1: 0.9085060062357075
-        mu2: 12.30680678456024
-        sigma2: 1.9200945471226591
-        n_samples: 55190
-        ks_fit_quality: 0.025237009894905515
+        w1: 0.7345364972613582
+        mu1: 8.759040636908631
+        sigma1: 0.9118831216412724
+        mu2: 12.367792282280869
+        sigma2: 1.9005610309558783
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 5660
+        ks_fit_quality: 0.0161494328484299
+    weekly_consistent:
       dwell:
         dist: weibull
         k: 2.9101324221291858
@@ -1346,16 +1379,18 @@ elaadnl_public_eu:
         rho_spearman: -0.5533783399476755
         rho_gaussian: -0.5714219011765309
         n_samples: 13623
-    regular_commuter:
       arrival:
         dist: truncnorm_mixture
-        w1: 0.8124423081954248
-        mu1: 8.549681583815538
-        sigma1: 0.9085060062357075
-        mu2: 12.30680678456024
-        sigma2: 1.9200945471226591
-        n_samples: 55190
-        ks_fit_quality: 0.025237009894905515
+        w1: 0.8066633456393533
+        mu1: 8.63087902098619
+        sigma1: 0.8848689477933617
+        mu2: 12.132669645979416
+        sigma2: 2.0041088892288506
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 13623
+        ks_fit_quality: 0.02206081105674601
+    regular_commuter:
       dwell:
         dist: weibull
         k: 3.2138106379583773
@@ -1378,8 +1413,19 @@ elaadnl_public_eu:
         rho_spearman: -0.5191208503533964
         rho_gaussian: -0.5369528550599112
         n_samples: 32549
+      arrival:
+        dist: truncnorm_mixture
+        w1: 0.8566583510609128
+        mu1: 8.454598643967552
+        sigma1: 0.9016099038969537
+        mu2: 12.254850102504728
+        sigma2: 1.8092663421553954
+        trunc_lo: 4.0
+        trunc_hi: 22.0
+        n_samples: 32549
+        ks_fit_quality: 0.03629316117567144
   calibration_metadata:
-    source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260627
+    source: calibration:elaadnl_open_2020_utrecht_4tu_2024_20260628
     dataset: ElaadNL / 4TU Utrecht office parking (SmoothEMS met GridShield)
     user_id_strategy: card_proxy
     archive_tag: utrecht_4tu_2024
@@ -1387,7 +1433,7 @@ elaadnl_public_eu:
     dataset_release: open_2020
     geography: NL_EU
     schema_version: v1
-    calibration_date: '2026-06-27'
+    calibration_date: '2026-06-28'
     n_users_total: 1231
     n_sessions_total: 55201
     n_users_assigned_in_population: 1231
