@@ -1,0 +1,111 @@
+{
+  "config": {
+    "feature_sets": {
+      "calendar_only": "hour-of-day, day-of-week only (isolates generator load-shape fidelity; no persistence)",
+      "lagged": "hour-of-day, day-of-week, lagged load (realistic operational forecaster; partly persistence)"
+    },
+    "freq": "1h",
+    "lags": [
+      1,
+      2,
+      3,
+      24
+    ],
+    "real_source": "elaadnl",
+    "scenario": "S_acn_caltech",
+    "seed": 1234,
+    "session_to_load_assumption": "uniform constant-power spread of delivered energy over connect->disconnect dwell window (energy-rectangle proxy); identical rule applied to real and synthetic.",
+    "train_frac": 0.6
+  },
+  "generator": {
+    "generator_git_sha": "d78d6eeddb3beff654bfb97ff5a9ef4f60038d60",
+    "generator_version": "0.1.0",
+    "n_sessions": 91,
+    "scenario_id": "S_acn_caltech",
+    "seed": 1234,
+    "sim_window": [
+      "2020-04-01 07:45:00",
+      "2020-04-30 19:00:00"
+    ]
+  },
+  "real_series": {
+    "end": "2024-10-02 16:00:00",
+    "mean_kw": 33.149175847692426,
+    "n_bins": 35980,
+    "peak_kw": 481.1124817631258,
+    "start": "2020-08-25 13:00:00",
+    "total_mwh": 1192.7073469999734
+  },
+  "results_calendar_only": {
+    "TRTR": {
+      "mae": 41.659007371251235,
+      "mape": 56.35614704287626,
+      "rmse": 87.08162597189624
+    },
+    "TRTS": {
+      "mae": 17.031878937070275,
+      "mape": 3753.5758671955537,
+      "rmse": 31.304297023400906
+    },
+    "TSTR": {
+      "mae": 56.18521600792716,
+      "mape": 59.648186544633155,
+      "rmse": 115.2398313196702
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 14.526208636675925,
+      "mape": 3.2920395017568964,
+      "rmse": 28.158205347773958
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 1.3486931051242574,
+      "mape": 1.05841491433494,
+      "rmse": 1.3233541523083345
+    },
+    "sample_counts": {
+      "real_test": 14392,
+      "real_train": 21588,
+      "synth": 708
+    }
+  },
+  "results_lagged": {
+    "TRTR": {
+      "mae": 7.125202979112421,
+      "mape": 14.974139350196136,
+      "rmse": 17.93868333851632
+    },
+    "TRTS": {
+      "mae": 1.3201206199512572,
+      "mape": 214.9723063495786,
+      "rmse": 2.8421811346769466
+    },
+    "TSTR": {
+      "mae": 54.25369105712761,
+      "mape": 43.88793693352391,
+      "rmse": 113.14666850179627
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 47.12848807801519,
+      "mape": 28.913797583327774,
+      "rmse": 95.20798516327994
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 7.614336211357439,
+      "mape": 2.930915487503397,
+      "rmse": 6.307412108605427
+    },
+    "sample_counts": {
+      "real_test": 14368,
+      "real_train": 21564,
+      "synth": 684
+    }
+  },
+  "synth_series": {
+    "end": "2020-04-30 18:00:00",
+    "mean_kw": 2.256277441476263,
+    "n_bins": 708,
+    "peak_kw": 24.365622404861487,
+    "start": "2020-04-01 07:00:00",
+    "total_mwh": 1.597444428565194
+  }
+}
