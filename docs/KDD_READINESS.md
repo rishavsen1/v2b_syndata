@@ -69,7 +69,7 @@ Priority: **P0** = submission blocker · **P1** = strongly expected · **P2** = 
 | 4 | P1 | 1 | Generalize 2-comp EM → **GMM-k** (`distribution_fitter.py`); add mixture path to **dwell** (`sessions_dist.sample_f_dwell` + `_weibull_mixture_ppf_u`); add scalar leaves to `DIST_PARAM_RANGES`; re-calibrate; re-run `model_eval`. | Closes held-out KS gap (~0.10→~0.03) with proven machinery; preserves copula + knobs + determinism. | ✅ merged. GMM-k arrival + Weibull dwell mixtures wired; ACN mean arrival KS 0.148→0.073. Dwell mixtures ship where they beat single-Weibull (gate conservative → aggregate dwell flat). |
 | 5 | P1 | 2 | Replace pooled-broadcast fit (`api.py:284-291`) with **per-region mixture fits** (fallback to pooled when n<60). | Fixes worst cell (`rare_consistent`, 36% of ACN). | ✅ merged. Per-region fits; `rare consistent` arrival KS **0.179→0.079** (μ 11.25 vs src 11.95). Single-site `acn_office001` n=41 falls back to pooled (small-sample). |
 | 6 | P1 | 2 | Widen window to ~[4,22] in all 3 locations; read `trunc_lo/hi` from calibrated block; gate behind calibrated-leaf presence to keep synthetic pops bitwise-identical; re-calibrate. | Recovers discarded tail mass causing σ under-dispersion. | ✅ merged. Window [4,22], read per-region; synthetic pops bitwise-identical (determinism tests green). |
-| 7 | P1 | 3 | Add battery dispatch: `samplers/battery_dispatch.py` + `renderers/battery_dispatch.py` → `battery_dispatch.csv` (peak-shave + TOU-arbitrage heuristic/LP over existing load/prices/DR); add `validate.py` invariants. | Builds the missing operational "→Building" behavior. | ☐ |
+| 7 | P1 | 3 | Add battery dispatch: `samplers/battery_dispatch.py` + `renderers/battery_dispatch.py` → `battery_dispatch.csv` (peak-shave + TOU-arbitrage heuristic/LP over existing load/prices/DR); add `validate.py` invariants. | Builds the missing operational "→Building" behavior. | ✅ merged. `battery_dispatch.csv` (deterministic peak-shave + TOU/DR arbitrage); DAG node + validator J1–J5; header-only when battery off (bitwise contract kept). Sample: 90 kW shaved, 330 kWh SoC swing. Caveat: greedy heuristic, not LP; not yet in optimus multi-building export. |
 | 8 | P1 | 3 | `tools/validate_pv.py`: compare `pv_model.pv_ac_series` to **PVWatts v8 API / SAM** (<5% annual error; G14 hourly). | Cheap, high-credibility validation of a deterministic model. | ☐ |
 | 9 | P2 | 3 | Map each tariff to an OpenEI **URDB** rate ID; validate peak/off-peak `$/kWh` + `peak_window`. | Makes prices traceably real. | ☐ |
 | 10 | P2 | 3 | Bound/fit DR magnitudes to published **CAISO / PG&E CBP/BIP/ELRP** commitments; else caveat explicitly. | Replaces a no-data prior with grounded ranges. | ☐ |
@@ -78,9 +78,9 @@ Priority: **P0** = submission blocker · **P1** = strongly expected · **P2** = 
 | 13 | P2 | all | Re-run `calibrate` → `validate_calibration` → `model_eval` → benchmark; commit refreshed results; reconcile `depart_soc_mu` 85-vs-50 doc contradiction (tracker O4). | Every paper number regenerable from committed scripts. | ☐ |
 
 ## Also outstanding (from the wider assessment, not in the table above)
-- **No LICENSE file** — blocker for an open-science track (add MIT/Apache-2.0).
-- Datasheet/dataset-card + Croissant metadata.
-- Ethics/fairness/bias/misuse section.
-- EV WATTS / INL are tiny synthetic fixtures, not the real releases.
+- ✅ **LICENSE added** — MIT (code, `LICENSE`) + CC BY 4.0 (synthetic data, `DATA_LICENSE.md`).
+- ✅ **Datasheet + Croissant metadata** — `docs/DATASHEET.md`, `croissant.json` (Croissant 1.0).
+- ✅ **Ethics/fairness/bias/misuse** — `docs/ETHICS.md`.
+- ◐ **EV WATTS now real** — `evwatts_public_2026.csv` (98 MB) + ElaadNL `utrecht_4tu_2024.csv` (4.3 MB) restored locally (2026-06-29); EV WATTS is no longer fixture-only. INL still fixture. Using the real EV WATTS requires adding a calibrated cohort (future work).
 - `verify_sweep.py` references metric columns absent from `MetricsResult` (benchmark pipeline not run end-to-end).
 - Benchmark is V1G-only (clips V2B discharge, excludes building load + DR from the scheduler).

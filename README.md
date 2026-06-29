@@ -348,3 +348,15 @@ family), from `docs/experiments/model_fit_plots.py`:
 
 See [`docs/experiments/`](docs/experiments/) for the full AIC/BIC/KS tables and
 the reproducible scripts.
+
+## License
+
+- **Code:** MIT — see [`LICENSE`](LICENSE).
+- **Synthetic data & original artifacts:** Creative Commons Attribution 4.0
+  (CC BY 4.0) — see [`DATA_LICENSE.md`](DATA_LICENSE.md).
+- Third-party calibration sources (ACN-Data, ElaadNL/4TU, EV WATTS, INL) retain
+  their own upstream licenses/terms and are not relicensed here.
+
+Dataset documentation: [`docs/DATASHEET.md`](docs/DATASHEET.md) (Datasheet for
+Datasets), [`docs/ETHICS.md`](docs/ETHICS.md), and
+[`croissant.json`](croissant.json) (ML Commons Croissant metadata).

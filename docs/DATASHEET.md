@@ -259,11 +259,11 @@ frozen corpus. Machine-readable schema: `croissant.json` (ML Commons Croissant
 JSON-LD).
 
 **Is there a DOI / license / terms?**
-- **License:** ⚠️ **No `LICENSE` file ships yet** — flagged as an open-science
-  blocker (`docs/KDD_READINESS.md`, "Also outstanding"); MIT/Apache-2.0 to be
-  added before release.
+- **License:** generator **code** is **MIT** (`LICENSE`); the **synthetic data**
+  and original repository artifacts are **CC BY 4.0** (`DATA_LICENSE.md`).
 - Calibration corpora retain their **own** upstream licenses/terms (ACN-Data,
-  ElaadNL/4TU) — users fitting from raw sources must honor those.
+  ElaadNL/4TU, EV WATTS, INL) — not relicensed here; users fitting from raw
+  sources must honor those.
 
 **Export controls / regulatory restrictions?**
 None known for the synthetic output.
@@ -318,7 +318,7 @@ Mirroring `docs/KDD_READINESS.md` and `docs/CALIBRATION_RESULTS.md`:
    excluded from every fidelity number (`docs/CALIBRATION_RESULTS.md`).
 5. **Single climate zone (Denver CZ-5B)** ships; geographic skew to US workplace
    + one NL site (`docs/KDD_READINESS.md`; see `docs/ETHICS.md` for bias detail).
-6. **Bundled benchmark is V1G-only**; battery is specs-only (no dispatch); PV is
-   modeled but **not yet validated** against PVWatts/SAM; DR magnitudes are a
-   no-data Uniform prior (`docs/KDD_READINESS.md`, actions #7–#10).
-7. **No `LICENSE` file yet** — to be added before release.
+6. **Bundled benchmark is V1G-only**; PV is modeled but **not yet validated**
+   against PVWatts/SAM; DR magnitudes are a no-data Uniform prior
+   (`docs/KDD_READINESS.md`, actions #8–#10). _(Battery dispatch now ships —
+   `battery_dispatch.csv` — so the DER "→Building" path is no longer specs-only.)_
