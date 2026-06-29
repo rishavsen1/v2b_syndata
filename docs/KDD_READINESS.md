@@ -81,6 +81,6 @@ Priority: **P0** = submission blocker · **P1** = strongly expected · **P2** = 
 - ✅ **LICENSE added** — MIT (code, `LICENSE`) + CC BY 4.0 (synthetic data, `DATA_LICENSE.md`).
 - ✅ **Datasheet + Croissant metadata** — `docs/DATASHEET.md`, `croissant.json` (Croissant 1.0).
 - ✅ **Ethics/fairness/bias/misuse** — `docs/ETHICS.md`.
-- ◐ **EV WATTS now real** — `evwatts_public_2026.csv` (98 MB) + ElaadNL `utrecht_4tu_2024.csv` (4.3 MB) restored locally (2026-06-29); EV WATTS is no longer fixture-only. INL still fixture. Using the real EV WATTS requires adding a calibrated cohort (future work).
+- ✅ **EV WATTS + ElaadNL raw caches restored & load-verified** (2026-06-29): **EV WATTS 1,265,017 real sessions** (`evwatts_public_2026.csv`, 98 MB — no longer the ~64-row fixture; now the largest real source) and **ElaadNL 55,201** (`utrecht_4tu_2024.csv`). INL still fixture. Next: add a real EV WATTS calibrated cohort (`populations.yaml`) to put the 1.26M sessions to work.
 - `verify_sweep.py` references metric columns absent from `MetricsResult` (benchmark pipeline not run end-to-end).
 - Benchmark is V1G-only (clips V2B discharge, excludes building load + DR from the scheduler).
