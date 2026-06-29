@@ -336,10 +336,17 @@ output. Reproduce with `docs/experiments/source_vs_generated.py`.
 
 ![Source vs generated distributions](docs/experiments/source_vs_generated.png)
 
-The 2-sample KS gaps (arrival 0.12, dwell 0.15, departure-SoC 0.19) make the
-model's limitations visible and honest: generated arrival is broader/later and
-hard-clipped at 6/20; generated dwell misses the source's **bimodal** shape and
-shows a clamp artifact near 14 h; departure SoC over-piles near 100%.
+The 2-sample KS gaps (arrival 0.10, dwell 0.12, departure-SoC 0.19) make the
+model's limitations visible and honest. Since the marginal upgrade — per-region
+2-component arrival mixtures + Weibull/mixture dwell, with the arrival window
+widened [6,20]→[4,22] — the **hard 6/20 clip is gone**: generated arrival now
+spans [4,22] (only ~1.7% in the widened tails) and tracks the source mode more
+closely (mean 11.1 vs 11.9 h), though it stays slightly narrower/earlier; dwell
+fits well (KS 0.12). **Departure SoC is the weakest cell and is unchanged** — it
+still over-piles near 100% (KS 0.19) because SoC is a modeled prior, not a
+calibrated fit. This pooled single-site view understates the gain; per-region
+multi-site cohorts improve more (see `docs/CALIBRATION_RESULTS.md` — e.g.
+rare-consistent arrival KS 0.18 → 0.08).
 
 Candidate-family comparison against the raw data (empirical vs each fitted
 family), from `docs/experiments/model_fit_plots.py`:
