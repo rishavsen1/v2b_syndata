@@ -48,6 +48,10 @@ NODE_TOPOLOGY: list[tuple[str, list[str]]] = [
     ("pv_generation.csv", ["PV_gen"]),
     ("pv.csv", ["PV_gen"]),
     ("battery.csv", ["X"]),
+    # Operational battery dispatch — a deterministic peak-shave + TOU-arbitrage
+    # heuristic over the already-rendered load/price/DR series. No RNG, so it
+    # cannot perturb other CSVs; header-only when the battery is off.
+    ("battery_dispatch.csv", ["battery.csv", "building_load.csv", "grid_prices.csv", "dr_events.csv"]),
 ]
 
 

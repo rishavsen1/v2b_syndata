@@ -38,6 +38,7 @@ _SCHEMAS: dict[str, list[str]] = {
     "battery": ["battery_id", "battery_type", "capacity_kwh", "power_kw",
                 "round_trip_efficiency", "min_soc_pct", "max_soc_pct",
                 "initial_soc_pct"],
+    "battery_dispatch": ["datetime", "power_battery_kw", "soc_kwh"],
 }
 
 _BATTERY_CLASSES = {"leaf_24", "bolt_40", "m3_75", "rivian_100"}
@@ -143,6 +144,9 @@ def validate(output_dir: Path, strict: bool = False) -> ValidationReport:
     # H — tariff / DR
     _check_h(rep, csvs, manifest)
 
+    # J — battery dispatch (specs from battery.csv; grid from building_load)
+    _check_j(rep, csvs, manifest)
+
     # Soft checks
     _check_soft(rep, csvs, manifest)
 
@@ -160,6 +164,7 @@ def _check_a3_a4(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
         "users": ["car_id", "phi", "kappa", "delta_km", "w1", "w2"],
         "chargers": ["charger_id", "min_rate_kw", "max_rate_kw"],
         "grid_prices": ["price_per_kwh"],
+        "battery_dispatch": ["power_battery_kw", "soc_kwh"],
         "dr_events": ["event_id", "magnitude_kw"],
         "sessions": ["session_id", "car_id", "duration_sec",
                      "arrival_soc", "required_soc_at_depart",
@@ -725,6 +730,87 @@ def _check_h(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                 rep.errors.append(
                     f"H9: program {program} year {year} has {n} events > season cap {spec.max_events_per_season}"
                 )
+
+
+def _check_j(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
+             manifest: dict[str, Any]) -> None:
+    """J — battery_dispatch operational invariants.
+
+    battery.csv carries the spec (capacity/power/efficiency/SoC band). The
+    dispatch must:
+      J1: be header-only iff the battery is off (battery_type == 'none').
+      J2: share building_load's exact 15-min datetime grid (when active).
+      J3: respect rated power: |power_battery_kw| <= power_kw (+tol).
+      J4: keep soc_kwh within [min,max]·capacity (+tol).
+      J5: obey SoC continuity / energy balance with round_trip_efficiency
+          across consecutive ticks (loss applied on the charge leg).
+    """
+    bd = csvs["battery_dispatch"]
+    batt = csvs["battery"]
+    if len(batt) == 0:
+        return  # no spec row → nothing to check against
+    spec = batt.iloc[0]
+    battery_off = str(spec["battery_type"]) == "none" or float(spec["capacity_kwh"]) <= 0.0
+
+    if battery_off:
+        rep.add(len(bd) == 0, f"J1: battery off but battery_dispatch has {len(bd)} rows")
+        return
+
+    rep.add(len(bd) > 0, "J1: battery on but battery_dispatch is header-only")
+    if len(bd) == 0:
+        return
+
+    capacity = float(spec["capacity_kwh"])
+    power_kw = float(spec["power_kw"])
+    rte = float(spec["round_trip_efficiency"])
+    soc_min = float(spec["min_soc_pct"]) / 100.0 * capacity
+    soc_max = float(spec["max_soc_pct"]) / 100.0 * capacity
+
+    # J2: datetime grid identical to building_load.
+    bl_dt = pd.to_datetime(csvs["building_load"]["datetime"])
+    bd_dt = pd.to_datetime(bd["datetime"])
+    rep.add(bd_dt.is_monotonic_increasing, "J2: battery_dispatch.datetime not monotone")
+    rep.add(list(bd_dt) == list(bl_dt),
+            "J2: battery_dispatch datetime grid differs from building_load")
+
+    # J3: rated-power clamp (small tol for float).
+    p = bd["power_battery_kw"].astype(float)
+    tol_p = 1e-6 + 1e-3 * power_kw
+    rep.add((p.abs() <= power_kw + tol_p).all(),
+            f"J3: |power_battery_kw| exceeds rated power {power_kw}")
+
+    # J4: SoC band.
+    soc = bd["soc_kwh"].astype(float)
+    tol_s = 1e-6 + 1e-3 * capacity
+    rep.add((soc >= soc_min - tol_s).all() and (soc <= soc_max + tol_s).all(),
+            f"J4: soc_kwh outside [{soc_min:.3f}, {soc_max:.3f}]")
+
+    # J5: SoC continuity / energy balance. soc_kwh is end-of-tick. The first row
+    # starts from the spec's initial_soc clamped into the band; each subsequent
+    # row follows from the previous SoC + the tick's energy flow. Convention:
+    # discharge (p>0) lowers SoC by p·Δt; charge (p<0) raises SoC by |p|·rte·Δt.
+    tick_h = 0.25
+    init_soc = min(max(float(spec["initial_soc_pct"]) / 100.0 * capacity, soc_min), soc_max)
+    prev = init_soc
+    bad_j5 = None
+    soc_vals = soc.to_numpy()
+    p_vals = p.to_numpy()
+    for i in range(len(soc_vals)):
+        pw = float(p_vals[i])
+        if pw >= 0.0:
+            delta = -pw * tick_h            # discharge: lossless on SoC
+        else:
+            delta = (-pw) * rte * tick_h    # charge: round-trip loss on charge leg
+        expected = min(max(prev + delta, soc_min), soc_max)
+        if abs(expected - float(soc_vals[i])) > tol_s:
+            bad_j5 = (i, expected, float(soc_vals[i]))
+            break
+        prev = float(soc_vals[i])
+    if bad_j5 is not None:
+        i, exp, got = bad_j5
+        rep.errors.append(
+            f"J5: soc_kwh continuity break at tick {i}: expected {exp:.4f}, got {got:.4f}"
+        )
 
 
 _S2_KS_THRESHOLD = 0.10
