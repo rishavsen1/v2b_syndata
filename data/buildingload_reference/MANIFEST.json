@@ -1,0 +1,269 @@
+{
+  "generated_at": "2026-06-28 22:57:52",
+  "zones": [
+    "5B",
+    "3B",
+    "4A",
+    "6A"
+  ],
+  "max_bdg2": 20,
+  "downloads": [
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-smalloffice.csv",
+      "dest": "comstock_5b_smalloffice.csv",
+      "status": "cached",
+      "bytes": 16403200
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-mediumoffice.csv",
+      "dest": "comstock_5b_mediumoffice.csv",
+      "status": "cached",
+      "bytes": 16712665
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-largeoffice.csv",
+      "dest": "comstock_5b_largeoffice.csv",
+      "status": "cached",
+      "bytes": 15302822
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-retailstripmall.csv",
+      "dest": "comstock_5b_retailstripmall.csv",
+      "status": "cached",
+      "bytes": 13384815
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-retailstandalone.csv",
+      "dest": "comstock_5b_retailstandalone.csv",
+      "status": "cached",
+      "bytes": 14127663
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-smalloffice.csv",
+      "dest": "comstock_3b_smalloffice.csv",
+      "status": "cached",
+      "bytes": 16313971
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-mediumoffice.csv",
+      "dest": "comstock_3b_mediumoffice.csv",
+      "status": "cached",
+      "bytes": 16430789
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-largeoffice.csv",
+      "dest": "comstock_3b_largeoffice.csv",
+      "status": "cached",
+      "bytes": 14908379
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-retailstripmall.csv",
+      "dest": "comstock_3b_retailstripmall.csv",
+      "status": "cached",
+      "bytes": 13108330
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-retailstandalone.csv",
+      "dest": "comstock_3b_retailstandalone.csv",
+      "status": "cached",
+      "bytes": 14161640
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-smalloffice.csv",
+      "dest": "comstock_4a_smalloffice.csv",
+      "status": "cached",
+      "bytes": 15204349
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-mediumoffice.csv",
+      "dest": "comstock_4a_mediumoffice.csv",
+      "status": "cached",
+      "bytes": 16792549
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-largeoffice.csv",
+      "dest": "comstock_4a_largeoffice.csv",
+      "status": "cached",
+      "bytes": 17009944
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-retailstripmall.csv",
+      "dest": "comstock_4a_retailstripmall.csv",
+      "status": "cached",
+      "bytes": 13663825
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-retailstandalone.csv",
+      "dest": "comstock_4a_retailstandalone.csv",
+      "status": "cached",
+      "bytes": 13990588
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-smalloffice.csv",
+      "dest": "comstock_6a_smalloffice.csv",
+      "status": "cached",
+      "bytes": 16808165
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-mediumoffice.csv",
+      "dest": "comstock_6a_mediumoffice.csv",
+      "status": "cached",
+      "bytes": 16904287
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-largeoffice.csv",
+      "dest": "comstock_6a_largeoffice.csv",
+      "status": "cached",
+      "bytes": 16776356
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-retailstripmall.csv",
+      "dest": "comstock_6a_retailstripmall.csv",
+      "status": "cached",
+      "bytes": 15014975
+    },
+    {
+      "url": "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-retailstandalone.csv",
+      "dest": "comstock_6a_retailstandalone.csv",
+      "status": "cached",
+      "bytes": 13633792
+    },
+    {
+      "url": "https://github.com/buds-lab/building-data-genome-project-2/raw/master/data/metadata/metadata.csv",
+      "dest": "bdg2_metadata.csv",
+      "status": "cached",
+      "bytes": 272024
+    },
+    {
+      "url": "https://github.com/buds-lab/building-data-genome-project-2/raw/master/data/meters/cleaned/electricity_cleaned.csv",
+      "dest": "bdg2_electricity_cleaned.csv",
+      "status": "cached",
+      "bytes": 174977911
+    }
+  ],
+  "total_bytes": 481903039,
+  "n_band_keys": 27,
+  "bdg2_kept": [
+    {
+      "building_id": "Panther_retail_Felix",
+      "archetype": "retail",
+      "sqm": 2941.9,
+      "nan_frac": 0.193
+    },
+    {
+      "building_id": "Panther_retail_Gilbert",
+      "archetype": "retail",
+      "sqm": 1421.8,
+      "nan_frac": 0.249
+    },
+    {
+      "building_id": "Panther_office_Danica",
+      "archetype": "office",
+      "sqm": 210.0,
+      "nan_frac": 0.193
+    },
+    {
+      "building_id": "Panther_retail_Rachel",
+      "archetype": "retail",
+      "sqm": 26.3,
+      "nan_frac": 0.193
+    },
+    {
+      "building_id": "Panther_retail_Kristina",
+      "archetype": "retail",
+      "sqm": 5487.9,
+      "nan_frac": 0.192
+    },
+    {
+      "building_id": "Panther_retail_Lester",
+      "archetype": "retail",
+      "sqm": 840.3,
+      "nan_frac": 0.11
+    },
+    {
+      "building_id": "Robin_office_Soledad",
+      "archetype": "office",
+      "sqm": 957.0,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Fox_office_Alice",
+      "archetype": "office",
+      "sqm": 18806.8,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Lamb_office_Gerardo",
+      "archetype": "office",
+      "sqm": 4859.0,
+      "nan_frac": 0.003
+    },
+    {
+      "building_id": "Bull_office_Ivette",
+      "archetype": "office",
+      "sqm": 3229.1,
+      "nan_frac": 0.025
+    },
+    {
+      "building_id": "Hog_office_Elizbeth",
+      "archetype": "office",
+      "sqm": 8593.5,
+      "nan_frac": 0.001
+    },
+    {
+      "building_id": "Hog_office_Mike",
+      "archetype": "office",
+      "sqm": 5924.5,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Hog_office_Alexis",
+      "archetype": "office",
+      "sqm": 2693.4,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Hog_office_Leanne",
+      "archetype": "office",
+      "sqm": 7646.1,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Hog_office_Lizzie",
+      "archetype": "office",
+      "sqm": 10351.6,
+      "nan_frac": 0.0
+    },
+    {
+      "building_id": "Hog_office_Byron",
+      "archetype": "office",
+      "sqm": 80038.2,
+      "nan_frac": 0.007
+    },
+    {
+      "building_id": "Eagle_office_Lamont",
+      "archetype": "office",
+      "sqm": 1453.8,
+      "nan_frac": 0.067
+    },
+    {
+      "building_id": "Eagle_office_Ryan",
+      "archetype": "office",
+      "sqm": 2092.5,
+      "nan_frac": 0.013
+    },
+    {
+      "building_id": "Eagle_office_Efrain",
+      "archetype": "office",
+      "sqm": 3995.5,
+      "nan_frac": 0.01
+    }
+  ],
+  "bdg2_dropped": [
+    {
+      "building_id": "Shrew_office_Lin",
+      "nan_frac": 0.465,
+      "all_zero": false
+    }
+  ]
+}

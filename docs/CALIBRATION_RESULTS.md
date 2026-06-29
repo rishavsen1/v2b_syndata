@@ -14,7 +14,7 @@ _Generated 2026-06-27._ Generated sessions are pooled across seeds and compared,
 - **S1 marginals** — mean |Δμ| 0.33 h across all region×variable cells; KS ≤ 0.22.
 - **S2 joint** — max Spearman ρ-gap 0.032; the arrival×dwell copula is reproduced.
 - **S3 held-out** — median Δ(holdout − train KS) 0.002; no systematic overfit.
-- **S5 building load** — 1/4 within the PNNL peak/off-peak band, 3/4 within the weekday/weekend band.
+- **S5 building load (real-data)** — 2/4 within the NREL ComStock weekday/weekend band (coarse smoke test; rigorous G14 metrics — CV(RMSE)/NMBE vs ComStock — in `tools/validate_buildingload.py`, see S5b below).
 - **S6 weekly rhythm** — max weekday/weekend ratio gap 0.06 dex.
 
 ## S0 — How real drivers are grouped into regions
@@ -82,14 +82,46 @@ _Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival rows
 | elaadnl | weekly consistent | arrival hour | 10,513 | 3,110 | 0.141 | 0.197 | +0.056 |
 | elaadnl | weekly consistent | dwell hours | 10,513 | 3,110 | 0.105 | 0.068 | -0.037 |
 
-## S5 — Building load vs PNNL design intent
+## S5 — Building load vs real-data (NREL ComStock) shape bands
 
-| scenario | archetype/size | peak kW | off-pk kW | pk/off | expect | ✓ | wd/we | expect | ✓ |
-|---|---|--:|--:|--:|--:|:-:|--:|--:|:-:|
-| S_size_small | office/small | 100 | 24.4 | 4.10 | [4.0, 8.0] | ✓ | 3.25 | [2.5, 8.0] | ✓ |
-| S01 | office/medium | 500 | 59.3 | 8.43 | [4.0, 8.0] | ✗ | 2.95 | [2.5, 8.0] | ✓ |
-| S_size_large | office/large | 2000 | 863.6 | 2.32 | [4.0, 8.0] | ✗ | 1.32 | [2.5, 8.0] | ✗ |
-| S_arch_retail | retail/standalone | 300 | 21.6 | 13.86 | [3.0, 6.0] | ✗ | 1.24 | [1.2, 2.5] | ✓ |
+_Coarse real-data smoke test. The weekday/weekend band is derived from NREL
+ComStock/EULP across climate zones 5B/3B/4A/6A
+(`data/buildingload_reference/reference_bands.json`); peak/off-peak is an
+informational sanity bound only. The rigorous ASHRAE Guideline-14 fidelity
+comparison (CV(RMSE)/NMBE vs ComStock, `peak_kw_scaling` off) lives in
+`tools/validate_buildingload.py` — see
+`data/buildingload_reference/validation_metrics.json` and the S5 metrics table
+below._
+
+| scenario | archetype/size | peak kW | off-pk kW | pk/off | wd/we | ComStock wd/we band | ✓ | band src |
+|---|---|--:|--:|--:|--:|--:|:-:|:-:|
+| S_size_small | office/small | 100 | 24.4 | 4.10 | 3.25 | [1.134, 1.935] | ✗ | comstock |
+| S01 | office/medium | 500 | 59.3 | 8.43 | 2.95 | [1.012, 1.984] | ✗ | comstock |
+| S_size_large | office/large | 2000 | 863.6 | 2.32 | 1.32 | [0.966, 1.934] | ✓ | comstock |
+| S_arch_retail | retail/standalone | 300 | 21.6 | 13.86 | 1.24 | [0.779, 1.37] | ✓ | comstock |
+
+### S5b — ASHRAE Guideline-14 fidelity vs NREL ComStock (CZ-5B, peak_kw_scaling OFF)
+
+_Generator's raw single-prototype EnergyPlus load vs the ComStock stock-average
+for each (archetype,size). G14 thresholds: CV(RMSE) ≤ 30 %, |NMBE| ≤ 10 %._
+
+| archetype/size | gen kW (mean) | ComStock kW (mean) | CV(RMSE) % | NMBE % | shape corr (wd) | peak-hr Δ | pass |
+|---|--:|--:|--:|--:|--:|--:|:-:|
+| office/small | 4.1 | 8.0 | 56.7 | +49.1 | 0.708 | 1 | ✗ |
+| office/med | 43.3 | 68.7 | 47.2 | +37.0 | 0.908 | 2 | ✗ |
+| office/large | 773.1 | 608.3 | 43.7 | −27.1 | 0.942 | 3 | ✗ |
+| retail/med (stripmall) | 27.9 | 60.6 | 59.3 | +54.0 | 0.912 | 1 | ✗ |
+| retail/large (standalone) | 21.5 | 36.6 | 51.6 | +41.2 | 0.866 | 1 | ✗ |
+
+**Interpretation.** 0/5 pass the strict G14 magnitude thresholds, but the failure
+is a documented model-scope difference, not a defect. The generator ships a
+single ASHRAE 90.1-2019 (efficient, new-construction) prototype per type — an
+unmodified prototype run gives ~8.4 W/m² for small office, matching the
+generator's ~7.8–8.0 W/m². ComStock is a *stock-weighted average* (~15.7 W/m²
+small office) that includes older, less-efficient buildings. The diurnal *shape*
+is reproduced well (weekday correlation 0.71–0.94, peak-hour within ≤3 h). Office
+weekday/weekend ratios run high because the generator zeros weekend office
+occupancy whereas ComStock carries a nonzero weekend base load.
 
 ## S6 — Weekly weekday/weekend rhythm
 
@@ -103,7 +135,7 @@ _Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival rows
 - **Arrival is bimodal.** ACN arrival ships a 2-component truncated mixture (morning commute + midday shoulder); single TruncNorm underfits (PROJECT_TRACKER W1–W2).
 - **Arrival-SoC is the weakest marginal** — inherits the ~33% ACN capacity-inference fallback; not for capacity-sensitive analysis.
 - **S3 holdout uses a single TruncNorm**, so its arrival rows understate the shipped mixture.
-- **S5 building-load** large-office / standalone-retail fall outside the design bands — a model-adequacy item, not a data-fit error.
+- **S5 building-load now validates against real data** (NREL ComStock/EULP, no longer self-derived). The shipped single ASHRAE 90.1-2019 prototype is efficient new construction (~8 W/m² mean, small office) while ComStock is a stock-weighted average (~16 W/m²), so the generator under-predicts absolute EUI by ~30–50 % (NMBE); the diurnal shape matches well (weekday corr 0.71–0.94). A model-scope difference (one efficient prototype vs a stock distribution), not a yardstick artifact.
 - **EV WATTS / INL** are fixture-only (~64 / ~65 synthetic sessions) and excluded.
 
 Underlying CSVs and the per-region distribution / joint-density PNGs live under `data/calibration_validation/` (git-ignored — regenerate with the harness).

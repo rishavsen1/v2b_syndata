@@ -584,35 +584,94 @@ def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
 # S5: building load vs PNNL prototype design intent
 # ──────────────────────────────────────────────────────────────────────
 
-# (archetype, size) → default scenario that uses it
+# (archetype, size) → default scenario that uses it, plus the matching
+# reference-band size token (reference_bands.json uses small/med/large; the
+# generator's "medium" office == reference "med", "standalone" retail ==
+# reference "large").
 S5_SCENARIOS = {
     ("office", "small"):     "S_size_small",
     ("office", "medium"):    "S01",
     ("office", "large"):     "S_size_large",
     ("retail", "standalone"): "S_arch_retail",
 }
+S5_REFERENCE_SIZE = {
+    ("office", "small"):      "small",
+    ("office", "medium"):     "med",
+    ("office", "large"):      "large",
+    ("retail", "standalone"): "large",   # standalone == reference retail|large
+}
 
-# PNNL design-intent ratios (peak/off-peak; weekday/weekend) — derived
-# from samplers/load.py::_WEEKDAY_OCC_BY_SOURCE schedules.
-# Office: ~0.95 peak vs ~0.05 off-peak → 19× theoretical; we expect 4-8×
-# realized due to plug-load + ramp.
-# Retail: ~0.90 peak vs ~0.15 off-peak → ~6× theoretical, 3-5× realized.
-PNNL_EXPECTED_PEAK_OFFPEAK = {
-    "office": (4.0, 8.0),     # peak/off-peak realized range
-    "retail": (3.0, 6.0),
-    "mixed":  (3.0, 6.0),
+# ──────────────────────────────────────────────────────────────────────
+# Real-data bands from NREL ComStock / EULP (replaces the old self-derived
+# PNNL_EXPECTED_* bands which compared EnergyPlus output to ranges that were
+# themselves derived from the generator's OWN occupancy schedules — i.e. the
+# model was validated against itself). The genuine ASHRAE-G14 fidelity check
+# (CV(RMSE)/NMBE vs ComStock) lives in tools/validate_buildingload.py; S5 keeps
+# only a COARSE real-data smoke test here.
+#
+# Bands are loaded from data/buildingload_reference/reference_bands.json, keyed
+# "<archetype>|<size>|BAND" with [lo,hi] ranges for weekday/weekend ratio and
+# load factor across the downloaded climate zones (5B/3B/4A/6A), plus the
+# normalized peak/off-peak ratio for context.
+REFERENCE_BANDS_PATH = (
+    REPO / "data" / "buildingload_reference" / "reference_bands.json"
+)
+
+# Coarse peak/off-peak smoke-test fallback (used only if the reference file is
+# absent). The generator's S5 ratio is peak-INSTANT / mean(hour<6), which runs
+# higher than ComStock's normalized peak-hour/off-peak-hour ratio, so this is a
+# generous smoke band, NOT a fidelity gate.
+_COARSE_PEAK_OFFPEAK = {
+    "office": (1.5, 30.0),
+    "retail": (1.5, 30.0),
+    "mixed":  (1.5, 30.0),
 }
-PNNL_EXPECTED_WEEKDAY_WEEKEND = {
-    "office": (2.5, 8.0),
-    "retail": (1.2, 2.5),     # retail open 7 days, smaller gap
-    "mixed":  (2.0, 5.0),
-}
+
+
+def _load_reference_bands(path: Path = REFERENCE_BANDS_PATH) -> dict | None:
+    """Load reference_bands.json, or None (with a warning) if absent."""
+    if not path.exists():
+        log.warning(
+            "S5: reference bands missing at %s — run "
+            "tools/fetch_buildingload_reference.py; falling back to coarse "
+            "smoke bands.", path,
+        )
+        return None
+    import json
+    try:
+        return json.loads(path.read_text())
+    except Exception as e:  # noqa: BLE001
+        log.warning("S5: could not parse %s: %s", path, e)
+        return None
+
+
+def _ww_band_for(bands: dict | None, arch: str, ref_size: str) -> tuple[float, float]:
+    """weekday/weekend band from reference BAND entry, widened ±15% for the
+    generator's coarser instantaneous-vs-mean ratio definition."""
+    default = (1.0, 9.0)
+    if not bands:
+        return default
+    entry = bands.get(f"{arch}|{ref_size}|BAND")
+    if not entry or "weekday_weekend_ratio" not in entry:
+        return default
+    lo, hi = entry["weekday_weekend_ratio"]
+    return (round(lo * 0.85, 3), round(hi * 1.15, 3))
 
 
 def s5_buildingload(output_root: Path) -> pd.DataFrame:
-    """Per (archetype, size), generate scenario; compare building_load ratios."""
+    """Per (archetype, size), generate scenario; coarse-compare building_load
+    shape ratios against REAL-DATA (ComStock/EULP) bands.
+
+    This is a coarse smoke test: the weekday/weekend ratio is checked against
+    ranges derived from NREL ComStock across multiple climate zones, and the
+    peak/off-peak ratio is kept only as an informational sanity bound. The
+    rigorous ASHRAE-G14 fidelity comparison (CV(RMSE)/NMBE vs ComStock) is in
+    tools/validate_buildingload.py.
+    """
+    bands = _load_reference_bands()
     rows = []
     for (arch, size), scenario in S5_SCENARIOS.items():
+        ref_size = S5_REFERENCE_SIZE.get((arch, size), size)
         out_dir = output_root / "scenarios_s5" / scenario / "seed42"
         if not (out_dir / "manifest.json").exists():
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -643,8 +702,11 @@ def s5_buildingload(output_root: Path) -> pd.DataFrame:
         po_ratio = peak / off_peak if off_peak > 1e-3 else float("inf")
         ww_ratio = weekday / weekend if weekend > 1e-3 else float("inf")
 
-        exp_po_lo, exp_po_hi = PNNL_EXPECTED_PEAK_OFFPEAK.get(arch, (0, 100))
-        exp_ww_lo, exp_ww_hi = PNNL_EXPECTED_WEEKDAY_WEEKEND.get(arch, (0, 100))
+        # Real-data weekday/weekend band (ComStock, multi-zone). Peak/off-peak
+        # kept as a generous coarse smoke bound only.
+        exp_po_lo, exp_po_hi = _COARSE_PEAK_OFFPEAK.get(arch, (1.5, 30.0))
+        exp_ww_lo, exp_ww_hi = _ww_band_for(bands, arch, ref_size)
+        band_src = "comstock" if bands else "coarse-fallback"
 
         rows.append({
             "scenario": scenario, "archetype": arch, "size": size,
@@ -656,6 +718,7 @@ def s5_buildingload(output_root: Path) -> pd.DataFrame:
             "ww_in_range": bool(exp_ww_lo <= ww_ratio <= exp_ww_hi),
             "expected_po_range": f"[{exp_po_lo}, {exp_po_hi}]",
             "expected_ww_range": f"[{exp_ww_lo}, {exp_ww_hi}]",
+            "band_source": band_src,
         })
 
     return pd.DataFrame(rows)
@@ -779,10 +842,10 @@ def write_results_md(output_root: Path) -> None:
         w(f"- **S3 held-out** — median Δ(holdout − train KS) {f(s3['delta'].median(), 3)}; "
           "no systematic overfit.")
     if not s5.empty:
-        po = int(s5["po_in_range"].astype(str).str.lower().eq("true").sum())
         ww = int(s5["ww_in_range"].astype(str).str.lower().eq("true").sum())
-        w(f"- **S5 building load** — {po}/{len(s5)} within the PNNL peak/off-peak band, "
-          f"{ww}/{len(s5)} within the weekday/weekend band.")
+        w(f"- **S5 building load (real-data)** — {ww}/{len(s5)} within the NREL "
+          "ComStock weekday/weekend band (coarse smoke test; rigorous G14 "
+          "metrics in `tools/validate_buildingload.py`).")
     if not s6.empty:
         w(f"- **S6 weekly rhythm** — max weekday/weekend ratio gap "
           f"{f(s6['gap_ratio_log10'].max(), 2)} dex.")
@@ -843,18 +906,26 @@ def write_results_md(output_root: Path) -> None:
         w("")
 
     if not s5.empty:
-        w("## S5 — Building load vs PNNL design intent")
+        w("## S5 — Building load vs real-data (NREL ComStock) shape bands")
         w("")
-        w("| scenario | archetype/size | peak kW | off-pk kW | pk/off | expect | ✓ | wd/we | expect | ✓ |")
-        w("|---|---|--:|--:|--:|--:|:-:|--:|--:|:-:|")
+        w("_Coarse real-data smoke test. The weekday/weekend band is derived "
+          "from NREL ComStock/EULP across climate zones 5B/3B/4A/6A "
+          "(`data/buildingload_reference/reference_bands.json`); peak/off-peak "
+          "is an informational sanity bound only. The rigorous ASHRAE "
+          "Guideline-14 fidelity comparison (CV(RMSE)/NMBE vs ComStock, "
+          "`peak_kw_scaling` off) lives in `tools/validate_buildingload.py` — "
+          "see `data/buildingload_reference/validation_metrics.json`._")
+        w("")
+        w("| scenario | archetype/size | peak kW | off-pk kW | pk/off | wd/we | ComStock wd/we band | ✓ | band src |")
+        w("|---|---|--:|--:|--:|--:|--:|:-:|:-:|")
         for _, r in s5.iterrows():
-            po_ok = str(r["po_in_range"]).strip().lower() == "true"
             ww_ok = str(r["ww_in_range"]).strip().lower() == "true"
+            src = r["band_source"] if "band_source" in r else "—"
             w(f"| {r['scenario']} | {r['archetype']}/{r['size']} | "
               f"{f(r['peak_kw'], 0)} | {f(r['off_peak_kw'], 1)} | "
-              f"{f(r['peak_off_peak_ratio'], 2)} | {r['expected_po_range']} | "
-              f"{'✓' if po_ok else '✗'} | {f(r['weekday_weekend_ratio'], 2)} | "
-              f"{r['expected_ww_range']} | {'✓' if ww_ok else '✗'} |")
+              f"{f(r['peak_off_peak_ratio'], 2)} | "
+              f"{f(r['weekday_weekend_ratio'], 2)} | "
+              f"{r['expected_ww_range']} | {'✓' if ww_ok else '✗'} | {src} |")
         w("")
 
     if not s6.empty:
@@ -876,8 +947,17 @@ def write_results_md(output_root: Path) -> None:
       "capacity-inference fallback; not for capacity-sensitive analysis.")
     w("- **S3 holdout uses a single TruncNorm**, so its arrival rows understate the "
       "shipped mixture.")
-    w("- **S5 building-load** large-office / standalone-retail fall outside the design "
-      "bands — a model-adequacy item, not a data-fit error.")
+    w("- **S5 building-load now validates against real data** (NREL ComStock/EULP, "
+      "no longer self-derived). The shipped single ASHRAE 90.1-2019 prototype is "
+      "an efficient new-construction building (~8 W/m² mean for small office), "
+      "while ComStock is a *stock-weighted average* (~16 W/m²) that includes older, "
+      "less-efficient buildings — so the generator systematically under-predicts "
+      "absolute EUI by ~30–50% (NMBE; see `validate_buildingload.py`). The diurnal "
+      "*shape* matches well (weekday corr 0.71–0.94). Office weekday/weekend ratio "
+      "runs high because the generator zeros weekend office occupancy whereas "
+      "ComStock buildings carry a nonzero weekend base load. These are model-scope "
+      "differences (one efficient prototype vs a stock distribution), not yardstick "
+      "artifacts.")
     w("- **EV WATTS / INL** are fixture-only (~64 / ~65 synthetic sessions) and excluded.")
     w("")
     w("Underlying CSVs and the per-region distribution / joint-density PNGs live under "

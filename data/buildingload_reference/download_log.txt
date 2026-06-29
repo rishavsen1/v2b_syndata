@@ -1,0 +1,70 @@
+[22:57:50] === fetch_buildingload_reference start; zones=['5B', '3B', '4A', '6A'] max_bdg2=20 force=False ===
+[22:57:50] CACHED  comstock_5b_smalloffice.csv (16,403,200 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-smalloffice.csv
+[22:57:50] CHAR    office|small|5B: peak/off=1.9782 wd/we=1.528 lf=0.4321 EUI=137.31 kWh/m2/yr peakdens=36.28 W/m2 peak=18.5378kW proto=511m2 n=1466
+[22:57:50] CACHED  comstock_5b_mediumoffice.csv (16,712,665 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-mediumoffice.csv
+[22:57:50] CHAR    office|med|5B: peak/off=2.018 wd/we=1.4229 lf=0.4262 EUI=120.76 kWh/m2/yr peakdens=32.35 W/m2 peak=161.1467kW proto=4982m2 n=1180
+[22:57:50] CACHED  comstock_5b_largeoffice.csv (15,302,822 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-largeoffice.csv
+[22:57:50] CHAR    office|large|5B: peak/off=2.0617 wd/we=1.2682 lf=0.468 EUI=115.04 kWh/m2/yr peakdens=28.06 W/m2 peak=1299.5973kW proto=46320m2 n=328
+[22:57:50] CACHED  comstock_5b_retailstripmall.csv (13,384,815 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-retailstripmall.csv
+[22:57:50] CHAR    retail|med|5B: peak/off=2.7855 wd/we=1.0412 lf=0.4222 EUI=254.11 kWh/m2/yr peakdens=68.71 W/m2 peak=143.5935kW proto=2090m2 n=1208
+[22:57:50] CACHED  comstock_5b_retailstandalone.csv (14,127,663 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=5B/up00-5b-retailstandalone.csv
+[22:57:50] CHAR    retail|large|5B: peak/off=2.602 wd/we=1.0829 lf=0.3839 EUI=139.76 kWh/m2/yr peakdens=41.56 W/m2 peak=95.328kW proto=2294m2 n=1205
+[22:57:50] CACHED  comstock_3b_smalloffice.csv (16,313,971 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-smalloffice.csv
+[22:57:50] CHAR    office|small|3B: peak/off=1.7978 wd/we=1.4827 lf=0.3907 EUI=163.28 kWh/m2/yr peakdens=47.71 W/m2 peak=24.3807kW proto=511m2 n=3323
+[22:57:50] CACHED  comstock_3b_mediumoffice.csv (16,430,789 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-mediumoffice.csv
+[22:57:50] CHAR    office|med|3B: peak/off=1.8275 wd/we=1.5685 lf=0.4293 EUI=154.63 kWh/m2/yr peakdens=41.11 W/m2 peak=204.8344kW proto=4982m2 n=1719
+[22:57:50] CACHED  comstock_3b_largeoffice.csv (14,908,379 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-largeoffice.csv
+[22:57:50] CHAR    office|large|3B: peak/off=1.8712 wd/we=1.5285 lf=0.4676 EUI=146.86 kWh/m2/yr peakdens=35.85 W/m2 peak=1660.784kW proto=46320m2 n=775
+[22:57:50] CACHED  comstock_3b_retailstripmall.csv (13,108,330 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-retailstripmall.csv
+[22:57:50] CHAR    retail|med|3B: peak/off=2.1618 wd/we=1.0352 lf=0.453 EUI=317.05 kWh/m2/yr peakdens=79.89 W/m2 peak=166.9711kW proto=2090m2 n=1712
+[22:57:50] CACHED  comstock_3b_retailstandalone.csv (14,161,640 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=3B/up00-3b-retailstandalone.csv
+[22:57:51] CHAR    retail|large|3B: peak/off=1.82 wd/we=1.0463 lf=0.4187 EUI=210.56 kWh/m2/yr peakdens=57.41 W/m2 peak=131.6923kW proto=2294m2 n=2221
+[22:57:51] CACHED  comstock_4a_smalloffice.csv (15,204,349 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-smalloffice.csv
+[22:57:51] CHAR    office|small|4A: peak/off=2.0217 wd/we=1.5263 lf=0.3972 EUI=154.63 kWh/m2/yr peakdens=44.44 W/m2 peak=22.7106kW proto=511m2 n=2845
+[22:57:51] CACHED  comstock_4a_mediumoffice.csv (16,792,549 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-mediumoffice.csv
+[22:57:51] CHAR    office|med|4A: peak/off=1.9434 wd/we=1.3854 lf=0.4193 EUI=142.79 kWh/m2/yr peakdens=38.88 W/m2 peak=193.6854kW proto=4982m2 n=2832
+[22:57:51] CACHED  comstock_4a_largeoffice.csv (17,009,944 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-largeoffice.csv
+[22:57:51] CHAR    office|large|4A: peak/off=1.8592 wd/we=1.3104 lf=0.4439 EUI=131.68 kWh/m2/yr peakdens=33.86 W/m2 peak=1568.5424kW proto=46320m2 n=1757
+[22:57:51] CACHED  comstock_4a_retailstripmall.csv (13,663,825 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-retailstripmall.csv
+[22:57:51] CHAR    retail|med|4A: peak/off=3.3546 wd/we=1.073 lf=0.3732 EUI=263.22 kWh/m2/yr peakdens=80.51 W/m2 peak=168.2672kW proto=2090m2 n=2110
+[22:57:51] CACHED  comstock_4a_retailstandalone.csv (13,990,588 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=4A/up00-4a-retailstandalone.csv
+[22:57:51] CHAR    retail|large|4A: peak/off=2.7413 wd/we=1.0614 lf=0.3708 EUI=164.28 kWh/m2/yr peakdens=50.58 W/m2 peak=116.0276kW proto=2294m2 n=2717
+[22:57:51] CACHED  comstock_6a_smalloffice.csv (16,808,165 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-smalloffice.csv
+[22:57:51] CHAR    office|small|6A: peak/off=1.9196 wd/we=1.53 lf=0.4269 EUI=136.67 kWh/m2/yr peakdens=36.55 W/m2 peak=18.6747kW proto=511m2 n=1987
+[22:57:51] CACHED  comstock_6a_mediumoffice.csv (16,904,287 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-mediumoffice.csv
+[22:57:51] CHAR    office|med|6A: peak/off=1.8425 wd/we=1.3227 lf=0.4428 EUI=143.74 kWh/m2/yr peakdens=37.05 W/m2 peak=184.5975kW proto=4982m2 n=1198
+[22:57:51] CACHED  comstock_6a_largeoffice.csv (16,776,356 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-largeoffice.csv
+[22:57:51] CHAR    office|large|6A: peak/off=1.8437 wd/we=1.2633 lf=0.4294 EUI=133.64 kWh/m2/yr peakdens=35.53 W/m2 peak=1645.5497kW proto=46320m2 n=367
+[22:57:51] CACHED  comstock_6a_retailstripmall.csv (15,014,975 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-retailstripmall.csv
+[22:57:51] CHAR    retail|med|6A: peak/off=3.2669 wd/we=1.0843 lf=0.3635 EUI=229.02 kWh/m2/yr peakdens=71.93 W/m2 peak=150.3262kW proto=2090m2 n=1182
+[22:57:51] CACHED  comstock_6a_retailstandalone.csv (13,633,792 bytes) <- https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/timeseries_aggregates/by_ashrae_iecc_climate_zone_2006/upgrade=0/ashrae_iecc_climate_zone_2006=6A/up00-6a-retailstandalone.csv
+[22:57:51] CHAR    retail|large|6A: peak/off=2.4752 wd/we=1.0188 lf=0.3723 EUI=134.92 kWh/m2/yr peakdens=41.37 W/m2 peak=94.8963kW proto=2294m2 n=1806
+[22:57:51] WROTE   comstock_timeseries.parquet (14,266,738 bytes, 700,800 rows)
+[22:57:51] CACHED  bdg2_metadata.csv (272,024 bytes) <- https://github.com/buds-lab/building-data-genome-project-2/raw/master/data/metadata/metadata.csv
+[22:57:51] BDG2    selected 15 office + 5 retail = 20 candidates
+[22:57:51] CACHED  bdg2_electricity_cleaned.csv (174,977,911 bytes) <- https://github.com/buds-lab/building-data-genome-project-2/raw/master/data/meters/cleaned/electricity_cleaned.csv
+[22:57:52] BDG2    KEEP Panther_retail_Felix (retail, 2942m2): peak/off=2.2665 lf=0.4283 eui=160.0
+[22:57:52] BDG2    KEEP Panther_retail_Gilbert (retail, 1422m2): peak/off=1.0105 lf=0.5204 eui=2.0
+[22:57:52] BDG2    KEEP Panther_office_Danica (office, 210m2): peak/off=1.9786 lf=0.3334 eui=79.0
+[22:57:52] BDG2    KEEP Panther_retail_Rachel (retail, 26m2): peak/off=2.1542 lf=0.2782 eui=352.0
+[22:57:52] BDG2    KEEP Panther_retail_Kristina (retail, 5488m2): peak/off=2.589 lf=0.4002 eui=125.0
+[22:57:52] BDG2    KEEP Panther_retail_Lester (retail, 840m2): peak/off=2.1201 lf=0.07 eui=167.0
+[22:57:52] BDG2    KEEP Robin_office_Soledad (office, 957m2): peak/off=1.8464 lf=0.341 eui=121.14
+[22:57:52] BDG2    KEEP Fox_office_Alice (office, 18807m2): peak/off=1.2635 lf=0.7616 eui=168.03
+[22:57:52] BDG2    KEEP Lamb_office_Gerardo (office, 4859m2): peak/off=3.4468 lf=0.1365 eui=15.75
+[22:57:52] BDG2    KEEP Bull_office_Ivette (office, 3229m2): peak/off=1.6446 lf=0.2743 eui=64.75
+[22:57:52] BDG2    DROP Shrew_office_Lin: nan_frac=0.47 all_zero=False
+[22:57:52] BDG2    KEEP Hog_office_Elizbeth (office, 8594m2): peak/off=1.4286 lf=0.5681 eui=240.6
+[22:57:52] BDG2    KEEP Hog_office_Mike (office, 5924m2): peak/off=1.6897 lf=0.3982 eui=94.7
+[22:57:52] BDG2    KEEP Hog_office_Alexis (office, 2693m2): peak/off=3.2587 lf=0.2635 eui=103.0
+[22:57:52] BDG2    KEEP Hog_office_Leanne (office, 7646m2): peak/off=1.5303 lf=0.6551 eui=262.9
+[22:57:52] BDG2    KEEP Hog_office_Lizzie (office, 10352m2): peak/off=2.6116 lf=0.5359 eui=107.7
+[22:57:52] BDG2    KEEP Hog_office_Byron (office, 80038m2): peak/off=1.5399 lf=0.5241 eui=168.8
+[22:57:52] BDG2    KEEP Eagle_office_Lamont (office, 1454m2): peak/off=1.4873 lf=0.4833 eui=196.26
+[22:57:52] BDG2    KEEP Eagle_office_Ryan (office, 2092m2): peak/off=1.6879 lf=0.4058 eui=110.41
+[22:57:52] BDG2    KEEP Eagle_office_Efrain (office, 3996m2): peak/off=1.2735 lf=0.4308 eui=105.88
+[22:57:52] BDG2    POOL retail|bdg2|all: n=5 peak/off=2.1542[1.4543,2.46] wd/we=1.1112 lf=0.4002[0.1533,0.4836] eui=160.0
+[22:57:52] BDG2    POOL office|bdg2|all: n=14 peak/off=1.6663[1.32,3.0646] wd/we=1.2363 lf=0.4183[0.2667,0.629] eui=109.055
+[22:57:52] WROTE   bdg2_timeseries.parquet (2,138,381 bytes, 333,336 rows)
+[22:57:52] WROTE   reference_bands.json (24,700 bytes, 27 keys)
+[22:57:52] WROTE   MANIFEST.json (total downloaded/cached 481,903,039 bytes)
