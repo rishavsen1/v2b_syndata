@@ -26,6 +26,7 @@ data/calibration/elaadnl_cache/
 data/calibration/elaadnl_per_user.csv
 data/load_pipeline_cache/
 data/stations/
+data/buildingload_reference/_raw/
 data/sweep/
 .idea/
 .vscode/
