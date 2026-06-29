@@ -49,3 +49,10 @@ handoff/
 data/paper_bench/
 data/calibration_validation/
 paper/
+
+# Guard: these are gitignored cache DIRS; the no-slash forms stop a stray
+# symlink at the path itself from being tracked (cf. worktree symlink incident 2026-06-28).
+data/load_pipeline_cache
+data/calibration/acn_cache
+data/calibration/elaadnl_cache
+data/calibration/evwatts_cache
