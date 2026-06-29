@@ -24,8 +24,14 @@ from scipy.optimize import minimize
 
 from ..knob_loader import DIST_PARAM_RANGES
 
-ARRIVAL_LO = 6.0
-ARRIVAL_HI = 20.0
+# Arrival-hour clip window. Widened from [6,20] → [4,22] (KDD task 6) to recover
+# the early-/late-shift tail mass the old window discarded (~8% of ACN arrivals),
+# which was the dominant cause of σ under-dispersion. The calibrated block now
+# carries these as `arrival.trunc_lo/trunc_hi` so generation reads them back; the
+# 6/20 default in sessions_dist keeps synthetic/hand-authored populations
+# bitwise-identical.
+ARRIVAL_LO = 4.0
+ARRIVAL_HI = 22.0
 MIN_SAMPLES = 30
 
 
@@ -54,8 +60,9 @@ def _drop_if_oor(name: str, fit: dict[str, Any], leaves: dict[str, str]) -> dict
 
 
 def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
-    """Fit TruncNorm(μ, σ) on [6, 20] via MLE. Returns canonical dict, or None
-    if any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """Fit TruncNorm(μ, σ) on [ARRIVAL_LO, ARRIVAL_HI] via MLE. Returns canonical
+    dict (incl. trunc_lo/trunc_hi), or None if any param falls outside
+    DIST_PARAM_RANGES (B4 guard).
     """
     n = int(len(arrival_hours))
     a, b = ARRIVAL_LO, ARRIVAL_HI
@@ -85,6 +92,7 @@ def fit_truncnorm_arrival(arrival_hours: np.ndarray) -> dict[str, Any] | None:
     a_std, b_std = (a - mu) / sig, (b - mu) / sig
     ks = float(st.kstest(arr, "truncnorm", args=(a_std, b_std, mu, sig)).statistic)
     fit = {"dist": "truncnorm", "mu": mu, "sigma": sig,
+           "trunc_lo": ARRIVAL_LO, "trunc_hi": ARRIVAL_HI,
            "n_samples": n, "ks_fit_quality": ks}
     return _drop_if_oor("arrival", fit, {"mu": "arrival.mu", "sigma": "arrival.sigma"})
 
@@ -157,6 +165,7 @@ def fit_truncnorm_mixture_arrival(arrival_hours: np.ndarray) -> dict[str, Any] |
         "w1": float(w[0]),
         "mu1": float(mu[0]), "sigma1": float(sd[0]),
         "mu2": float(mu[1]), "sigma2": float(sd[1]),
+        "trunc_lo": ARRIVAL_LO, "trunc_hi": ARRIVAL_HI,
         "n_samples": n, "ks_fit_quality": ks_mix,
     }
     return _drop_if_oor("arrival_mixture", fit, {

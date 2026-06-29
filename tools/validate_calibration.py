@@ -548,11 +548,36 @@ def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
             # Build CDF from fit params and run kstest(test, cdf)
             if var == "arrival_hour" and fit.get("dist") == "truncnorm":
                 from scipy.stats import truncnorm
-                a, b = (6 - fit["mu"]) / fit["sigma"], (20 - fit["mu"]) / fit["sigma"]
+                lo = float(fit.get("trunc_lo", 6.0))
+                hi = float(fit.get("trunc_hi", 20.0))
+                a, b = (lo - fit["mu"]) / fit["sigma"], (hi - fit["mu"]) / fit["sigma"]
                 cdf = truncnorm(a, b, loc=fit["mu"], scale=fit["sigma"]).cdf
+            elif var == "arrival_hour" and fit.get("dist") == "truncnorm_mixture":
+                from scipy.stats import truncnorm
+                lo = float(fit.get("trunc_lo", 6.0))
+                hi = float(fit.get("trunc_hi", 20.0))
+                comps = [(fit["w1"], fit["mu1"], fit["sigma1"]),
+                         (1.0 - fit["w1"], fit["mu2"], fit["sigma2"])]
+
+                def cdf(x, _comps=comps, _lo=lo, _hi=hi):
+                    return sum(
+                        w * truncnorm.cdf(x, (_lo - m) / s, (_hi - m) / s,
+                                          loc=m, scale=s)
+                        for (w, m, s) in _comps
+                    )
             elif var == "dwell_hours" and fit.get("dist") == "weibull":
                 from scipy.stats import weibull_min
                 cdf = weibull_min(fit["k"], scale=fit["lambda"]).cdf
+            elif var == "dwell_hours" and fit.get("dist") == "weibull_mixture":
+                from scipy.stats import weibull_min
+                comps = [(fit["w1"], fit["k1"], fit["lambda1"]),
+                         (1.0 - fit["w1"], fit["k2"], fit["lambda2"])]
+
+                def cdf(x, _comps=comps):
+                    return sum(
+                        w * weibull_min.cdf(x, k, scale=lam)
+                        for (w, k, lam) in _comps
+                    )
             else:
                 continue
 

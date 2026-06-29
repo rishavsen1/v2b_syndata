@@ -37,6 +37,12 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
     params = {}
     for car_id, u in ctx.a_user.items():
         cal = _region_dist(ctx, u.region, "arrival")
+        # Truncation window: read the calibrated block's trunc_lo/trunc_hi when
+        # present (KDD task 6 widened the fit window to [4,22]); default to the
+        # historical 6/20 so synthetic / hand-authored populations — which carry
+        # no trunc_lo/hi leaf — stay BITWISE-IDENTICAL.
+        trunc_lo = float(cal.get("trunc_lo", 6.0))
+        trunc_hi = float(cal.get("trunc_hi", 20.0))
         if "w1" in cal and "mu1" in cal:
             w1 = float(cal["w1"])
             params[car_id] = {
@@ -44,14 +50,14 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
                     (w1, float(cal["mu1"]), float(cal["sigma1"])),
                     (1.0 - w1, float(cal["mu2"]), float(cal["sigma2"])),
                 ],
-                "trunc_lo": 6.0, "trunc_hi": 20.0, "phi": u.phi,
+                "trunc_lo": trunc_lo, "trunc_hi": trunc_hi, "phi": u.phi,
             }
         else:
             mu = float(cal.get("mu", 8.5))
             sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
             sigma = float(cal.get("sigma", sigma_default))
-            params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": 6.0,
-                              "trunc_hi": 20.0, "phi": u.phi}
+            params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": trunc_lo,
+                              "trunc_hi": trunc_hi, "phi": u.phi}
     ctx.latents["f_arr"] = params
 
 
