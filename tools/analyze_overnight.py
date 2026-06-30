@@ -186,7 +186,7 @@ def cv_ranking(stats):
     items.sort(key=lambda t: t[1], reverse=True)
     items = items[:14]
     fig, ax = plt.subplots(figsize=(6.0, 3.6))
-    labels = [k for k, _ in items]; vals = [v * 100 for _, v in items]
+    labels = [LABELS.get(k, k) for k, _ in items]; vals = [v * 100 for _, v in items]
     ax.barh(range(len(labels)), vals, color=NAVY)
     ax.set_yticks(range(len(labels))); ax.set_yticklabels(labels, fontsize=7)
     ax.invert_yaxis(); ax.set_xlabel("coefficient of variation across samples (%)", fontsize=8)
@@ -253,19 +253,20 @@ def main():
 
 # ── HTML ─────────────────────────────────────────────────────────────────────
 LABELS = {
-    "bl_peak_kw": "Building peak (kW)", "bl_mean_kw": "Building mean (kW)",
-    "bl_energy_mwh": "Building energy (MWh/mo)", "bl_load_factor": "Load factor",
-    "bl_peak_hour": "Peak hour", "bl_flex_frac": "Flexible-load fraction",
-    "pv_energy_mwh": "PV energy (MWh/mo)", "pv_peak_kw": "PV peak (kW)",
-    "pv_capacity_factor": "PV capacity factor", "net_peak_kw": "Net peak load (kW)",
-    "net_min_kw": "Net min (kW, <0=export)", "pv_self_consumption": "PV self-consumption",
-    "energy_cost_usd": "Energy cost ($/mo)", "net_cost_usd": "Net energy cost ($/mo)",
-    "wx_mean_temp_c": "Mean temp (°C)", "wx_max_temp_c": "Max temp (°C)",
-    "wx_mean_ghi": "Mean GHI (W/m²)", "n_sessions": "Sessions/mo",
-    "sessions_per_day": "Sessions/day", "arr_hour_mean": "Mean arrival hour",
-    "dwell_h_mean": "Mean dwell (h)", "peak_concurrency": "Peak EV concurrency",
-    "concurrency_infeasible_frac": "Ticks over charger cap", "req_soc_mean": "Mean required SoC (%)",
-    "ev_energy_mwh": "EV energy demand (MWh/mo)", "n_dr_events": "DR events/mo",
+    "bl_peak_kw": "Building peak load (kW)", "bl_mean_kw": "Building average load (kW)",
+    "bl_min_kw": "Building base/overnight load (kW)",
+    "bl_energy_mwh": "Building monthly energy (MWh)", "bl_load_factor": "Load factor (avg ÷ peak)",
+    "bl_peak_hour": "Hour of daily peak", "bl_flex_frac": "Flexible (HVAC) load share",
+    "pv_energy_mwh": "PV monthly generation (MWh)", "pv_peak_kw": "PV peak output (kW)",
+    "pv_capacity_factor": "PV capacity factor (avg ÷ rated)", "net_peak_kw": "Net peak load after PV (kW)",
+    "net_min_kw": "Net minimum load (kW; <0 = PV export)", "pv_self_consumption": "PV used on-site (self-consumption)",
+    "energy_cost_usd": "Monthly energy cost ($)", "net_cost_usd": "Monthly energy cost after PV ($)",
+    "wx_mean_temp_c": "Mean outdoor temperature (°C)", "wx_max_temp_c": "Max outdoor temperature (°C)",
+    "wx_mean_ghi": "Mean solar irradiance (W/m²)", "n_sessions": "EV charging sessions / month",
+    "sessions_per_day": "EV sessions / day", "arr_hour_mean": "Mean EV arrival hour",
+    "dwell_h_mean": "Mean EV dwell time (hours)", "peak_concurrency": "Peak simultaneous EVs charging",
+    "concurrency_infeasible_frac": "Time over charger capacity", "req_soc_mean": "Mean required departure SoC (%)",
+    "ev_energy_mwh": "EV charging energy / month (MWh)", "n_dr_events": "Demand-response events / month",
 }
 
 
@@ -328,6 +329,7 @@ def render_html(df, stats, st_s, st_m, charts):
       <div class="kpi"><div class="v">{conc95:.0f}</div><div class="k">Peak EV concurrency — P95 (vs {N_CHARGERS} chargers)</div></div>
       <div class="kpi"><div class="v">{g('pv_self_consumption','p50')*100:.0f}%</div><div class="k">PV self-consumption — median</div></div>
     </div>
+    <p class="muted"><b>CV = coefficient of variation = standard deviation ÷ mean</b> (shown as %). A <i>unitless</i> measure of <i>relative</i> uncertainty, so quantities in different units (kW, MWh, $) sit on one scale: higher ⇒ more uncertain relative to its typical value; near&nbsp;0 ⇒ effectively deterministic.</p>
     <div class="imgrow">{img('cv')}</div>
     <div class="take"><b>How to use it downstream:</b> the CV ranking shows which quantities are uncertain enough to demand robust (distributional) decisions vs. which are effectively deterministic. Design to the <b>P95</b> for capacity/adequacy (peaks, concurrency) and to the <b>P5–P95 band</b> for energy/cost/PV planning.</div>
   </section>
