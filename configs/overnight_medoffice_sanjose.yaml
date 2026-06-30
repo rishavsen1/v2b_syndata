@@ -1,0 +1,31 @@
+# Consolidated input config — overnight uncertainty dataset.
+# 1 building (San Jose medium office), 15 EVs / 15 chargers (50/50 bi/uni),
+# PV rooftop_medium (100 kW DC), battery lfp_2h (200 kWh / 100 kW).
+# Output noise = clean (NO output-side jitter); the ONLY perturbation is the
+# input-side WEATHER realization, which re-runs EnergyPlus so the load stays
+# physically faithful. Run TWICE (see commands below): --weather-profile slight
+# and --weather-profile moderate, 75 samples/month each → 150 samples/month,
+# split half/half, over Jan–Dec → 1,800 monthly realizations total.
+#
+# Run (slight half):
+#   uv run python -m v2b_syndata.cli generate-multi \
+#     --config configs/overnight_medoffice_sanjose.yaml \
+#     --output-dir data/output/overnight/slight \
+#     --start-month 2024-01 --end-month 2024-12 --samples-per-month 75 \
+#     --workers 12 --seed-base 0 --noise-profile clean --weather-profile slight --force
+# Run (moderate half): same, --output-dir .../moderate --seed-base 100000 --weather-profile moderate
+output_mode: shared
+buildings:
+  - base_scenario: S01
+    descriptors:
+      location: san_jose_ca
+      building: medium_office_v1
+      population: consent_default
+      equipment: balanced_50pct
+      noise: clean
+    overrides:
+      ev_fleet.ev_count: 15
+      charging_infra.charger_count: 15
+      pv.pv_type: rooftop_medium
+      battery.battery_type: lfp_2h
+    seed: 42
