@@ -206,6 +206,129 @@ def api_scenarios():
     return jsonify(load_scenarios())
 
 
+# ────────────────────────────────────────────────────────────────────────────
+# Input previews (read-only). Each endpoint reads the descriptor library and
+# returns the parameters the UI needs to draw a quick "what does this input
+# produce" preview. NO generation run — these are pure config reads.
+# ────────────────────────────────────────────────────────────────────────────
+
+def _load_library(filename: str) -> dict:
+    with open(CONFIGS / filename) as f:
+        return yaml.safe_load(f) or {}
+
+
+@app.route("/api/preview/location/<loc_id>")
+def api_preview_location(loc_id: str):
+    """Tariff + climate fields for a location descriptor (read-only)."""
+    lib = _load_library("locations.yaml")
+    entry = lib.get(loc_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown location: {loc_id}"}), 404
+    tariff = entry.get("tariff") or {}
+    return jsonify({
+        "id": loc_id,
+        "description": entry.get("description", ""),
+        "climate": entry.get("climate"),
+        "tmyx_station": entry.get("tmyx_station"),
+        "tariff": {
+            "type": tariff.get("type"),
+            "energy_price_offpeak": tariff.get("energy_price_offpeak"),
+            "energy_price_peak": tariff.get("energy_price_peak"),
+            "peak_window": tariff.get("peak_window"),
+            "demand_charge_per_kw": tariff.get("demand_charge_per_kw"),
+            "dr_program": tariff.get("dr_program"),
+        },
+    })
+
+
+@app.route("/api/preview/population/<pop_id>")
+def api_preview_population(pop_id: str):
+    """Region weights + per-region arrival/dwell/SoC distribution params for a
+    population descriptor (read-only). Arrival may be a single TruncNorm
+    (mu/sigma) or a 2-component TruncNorm mixture (w1/mu1/sigma1/mu2/sigma2);
+    both shapes are passed through verbatim so the client can plot either."""
+    lib = _load_library("populations.yaml")
+    entry = lib.get(pop_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown population: {pop_id}"}), 404
+
+    axes = []
+    for r in entry.get("axes_distribution") or []:
+        if isinstance(r, dict):
+            axes.append({"name": r.get("name"), "weight": r.get("weight")})
+
+    regions = {}
+    for name, rd in (entry.get("region_distributions") or {}).items():
+        if not isinstance(rd, dict):
+            continue
+        out: dict = {}
+        if isinstance(rd.get("arrival"), dict):
+            out["arrival"] = rd["arrival"]
+        if isinstance(rd.get("dwell"), dict):
+            out["dwell"] = rd["dwell"]
+        if isinstance(rd.get("soc_arrival"), dict):
+            out["soc_arrival"] = rd["soc_arrival"]
+        regions[name] = out
+
+    return jsonify({
+        "id": pop_id,
+        "description": entry.get("description", ""),
+        "calibration_policy": entry.get("calibration_policy"),
+        "axes_distribution": axes,
+        "region_distributions": regions,
+    })
+
+
+@app.route("/api/preview/building/<bldg_id>")
+def api_preview_building(bldg_id: str):
+    """Building archetype/size/peak + an ILLUSTRATIVE normalized daily load
+    shape (read-only). The shape is a stylized archetype curve (office:
+    midday-centred; retail: evening-rising), NOT an EnergyPlus simulation — a
+    precomputed-EnergyPlus profile is a later phase. Marked `illustrative`."""
+    lib = _load_library("buildings.yaml")
+    entry = lib.get(bldg_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown building: {bldg_id}"}), 404
+
+    archetype = entry.get("archetype")
+    # 24 hourly samples of a normalized [0,1] load shape (fraction of peak).
+    import math
+
+    base = 0.34
+    shape = []
+    for h in range(25):
+        if archetype == "retail":
+            # evening-rising: low morning, climbs through afternoon, peaks ~19h
+            w = math.exp(-(((h - 19) / 4.5) ** 2))
+            frac = 0.30 + 0.70 * w
+        elif archetype == "office":
+            # midday-centred workday bell, peak ~13h
+            w = math.exp(-(((h - 13) / 4.2) ** 2))
+            frac = base + (1 - base) * w
+        else:  # mixed / unknown → broad daytime plateau
+            w = math.exp(-(((h - 14) / 5.0) ** 2))
+            frac = 0.40 + 0.60 * w
+        shape.append(round(frac, 4))
+
+    return jsonify({
+        "id": bldg_id,
+        "description": entry.get("description", ""),
+        "archetype": archetype,
+        "size": entry.get("size"),
+        "peak_kw": entry.get("peak_kw"),
+        "doe_prototype": entry.get("doe_prototype"),
+        "occupancy_source": entry.get("occupancy_source"),
+        "default_population": entry.get("default_population"),
+        "load_shape": {
+            "illustrative": True,
+            "note": ("Stylized archetype curve, not an EnergyPlus simulation. "
+                     "A precomputed-EnergyPlus profile is a later phase."),
+            "hours": list(range(25)),
+            "normalized": shape,  # fraction of peak_kw, per hour 0..24
+        },
+    })
+
+
 @app.route("/api/resolve", methods=["POST"])
 def api_resolve():
     """Dry-run knob resolution: same chain the CLI uses, no rendering.

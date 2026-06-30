@@ -192,6 +192,67 @@ def test_ui_der_info_and_preset_sync(page, server):
 
 
 @pytest.mark.browser
+def test_ui_input_previews(page, server):
+    """Input previews: the collapsible Preview panel renders the three blocks
+    for the card's current selections, and the per-field ⓘ opens a popover.
+
+    Plotly itself loads from a CDN that the network-isolated headless browser
+    can't reach, so we assert on the panel/popover STRUCTURE (built before the
+    Plotly call), not on rendered charts."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # ⓘ buttons sit next to Location / Building / Population in the grid
+    assert card.locator(".descriptor-grid .preview-info[data-preview='location']").count() == 1
+    assert card.locator(".descriptor-grid .preview-info[data-preview='building']").count() == 1
+    assert card.locator(".descriptor-grid .preview-info[data-preview='population']").count() == 1
+
+    # pick concrete descriptors so the previews have something to render. The
+    # blank "scenario default" option has its *label* rewritten to the inherited
+    # descriptor id, which can collide with select_option(value=…) matching — so
+    # select by the unique full "<id> — <description>" label instead.
+    card.locator(".mb-location").select_option(
+        label="nashville_tn — Nashville, TN — TVA territory, subtropical, low-cost commercial")
+    card.locator(".mb-building").select_option(
+        label="medium_office_v1 — Medium office, ~5000 m², standard work hours")
+    card.locator(".mb-population").select_option(
+        label="consent_default — Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes")
+
+    # Integration B: open the Preview panel → its scaffold + all three blocks
+    # appear. `.preview-affects` and the three .pv-block elements are written
+    # before any Plotly call, so they're present even though Plotly (CDN) can't
+    # load here. The illustrative caveat for the building block is likewise
+    # written into the block before the chart call.
+    card.locator(".mb-preview > summary").click()
+    page.wait_for_selector(".building-card .card-preview .preview-affects", timeout=8000)
+    host = card.locator(".card-preview")
+    assert host.locator(".preview-affects").count() == 1
+    for block in ("location", "building", "population"):
+        page.wait_for_selector(
+            f".building-card .card-preview .pv-block[data-block='{block}']", timeout=8000)
+        assert host.locator(f".pv-block[data-block='{block}']").count() == 1
+    # the illustrative caveat is shown for the building block
+    page.wait_for_function(
+        "document.querySelector(\".building-card .card-preview .pv-block[data-block='building']\")"
+        ".textContent.toLowerCase().includes('illustrative')",
+        timeout=8000)
+
+    # Integration A: clicking the population ⓘ opens a floating popover with a
+    # head naming the selection (set before the Plotly call → robust to no-CDN).
+    card.locator(".preview-info[data-preview='population']").click()
+    page.wait_for_selector(".preview-popover", timeout=8000)
+    assert page.locator(".preview-popover").count() == 1
+    page.wait_for_function(
+        "document.querySelector('.preview-popover .pp-head')"
+        " && document.querySelector('.preview-popover .pp-head').textContent.includes('consent_default')",
+        timeout=8000)
+    # clicking the same ⓘ again toggles it closed
+    card.locator(".preview-info[data-preview='population']").click()
+    assert page.locator(".preview-popover").count() == 0
+
+
+@pytest.mark.browser
 def test_ui_tour(page, server):
     """The '▶ Take a tour' button starts the driver.js guided tour and steps
     through it."""
