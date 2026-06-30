@@ -508,3 +508,122 @@ button.secondary:hover { background: var(--primary); color: white; }
 .building-card .card-knob-buckets .knob-bucket h3 { font-size: 0.82rem; margin: 0.5rem 0 0.25rem; }
 .building-card .mb-dup { border-color: #2c7fb8; color: #2c7fb8; }
 .building-card .mb-dup:hover { background: #2c7fb8; color: #fff; }
+
+/* ── Input previews (ⓘ popover + collapsible Preview panel) ──────────────── */
+/* The ⓘ buttons next to Location/Building/Population — mirror the der-info ⓘ. */
+.descriptor-grid .preview-info {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #0e6e87;
+    font-size: 0.85rem;
+    padding: 0 0.15rem;
+    line-height: 1;
+}
+
+/* The collapsible row sits among the other detail panels (DER/Perturb/Adv). */
+.building-card details.panel-row { margin-top: 0.55rem; border-top: 1px solid var(--border); }
+.building-card details.panel-row > summary {
+    cursor: pointer;
+    user-select: none;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.92rem;
+    padding: 0.45rem 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.building-card details.panel-row > summary::-webkit-details-marker { display: none; }
+.building-card details.panel-row .chev { transition: transform 0.12s; font-size: 0.8rem; }
+.building-card details.panel-row[open] .chev { transform: rotate(90deg); }
+
+.preview-affects {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0.2rem 0 0.7rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.preview-affects strong { color: var(--primary); }
+.preview-affects .a-tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: #eef3f8;
+    color: var(--primary);
+    border: 1px solid #cfe0ee;
+    border-radius: 10px;
+    padding: 1px 7px;
+}
+.card-preview .pv-block { margin-bottom: 0.5rem; }
+.card-preview .pv-block > h4 {
+    margin: 0.6rem 0 0.35rem;
+    font-size: 0.82rem;
+    color: var(--primary);
+    font-family: var(--font-mono);
+    text-transform: lowercase;
+}
+.card-preview .chart-grid {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.card-preview .chart-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.5rem;
+    min-width: 0;
+}
+.pp-note { font-size: 0.72rem; color: var(--text-muted); font-style: italic; margin: 0.3rem 0 0; }
+.pp-default-tag {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-style: normal;
+    background: #eef3f8;
+    color: var(--primary);
+    border: 1px solid #cfe0ee;
+    border-radius: 9px;
+    padding: 0 6px;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
+.pp-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.8rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+.pp-k { display: inline-flex; align-items: center; gap: 5px; }
+.pp-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* The floating ⓘ popover (integration A) — mirrors .der-popover. */
+.preview-popover {
+    position: absolute;
+    z-index: 1000;
+    background: #fff;
+    border: 1px solid #c9d3dc;
+    border-radius: 6px;
+    padding: 0.6rem 0.7rem;
+    box-shadow: 0 6px 20px -10px rgba(21, 32, 32, 0.45);
+    max-width: 420px;
+    width: max-content;
+}
+.preview-popover .pp-head {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0 0 0.35rem;
+}
+.preview-popover .pp-chart { width: 300px; max-width: 100%; }
+.preview-popover .pp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+}
+.preview-popover .pp-grid .pp-chart { width: 190px; }

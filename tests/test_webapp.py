@@ -93,6 +93,84 @@ def test_resolve_returns_knob_values(client):
 
 
 @pytest.mark.webapp
+def test_preview_location(client):
+    d = client.get("/api/preview/location/nashville_tn").get_json()
+    assert d["id"] == "nashville_tn"
+    assert d["climate"] == "subtropical"
+    assert d["tmyx_station"].startswith("USA_TN_Nashville")
+    t = d["tariff"]
+    assert t["type"] == "TOU"
+    assert t["energy_price_offpeak"] == 0.085 and t["energy_price_peak"] == 0.135
+    assert t["peak_window"] == [14, 19]
+    assert t["demand_charge_per_kw"] == 8.50
+    assert t["dr_program"] == "none"
+    # bad id → 404
+    assert client.get("/api/preview/location/nope").status_code == 404
+
+
+@pytest.mark.webapp
+def test_preview_population(client):
+    d = client.get("/api/preview/population/consent_default").get_json()
+    assert d["id"] == "consent_default"
+    names = {a["name"] for a in d["axes_distribution"]}
+    assert "stable_commuter" in names
+    # weights present
+    assert all("weight" in a for a in d["axes_distribution"])
+    rd = d["region_distributions"]["stable_commuter"]
+    assert rd["arrival"]["mu"] == 8.5 and rd["arrival"]["sigma"] == 0.8
+    assert rd["dwell"]["k"] == 2.2 and rd["dwell"]["lambda"] == 9.0
+    assert rd["soc_arrival"]["alpha"] == 4.0 and rd["soc_arrival"]["beta"] == 6.0
+    # bad id → 404
+    assert client.get("/api/preview/population/nope").status_code == 404
+
+
+@pytest.mark.webapp
+def test_preview_population_mixture_arrival(client):
+    """A calibrated population can carry a TruncNorm-mixture arrival; the
+    endpoint passes the mixture params through verbatim."""
+    d = client.get("/api/preview/population/acn_workplace_baseline").get_json()
+    arr = d["region_distributions"]["rare_consistent"]["arrival"]
+    assert arr["dist"] == "truncnorm_mixture"
+    assert "w1" in arr and "mu1" in arr and "mu2" in arr
+
+
+@pytest.mark.webapp
+def test_preview_building(client):
+    d = client.get("/api/preview/building/medium_office_v1").get_json()
+    assert d["archetype"] == "office" and d["size"] == "med"
+    assert d["peak_kw"] == 150 and d["doe_prototype"] == "MediumOffice"
+    assert d["occupancy_source"] == "ashrae_90_1_office"
+    ls = d["load_shape"]
+    # REAL ComStock weekday shape (not illustrative), peak-normalized to 1.0 so
+    # the client scales it to peak_kw → preview peak == peak_kw.
+    assert ls["source"] == "comstock_amy2018" and ls["illustrative"] is False
+    assert ls["reference_zone"] == "5B"
+    assert ls["reference_key"] == "office|med|5B"
+    norm = ls["normalized"]
+    assert len(norm) == 25 and len(ls["hours"]) == 25
+    assert abs(max(norm) - 1.0) < 1e-6           # normalized to peak == 1.0
+    assert norm[0] == norm[24]                   # daily loop closed
+    # office shape peaks in the daytime (ComStock med-office peaks ~13h)
+    assert norm.index(max(norm)) in range(9, 17)
+    # retail shape is also real ComStock, peaking in the afternoon
+    r = client.get("/api/preview/building/retail_strip_mall").get_json()
+    rls = r["load_shape"]
+    assert rls["source"] == "comstock_amy2018"
+    assert rls["reference_key"].startswith("retail|")
+    assert abs(max(rls["normalized"]) - 1.0) < 1e-6
+    assert rls["normalized"].index(max(rls["normalized"])) >= 12   # afternoon/evening
+    # mixed-use has no ComStock prototype → falls back to the office profile,
+    # still a real shape (note flags the fallback)
+    mx = client.get("/api/preview/building/mixed_use_v1").get_json()
+    mls = mx["load_shape"]
+    assert mls["source"] == "comstock_amy2018"
+    assert mls["reference_key"].startswith("office|")
+    assert "office profile" in mls["note"].lower()
+    # bad id → 404
+    assert client.get("/api/preview/building/nope").status_code == 404
+
+
+@pytest.mark.webapp
 def test_bad_route_returns_html_not_json(client):
     r = client.get("/api/does-not-exist")
     assert r.status_code == 404

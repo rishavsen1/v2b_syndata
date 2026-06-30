@@ -192,6 +192,121 @@ def test_ui_der_info_and_preset_sync(page, server):
 
 
 @pytest.mark.browser
+def test_ui_input_previews(page, server):
+    """Input previews: the collapsible Preview panel renders the three blocks
+    for the card's current selections, and the per-field ⓘ opens a popover.
+
+    We assert on the panel/popover STRUCTURE and the block text (headings,
+    captions) which are written before the Plotly draw, so the test holds
+    regardless of whether the Plotly bundle renders."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # ⓘ buttons sit next to Location / Building / Population in the grid
+    assert card.locator(".descriptor-grid .preview-info[data-preview='location']").count() == 1
+    assert card.locator(".descriptor-grid .preview-info[data-preview='building']").count() == 1
+    assert card.locator(".descriptor-grid .preview-info[data-preview='population']").count() == 1
+
+    # pick concrete descriptors so the previews have something to render. The
+    # blank "scenario default" option has its *label* rewritten to the inherited
+    # descriptor id, which can collide with select_option(value=…) matching — so
+    # select by the unique full "<id> — <description>" label instead.
+    card.locator(".mb-location").select_option(
+        label="nashville_tn — Nashville, TN — TVA territory, subtropical, low-cost commercial")
+    card.locator(".mb-building").select_option(
+        label="medium_office_v1 — Medium office, ~5000 m², standard work hours")
+    card.locator(".mb-population").select_option(
+        label="consent_default — Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes")
+
+    # Integration B: open the Preview panel → all three blocks appear, and each
+    # carries its OWN per-input "affects:" tag row (replacing the old single
+    # combined line). The affects rows + headings are written before the Plotly
+    # draw, so they're present regardless of chart rendering.
+    card.locator(".mb-preview > summary").click()
+    host = card.locator(".card-preview")
+    for block in ("location", "building", "population"):
+        page.wait_for_selector(
+            f".building-card .card-preview .pv-block[data-block='{block}'] .preview-affects",
+            timeout=8000)
+        assert host.locator(f".pv-block[data-block='{block}']").count() == 1
+        # exactly one per-input affects row inside each block
+        assert host.locator(f".pv-block[data-block='{block}'] .preview-affects").count() == 1
+    # per-input affects tags: location drives prices + weather→load; population
+    # drives arrival/dwell/SoC/region.
+    loc_aff = host.locator(".pv-block[data-block='location'] .preview-affects").inner_text()
+    assert "utility prices" in loc_aff and "weather" in loc_aff.lower()
+    pop_aff = host.locator(".pv-block[data-block='population'] .preview-affects").inner_text()
+    for t in ("arrival", "dwell", "region frequency"):
+        assert t in pop_aff
+    bld_aff = host.locator(".pv-block[data-block='building'] .preview-affects").inner_text()
+    assert "building load shape" in bld_aff.lower()
+    # the building block uses a REAL ComStock shape normalized to peak_kw (150)
+    page.wait_for_function(
+        "document.querySelector(\".building-card .card-preview .pv-block[data-block='building']\")"
+        ".textContent.toLowerCase().includes('comstock')",
+        timeout=8000)
+    assert "150 kW" in host.locator(".pv-block[data-block='building']").inner_text()
+
+    # Integration A: clicking the population ⓘ opens a floating popover with a
+    # head naming the selection (set before the Plotly draw → robust either way).
+    card.locator(".preview-info[data-preview='population']").click()
+    page.wait_for_selector(".preview-popover", timeout=8000)
+    assert page.locator(".preview-popover").count() == 1
+    page.wait_for_function(
+        "document.querySelector('.preview-popover .pp-head')"
+        " && document.querySelector('.preview-popover .pp-head').textContent.includes('consent_default')",
+        timeout=8000)
+    # clicking the same ⓘ again toggles it closed
+    card.locator(".preview-info[data-preview='population']").click()
+    assert page.locator(".preview-popover").count() == 0
+
+
+@pytest.mark.browser
+def test_ui_input_previews_render_for_defaults(page, server):
+    """A freshly-added card with NOTHING explicitly chosen still renders all
+    three previews from the base scenario's inherited descriptors (S01 →
+    nashville_tn / medium_office_v1 / consent_default), each flagged as a
+    scenario default. Both the panel and the ⓘ popover resolve the default."""
+    page.goto(server + "/", wait_until="networkidle")
+    page.wait_for_selector(".building-card")
+    card = page.locator(".building-card").first
+
+    # nothing explicitly chosen: the three descriptor selects sit on the blank
+    # "scenario default" option (value === "")
+    assert card.locator(".mb-location").input_value() == ""
+    assert card.locator(".mb-building").input_value() == ""
+    assert card.locator(".mb-population").input_value() == ""
+
+    # Integration B: opening the panel still renders all three blocks, resolved
+    # to the S01 inherited defaults and tagged "scenario default".
+    card.locator(".mb-preview > summary").click()
+    page.wait_for_selector(".building-card .card-preview .preview-affects", timeout=8000)
+    host = card.locator(".card-preview")
+    page.wait_for_function(
+        "document.querySelector(\".building-card .card-preview .pv-block[data-block='location'] h4\")"
+        " && document.querySelector(\".building-card .card-preview .pv-block[data-block='location'] h4\")"
+        ".textContent.includes('nashville_tn')",
+        timeout=8000)
+    loc_txt = host.locator(".pv-block[data-block='location'] h4").inner_text()
+    assert "nashville_tn" in loc_txt and "scenario default" in loc_txt
+    assert "medium_office_v1" in host.locator(".pv-block[data-block='building'] h4").inner_text()
+    assert "consent_default" in host.locator(".pv-block[data-block='population'] h4").inner_text()
+
+    # Integration A: the ⓘ on a blank Building select previews the inherited
+    # default (medium_office_v1), tagged "(scenario default)".
+    card.locator(".preview-info[data-preview='building']").click()
+    page.wait_for_selector(".preview-popover", timeout=8000)
+    # wait for the RESOLVED head (the transient "loading…" head also contains the
+    # id, so key the wait on the "scenario default" tag the resolved head adds).
+    page.wait_for_function(
+        "document.querySelector('.preview-popover .pp-head')"
+        " && document.querySelector('.preview-popover .pp-head').textContent.includes('scenario default')",
+        timeout=8000)
+    assert "medium_office_v1" in page.locator(".preview-popover .pp-head").inner_text()
+
+
+@pytest.mark.browser
 def test_ui_tour(page, server):
     """The '▶ Take a tour' button starts the driver.js guided tour and steps
     through it."""

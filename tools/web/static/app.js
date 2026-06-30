@@ -829,9 +829,9 @@ function createBuildingCard() {
         </div>
         <div class="descriptor-grid">
             <label><span class="field-name">Base scenario</span><select class="mb-base"></select></label>
-            <label><span class="field-name">Location</span><select class="mb-location"></select></label>
-            <label><span class="field-name">Building</span><select class="mb-building"></select></label>
-            <label><span class="field-name">Population</span><select class="mb-population"></select></label>
+            <label><span class="field-name">Location <button type="button" class="preview-info" data-preview="location" aria-label="preview this location" title="preview what this location produces">&#9432;</button></span><select class="mb-location"></select></label>
+            <label><span class="field-name">Building <button type="button" class="preview-info" data-preview="building" aria-label="preview this building" title="preview what this building produces">&#9432;</button></span><select class="mb-building"></select></label>
+            <label><span class="field-name">Population <button type="button" class="preview-info" data-preview="population" aria-label="preview this population" title="preview what this population produces">&#9432;</button></span><select class="mb-population"></select></label>
             <label><span class="field-name">Equipment</span><select class="mb-equipment"></select></label>
             <label><span class="field-name">Seed</span><input type="number" class="mb-seed" step="1"></label>
             <label><span class="field-name">EV count</span><input type="number" class="mb-ev-count" min="1" placeholder="scenario default"></label>
@@ -846,6 +846,11 @@ function createBuildingCard() {
             <label><span class="field-name">Building load noise (post-generation)</span><select class="mb-noise"></select></label>
         </div>
         <div class="mb-soc-warn inline-error" style="display:none"></div>
+        <details class="mb-preview panel-row">
+            <summary><span class="chev">▶</span>Preview — what these inputs produce (this building)</summary>
+            <p class="hint" style="margin:0.3rem 0">Computed from the selected Location / Building / Population config values, drawn with Plotly. Re-renders when any of those three change. The building load is a <strong>real NREL ComStock</strong> weekday profile (reference climate CZ-5B) scaled to peak_kw; only the weather mini-chart is illustrative.</p>
+            <div class="card-preview"></div>
+        </details>
         <details class="mb-der">
             <summary>PV &amp; battery — advanced (this building)</summary>
             <p class="hint" style="margin:0.3rem 0">The <strong>PV system</strong> and <strong>Battery</strong> selectors in the inputs above are the on/off + sizing controls (a preset other than <code>none</code> enables it). These dials fine-tune the selected system: explicit <code>pv.dc_capacity_kw</code>, tilt/azimuth, module, derate; battery <code>capacity_kwh</code>/<code>power_kw</code>, efficiency, SoC window. The PV curve uses the <em>same</em> (perturbed) weather as this building's load.</p>
@@ -896,6 +901,26 @@ function createBuildingCard() {
             e.stopPropagation();
             toggleDerPopover(btn, btn.dataset.der);
         }));
+
+    // INPUT PREVIEWS — integration A: ⓘ next to Location/Building/Population.
+    card.querySelectorAll(".preview-info").forEach(btn =>
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePreviewPopover(btn, btn.dataset.preview, card);
+        }));
+    // INPUT PREVIEWS — integration B: the collapsible panel renders on open and
+    // re-renders whenever a descriptor select changes (if the panel is open).
+    const previewDetails = card.querySelector(".mb-preview");
+    if (previewDetails) {
+        previewDetails.addEventListener("toggle", () => {
+            if (previewDetails.open) renderCardPreview(card);
+        });
+        // Re-render on descriptor changes AND on base-scenario change (the base
+        // determines which inherited defaults fill any blank descriptor).
+        [".mb-location", ".mb-building", ".mb-population", ".mb-base"].forEach(s =>
+            card.querySelector(s).addEventListener("change", () => renderCardPreview(card)));
+    }
 
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
     // sessions for this building. Warn live. Floor = this card's min_depart_soc
@@ -1367,6 +1392,466 @@ function plotOptimus(divId, csvName, byBuilding, feature, shape = "box", agg = "
     if (isHistShape) layout.barmode = "overlay";
     else if (!isTimeSeries) layout.boxmode = "group";   // box + violin group by building
     Plotly.newPlot(divId, traces, layout);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// INPUT PREVIEWS — show what a selected Location / Building / Population
+// produces, BEFORE generating. Two integration points share this code:
+//   A) a per-field ⓘ popover (single preview, floating);
+//   B) a collapsible "▶ Preview" panel per card (all three previews together).
+// Density curves are computed in JS from the params the backend returns and
+// drawn with the Plotly already loaded in index.html.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Region series palette: tool navy + amber + valid-green + two harmonious tones.
+const PREVIEW_REGION_COLORS = ["#1f4e79", "#d8853b", "#2ca02c", "#2c7fb8", "#8e5aa8"];
+
+const _normPdf = (x, m, s) => Math.exp(-0.5 * ((x - m) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+const _weibPdf = (x, k, l) => (x <= 0 ? 0 : (k / l) * (x / l) ** (k - 1) * Math.exp(-((x / l) ** k)));
+// Lanczos approximation for ln Γ(z) — needed for the Beta normalizing constant.
+function _lgamma(z) {
+    const g = [676.5203681218851, -1259.1392167224028, 771.32342877765313,
+        -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+        9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
+    z -= 1;
+    let x = 0.99999999999980993;
+    for (let i = 0; i < g.length; i++) x += g[i] / (z + i + 1);
+    const t = z + g.length - 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+const _betaPdf = (x, a, b) => {
+    if (x <= 0 || x >= 1) return 0;
+    const lnB = _lgamma(a) + _lgamma(b) - _lgamma(a + b);
+    return Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) - lnB);
+};
+const _lin = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+
+// Abramowitz & Stegun 7.1.26 erf approximation (|err| < 1.5e-7), → standard
+// normal CDF Φ. Needed to renormalize the truncated normal over its window.
+function _erf(x) {
+    const s = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+        - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+}
+const _normCdf = (x, mu, sigma) => 0.5 * (1 + _erf((x - mu) / (sigma * Math.SQRT2)));
+
+// Truncated-normal pdf on [lo,hi], RENORMALIZED so it integrates to 1 over the
+// window: φ((x-μ)/σ)/σ ÷ (Φ(hi)-Φ(lo)). (Without the divisor the curve is just a
+// clipped normal and under-integrates whenever μ sits near a window edge.)
+function _truncNormPdf(x, mu, sigma, lo, hi) {
+    if (x < lo || x > hi) return 0;
+    const z = _normCdf(hi, mu, sigma) - _normCdf(lo, mu, sigma);
+    if (z <= 1e-9) return 0;
+    return _normPdf(x, mu, sigma) / z;
+}
+// Evaluate an arrival distribution (single TruncNorm or 2-comp mixture) at x.
+function _arrivalPdf(arr, x) {
+    const lo = arr.trunc_lo != null ? arr.trunc_lo : 4;
+    const hi = arr.trunc_hi != null ? arr.trunc_hi : 22;
+    if (arr.dist === "truncnorm_mixture" || (arr.mu1 != null && arr.mu2 != null)) {
+        const w1 = arr.w1 != null ? arr.w1 : 0.5;
+        return w1 * _truncNormPdf(x, arr.mu1, arr.sigma1, lo, hi)
+            + (1 - w1) * _truncNormPdf(x, arr.mu2, arr.sigma2, lo, hi);
+    }
+    // single truncnorm: {mu, sigma}
+    if (arr.mu != null) return _truncNormPdf(x, arr.mu, arr.sigma, lo, hi);
+    return 0;
+}
+// Evaluate a dwell distribution (single Weibull or 2-comp mixture) at x.
+function _dwellPdf(dw, x) {
+    if (dw.dist === "weibull_mixture" || (dw.k1 != null && dw.k2 != null)) {
+        const w1 = dw.w1 != null ? dw.w1 : 0.5;
+        return w1 * _weibPdf(x, dw.k1, dw.lambda1) + (1 - w1) * _weibPdf(x, dw.k2, dw.lambda2);
+    }
+    if (dw.k != null) return _weibPdf(x, dw.k, dw.lambda);
+    return 0;
+}
+
+// Compact Plotly layout shared by the small preview charts.
+function _previewLayout(opts) {
+    return Object.assign({
+        margin: { t: 24, l: 36, r: 8, b: 30 },
+        height: opts.height || 150,
+        showlegend: false,
+        font: { size: 10, family: "var(--font-ui)" },
+        title: opts.title ? { text: opts.title, font: { size: 11, color: "#1f4e79" } } : undefined,
+        xaxis: { title: opts.xtitle ? { text: opts.xtitle, font: { size: 9 } } : undefined,
+                 tickfont: { size: 8 }, zeroline: false },
+        yaxis: { showticklabels: false, zeroline: false, showgrid: false },
+        paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    }, opts.extra || {});
+}
+const _PLOT_CFG = { displayModeBar: false, responsive: true, staticPlot: false };
+
+// ── Location price + (illustrative) weather ──────────────────────────────────
+function renderLocationPreview(hostPrice, data, hostWeather) {
+    const t = data.tariff || {};
+    const off = t.energy_price_offpeak, pk = t.energy_price_peak;
+    const win = t.peak_window || [];
+    const xs = [], ys = [];
+    for (let h = 0; h <= 24; h += 0.25) {
+        xs.push(h);
+        const peak = win.length === 2 && h >= win[0] && h < win[1];
+        ys.push(peak ? pk : off);
+    }
+    const traces = [{
+        x: xs, y: ys, type: "scatter", mode: "lines",
+        line: { color: "#1f4e79", width: 2 }, fill: "tozeroy",
+        fillcolor: "rgba(31,78,121,0.10)", hoverinfo: "x+y",
+    }];
+    const layout = _previewLayout({
+        title: `${data.id} — ${t.type || "tariff"} ($/kWh)`,
+        xtitle: "hour of day",
+        extra: { xaxis: { range: [0, 24], tickvals: [0, 6, 12, 18, 24], tickfont: { size: 8 } },
+                 yaxis: { rangemode: "tozero", tickfont: { size: 8 }, showticklabels: true },
+                 shapes: win.length === 2 ? [{
+                     type: "rect", xref: "x", yref: "paper", x0: win[0], x1: win[1],
+                     y0: 0, y1: 1, fillcolor: "rgba(216,133,59,0.13)", line: { width: 0 },
+                 }] : [] },
+    });
+    Plotly.newPlot(hostPrice, traces, layout, _PLOT_CFG);
+
+    if (hostWeather) {
+        // Illustrative monthly dry-bulb shape keyed off the climate band. Marked
+        // illustrative — the real TMYx series is exported only at generation.
+        const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+        const CLIMATE_TEMPS = {
+            subtropical: [7, 9, 14, 18, 23, 27, 28, 28, 24, 18, 12, 8],
+            temperate: [4, 6, 10, 14, 19, 23, 26, 25, 21, 15, 9, 5],
+            cold: [-8, -5, 1, 9, 16, 21, 24, 22, 17, 9, 1, -5],
+            tropical: [20, 21, 23, 25, 27, 28, 29, 29, 28, 26, 23, 21],
+        };
+        const temps = CLIMATE_TEMPS[data.climate] || CLIMATE_TEMPS.temperate;
+        Plotly.newPlot(hostWeather, [{
+            x: months, y: temps, type: "bar",
+            marker: { color: "rgba(216,133,59,0.85)" }, hoverinfo: "y",
+        }], _previewLayout({
+            title: `weather (illustrative · ${data.climate || "?"})`,
+            extra: { yaxis: { tickfont: { size: 8 }, showticklabels: true, title: { text: "°C", font: { size: 9 } } } },
+        }), _PLOT_CFG);
+    }
+}
+
+// ── Building illustrative daily load ──────────────────────────────────────────
+function renderBuildingPreview(host, data) {
+    const ls = data.load_shape || {};
+    const peak = Number(data.peak_kw) || 1;
+    const xs = ls.hours || [];
+    const ys = (ls.normalized || []).map(f => f * peak);
+    Plotly.newPlot(host, [{
+        x: xs, y: ys, type: "scatter", mode: "lines",
+        line: { color: "#1f4e79", width: 2 }, fill: "tozeroy",
+        fillcolor: "rgba(31,78,121,0.12)", hoverinfo: "x+y",
+    }], _previewLayout({
+        title: `${data.id} — ${data.archetype}/${data.size} · peak ${peak} kW`
+            + ((data.load_shape || {}).source === "comstock_amy2018"
+               ? ` · ComStock CZ-${(data.load_shape || {}).reference_zone}` : " (illustrative)"),
+        xtitle: "hour of day",
+        extra: { xaxis: { range: [0, 24], tickvals: [0, 6, 12, 18, 24], tickfont: { size: 8 } },
+                 yaxis: { rangemode: "tozero", tickfont: { size: 8 }, showticklabels: true,
+                          title: { text: "kW", font: { size: 9 } } } },
+    }), _PLOT_CFG);
+}
+
+// ── Population arrival / dwell / SoC / region-frequency ───────────────────────
+// Returns the ordered region list (name, weight, color) so callers can build a
+// legend. Renders into whichever of the four hosts are provided.
+function renderPopulationPreview(hosts, data) {
+    const axes = data.axes_distribution || [];
+    const rd = data.region_distributions || {};
+    // Order regions by axes_distribution (weight order); attach a color each.
+    const regions = axes.map((a, i) => ({
+        name: a.name, weight: a.weight,
+        color: PREVIEW_REGION_COLORS[i % PREVIEW_REGION_COLORS.length],
+        dist: rd[a.name] || {},
+    }));
+
+    const mkSeries = (xs, fn) => regions
+        .filter(r => fn.has(r))
+        .map(r => ({
+            x: xs, y: xs.map(x => fn.eval(r, x)), type: "scatter", mode: "lines",
+            line: { color: r.color, width: 1.6 }, name: r.name, hoverinfo: "skip",
+        }));
+
+    if (hosts.arrival) {
+        const xs = _lin(4, 22, 90);
+        const traces = mkSeries(xs, {
+            has: r => r.dist.arrival, eval: (r, x) => _arrivalPdf(r.dist.arrival, x),
+        });
+        Plotly.newPlot(hosts.arrival, traces, _previewLayout({
+            title: "arrival hour — TruncNorm", xtitle: "hour",
+            extra: { xaxis: { range: [4, 22], tickvals: [6, 9, 12, 15, 18, 21], tickfont: { size: 8 } } },
+        }), _PLOT_CFG);
+    }
+    if (hosts.dwell) {
+        const xs = _lin(0.05, 18, 90);
+        const traces = mkSeries(xs, {
+            has: r => r.dist.dwell, eval: (r, x) => _dwellPdf(r.dist.dwell, x),
+        });
+        Plotly.newPlot(hosts.dwell, traces, _previewLayout({
+            title: "dwell hours — Weibull", xtitle: "hours",
+            extra: { xaxis: { range: [0, 18], tickvals: [0, 4, 8, 12, 16], tickfont: { size: 8 } } },
+        }), _PLOT_CFG);
+    }
+    if (hosts.soc) {
+        const xs = _lin(0.01, 0.99, 90);
+        const traces = mkSeries(xs, {
+            has: r => r.dist.soc_arrival,
+            eval: (r, x) => _betaPdf(x, r.dist.soc_arrival.alpha, r.dist.soc_arrival.beta),
+        });
+        Plotly.newPlot(hosts.soc, traces, _previewLayout({
+            title: "arrival SoC — Beta", xtitle: "state of charge",
+            extra: { xaxis: { range: [0, 1], tickvals: [0, 0.5, 1], ticktext: ["0", "50%", "100%"], tickfont: { size: 8 } } },
+        }), _PLOT_CFG);
+    }
+    if (hosts.freq) {
+        Plotly.newPlot(hosts.freq, [{
+            x: regions.map(r => r.name.split("_")[0]),
+            y: regions.map(r => r.weight),
+            type: "bar",
+            marker: { color: regions.map(r => r.color) },
+            text: regions.map(r => `${Math.round((r.weight || 0) * 100)}%`),
+            textposition: "outside", textfont: { size: 8 }, hoverinfo: "x+y",
+        }], _previewLayout({
+            title: "region frequency",
+            extra: { xaxis: { tickfont: { size: 7 } }, yaxis: { rangemode: "tozero" },
+                     margin: { t: 24, l: 8, r: 8, b: 40 } },
+        }), _PLOT_CFG);
+    }
+    return regions;
+}
+
+async function _fetchPreview(kind, id) {
+    const r = await fetch(`/api/preview/${kind}/${encodeURIComponent(id)}`);
+    return safeJson(r);
+}
+
+// Resolve the EFFECTIVE descriptor id for a card: the explicit pick if one is
+// chosen, else the base scenario's inherited descriptor (so previews render for
+// defaults, not just explicit picks). Returns {id, inherited} — `inherited` is
+// true when the id came from the base scenario rather than an explicit pick.
+function effectiveDescriptor(card, kind) {
+    const explicit = card.querySelector(".mb-" + kind).value;
+    if (explicit) return { id: explicit, inherited: false };
+    const baseId = card.querySelector(".mb-base").value;
+    const sc = (SCENARIOS || []).find(s => s.id === baseId);
+    const inheritedId = sc && sc.descriptors && sc.descriptors[kind];
+    return inheritedId ? { id: inheritedId, inherited: true } : { id: null, inherited: false };
+}
+
+// ── Integration A: per-field ⓘ popover ───────────────────────────────────────
+// Click an ⓘ next to Location/Building/Population → fetch the preview for the
+// CURRENTLY selected option → render a compact Plotly chart in a floating
+// popover. Click-outside (or clicking the same ⓘ) closes. Mirrors the
+// der-popover pattern (one popover at a time, body-anchored, outside-close).
+async function togglePreviewPopover(btn, kind, card) {
+    const existing = document.querySelector(".preview-popover");
+    const wasForThis = existing && existing._forBtn === btn;
+    if (existing) existing.remove();
+    if (wasForThis) return;
+
+    // Resolve the effective descriptor: explicit pick, else the base scenario's
+    // inherited default — so the ⓘ always previews something.
+    const eff = effectiveDescriptor(card, kind);
+    const id = eff.id;
+    if (!id) return;  // no explicit pick AND no scenario default → nothing to show
+
+    const pop = document.createElement("div");
+    pop.className = "preview-popover";
+    pop._forBtn = btn;
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    pop.style.left = `${window.scrollX + Math.max(8, r.left - 120)}px`;
+    pop.style.top = `${window.scrollY + r.bottom + 4}px`;
+    pop.innerHTML = `<p class="pp-head">${kind}: ${id} — loading…</p>`;
+
+    let data;
+    try {
+        data = await _fetchPreview(kind, id);
+    } catch (e) {
+        pop.innerHTML = `<p class="pp-head">preview fetch failed: ${escapeHtml(String(e.message || e))}</p>`;
+        data = null;
+    }
+    if (data && data.error) { pop.innerHTML = `<p class="pp-head">${escapeHtml(data.error)}</p>`; data = null; }
+    if (data) {
+        // Build the head + chart hosts first (so the head survives even if the
+        // Plotly draw throws — e.g. CDN unavailable), then draw in a guarded step.
+        pop.innerHTML = "";
+        const head = document.createElement("p");
+        head.className = "pp-head";
+        const tag = eff.inherited ? " (scenario default)" : "";
+        // one-line "affects:" row for this single input
+        const affectsRow = (tags) => {
+            const row = document.createElement("div");
+            row.className = "preview-affects";
+            row.innerHTML = `<strong>affects:</strong>`
+                + tags.map(t => `<span class="a-tag">${t}</span>`).join("");
+            return row;
+        };
+        const draws = [];
+        if (kind === "location") {
+            const t = data.tariff || {};
+            head.textContent = `${id}${tag} — ${t.type || "tariff"} · DR: ${t.dr_program || "none"}`;
+            pop.appendChild(head);
+            pop.appendChild(affectsRow(["utility prices", "weather → building load"]));
+            const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
+            draws.push(() => renderLocationPreview(c, data, null));
+        } else if (kind === "building") {
+            head.textContent = `${id}${tag} — ${data.archetype}/${data.size} · ${data.doe_prototype}`;
+            pop.appendChild(head);
+            pop.appendChild(affectsRow(["building load shape & magnitude"]));
+            const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
+            const ls = data.load_shape || {};
+            const note = document.createElement("p");
+            note.className = "pp-note";
+            note.textContent = ls.source === "comstock_amy2018"
+                ? `real ComStock weekday shape · CZ-${ls.reference_zone} · peak = ${data.peak_kw} kW`
+                : "load shape is illustrative";
+            draws.push(() => { renderBuildingPreview(c, data); pop.appendChild(note); });
+        } else {  // population
+            head.textContent = `${id}${tag} — ${(data.axes_distribution || []).length} regions`;
+            pop.appendChild(head);
+            pop.appendChild(affectsRow(["arrival", "dwell", "energy / required SoC", "region frequency"]));
+            const grid = document.createElement("div"); grid.className = "pp-grid"; pop.appendChild(grid);
+            const a = document.createElement("div"); a.className = "pp-chart"; grid.appendChild(a);
+            const dw = document.createElement("div"); dw.className = "pp-chart"; grid.appendChild(dw);
+            const so = document.createElement("div"); so.className = "pp-chart"; grid.appendChild(so);
+            const fr = document.createElement("div"); fr.className = "pp-chart"; grid.appendChild(fr);
+            const leg = document.createElement("div"); leg.className = "pp-legend"; pop.appendChild(leg);
+            draws.push(() => {
+                const regions = renderPopulationPreview({ arrival: a, dwell: dw, soc: so, freq: fr }, data);
+                leg.innerHTML = regions.map(rg =>
+                    `<span class="pp-k"><span class="pp-sw" style="background:${rg.color}"></span>${escapeHtml(rg.name)}</span>`).join("");
+            });
+        }
+        try { draws.forEach(d => d()); } catch (e) {
+            const err = document.createElement("p");
+            err.className = "pp-note"; err.textContent = `chart unavailable: ${String(e.message || e)}`;
+            pop.appendChild(err);
+        }
+    }
+
+    setTimeout(() => {
+        const close = (e) => {
+            if (!pop.contains(e.target) && e.target !== btn) {
+                pop.remove();
+                document.removeEventListener("click", close);
+            }
+        };
+        document.addEventListener("click", close);
+    }, 0);
+}
+
+// ── Integration B: the collapsible "Preview" panel per card ───────────────────
+// Renders all three previews (for this card's current selections) into the
+// .card-preview container. Re-run whenever location/building/population change
+// or the panel is opened. Skipped while the <details> is closed (cheap + avoids
+// laying out hidden Plotly charts at 0 width).
+async function renderCardPreview(card) {
+    const details = card.querySelector(".mb-preview");
+    if (!details || !details.open) return;
+    const host = card.querySelector(".card-preview");
+    if (!host) return;
+
+    // Resolve EFFECTIVE descriptors: explicit pick, else the base scenario's
+    // inherited default — so the panel renders for defaults, not just explicit
+    // picks. A freshly-added card (nothing chosen) still shows the S01 defaults.
+    const loc = effectiveDescriptor(card, "location");
+    const bldg = effectiveDescriptor(card, "building");
+    const pop = effectiveDescriptor(card, "population");
+    const dtag = (eff) => eff.inherited ? ` <span class="pp-default-tag">scenario default</span>` : "";
+    // Per-input "affects:" tag row — what THAT single input drives downstream.
+    const affects = (tags) => `<div class="preview-affects"><strong>affects:</strong>`
+        + tags.map(t => `<span class="a-tag">${t}</span>`).join("") + `</div>`;
+
+    host.innerHTML = `
+        <div class="pv-block" data-block="location"></div>
+        <div class="pv-block" data-block="building"></div>
+        <div class="pv-block" data-block="population"></div>`;
+
+    const block = (sel) => host.querySelector(`.pv-block[data-block='${sel}']`);
+
+    // A guarded chart draw: the block scaffold (headings, caveats, chart hosts)
+    // is written first so it survives even if the Plotly draw throws — e.g. the
+    // Plotly CDN is unreachable. Only the fetch/parse failures show inline.
+    const drawGuarded = (hostBlock, drawFn) => {
+        try { drawFn(); } catch (e) {
+            const err = document.createElement("p");
+            err.className = "pp-note";
+            err.textContent = `chart unavailable: ${String(e.message || e)}`;
+            hostBlock.appendChild(err);
+        }
+    };
+
+    // location
+    const locBlock = block("location");
+    if (!loc.id) {
+        locBlock.innerHTML = `<h4>location</h4><p class="pp-note">no location (base scenario sets none)</p>`;
+    } else {
+        try {
+            const data = await _fetchPreview("location", loc.id);
+            if (data.error) throw new Error(data.error);
+            locBlock.innerHTML = `<h4>location · ${escapeHtml(loc.id)}${dtag(loc)}</h4>
+                ${affects(["utility prices", "weather → building load"])}
+                <div class="chart-grid"><div class="chart-card" data-c="price"></div>
+                <div class="chart-card" data-c="weather"></div></div>
+                <p class="pp-note">price is the real tariff; the monthly temperature chart is illustrative (real TMYx weather is exported at generation).</p>`;
+            drawGuarded(locBlock, () => renderLocationPreview(
+                locBlock.querySelector("[data-c='price']"), data,
+                locBlock.querySelector("[data-c='weather']")));
+        } catch (e) { locBlock.innerHTML = `<h4>location</h4><p class="pp-note">${escapeHtml(String(e.message || e))}</p>`; }
+    }
+
+    // building
+    const bBlock = block("building");
+    if (!bldg.id) {
+        bBlock.innerHTML = `<h4>building</h4><p class="pp-note">no building (base scenario sets none)</p>`;
+    } else {
+        try {
+            const data = await _fetchPreview("building", bldg.id);
+            if (data.error) throw new Error(data.error);
+            const ls = data.load_shape || {};
+            const caveat = ls.source === "comstock_amy2018"
+                ? `Real <strong>NREL ComStock</strong> weekday profile (CZ-${ls.reference_zone}, reference climate), normalized so the peak equals <strong>peak_kw = ${data.peak_kw} kW</strong>. The deployed location's weather shifts the real curve.`
+                : `daily load shape is illustrative — normalized to peak_kw = ${data.peak_kw} kW.`;
+            bBlock.innerHTML = `<h4>building · ${escapeHtml(bldg.id)}${dtag(bldg)}</h4>
+                ${affects(["building load shape & magnitude"])}
+                <div class="chart-grid"><div class="chart-card" data-c="load"></div></div>
+                <p class="pp-note">${caveat}</p>`;
+            drawGuarded(bBlock, () => renderBuildingPreview(bBlock.querySelector("[data-c='load']"), data));
+        } catch (e) { bBlock.innerHTML = `<h4>building</h4><p class="pp-note">${escapeHtml(String(e.message || e))}</p>`; }
+    }
+
+    // population
+    const pBlock = block("population");
+    if (!pop.id) {
+        pBlock.innerHTML = `<h4>population</h4><p class="pp-note">no population (base scenario sets none)</p>`;
+    } else {
+        try {
+            const data = await _fetchPreview("population", pop.id);
+            if (data.error) throw new Error(data.error);
+            pBlock.innerHTML = `<h4>population · ${escapeHtml(pop.id)}${dtag(pop)} — ${(data.axes_distribution || []).length} regions</h4>
+                ${affects(["arrival", "dwell", "energy / required SoC", "region frequency"])}
+                <div class="chart-grid">
+                    <div class="chart-card" data-c="arr"></div><div class="chart-card" data-c="dw"></div>
+                    <div class="chart-card" data-c="soc"></div><div class="chart-card" data-c="freq"></div>
+                </div><div class="pp-legend" data-c="leg"></div>`;
+            drawGuarded(pBlock, () => {
+                const regions = renderPopulationPreview({
+                    arrival: pBlock.querySelector("[data-c='arr']"),
+                    dwell: pBlock.querySelector("[data-c='dw']"),
+                    soc: pBlock.querySelector("[data-c='soc']"),
+                    freq: pBlock.querySelector("[data-c='freq']"),
+                }, data);
+                pBlock.querySelector("[data-c='leg']").innerHTML = regions.map(rg =>
+                    `<span class="pp-k"><span class="pp-sw" style="background:${rg.color}"></span>${escapeHtml(rg.name)}</span>`).join("");
+            });
+        } catch (e) { pBlock.innerHTML = `<h4>population</h4><p class="pp-note">${escapeHtml(String(e.message || e))}</p>`; }
+    }
 }
 
 function extractOptimusFeature(rows, csvName, feature) {

@@ -206,6 +206,189 @@ def api_scenarios():
     return jsonify(load_scenarios())
 
 
+# ────────────────────────────────────────────────────────────────────────────
+# Input previews (read-only). Each endpoint reads the descriptor library and
+# returns the parameters the UI needs to draw a quick "what does this input
+# produce" preview. NO generation run — these are pure config reads.
+# ────────────────────────────────────────────────────────────────────────────
+
+def _load_library(filename: str) -> dict:
+    with open(CONFIGS / filename) as f:
+        return yaml.safe_load(f) or {}
+
+
+@app.route("/api/preview/location/<loc_id>")
+def api_preview_location(loc_id: str):
+    """Tariff + climate fields for a location descriptor (read-only)."""
+    lib = _load_library("locations.yaml")
+    entry = lib.get(loc_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown location: {loc_id}"}), 404
+    tariff = entry.get("tariff") or {}
+    return jsonify({
+        "id": loc_id,
+        "description": entry.get("description", ""),
+        "climate": entry.get("climate"),
+        "tmyx_station": entry.get("tmyx_station"),
+        "tariff": {
+            "type": tariff.get("type"),
+            "energy_price_offpeak": tariff.get("energy_price_offpeak"),
+            "energy_price_peak": tariff.get("energy_price_peak"),
+            "peak_window": tariff.get("peak_window"),
+            "demand_charge_per_kw": tariff.get("demand_charge_per_kw"),
+            "dr_program": tariff.get("dr_program"),
+        },
+    })
+
+
+@app.route("/api/preview/population/<pop_id>")
+def api_preview_population(pop_id: str):
+    """Region weights + per-region arrival/dwell/SoC distribution params for a
+    population descriptor (read-only). Arrival may be a single TruncNorm
+    (mu/sigma) or a 2-component TruncNorm mixture (w1/mu1/sigma1/mu2/sigma2);
+    both shapes are passed through verbatim so the client can plot either."""
+    lib = _load_library("populations.yaml")
+    entry = lib.get(pop_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown population: {pop_id}"}), 404
+
+    axes = []
+    for r in entry.get("axes_distribution") or []:
+        if isinstance(r, dict):
+            axes.append({"name": r.get("name"), "weight": r.get("weight")})
+
+    regions = {}
+    for name, rd in (entry.get("region_distributions") or {}).items():
+        if not isinstance(rd, dict):
+            continue
+        out: dict = {}
+        if isinstance(rd.get("arrival"), dict):
+            out["arrival"] = rd["arrival"]
+        if isinstance(rd.get("dwell"), dict):
+            out["dwell"] = rd["dwell"]
+        if isinstance(rd.get("soc_arrival"), dict):
+            out["soc_arrival"] = rd["soc_arrival"]
+        regions[name] = out
+
+    return jsonify({
+        "id": pop_id,
+        "description": entry.get("description", ""),
+        "calibration_policy": entry.get("calibration_policy"),
+        "axes_distribution": axes,
+        "region_distributions": regions,
+    })
+
+
+# Real ComStock normalized weekday load shapes (NREL ComStock AMY2018), keyed
+# `<archetype>|<size>|<climate-zone>`, peak-normalized to 1.0. Committed under
+# data/buildingload_reference/. We serve the CZ-5B shape (the generator's
+# reference location, Nashville) scaled to the building's peak_kw — so the
+# preview peak equals peak_kw, exactly like the generator's output.
+_BLOAD_REF_PATH = REPO_ROOT / "data" / "buildingload_reference" / "reference_bands.json"
+_BLOAD_REFERENCE_ZONE = "5B"  # CZ-5B (cool-dry); the reference/Nashville climate
+
+
+def _load_building_load_reference() -> dict:
+    try:
+        with open(_BLOAD_REF_PATH) as f:
+            return json.load(f) or {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _building_load_shape(archetype: str, size: str) -> dict:
+    """Return the real ComStock weekday 24h shape (normalized to 1.0 at peak)
+    for this (archetype, size) at the reference zone, with graceful fallbacks.
+    The returned dict carries the source key actually used so the UI can be
+    honest about which reference/climate it reflects."""
+    ref = _load_building_load_reference()
+    # `mixed` has no ComStock prototype → fall back to office (occupancy-driven).
+    ref_arch = "office" if archetype == "mixed" else (archetype or "office")
+    # Try the requested size, then medium, then any size, all at the ref zone.
+    candidates = [
+        f"{ref_arch}|{size}|{_BLOAD_REFERENCE_ZONE}",
+        f"{ref_arch}|med|{_BLOAD_REFERENCE_ZONE}",
+    ]
+    candidates += [k for k in ref
+                   if k.startswith(f"{ref_arch}|") and k.endswith(f"|{_BLOAD_REFERENCE_ZONE}")]
+    for key in candidates:
+        entry = ref.get(key)
+        if isinstance(entry, dict) and entry.get("shape_weekday"):
+            sw = list(entry["shape_weekday"])  # 24 hourly values, max == 1.0
+            if len(sw) == 24:
+                # close the daily loop so the line spans [0,24] with hour 24 == hour 0
+                norm = [round(float(v), 5) for v in sw] + [round(float(sw[0]), 5)]
+                return {"key": key, "normalized": norm, "found": True}
+    return {"key": None, "normalized": None, "found": False}
+
+
+@app.route("/api/preview/building/<bldg_id>")
+def api_preview_building(bldg_id: str):
+    """Building archetype/size/peak + a REAL normalized daily load shape
+    (read-only). The shape is the NREL ComStock AMY2018 normalized weekday
+    profile for this (archetype, size) at the reference climate zone (CZ-5B,
+    Nashville), peak-normalized to 1.0 — the client scales it to `peak_kw`, so
+    the preview peaks at exactly peak_kw, like the generator's output."""
+    lib = _load_library("buildings.yaml")
+    entry = lib.get(bldg_id)
+    if not isinstance(entry, dict):
+        return jsonify({"error": f"unknown building: {bldg_id}"}), 404
+
+    archetype = entry.get("archetype")
+    size = entry.get("size")
+    shp = _building_load_shape(archetype, size)
+    is_mixed = archetype == "mixed"
+
+    if shp["found"]:
+        note = (f"NREL ComStock AMY2018 weekday profile ({shp['key']}), "
+                f"normalized to peak_kw. Reference climate zone CZ-{_BLOAD_REFERENCE_ZONE} "
+                f"(Nashville); the deployed location's weather shifts the real curve.")
+        if is_mixed:
+            note += " Mixed-use uses the office profile (occupancy-driven)."
+        load_shape = {
+            "source": "comstock_amy2018",
+            "reference_zone": _BLOAD_REFERENCE_ZONE,
+            "reference_key": shp["key"],
+            "illustrative": False,
+            "note": note,
+            "hours": list(range(25)),
+            "normalized": shp["normalized"],  # fraction of peak_kw, per hour 0..24
+        }
+    else:
+        # No reference available → honest fallback to a stylized archetype bell.
+        import math
+        base = 0.34
+        shape = []
+        for h in range(25):
+            if archetype == "retail":
+                w = math.exp(-(((h - 15) / 4.5) ** 2)); frac = 0.30 + 0.70 * w
+            elif archetype == "office":
+                w = math.exp(-(((h - 13) / 4.2) ** 2)); frac = base + (1 - base) * w
+            else:
+                w = math.exp(-(((h - 14) / 5.0) ** 2)); frac = 0.40 + 0.60 * w
+            shape.append(round(frac, 4))
+        load_shape = {
+            "source": "stylized",
+            "illustrative": True,
+            "note": ("ComStock reference unavailable — stylized archetype curve, "
+                     "normalized to peak_kw."),
+            "hours": list(range(25)),
+            "normalized": shape,
+        }
+
+    return jsonify({
+        "id": bldg_id,
+        "description": entry.get("description", ""),
+        "archetype": archetype,
+        "size": size,
+        "peak_kw": entry.get("peak_kw"),
+        "doe_prototype": entry.get("doe_prototype"),
+        "occupancy_source": entry.get("occupancy_source"),
+        "default_population": entry.get("default_population"),
+        "load_shape": load_shape,
+    })
+
+
 @app.route("/api/resolve", methods=["POST"])
 def api_resolve():
     """Dry-run knob resolution: same chain the CLI uses, no rendering.
