@@ -26,6 +26,7 @@ import tempfile
 import time
 import traceback
 import uuid
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -234,24 +235,76 @@ def _config_dict(cfg: MultiConfig) -> dict[str, Any]:
     }
 
 
+def _warn_on_duplicate_seeds(specs: list[BuildingSpec]) -> None:
+    """Warn if the fully-expanded building list has colliding seeds.
+
+    Distinct seeds are what make replicas distinct realizations; a collision
+    (e.g. user-set seeds too close together relative to their multipliers)
+    yields byte-identical buildings, which is almost never intended.
+    """
+    seen: dict[int, int] = {}
+    dupes: list[int] = []
+    for bid, spec in enumerate(specs):
+        if spec.seed in seen:
+            dupes.append(spec.seed)
+        else:
+            seen[spec.seed] = bid
+    if dupes:
+        warnings.warn(
+            "multi-building expansion produced duplicate seed(s) "
+            f"{sorted(set(dupes))} across the expanded building list; those "
+            "buildings will be byte-identical. Space user-set seeds across "
+            "entries by at least each entry's multiplier to avoid collisions.",
+            stacklevel=2,
+        )
+
+
 def config_from_dict(data: dict[str, Any]) -> MultiConfig:
     """Rebuild a MultiConfig from parsed JSON/YAML.
 
     Accepts both shapes: an exported `multi_building_config.json` (globals
     nested under `"globals"`) and a hand-authored config (globals at top level).
+
+    **Multiplier expansion.** Each building entry may carry an optional
+    ``multiplier: int`` (default ``1``, must be ``>= 1``). An entry with
+    ``multiplier=N`` expands into ``N`` *distinct* realizations of the SAME
+    config (identical ``base_scenario`` / ``descriptors`` / ``overrides`` /
+    ``noise_profile`` / ``weather_profile`` / ``policy``), where replica ``k``
+    (``k = 0 .. N-1``) is given seed ``base_seed + k``. Expansion is applied in
+    file order, and ``building_id`` is assigned sequentially across the fully
+    expanded list (so multipliers compose with multiple entries — see
+    `_config_dict`). ``multiplier`` is an *input-only* convenience: the recorded
+    `multi_building_config.json` stores the fully expanded list with concrete
+    per-replica seeds and never re-expands on regenerate.
+
+    Caveat: replica seeds run ``base_seed .. base_seed + N - 1``, so user-set
+    seeds across entries should be spaced by at least each entry's multiplier to
+    avoid colliding (e.g. seeds 100 and 102 with multiplier 3 overlap at 102).
+    A warning is emitted if the final expanded list contains duplicate seeds.
     """
     g = data.get("globals", data)  # nested (exported) or top-level (authored)
     specs = []
     for b in data["buildings"]:
-        specs.append(BuildingSpec(
-            base_scenario=b["base_scenario"],
-            descriptors=b.get("descriptors") or {},
-            overrides=b.get("overrides") or {},
-            seed=int(b.get("seed", 42)),
-            noise_profile=b.get("noise_profile"),
-            weather_profile=b.get("weather_profile"),
-            policy=b.get("policy"),
-        ))
+        mult = b.get("multiplier", 1)
+        if isinstance(mult, bool) or not isinstance(mult, int):
+            raise ValueError(
+                f"multiplier must be an integer >= 1, got {mult!r} "
+                f"(type {type(mult).__name__})"
+            )
+        if mult < 1:
+            raise ValueError(f"multiplier must be >= 1, got {mult}")
+        base_seed = int(b.get("seed", 42))
+        for k in range(mult):
+            specs.append(BuildingSpec(
+                base_scenario=b["base_scenario"],
+                descriptors=b.get("descriptors") or {},
+                overrides=b.get("overrides") or {},
+                seed=base_seed + k,
+                noise_profile=b.get("noise_profile"),
+                weather_profile=b.get("weather_profile"),
+                policy=b.get("policy"),
+            ))
+    _warn_on_duplicate_seeds(specs)
     return MultiConfig(
         buildings=specs,
         output_mode=data.get("output_mode", g.get("output_mode", "shared")),

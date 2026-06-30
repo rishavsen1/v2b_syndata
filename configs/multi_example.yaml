@@ -12,13 +12,21 @@ buildings:
     descriptors: {location: nashville_tn}
     overrides: {ev_fleet.ev_count: 30, charging_infra.charger_count: 30}
     seed: 42
+    # multiplier: 5            # OPTIONAL (default 1, must be >= 1): expand this
+    #                          # one entry into N DISTINCT buildings, each with
+    #                          # the SAME config but a deterministic distinct
+    #                          # seed (replica k gets seed = base_seed + k, here
+    #                          # 42,43,44,45,46). building_id is assigned
+    #                          # sequentially across the fully expanded list.
+    #                          # Space seeds across entries by >= each entry's
+    #                          # multiplier so the seed ranges don't collide.
 
   - base_scenario: S01
     descriptors: {building: large_office_v1, location: san_jose_ca}
     overrides: {ev_fleet.ev_count: 25, charging_infra.charger_count: 25}
-    seed: 7
+    seed: 1007             # spaced clear of entry 1's 42-range to avoid seed collisions
 
   - base_scenario: S01
     descriptors: {population: stable_commuter_heavy}
     overrides: {ev_fleet.ev_count: 20, charging_infra.charger_count: 20}
-    seed: 99
+    seed: 2099
