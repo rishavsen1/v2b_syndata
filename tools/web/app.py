@@ -503,10 +503,19 @@ def api_generate_unified():
         "--end-month", end_month,
         "--samples-per-month", str(int(payload.get("samples", 1))),
         "--workers", str(int(payload.get("workers", 4))),
+        # Run-level output-noise default (per-building noise_profile in each spec
+        # still wins). Defaults to tmyx_stochastic — today's effective default.
         "--noise-profile", payload.get("noise_profile") or "tmyx_stochastic",
     ]
-    # Weather perturbation is per-building (each spec carries its own
-    # weather_profile, written into the config above); no run-level flag needed.
+    # Run-level weather perturbation default: each building spec may carry its
+    # own weather_profile (written into the config above, which wins); these
+    # flags set the run-level default + an optional explicit per-sample σ.
+    weather_profile = payload.get("weather_profile")
+    if weather_profile:
+        cmd += ["--weather-profile", weather_profile]
+    weather_sigma_c = payload.get("weather_sigma_c")
+    if weather_sigma_c not in (None, "") and float(weather_sigma_c) > 0:
+        cmd += ["--weather-sigma-c", str(float(weather_sigma_c))]
     if payload.get("force", True):
         cmd.append("--force")
 
@@ -627,6 +636,15 @@ def api_batch():
         "--workers", str(workers),
         "--noise-profile", noise_profile,
     ]
+    # Run-level Dirichlet α's (sample-to-sample behavior/battery-mix variation).
+    # Only forwarded when explicitly set; otherwise `batch` applies its own
+    # tmyx_stochastic default (α≈30), keeping default runs unchanged.
+    axes_alpha = payload.get("axes_alpha")
+    if axes_alpha not in (None, ""):
+        cmd += ["--axes-alpha", str(float(axes_alpha))]
+    battery_alpha = payload.get("battery_alpha")
+    if battery_alpha not in (None, ""):
+        cmd += ["--battery-alpha", str(float(battery_alpha))]
     if force:
         cmd.append("--force")
     for path, value in (payload.get("overrides") or {}).items():

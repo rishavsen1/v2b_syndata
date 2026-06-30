@@ -52,8 +52,18 @@
             <label><span class="field-name">DR incentive ($/kW)</span><input type="number" id="u-dr-incentive" step="0.5" placeholder="(default)"></label>
             <label><span class="field-name">DR penalty ($/kWh)</span><input type="number" id="u-dr-penalty" step="0.5" placeholder="(default)"></label>
             <label><span class="field-name">Default policy</span><input type="text" id="u-default-policy" value="ILP-MPCFIXEDFSL"></label>
+            <label><span class="field-name">Output noise profile (run default)</span>
+                <select id="u-noise-profile"></select>
+            </label>
+            <label><span class="field-name">Weather perturbation (run default)</span>
+                <select id="u-weather-profile"></select>
+            </label>
+            <label><span class="field-name">Weather σ °C (per-sample, 0=profile)</span><input type="number" id="u-weather-sigma-c" min="0" step="0.5" value="0"></label>
+            <label><span class="field-name">Axes Dirichlet α</span><input type="number" id="u-axes-alpha" min="0" step="1"></label>
+            <label><span class="field-name">Battery-mix Dirichlet α</span><input type="number" id="u-battery-alpha" min="0" step="1"></label>
             <label class="inline-flag" style="margin-left:0"><input type="checkbox" id="u-force" checked> overwrite output if exists</label>
         </div>
+        <div id="alpha-hint" class="hint" style="margin-top:0.3rem">The <code>tmyx_stochastic</code> noise profile implies Dirichlet α≈30 (sample-to-sample variation in behavior/battery mix); higher α (e.g. <code>1e6</code>) effectively turns it off. These are the run-level defaults — a per-building card override still wins.</div>
         <div id="run-estimate" class="hint"></div>
     </section>
 

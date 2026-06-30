@@ -74,6 +74,8 @@ _JITTER_KNOBS = (
     "noise.dr_notification_dropout_prob",
     "noise.price_jitter_pct",
     "noise.occupancy_jitter_pct",
+    "noise.load_flex_jitter_pct",
+    "noise.load_inflex_jitter_pct",
 )
 
 
@@ -255,6 +257,20 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
     if args.output_mode:
         cfg.output_mode = args.output_mode
 
+    # Run-level Dirichlet alphas: applied to every building's overrides (so they
+    # win over the per-building tmyx_stochastic setdefault in multi_building).
+    # Matches `batch`'s --axes-alpha/--battery-alpha. A per-building override of
+    # the same key still wins (set explicitly in the config).
+    if args.axes_alpha is not None or args.battery_alpha is not None:
+        for spec in cfg.buildings:
+            spec.overrides = dict(spec.overrides)
+            if (args.axes_alpha is not None
+                    and "user_behavior.axes_distribution_dirichlet_alpha" not in spec.overrides):
+                spec.overrides["user_behavior.axes_distribution_dirichlet_alpha"] = args.axes_alpha
+            if (args.battery_alpha is not None
+                    and "ev_fleet.battery_mix_dirichlet_alpha" not in spec.overrides):
+                spec.overrides["ev_fleet.battery_mix_dirichlet_alpha"] = args.battery_alpha
+
     # Batch mode: buildings × samples × months when --start-month is given.
     if args.start_month:
         def _progress(res, m):
@@ -271,6 +287,7 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
             noise_profile=args.noise_profile,
             weather_profile=args.weather_profile,
             weather_sigma_c=args.weather_sigma_c,
+            weather_solar_sigma=args.weather_solar_sigma,
             force=args.force,
             progress_callback=_progress,
         )
@@ -512,6 +529,15 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--weather-sigma-c", type=float, default=0.0,
                     help="explicit per-sample dry-bulb σ (°C); overrides the temperature "
                          "σ of --weather-profile when > 0.")
+    gm.add_argument("--weather-solar-sigma", type=float, default=0.0,
+                    help="explicit per-sample solar-scale σ; overrides the solar σ of "
+                         "--weather-profile when > 0 (matches `batch`'s weather solar σ).")
+    gm.add_argument("--axes-alpha", type=float, default=None,
+                    help="user_behavior.axes_distribution_dirichlet_alpha applied to every "
+                         "building (matches `batch`; default 30 when noise=tmyx_stochastic).")
+    gm.add_argument("--battery-alpha", type=float, default=None,
+                    help="ev_fleet.battery_mix_dirichlet_alpha applied to every building "
+                         "(matches `batch`; default 30 when noise=tmyx_stochastic).")
     gm.add_argument("--force", action="store_true", help="overwrite output-dir if it exists")
     gm.set_defaults(func=cmd_generate_multi)
 

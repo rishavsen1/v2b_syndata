@@ -80,7 +80,7 @@ const DER_GRID_KNOBS = new Map([
 // so every dial that adds randomness/realism lives in one place. The whole
 // `noise` bucket plus the two fixed weather-offset knobs move there.
 //   - noise.profile is represented by the .mb-noise dropdown (not a duplicate widget)
-//   - the per-sample stochastic weather σ is a run-level control (#u-weather-sigma)
+//   - the per-sample stochastic weather σ is a run-level control (#u-weather-sigma-c)
 const PERTURB_WEATHER_KNOBS = new Set([
     "building_load.weather_temp_offset_c",
     "building_load.weather_solar_scale",
@@ -151,8 +151,51 @@ async function init() {
     });
     const estInputs = ["u-start-month", "u-end-month", "u-samples"];
     estInputs.forEach(id => document.getElementById(id).addEventListener("input", updateRunEstimate));
+    initRunLevelControls();             // noise/weather/alpha run-level defaults
     addBuilding();                      // start with one building card
     updateRunEstimate();
+}
+
+// Run-level sample-variation controls (noise profile, weather perturbation +
+// per-sample σ, and the two Dirichlet α's). These default to today's effective
+// values so a default run is byte-identical to before (F2: "surface it, keep
+// default"). A per-building card override still wins over these run defaults.
+const ALPHA_TMYX = 30;        // α the tmyx_stochastic profile implies today
+const ALPHA_OFF = 1e6;        // effectively-off α (clean / non-stochastic)
+
+function initRunLevelControls() {
+    // Noise profile select — default tmyx_stochastic (current batch/web default).
+    const noiseSel = document.getElementById("u-noise-profile");
+    if (noiseSel) {
+        mbFillSelect(noiseSel, DESCRIPTORS.noise, null);
+        noiseSel.value = "tmyx_stochastic";
+        noiseSel.addEventListener("change", updateAlphaPlaceholders);
+    }
+    // Weather perturbation select — default none.
+    const wxSel = document.getElementById("u-weather-profile");
+    if (wxSel) {
+        mbFillSelect(wxSel, DESCRIPTORS.weather, null);
+        wxSel.value = "none";
+    }
+    updateAlphaPlaceholders();
+}
+
+// F2 pre-fill: the α inputs show the EFFECTIVE value for the chosen noise
+// profile (30 under tmyx_stochastic, else 1e6). They stay as placeholders so a
+// blank input means "use the effective default" and the payload only sends an
+// explicit α when the user types one.
+function effectiveAlpha() {
+    const noiseSel = document.getElementById("u-noise-profile");
+    const prof = noiseSel ? noiseSel.value : "tmyx_stochastic";
+    return prof === "tmyx_stochastic" ? ALPHA_TMYX : ALPHA_OFF;
+}
+
+function updateAlphaPlaceholders() {
+    const eff = String(effectiveAlpha());
+    ["u-axes-alpha", "u-battery-alpha"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.placeholder = eff;
+    });
 }
 
 function updateSourceLabel(widget, path, ctx) {
@@ -1030,6 +1073,13 @@ function applyConfig(cfg) {
     set("u-workers", cfg.workers);
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
+    // Run-level sample-variation controls.
+    set("u-noise-profile", cfg.noise_profile); set("u-weather-profile", cfg.weather_profile);
+    set("u-weather-sigma-c", cfg.weather_sigma_c);
+    const sh = cfg.shared_overrides || {};
+    set("u-axes-alpha", sh["user_behavior.axes_distribution_dirichlet_alpha"]);
+    set("u-battery-alpha", sh["ev_fleet.battery_mix_dirichlet_alpha"]);
+    updateAlphaPlaceholders();
     if (cfg.output_mode) {
         const r = document.querySelector(`input[name='output-mode'][value='${cfg.output_mode}']`);
         if (r) r.checked = true;
@@ -1064,6 +1114,22 @@ function buildUnifiedPayload() {
     const drp = val("u-dr-program"); if (drp) payload.dr_program = drp;
     const inc = num("u-dr-incentive"); if (inc !== null) payload.dr_incentive_per_kw = inc;
     const pen = num("u-dr-penalty"); if (pen !== null) payload.dr_penalty_per_kwh = pen;
+
+    // Run-level sample-variation controls (defaults match today's effective
+    // behavior so a default run is unchanged). A per-building card's own
+    // noise_profile / weather_profile / α override still wins.
+    const np = val("u-noise-profile"); if (np) payload.noise_profile = np;
+    const wp = val("u-weather-profile"); if (wp) payload.weather_profile = wp;
+    const wsig = num("u-weather-sigma-c"); if (wsig !== null) payload.weather_sigma_c = wsig;
+    // Dirichlet α's flow through shared_overrides (merged into every building,
+    // per-building overrides win). Only sent when the user typed an explicit
+    // value — a blank input keeps the profile-implied effective default.
+    const shared = {};
+    const aa = num("u-axes-alpha");
+    if (aa !== null) shared["user_behavior.axes_distribution_dirichlet_alpha"] = aa;
+    const ba = num("u-battery-alpha");
+    if (ba !== null) shared["ev_fleet.battery_mix_dirichlet_alpha"] = ba;
+    if (Object.keys(shared).length) payload.shared_overrides = shared;
     return payload;
 }
 

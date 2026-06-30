@@ -146,6 +146,126 @@ def test_generate_unified_builds_per_building_config(client, tmp_path):
 
 
 @pytest.mark.webapp
+def test_generate_unified_run_level_sample_variation(client, tmp_path):
+    """Run-level noise/weather/Dirichlet-α controls flow through the unified
+    endpoint: noise + weather → CLI flags; the two α's → shared_overrides merged
+    into every building. Spawn then immediately kill — no EnergyPlus wait."""
+    payload = {
+        "buildings": [
+            {"base_scenario": "S01", "seed": 1},
+            {"base_scenario": "S01", "seed": 2},
+        ],
+        "output_mode": "shared", "output_path": str(tmp_path / "o"),
+        "start_month": "2024-04", "end_month": "2024-04", "samples": 1, "workers": 1,
+        "noise_profile": "clean", "weather_profile": "moderate", "weather_sigma_c": 1.5,
+        "shared_overrides": {
+            "user_behavior.axes_distribution_dirichlet_alpha": 12,
+            "ev_fleet.battery_mix_dirichlet_alpha": 7,
+        },
+    }
+    r = client.post("/api/generate-unified", json=payload)
+    assert r.status_code == 200
+    job = r.get_json()["job_id"]
+    try:
+        cmd = webapp.BATCH_JOBS[job]["cmd"]
+        # run-level noise + weather forwarded as CLI flags
+        assert "--noise-profile" in cmd and cmd[cmd.index("--noise-profile") + 1] == "clean"
+        assert "--weather-profile" in cmd and cmd[cmd.index("--weather-profile") + 1] == "moderate"
+        assert "--weather-sigma-c" in cmd and cmd[cmd.index("--weather-sigma-c") + 1] == "1.5"
+        # α's merged into every building via shared_overrides
+        cfg = json.loads(list(webapp.RUNS_DIR.glob(f"_unified_cfg_{job}.json"))[0].read_text())
+        assert "shared_overrides" not in cfg  # collapsed into each building
+        for b in cfg["buildings"]:
+            assert b["overrides"]["user_behavior.axes_distribution_dirichlet_alpha"] == 12
+            assert b["overrides"]["ev_fleet.battery_mix_dirichlet_alpha"] == 7
+    finally:
+        webapp.BATCH_JOBS[job]["process"].terminate()
+
+
+@pytest.mark.webapp
+def test_generate_unified_defaults_unchanged(client, tmp_path):
+    """A default run (no run-level controls set) still uses the historical
+    default noise profile and forwards no weather/α flags → output unchanged."""
+    payload = {
+        "buildings": [{"base_scenario": "S01", "seed": 1}],
+        "output_path": str(tmp_path / "o"),
+        "start_month": "2024-04", "end_month": "2024-04", "samples": 1, "workers": 1,
+    }
+    r = client.post("/api/generate-unified", json=payload)
+    job = r.get_json()["job_id"]
+    try:
+        cmd = webapp.BATCH_JOBS[job]["cmd"]
+        assert cmd[cmd.index("--noise-profile") + 1] == "tmyx_stochastic"
+        assert "--weather-profile" not in cmd
+        assert "--weather-sigma-c" not in cmd
+        cfg = json.loads(list(webapp.RUNS_DIR.glob(f"_unified_cfg_{job}.json"))[0].read_text())
+        ov = cfg["buildings"][0]["overrides"]
+        assert "user_behavior.axes_distribution_dirichlet_alpha" not in ov
+        assert "ev_fleet.battery_mix_dirichlet_alpha" not in ov
+    finally:
+        webapp.BATCH_JOBS[job]["process"].terminate()
+
+
+@pytest.mark.webapp
+def test_batch_forwards_alpha_and_noise_flags(client, tmp_path):
+    """/api/batch surfaces noise_profile and forwards --axes-alpha/--battery-alpha
+    when set. Spawn then kill (no EnergyPlus wait)."""
+    payload = {
+        "base_scenario": "S01", "output_path": str(tmp_path / "b"),
+        "start_month": "2024-04", "end_month": "2024-04", "samples": 1, "workers": 1,
+        "noise_profile": "clean", "axes_alpha": 5, "battery_alpha": 9,
+    }
+    r = client.post("/api/batch", json=payload)
+    assert r.status_code == 200
+    bid = r.get_json()["batch_id"]
+    try:
+        cmd = webapp.BATCH_JOBS[bid]["cmd"]
+        assert cmd[cmd.index("--noise-profile") + 1] == "clean"
+        assert "--axes-alpha" in cmd and cmd[cmd.index("--axes-alpha") + 1] == "5.0"
+        assert "--battery-alpha" in cmd and cmd[cmd.index("--battery-alpha") + 1] == "9.0"
+    finally:
+        webapp.BATCH_JOBS[bid]["process"].terminate()
+
+
+@pytest.mark.webapp
+def test_batch_defaults_no_alpha_flags(client, tmp_path):
+    """Without explicit α's, /api/batch forwards no alpha flags (batch applies
+    its own tmyx_stochastic default), keeping default runs unchanged."""
+    payload = {
+        "base_scenario": "S01", "output_path": str(tmp_path / "b2"),
+        "start_month": "2024-04", "end_month": "2024-04", "samples": 1, "workers": 1,
+    }
+    bid = client.post("/api/batch", json=payload).get_json()["batch_id"]
+    try:
+        cmd = webapp.BATCH_JOBS[bid]["cmd"]
+        assert "--axes-alpha" not in cmd and "--battery-alpha" not in cmd
+        assert cmd[cmd.index("--noise-profile") + 1] == "tmyx_stochastic"
+    finally:
+        webapp.BATCH_JOBS[bid]["process"].terminate()
+
+
+@pytest.mark.webapp
+def test_index_html_has_run_level_controls():
+    """The run-grid surfaces the four run-level sample-variation controls; app.js
+    populates + wires them with the F2 effective-default pre-fill."""
+    web = Path(__file__).resolve().parents[1] / "tools" / "web" / "static"
+    idx = (web / "index.html").read_text()
+    for el in ("u-noise-profile", "u-weather-profile", "u-weather-sigma-c",
+               "u-axes-alpha", "u-battery-alpha"):
+        assert el in idx, f"{el} missing from index.html"
+    app_js = (web / "app.js").read_text()
+    assert "initRunLevelControls" in app_js and "updateAlphaPlaceholders" in app_js
+    # F2 effective α pre-fill (30 under tmyx_stochastic, 1e6 otherwise)
+    assert "ALPHA_TMYX = 30" in app_js and "ALPHA_OFF = 1e6" in app_js
+    # payload wiring: run-level noise/weather + α's into shared_overrides
+    assert "payload.noise_profile" in app_js and "payload.weather_profile" in app_js
+    assert "user_behavior.axes_distribution_dirichlet_alpha" in app_js
+    assert "ev_fleet.battery_mix_dirichlet_alpha" in app_js
+    # F4: the stale #u-weather-sigma comment now matches the real control id
+    assert "#u-weather-sigma-c" in app_js
+
+
+@pytest.mark.webapp
 def test_unified_status_csv_download_fake_job(client, tmp_path):
     """Cover the status/csv/download endpoints without EnergyPlus by registering
     a finished fake job over a hand-built output tree."""
