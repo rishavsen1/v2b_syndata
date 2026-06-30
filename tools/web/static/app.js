@@ -879,8 +879,10 @@ function createBuildingCard() {
         previewDetails.addEventListener("toggle", () => {
             if (previewDetails.open) renderCardPreview(card);
         });
-        ["location", "building", "population"].forEach(k =>
-            card.querySelector(".mb-" + k).addEventListener("change", () => renderCardPreview(card)));
+        // Re-render on descriptor changes AND on base-scenario change (the base
+        // determines which inherited defaults fill any blank descriptor).
+        [".mb-location", ".mb-building", ".mb-population", ".mb-base"].forEach(s =>
+            card.querySelector(s).addEventListener("change", () => renderCardPreview(card)));
     }
 
     // Footgun guard: Max SoC ≤ the departure floor (min_depart_soc) drops ALL
@@ -1368,12 +1370,26 @@ const _betaPdf = (x, a, b) => {
 };
 const _lin = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
 
-// TruncNorm pdf on [lo,hi] (renormalized). Falls back to a plain normal if the
-// truncation mass can't be computed; for plotting purposes the un-normalized
-// curve is fine since each region's curve is plotted on its own.
+// Abramowitz & Stegun 7.1.26 erf approximation (|err| < 1.5e-7), → standard
+// normal CDF Φ. Needed to renormalize the truncated normal over its window.
+function _erf(x) {
+    const s = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+        - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+}
+const _normCdf = (x, mu, sigma) => 0.5 * (1 + _erf((x - mu) / (sigma * Math.SQRT2)));
+
+// Truncated-normal pdf on [lo,hi], RENORMALIZED so it integrates to 1 over the
+// window: φ((x-μ)/σ)/σ ÷ (Φ(hi)-Φ(lo)). (Without the divisor the curve is just a
+// clipped normal and under-integrates whenever μ sits near a window edge.)
 function _truncNormPdf(x, mu, sigma, lo, hi) {
     if (x < lo || x > hi) return 0;
-    return _normPdf(x, mu, sigma);
+    const z = _normCdf(hi, mu, sigma) - _normCdf(lo, mu, sigma);
+    if (z <= 1e-9) return 0;
+    return _normPdf(x, mu, sigma) / z;
 }
 // Evaluate an arrival distribution (single TruncNorm or 2-comp mixture) at x.
 function _arrivalPdf(arr, x) {
@@ -1555,6 +1571,19 @@ async function _fetchPreview(kind, id) {
     return safeJson(r);
 }
 
+// Resolve the EFFECTIVE descriptor id for a card: the explicit pick if one is
+// chosen, else the base scenario's inherited descriptor (so previews render for
+// defaults, not just explicit picks). Returns {id, inherited} — `inherited` is
+// true when the id came from the base scenario rather than an explicit pick.
+function effectiveDescriptor(card, kind) {
+    const explicit = card.querySelector(".mb-" + kind).value;
+    if (explicit) return { id: explicit, inherited: false };
+    const baseId = card.querySelector(".mb-base").value;
+    const sc = (SCENARIOS || []).find(s => s.id === baseId);
+    const inheritedId = sc && sc.descriptors && sc.descriptors[kind];
+    return inheritedId ? { id: inheritedId, inherited: true } : { id: null, inherited: false };
+}
+
 // ── Integration A: per-field ⓘ popover ───────────────────────────────────────
 // Click an ⓘ next to Location/Building/Population → fetch the preview for the
 // CURRENTLY selected option → render a compact Plotly chart in a floating
@@ -1566,9 +1595,11 @@ async function togglePreviewPopover(btn, kind, card) {
     if (existing) existing.remove();
     if (wasForThis) return;
 
-    const sel = card.querySelector(".mb-" + kind);
-    const id = sel && sel.value;
-    if (!id) return;  // "scenario default" / blank → nothing selected to preview
+    // Resolve the effective descriptor: explicit pick, else the base scenario's
+    // inherited default — so the ⓘ always previews something.
+    const eff = effectiveDescriptor(card, kind);
+    const id = eff.id;
+    if (!id) return;  // no explicit pick AND no scenario default → nothing to show
 
     const pop = document.createElement("div");
     pop.className = "preview-popover";
@@ -1593,22 +1624,27 @@ async function togglePreviewPopover(btn, kind, card) {
         pop.innerHTML = "";
         const head = document.createElement("p");
         head.className = "pp-head";
+        const tag = eff.inherited ? " (scenario default)" : "";
         const draws = [];
         if (kind === "location") {
             const t = data.tariff || {};
-            head.textContent = `${id} — ${t.type || "tariff"} · DR: ${t.dr_program || "none"}`;
+            head.textContent = `${id}${tag} — ${t.type || "tariff"} · DR: ${t.dr_program || "none"}`;
             pop.appendChild(head);
             const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
             draws.push(() => renderLocationPreview(c, data, null));
         } else if (kind === "building") {
-            head.textContent = `${id} — ${data.archetype}/${data.size} · ${data.doe_prototype}`;
+            head.textContent = `${id}${tag} — ${data.archetype}/${data.size} · ${data.doe_prototype}`;
             pop.appendChild(head);
             const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
+            const ls = data.load_shape || {};
             const note = document.createElement("p");
-            note.className = "pp-note"; note.textContent = "load shape is illustrative";
+            note.className = "pp-note";
+            note.textContent = ls.source === "comstock_amy2018"
+                ? `real ComStock weekday shape · CZ-${ls.reference_zone} · peak = ${data.peak_kw} kW`
+                : "load shape is illustrative";
             draws.push(() => { renderBuildingPreview(c, data); pop.appendChild(note); });
         } else {  // population
-            head.textContent = `${id} — ${(data.axes_distribution || []).length} regions`;
+            head.textContent = `${id}${tag} — ${(data.axes_distribution || []).length} regions`;
             pop.appendChild(head);
             const grid = document.createElement("div"); grid.className = "pp-grid"; pop.appendChild(grid);
             const a = document.createElement("div"); a.className = "pp-chart"; grid.appendChild(a);
@@ -1651,9 +1687,13 @@ async function renderCardPreview(card) {
     const host = card.querySelector(".card-preview");
     if (!host) return;
 
-    const loc = card.querySelector(".mb-location").value;
-    const bldg = card.querySelector(".mb-building").value;
-    const pop = card.querySelector(".mb-population").value;
+    // Resolve EFFECTIVE descriptors: explicit pick, else the base scenario's
+    // inherited default — so the panel renders for defaults, not just explicit
+    // picks. A freshly-added card (nothing chosen) still shows the S01 defaults.
+    const loc = effectiveDescriptor(card, "location");
+    const bldg = effectiveDescriptor(card, "building");
+    const pop = effectiveDescriptor(card, "population");
+    const dtag = (eff) => eff.inherited ? ` <span class="pp-default-tag">scenario default</span>` : "";
 
     host.innerHTML = `
         <div class="preview-affects"><strong>affects →</strong>
@@ -1680,15 +1720,16 @@ async function renderCardPreview(card) {
 
     // location
     const locBlock = block("location");
-    if (!loc) {
-        locBlock.innerHTML = `<h4>location</h4><p class="pp-note">no location selected (using scenario default)</p>`;
+    if (!loc.id) {
+        locBlock.innerHTML = `<h4>location</h4><p class="pp-note">no location (base scenario sets none)</p>`;
     } else {
         try {
-            const data = await _fetchPreview("location", loc);
+            const data = await _fetchPreview("location", loc.id);
             if (data.error) throw new Error(data.error);
-            locBlock.innerHTML = `<h4>location · ${escapeHtml(loc)}</h4>
+            locBlock.innerHTML = `<h4>location · ${escapeHtml(loc.id)}${dtag(loc)}</h4>
                 <div class="chart-grid"><div class="chart-card" data-c="price"></div>
-                <div class="chart-card" data-c="weather"></div></div>`;
+                <div class="chart-card" data-c="weather"></div></div>
+                <p class="pp-note">price is the real tariff; the monthly temperature chart is illustrative (real TMYx weather is exported at generation).</p>`;
             drawGuarded(locBlock, () => renderLocationPreview(
                 locBlock.querySelector("[data-c='price']"), data,
                 locBlock.querySelector("[data-c='weather']")));
@@ -1697,28 +1738,32 @@ async function renderCardPreview(card) {
 
     // building
     const bBlock = block("building");
-    if (!bldg) {
-        bBlock.innerHTML = `<h4>building</h4><p class="pp-note">no building selected (using scenario default)</p>`;
+    if (!bldg.id) {
+        bBlock.innerHTML = `<h4>building</h4><p class="pp-note">no building (base scenario sets none)</p>`;
     } else {
         try {
-            const data = await _fetchPreview("building", bldg);
+            const data = await _fetchPreview("building", bldg.id);
             if (data.error) throw new Error(data.error);
-            bBlock.innerHTML = `<h4>building · ${escapeHtml(bldg)}</h4>
+            const ls = data.load_shape || {};
+            const caveat = ls.source === "comstock_amy2018"
+                ? `Real <strong>NREL ComStock</strong> weekday profile (CZ-${ls.reference_zone}, reference climate), normalized so the peak equals <strong>peak_kw = ${data.peak_kw} kW</strong>. The deployed location's weather shifts the real curve.`
+                : `daily load shape is illustrative — normalized to peak_kw = ${data.peak_kw} kW.`;
+            bBlock.innerHTML = `<h4>building · ${escapeHtml(bldg.id)}${dtag(bldg)}</h4>
                 <div class="chart-grid"><div class="chart-card" data-c="load"></div></div>
-                <p class="pp-note">daily load shape is <strong>illustrative</strong> — production uses a precomputed EnergyPlus profile.</p>`;
+                <p class="pp-note">${caveat}</p>`;
             drawGuarded(bBlock, () => renderBuildingPreview(bBlock.querySelector("[data-c='load']"), data));
         } catch (e) { bBlock.innerHTML = `<h4>building</h4><p class="pp-note">${escapeHtml(String(e.message || e))}</p>`; }
     }
 
     // population
     const pBlock = block("population");
-    if (!pop) {
-        pBlock.innerHTML = `<h4>population</h4><p class="pp-note">no population selected (using scenario default)</p>`;
+    if (!pop.id) {
+        pBlock.innerHTML = `<h4>population</h4><p class="pp-note">no population (base scenario sets none)</p>`;
     } else {
         try {
-            const data = await _fetchPreview("population", pop);
+            const data = await _fetchPreview("population", pop.id);
             if (data.error) throw new Error(data.error);
-            pBlock.innerHTML = `<h4>population · ${escapeHtml(pop)} — ${(data.axes_distribution || []).length} regions</h4>
+            pBlock.innerHTML = `<h4>population · ${escapeHtml(pop.id)}${dtag(pop)} — ${(data.axes_distribution || []).length} regions</h4>
                 <div class="chart-grid">
                     <div class="chart-card" data-c="arr"></div><div class="chart-card" data-c="dw"></div>
                     <div class="chart-card" data-c="soc"></div><div class="chart-card" data-c="freq"></div>

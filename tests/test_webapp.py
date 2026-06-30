@@ -141,15 +141,31 @@ def test_preview_building(client):
     assert d["peak_kw"] == 500 and d["doe_prototype"] == "MediumOffice"
     assert d["occupancy_source"] == "ashrae_90_1_office"
     ls = d["load_shape"]
-    assert ls["illustrative"] is True
-    assert len(ls["normalized"]) == 25 and len(ls["hours"]) == 25
-    # office shape peaks around midday (13h), not at hour 0
+    # REAL ComStock weekday shape (not illustrative), peak-normalized to 1.0 so
+    # the client scales it to peak_kw → preview peak == peak_kw.
+    assert ls["source"] == "comstock_amy2018" and ls["illustrative"] is False
+    assert ls["reference_zone"] == "5B"
+    assert ls["reference_key"] == "office|med|5B"
     norm = ls["normalized"]
-    assert norm.index(max(norm)) in range(10, 16)
-    # retail shape peaks in the evening
+    assert len(norm) == 25 and len(ls["hours"]) == 25
+    assert abs(max(norm) - 1.0) < 1e-6           # normalized to peak == 1.0
+    assert norm[0] == norm[24]                   # daily loop closed
+    # office shape peaks in the daytime (ComStock med-office peaks ~13h)
+    assert norm.index(max(norm)) in range(9, 17)
+    # retail shape is also real ComStock, peaking in the afternoon
     r = client.get("/api/preview/building/retail_strip_mall").get_json()
-    rnorm = r["load_shape"]["normalized"]
-    assert rnorm.index(max(rnorm)) >= 16
+    rls = r["load_shape"]
+    assert rls["source"] == "comstock_amy2018"
+    assert rls["reference_key"].startswith("retail|")
+    assert abs(max(rls["normalized"]) - 1.0) < 1e-6
+    assert rls["normalized"].index(max(rls["normalized"])) >= 12   # afternoon/evening
+    # mixed-use has no ComStock prototype → falls back to the office profile,
+    # still a real shape (note flags the fallback)
+    mx = client.get("/api/preview/building/mixed_use_v1").get_json()
+    mls = mx["load_shape"]
+    assert mls["source"] == "comstock_amy2018"
+    assert mls["reference_key"].startswith("office|")
+    assert "office profile" in mls["note"].lower()
     # bad id → 404
     assert client.get("/api/preview/building/nope").status_code == 404
 

@@ -579,6 +579,18 @@ button.secondary:hover { background: var(--primary); color: white; }
     min-width: 0;
 }
 .pp-note { font-size: 0.72rem; color: var(--text-muted); font-style: italic; margin: 0.3rem 0 0; }
+.pp-default-tag {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-style: normal;
+    background: #eef3f8;
+    color: var(--primary);
+    border: 1px solid #cfe0ee;
+    border-radius: 9px;
+    padding: 0 6px;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
 .pp-legend {
     display: flex;
     flex-wrap: wrap;

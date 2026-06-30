@@ -279,53 +279,113 @@ def api_preview_population(pop_id: str):
     })
 
 
+# Real ComStock normalized weekday load shapes (NREL ComStock AMY2018), keyed
+# `<archetype>|<size>|<climate-zone>`, peak-normalized to 1.0. Committed under
+# data/buildingload_reference/. We serve the CZ-5B shape (the generator's
+# reference location, Nashville) scaled to the building's peak_kw — so the
+# preview peak equals peak_kw, exactly like the generator's output.
+_BLOAD_REF_PATH = REPO_ROOT / "data" / "buildingload_reference" / "reference_bands.json"
+_BLOAD_REFERENCE_ZONE = "5B"  # CZ-5B (cool-dry); the reference/Nashville climate
+
+
+def _load_building_load_reference() -> dict:
+    try:
+        with open(_BLOAD_REF_PATH) as f:
+            return json.load(f) or {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _building_load_shape(archetype: str, size: str) -> dict:
+    """Return the real ComStock weekday 24h shape (normalized to 1.0 at peak)
+    for this (archetype, size) at the reference zone, with graceful fallbacks.
+    The returned dict carries the source key actually used so the UI can be
+    honest about which reference/climate it reflects."""
+    ref = _load_building_load_reference()
+    # `mixed` has no ComStock prototype → fall back to office (occupancy-driven).
+    ref_arch = "office" if archetype == "mixed" else (archetype or "office")
+    # Try the requested size, then medium, then any size, all at the ref zone.
+    candidates = [
+        f"{ref_arch}|{size}|{_BLOAD_REFERENCE_ZONE}",
+        f"{ref_arch}|med|{_BLOAD_REFERENCE_ZONE}",
+    ]
+    candidates += [k for k in ref
+                   if k.startswith(f"{ref_arch}|") and k.endswith(f"|{_BLOAD_REFERENCE_ZONE}")]
+    for key in candidates:
+        entry = ref.get(key)
+        if isinstance(entry, dict) and entry.get("shape_weekday"):
+            sw = list(entry["shape_weekday"])  # 24 hourly values, max == 1.0
+            if len(sw) == 24:
+                # close the daily loop so the line spans [0,24] with hour 24 == hour 0
+                norm = [round(float(v), 5) for v in sw] + [round(float(sw[0]), 5)]
+                return {"key": key, "normalized": norm, "found": True}
+    return {"key": None, "normalized": None, "found": False}
+
+
 @app.route("/api/preview/building/<bldg_id>")
 def api_preview_building(bldg_id: str):
-    """Building archetype/size/peak + an ILLUSTRATIVE normalized daily load
-    shape (read-only). The shape is a stylized archetype curve (office:
-    midday-centred; retail: evening-rising), NOT an EnergyPlus simulation — a
-    precomputed-EnergyPlus profile is a later phase. Marked `illustrative`."""
+    """Building archetype/size/peak + a REAL normalized daily load shape
+    (read-only). The shape is the NREL ComStock AMY2018 normalized weekday
+    profile for this (archetype, size) at the reference climate zone (CZ-5B,
+    Nashville), peak-normalized to 1.0 — the client scales it to `peak_kw`, so
+    the preview peaks at exactly peak_kw, like the generator's output."""
     lib = _load_library("buildings.yaml")
     entry = lib.get(bldg_id)
     if not isinstance(entry, dict):
         return jsonify({"error": f"unknown building: {bldg_id}"}), 404
 
     archetype = entry.get("archetype")
-    # 24 hourly samples of a normalized [0,1] load shape (fraction of peak).
-    import math
+    size = entry.get("size")
+    shp = _building_load_shape(archetype, size)
+    is_mixed = archetype == "mixed"
 
-    base = 0.34
-    shape = []
-    for h in range(25):
-        if archetype == "retail":
-            # evening-rising: low morning, climbs through afternoon, peaks ~19h
-            w = math.exp(-(((h - 19) / 4.5) ** 2))
-            frac = 0.30 + 0.70 * w
-        elif archetype == "office":
-            # midday-centred workday bell, peak ~13h
-            w = math.exp(-(((h - 13) / 4.2) ** 2))
-            frac = base + (1 - base) * w
-        else:  # mixed / unknown → broad daytime plateau
-            w = math.exp(-(((h - 14) / 5.0) ** 2))
-            frac = 0.40 + 0.60 * w
-        shape.append(round(frac, 4))
+    if shp["found"]:
+        note = (f"NREL ComStock AMY2018 weekday profile ({shp['key']}), "
+                f"normalized to peak_kw. Reference climate zone CZ-{_BLOAD_REFERENCE_ZONE} "
+                f"(Nashville); the deployed location's weather shifts the real curve.")
+        if is_mixed:
+            note += " Mixed-use uses the office profile (occupancy-driven)."
+        load_shape = {
+            "source": "comstock_amy2018",
+            "reference_zone": _BLOAD_REFERENCE_ZONE,
+            "reference_key": shp["key"],
+            "illustrative": False,
+            "note": note,
+            "hours": list(range(25)),
+            "normalized": shp["normalized"],  # fraction of peak_kw, per hour 0..24
+        }
+    else:
+        # No reference available → honest fallback to a stylized archetype bell.
+        import math
+        base = 0.34
+        shape = []
+        for h in range(25):
+            if archetype == "retail":
+                w = math.exp(-(((h - 15) / 4.5) ** 2)); frac = 0.30 + 0.70 * w
+            elif archetype == "office":
+                w = math.exp(-(((h - 13) / 4.2) ** 2)); frac = base + (1 - base) * w
+            else:
+                w = math.exp(-(((h - 14) / 5.0) ** 2)); frac = 0.40 + 0.60 * w
+            shape.append(round(frac, 4))
+        load_shape = {
+            "source": "stylized",
+            "illustrative": True,
+            "note": ("ComStock reference unavailable — stylized archetype curve, "
+                     "normalized to peak_kw."),
+            "hours": list(range(25)),
+            "normalized": shape,
+        }
 
     return jsonify({
         "id": bldg_id,
         "description": entry.get("description", ""),
         "archetype": archetype,
-        "size": entry.get("size"),
+        "size": size,
         "peak_kw": entry.get("peak_kw"),
         "doe_prototype": entry.get("doe_prototype"),
         "occupancy_source": entry.get("occupancy_source"),
         "default_population": entry.get("default_population"),
-        "load_shape": {
-            "illustrative": True,
-            "note": ("Stylized archetype curve, not an EnergyPlus simulation. "
-                     "A precomputed-EnergyPlus profile is a later phase."),
-            "hours": list(range(25)),
-            "normalized": shape,  # fraction of peak_kw, per hour 0..24
-        },
+        "load_shape": load_shape,
     })
 
 
