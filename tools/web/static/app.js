@@ -811,7 +811,7 @@ function createBuildingCard() {
         <div class="mb-soc-warn inline-error" style="display:none"></div>
         <details class="mb-preview panel-row">
             <summary><span class="chev">▶</span>Preview — what these inputs produce (this building)</summary>
-            <p class="hint" style="margin:0.3rem 0">Computed from the selected Location / Building / Population config values, drawn with Plotly. Re-renders when any of those three change. The building daily-load shape is <strong>illustrative</strong> (production uses a precomputed EnergyPlus profile).</p>
+            <p class="hint" style="margin:0.3rem 0">Computed from the selected Location / Building / Population config values, drawn with Plotly. Re-renders when any of those three change. The building load is a <strong>real NREL ComStock</strong> weekday profile (reference climate CZ-5B) scaled to peak_kw; only the weather mini-chart is illustrative.</p>
             <div class="card-preview"></div>
         </details>
         <details class="mb-der">
@@ -1490,7 +1490,9 @@ function renderBuildingPreview(host, data) {
         line: { color: "#1f4e79", width: 2 }, fill: "tozeroy",
         fillcolor: "rgba(31,78,121,0.12)", hoverinfo: "x+y",
     }], _previewLayout({
-        title: `${data.id} — ${data.archetype}/${data.size} · peak ${peak} kW (illustrative)`,
+        title: `${data.id} — ${data.archetype}/${data.size} · peak ${peak} kW`
+            + ((data.load_shape || {}).source === "comstock_amy2018"
+               ? ` · ComStock CZ-${(data.load_shape || {}).reference_zone}` : " (illustrative)"),
         xtitle: "hour of day",
         extra: { xaxis: { range: [0, 24], tickvals: [0, 6, 12, 18, 24], tickfont: { size: 8 } },
                  yaxis: { rangemode: "tozero", tickfont: { size: 8 }, showticklabels: true,
