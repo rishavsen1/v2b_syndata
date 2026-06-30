@@ -38,10 +38,18 @@ const PLOT_FEATURES = {
         { value: "price_per_kwh",    label: "price ($/kWh)" },
     ],
     "weather_data.csv": [
-        { value: "dry_bulb_temp_c",        label: "dry-bulb temperature (°C)" },
-        { value: "global_horizontal_w_m2", label: "solar GHI (W/m²)" },
-        { value: "relative_humidity_pct",  label: "relative humidity (%)" },
-        { value: "wind_speed_m_s",         label: "wind speed (m/s)" },
+        { value: "dry_bulb_temp_c",          label: "dry-bulb temperature (°C)" },
+        { value: "dew_point_temp_c",         label: "dew-point temperature (°C)" },
+        { value: "relative_humidity_pct",    label: "relative humidity (%)" },
+        { value: "global_horizontal_w_m2",   label: "solar GHI (W/m²)" },
+        { value: "direct_normal_w_m2",       label: "solar DNI (W/m²)" },
+        { value: "diffuse_horizontal_w_m2",  label: "solar DHI (W/m²)" },
+        { value: "wind_speed_m_s",           label: "wind speed (m/s)" },
+        { value: "wind_direction_deg",       label: "wind direction (°)" },
+        { value: "atmospheric_pressure_pa",  label: "atmospheric pressure (Pa)" },
+        { value: "horizontal_ir_w_m2",       label: "horizontal IR / sky longwave (W/m²)" },
+        { value: "total_sky_cover",          label: "total sky cover (tenths)" },
+        { value: "opaque_sky_cover",         label: "opaque sky cover (tenths)" },
     ],
 };
 // CSVs that carry per-building distributions worth plotting.

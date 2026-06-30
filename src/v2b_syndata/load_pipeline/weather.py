@@ -294,28 +294,44 @@ def perturb_epw_file(
     return Path(out_path)
 
 
+def _opt_float(parts: list[str], idx: int) -> float:
+    """Parse an optional EPW field → float, or NaN when absent/unparseable.
+    Lets minimal rows (e.g. fixtures without sky-cover) stay parseable."""
+    try:
+        return float(parts[idx])
+    except (ValueError, IndexError):
+        return float("nan")
+
+
 def parse_epw_weather(
     epw_path: Path, *, year: int = 2020,
 ) -> pd.DataFrame:
-    """Parse the EPW weather fields used by the optimus `weather_data.csv`
-    export: dry-bulb temp, dew-point temp, relative humidity, wind speed, and
-    the three solar-irradiance channels.
+    """Parse the EPW weather fields used by the optimus `weather_data.csv` export.
 
     Returns an hourly DataFrame indexed by datetime (built from each EPW row's
     month/day/hour anchored to `year`, mirroring `parse_epw_temperatures`), with
     columns `dry_bulb_temp_c, dew_point_temp_c, relative_humidity_pct,
     wind_speed_m_s, global_horizontal_w_m2, direct_normal_w_m2,
-    diffuse_horizontal_w_m2`.
+    diffuse_horizontal_w_m2, atmospheric_pressure_pa, horizontal_ir_w_m2,
+    wind_direction_deg, total_sky_cover, opaque_sky_cover`.
+
+    The first seven are the model's perturbed channels + solar; the last five are
+    the additional raw EnergyPlus weather inputs, carried through unperturbed so
+    weather_data.csv is a fuller record of what the simulation saw.
 
     EPW data-row columns (0-indexed):
       1:Month 2:Day 3:Hour 6:DryBulb[°C] 7:DewPoint[°C] 8:RelativeHumidity[%]
-      13:GlobalHorizontalRadiation 14:DirectNormalRadiation
-      15:DiffuseHorizontalRadiation (all Wh/m², hourly ≈ avg W/m²) 21:WindSpeed[m/s]
-    Hour is 1-24 in EPW; remapped to 0-23 for pandas.
+      9:AtmosphericPressure[Pa] 12:HorizontalInfraredRadiation[Wh/m²]
+      13:GlobalHorizontal 14:DirectNormal 15:DiffuseHorizontal (Wh/m² ≈ avg W/m²)
+      20:WindDirection[°] 21:WindSpeed[m/s] 22:TotalSkyCover[tenths] 23:OpaqueSkyCover[tenths]
+    Hour is 1-24 in EPW; remapped to 0-23 for pandas. Cols 9/12/20/22/23 are
+    optional (NaN when a minimal row omits them).
     """
     cols = ["month", "day", "hour", "dry_bulb_temp_c", "dew_point_temp_c",
             "relative_humidity_pct", "wind_speed_m_s",
-            "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2"]
+            "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2",
+            "atmospheric_pressure_pa", "horizontal_ir_w_m2", "wind_direction_deg",
+            "total_sky_cover", "opaque_sky_cover"]
     with Path(epw_path).open() as f:
         for _ in range(8):
             f.readline()  # skip headers
@@ -337,8 +353,15 @@ def parse_epw_weather(
                 wind_speed = float(parts[21])
             except (ValueError, IndexError):
                 continue
-            rows.append((month, day, hour, dry_bulb_c, dew_point_c,
-                         rel_humidity, wind_speed, ghi, dni, dhi))
+            rows.append((
+                month, day, hour, dry_bulb_c, dew_point_c, rel_humidity,
+                wind_speed, ghi, dni, dhi,
+                _opt_float(parts, 9),   # atmospheric pressure [Pa]
+                _opt_float(parts, 12),  # horizontal IR (sky longwave) [Wh/m²]
+                _opt_float(parts, 20),  # wind direction [°]
+                _opt_float(parts, 22),  # total sky cover [tenths]
+                _opt_float(parts, 23),  # opaque sky cover [tenths]
+            ))
 
     df = pd.DataFrame(rows, columns=cols)
     timestamps = pd.to_datetime(dict(
@@ -348,6 +371,8 @@ def parse_epw_weather(
         "dry_bulb_temp_c", "dew_point_temp_c",
         "relative_humidity_pct", "wind_speed_m_s",
         "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2",
+        "atmospheric_pressure_pa", "horizontal_ir_w_m2", "wind_direction_deg",
+        "total_sky_cover", "opaque_sky_cover",
     ]].copy()
     out.index = timestamps
     return out

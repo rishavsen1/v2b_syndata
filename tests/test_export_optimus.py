@@ -233,6 +233,8 @@ def test_weather_window(tmp_path, monkeypatch):
         "datetime", "dry_bulb_temp_c", "dew_point_temp_c",
         "relative_humidity_pct", "wind_speed_m_s",
         "global_horizontal_w_m2", "direct_normal_w_m2", "diffuse_horizontal_w_m2",
+        "atmospheric_pressure_pa", "horizontal_ir_w_m2", "wind_direction_deg",
+        "total_sky_cover", "opaque_sky_cover",
         "building_id",
     ]
     assert len(out) == 30 * 24  # September, hourly

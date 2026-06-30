@@ -227,6 +227,12 @@ def build_weather(
         "global_horizontal_w_m2": wx["global_horizontal_w_m2"].values,
         "direct_normal_w_m2": wx["direct_normal_w_m2"].values,
         "diffuse_horizontal_w_m2": wx["diffuse_horizontal_w_m2"].values,
+        # Additional raw EnergyPlus weather inputs (carried through unperturbed).
+        "atmospheric_pressure_pa": wx["atmospheric_pressure_pa"].values,
+        "horizontal_ir_w_m2": wx["horizontal_ir_w_m2"].values,
+        "wind_direction_deg": wx["wind_direction_deg"].values,
+        "total_sky_cover": wx["total_sky_cover"].values,
+        "opaque_sky_cover": wx["opaque_sky_cover"].values,
         "building_id": building_id,
     })
     return out
