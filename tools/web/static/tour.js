@@ -29,6 +29,15 @@ function startTour() {
                 + "Population / Equipment selectors override its descriptors per building.",
             side: "bottom", align: "start",
         } },
+        { element: card + " .preview-info[data-preview='population']", popover: {
+            title: "Preview your choices 🔎",
+            description: "Not sure what a Location / Building / Population produces? Click the <b>ⓘ</b> "
+                + "next to each for a quick chart — utility prices & weather for Location, the load curve "
+                + "(peak = the building's kW) for Building, and arrival / dwell / SoC / region mix for "
+                + "Population. Or open the <b>▶ Preview — what these inputs produce</b> panel below to see "
+                + "all three at once. It works even at the scenario defaults.",
+            side: "bottom", align: "start",
+        } },
         { element: card + " .mb-peak-kw", popover: {
             title: "Quick fields",
             description: "Common knobs surfaced as inputs — EV & charger count, peak kW, SoC bounds, seed. "
