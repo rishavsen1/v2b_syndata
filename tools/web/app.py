@@ -361,11 +361,14 @@ def api_preview_building(bldg_id: str):
         shape = []
         for h in range(25):
             if archetype == "retail":
-                w = math.exp(-(((h - 15) / 4.5) ** 2)); frac = 0.30 + 0.70 * w
+                w = math.exp(-(((h - 15) / 4.5) ** 2))
+                frac = 0.30 + 0.70 * w
             elif archetype == "office":
-                w = math.exp(-(((h - 13) / 4.2) ** 2)); frac = base + (1 - base) * w
+                w = math.exp(-(((h - 13) / 4.2) ** 2))
+                frac = base + (1 - base) * w
             else:
-                w = math.exp(-(((h - 14) / 5.0) ** 2)); frac = 0.40 + 0.60 * w
+                w = math.exp(-(((h - 14) / 5.0) ** 2))
+                frac = 0.40 + 0.60 * w
             shape.append(round(frac, 4))
         load_shape = {
             "source": "stylized",

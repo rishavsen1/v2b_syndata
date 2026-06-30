@@ -397,6 +397,7 @@ def test_generate_unified_full_cycle(client, tmp_path):
     csv = client.get(f"/api/generate-unified/{job}/csv/APR2024/0/cars.csv")
     assert csv.status_code == 200
     import io
+
     import pandas as pd
     cars = pd.read_csv(io.BytesIO(csv.get_data()), index_col=0)
     counts = cars.groupby("building_id").size().to_dict()
