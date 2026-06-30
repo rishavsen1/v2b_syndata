@@ -89,14 +89,25 @@ Then open `http://<host-ip>:5000` from your laptop. Notes:
 
 ## Generate (CLI)
 
-```bash
-uv run python -m v2b_syndata.cli generate \
-    --scenario S01 \
-    --seed 42 \
-    --output-dir data/output/dev/S01/seed42/
+The supported output is the **optimus / multi-building** format (a `building_id`
+column) — use `generate-multi` (or the web tool):
 
-uv run python -m v2b_syndata.cli validate data/output/dev/S01/seed42/
+```bash
+uv run python -m v2b_syndata.cli generate-multi \
+    --config my_run.json \
+    --output-dir data/output/dev/run1/
 ```
+
+> **Deprecated:** the single-shot `generate` subcommand below produces the
+> legacy *native* (non-optimus) CSVs. It still works (the underlying engine is
+> shared — `generate-multi` calls it per building) but is discouraged; prefer
+> `generate-multi`. It emits a `DeprecationWarning`.
+>
+> ```bash
+> uv run python -m v2b_syndata.cli generate --scenario S01 --seed 42 \
+>     --output-dir data/output/dev/S01/seed42/
+> uv run python -m v2b_syndata.cli validate data/output/dev/S01/seed42/
+> ```
 
 ## Other commands
 

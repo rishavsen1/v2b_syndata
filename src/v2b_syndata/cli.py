@@ -22,6 +22,19 @@ load_dotenv(REPO_ROOT / ".env", override=False)
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
+    import warnings
+
+    # The single-shot `generate` (native, non-optimus CSVs) is deprecated: the
+    # optimus/multi-building export is the only output path going forward. The
+    # engine (runner.generate) is unchanged — generate-multi calls it per
+    # building — so this subcommand still works, just discouraged.
+    warnings.warn(
+        "the single-shot `generate` subcommand is deprecated; use `generate-multi` "
+        "(optimus output) or the web tool. The generation engine is unchanged.",
+        DeprecationWarning, stacklevel=2,
+    )
+    print("[DEPRECATED] `generate` (single-shot, native CSVs) → prefer "
+          "`generate-multi` or the web tool.", file=sys.stderr)
     cli_overrides = parse_overrides(args.override or [])
     try:
         manifest = generate(
@@ -400,7 +413,8 @@ def main(argv: list[str] | None = None) -> int:
                    help=f"directory containing knobs.yaml + descriptor libraries (default: {DEFAULT_CONFIG_DIR})")
     sub = p.add_subparsers(dest="command", required=True)
 
-    g = sub.add_parser("generate", help="generate one scenario seed")
+    g = sub.add_parser("generate",
+                       help="[DEPRECATED → use generate-multi] generate one scenario seed (native CSVs)")
     g.add_argument("--scenario", required=True)
     g.add_argument("--seed", type=int, required=True)
     g.add_argument("--output-dir", required=True)
