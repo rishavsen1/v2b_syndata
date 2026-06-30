@@ -28,4 +28,8 @@ buildings:
       charging_infra.charger_count: 15
       pv.pv_type: rooftop_medium
       battery.battery_type: lfp_2h
+      # Natural weather-driven building load: use RAW EnergyPlus magnitudes
+      # (peak varies with the perturbed weather per sample) instead of pinning
+      # max(power_kw) to peak_kw. peak_kw becomes inert.
+      building_load.peak_kw_scaling: false
     seed: 42

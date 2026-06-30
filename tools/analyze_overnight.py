@@ -236,6 +236,7 @@ def main():
     stats_mod = {c: describe(df[df.profile == "moderate"][c]) for c in metric_cols}
 
     charts = {
+        "peak": hist_by_profile(df, "bl_peak_kw", "Building peak load", "kW"),
         "energy": hist_by_profile(df, "bl_energy_mwh", "Building monthly energy", "MWh"),
         "netpeak": hist_by_profile(df, "net_peak_kw", "Net peak (load − PV)", "kW"),
         "month_load": monthly_band(df, "bl_energy_mwh", "Monthly building energy", "MWh", NAVY),
@@ -322,8 +323,8 @@ def render_html(df, stats, st_s, st_m, charts):
     <h2>What this dataset is &amp; how to read the uncertainty</h2>
     <p class="muted">Each of the <b>{n}</b> samples is one calendar month of this building, generated with a <b>physically faithful</b> per-sample weather realization (the EPW is perturbed and EnergyPlus re-run) and <b>no output-side noise</b>. So the spread you see across samples is the genuine weather-driven (and EV-stochastic) uncertainty of the outputs — not artificial jitter. Columns below: <b>mean</b>, <b>std</b>, <b>CV</b> (std/mean — the normalized uncertainty), and the <b>P5/P50/P95</b> band you should design against.</p>
     <div class="kpis">
-      <div class="kpi"><div class="v">{peak95:,.0f} kW</div><div class="k">Building peak — pinned design <code>peak_kw</code> (service sizing; CV≈0)</div></div>
-      <div class="kpi"><div class="v">{netpeak95:,.0f} kW</div><div class="k">Net peak after PV — P95 = design peak ⇒ PV doesn't reliably shave it (size storage to this)</div></div>
+      <div class="kpi"><div class="v">{peak95:,.0f} kW</div><div class="k">Building peak — P95 (weather-driven; size service/transformer to this)</div></div>
+      <div class="kpi"><div class="v">{netpeak95:,.0f} kW</div><div class="k">Net peak after PV — P95 (battery / peak-shaving target)</div></div>
       <div class="kpi"><div class="v">{conc95:.0f}</div><div class="k">Peak EV concurrency — P95 (vs {N_CHARGERS} chargers)</div></div>
       <div class="kpi"><div class="v">{g('pv_self_consumption','p50')*100:.0f}%</div><div class="k">PV self-consumption — median</div></div>
     </div>
@@ -333,16 +334,16 @@ def render_html(df, stats, st_s, st_m, charts):
 
   <section>
     <h2>Building load</h2>
-    <div class="imgrow">{img('energy')}{img('month_load')}</div>
+    <div class="imgrow">{img('peak')}{img('energy')}{img('month_load')}</div>
     {stat_table(stats, ['bl_peak_kw','bl_mean_kw','bl_energy_mwh','bl_load_factor','bl_peak_hour','bl_flex_frac'])}
-    <div class="take"><b>Decision read:</b> the building <b>peak is pinned to the design <code>peak_kw</code> = {peak95:,.0f} kW</b> (CV≈0 — a design input, not an uncertain output), so size the electrical service to it directly. The genuine month-to-month uncertainty is in <b>energy</b> (CV {g('bl_energy_mwh','cv')*100:.0f}%, P5–P95 {g('bl_energy_mwh','p5'):.0f}–{g('bl_energy_mwh','p95'):.0f} MWh) and the <b>load factor</b> (median ≈ {g('bl_load_factor','p50'):.2f} ⇒ a peaky facility with strong peak-shaving headroom).</div>
+    <div class="take"><b>Decision read:</b> raw EnergyPlus magnitudes flow through (no peak normalization), so the building <b>peak is weather-driven</b>: P95 = <b>{peak95:,.0f} kW</b> (CV {g('bl_peak_kw','cv')*100:.0f}%, P5–P95 {g('bl_peak_kw','p5'):.0f}–{peak95:.0f} kW) — size the electrical service / transformer to the P95, not the mean. Energy varies CV {g('bl_energy_mwh','cv')*100:.0f}% ({g('bl_energy_mwh','p5'):.0f}–{g('bl_energy_mwh','p95'):.0f} MWh/mo); load factor median ≈ {g('bl_load_factor','p50'):.2f} (peaky ⇒ strong peak-shaving headroom). Summer (cooling) months drive the upper tail — see the monthly band.</div>
   </section>
 
   <section>
     <h2>PV generation &amp; net load</h2>
     <div class="imgrow">{img('month_pv')}{img('netpeak')}{img('selfcons')}{img('month_netpeak')}</div>
     {stat_table(stats, ['pv_energy_mwh','pv_peak_kw','pv_capacity_factor','pv_self_consumption','net_peak_kw','net_min_kw'])}
-    <div class="take"><b>Decision read:</b> net-peak averages <b>{g('net_peak_kw','mean'):,.0f} kW</b> (PV shaves the daytime peak) but its <b>P95 = {netpeak95:,.0f} kW = the {peak95:,.0f} kW design peak</b> — on low-PV (winter/cloudy) samples PV contributes ≈0 at the peak instant, so <b>you cannot rely on PV alone for demand reduction</b>; storage (the 200 kWh / 100 kW LFP) is what cuts the peak with confidence. PV generation is the single most uncertain output (CV {g('pv_energy_mwh','cv')*100:.0f}%); self-consumption is high (~{g('pv_self_consumption','p50')*100:.0f}%, the office daytime load absorbs most PV) so added storage mainly buys peak reduction, not more PV capture.</div>
+    <div class="take"><b>Decision read:</b> PV trims the peak — net-peak P95 <b>{netpeak95:,.0f} kW</b> vs building-peak P95 <b>{peak95:,.0f} kW</b> — but the reduction is unreliable: on low-PV winter/cloudy samples PV contributes ≈0 at the peak instant, so <b>storage (200 kWh / 100 kW LFP), not PV, is what cuts the peak with confidence</b>. PV generation is the single most uncertain output (CV {g('pv_energy_mwh','cv')*100:.0f}%); self-consumption ~{g('pv_self_consumption','p50')*100:.0f}% (the office daytime load absorbs most PV) so added storage mainly buys peak reduction, not more PV capture. Negative net-min ⇒ PV export hours (interconnection / export-tariff exposure).</div>
   </section>
 
   <section>
