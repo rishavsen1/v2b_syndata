@@ -205,6 +205,56 @@ def test_cli_generate_multi_weather_profile(tmp_path: Path, _stub_weather):
     assert "building_load.weather_solar_scale" in ov
 
 
+def test_cli_generate_multi_alpha_flags_applied(tmp_path: Path, _stub_weather):
+    """--axes-alpha / --battery-alpha are accepted and applied to every building
+    (matching `batch`). The resolved per-unit config records them as overrides."""
+    import json
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    out = tmp_path / "alpha"
+    rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg),
+              "--output-dir", str(out), "--start-month", "2021-09", "--end-month", "2021-09",
+              "--samples-per-month", "1", "--workers", "1", "--noise-profile", "clean",
+              "--axes-alpha", "12", "--battery-alpha", "7")
+    assert rc == 0
+    unit = json.loads((out / "SEP2021" / "0" / "multi_building_config.json").read_text())
+    for b in unit["buildings"]:
+        ov = b["overrides"]
+        assert ov["user_behavior.axes_distribution_dirichlet_alpha"] == 12
+        assert ov["ev_fleet.battery_mix_dirichlet_alpha"] == 7
+
+
+def test_cli_generate_multi_weather_solar_sigma(tmp_path: Path, _stub_weather):
+    """--weather-solar-sigma is accepted and reflected in the batch manifest."""
+    import json
+    cfg = _write_multi_cfg(tmp_path / "mb.json")
+    out = tmp_path / "solarsig"
+    rc = _run("--config-dir", str(CONFIG_DIR), "generate-multi", "--config", str(cfg),
+              "--output-dir", str(out), "--start-month", "2021-09", "--end-month", "2021-09",
+              "--samples-per-month", "1", "--workers", "1", "--noise-profile", "clean",
+              "--weather-solar-sigma", "0.1")
+    assert rc == 0
+    manifest = json.loads((out / "batch_manifest.json").read_text())
+    assert manifest["weather_solar_sigma"] == 0.1
+    unit = json.loads((out / "SEP2021" / "0" / "multi_building_config.json").read_text())
+    assert "building_load.weather_solar_scale" in unit["buildings"][0]["overrides"]
+
+
+def test_all_jitters_zero_includes_flex_inflex():
+    """F6: _all_jitters_zero must inspect all 8 noise jitter knobs — a run with
+    ONLY load_flex/load_inflex jitter must NOT be treated as clean."""
+    def _manifest(knobs: dict) -> dict:
+        return {"knob_resolution": {k: {"value": v} for k, v in knobs.items()}}
+
+    # both new knobs are checked
+    assert "noise.load_flex_jitter_pct" in cli_mod._JITTER_KNOBS
+    assert "noise.load_inflex_jitter_pct" in cli_mod._JITTER_KNOBS
+    # truly clean → True
+    assert cli_mod._all_jitters_zero(_manifest({k: 0.0 for k in cli_mod._JITTER_KNOBS}))
+    # flex-only jitter → NOT clean (regression: previously slipped through)
+    assert not cli_mod._all_jitters_zero(_manifest({"noise.load_flex_jitter_pct": 0.05}))
+    assert not cli_mod._all_jitters_zero(_manifest({"noise.load_inflex_jitter_pct": 0.03}))
+
+
 def test_cli_generate_multi_from_config(tmp_path: Path, _stub_weather):
     import filecmp
     cfg = _write_multi_cfg(tmp_path / "mb.json")
