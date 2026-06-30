@@ -138,7 +138,7 @@ def test_preview_population_mixture_arrival(client):
 def test_preview_building(client):
     d = client.get("/api/preview/building/medium_office_v1").get_json()
     assert d["archetype"] == "office" and d["size"] == "med"
-    assert d["peak_kw"] == 500 and d["doe_prototype"] == "MediumOffice"
+    assert d["peak_kw"] == 150 and d["doe_prototype"] == "MediumOffice"
     assert d["occupancy_source"] == "ashrae_90_1_office"
     ls = d["load_shape"]
     # REAL ComStock weekday shape (not illustrative), peak-normalized to 1.0 so

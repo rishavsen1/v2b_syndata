@@ -1627,16 +1627,26 @@ async function togglePreviewPopover(btn, kind, card) {
         const head = document.createElement("p");
         head.className = "pp-head";
         const tag = eff.inherited ? " (scenario default)" : "";
+        // one-line "affects:" row for this single input
+        const affectsRow = (tags) => {
+            const row = document.createElement("div");
+            row.className = "preview-affects";
+            row.innerHTML = `<strong>affects:</strong>`
+                + tags.map(t => `<span class="a-tag">${t}</span>`).join("");
+            return row;
+        };
         const draws = [];
         if (kind === "location") {
             const t = data.tariff || {};
             head.textContent = `${id}${tag} — ${t.type || "tariff"} · DR: ${t.dr_program || "none"}`;
             pop.appendChild(head);
+            pop.appendChild(affectsRow(["utility prices", "weather → building load"]));
             const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
             draws.push(() => renderLocationPreview(c, data, null));
         } else if (kind === "building") {
             head.textContent = `${id}${tag} — ${data.archetype}/${data.size} · ${data.doe_prototype}`;
             pop.appendChild(head);
+            pop.appendChild(affectsRow(["building load shape & magnitude"]));
             const c = document.createElement("div"); c.className = "pp-chart"; pop.appendChild(c);
             const ls = data.load_shape || {};
             const note = document.createElement("p");
@@ -1648,6 +1658,7 @@ async function togglePreviewPopover(btn, kind, card) {
         } else {  // population
             head.textContent = `${id}${tag} — ${(data.axes_distribution || []).length} regions`;
             pop.appendChild(head);
+            pop.appendChild(affectsRow(["arrival", "dwell", "energy / required SoC", "region frequency"]));
             const grid = document.createElement("div"); grid.className = "pp-grid"; pop.appendChild(grid);
             const a = document.createElement("div"); a.className = "pp-chart"; grid.appendChild(a);
             const dw = document.createElement("div"); dw.className = "pp-chart"; grid.appendChild(dw);
@@ -1696,12 +1707,11 @@ async function renderCardPreview(card) {
     const bldg = effectiveDescriptor(card, "building");
     const pop = effectiveDescriptor(card, "population");
     const dtag = (eff) => eff.inherited ? ` <span class="pp-default-tag">scenario default</span>` : "";
+    // Per-input "affects:" tag row — what THAT single input drives downstream.
+    const affects = (tags) => `<div class="preview-affects"><strong>affects:</strong>`
+        + tags.map(t => `<span class="a-tag">${t}</span>`).join("") + `</div>`;
 
     host.innerHTML = `
-        <div class="preview-affects"><strong>affects →</strong>
-            <span class="a-tag">prices</span><span class="a-tag">load shape</span>
-            <span class="a-tag">arrival</span><span class="a-tag">dwell</span>
-            <span class="a-tag">SoC / energy</span><span class="a-tag">region mix</span></div>
         <div class="pv-block" data-block="location"></div>
         <div class="pv-block" data-block="building"></div>
         <div class="pv-block" data-block="population"></div>`;
@@ -1729,6 +1739,7 @@ async function renderCardPreview(card) {
             const data = await _fetchPreview("location", loc.id);
             if (data.error) throw new Error(data.error);
             locBlock.innerHTML = `<h4>location · ${escapeHtml(loc.id)}${dtag(loc)}</h4>
+                ${affects(["utility prices", "weather → building load"])}
                 <div class="chart-grid"><div class="chart-card" data-c="price"></div>
                 <div class="chart-card" data-c="weather"></div></div>
                 <p class="pp-note">price is the real tariff; the monthly temperature chart is illustrative (real TMYx weather is exported at generation).</p>`;
@@ -1751,6 +1762,7 @@ async function renderCardPreview(card) {
                 ? `Real <strong>NREL ComStock</strong> weekday profile (CZ-${ls.reference_zone}, reference climate), normalized so the peak equals <strong>peak_kw = ${data.peak_kw} kW</strong>. The deployed location's weather shifts the real curve.`
                 : `daily load shape is illustrative — normalized to peak_kw = ${data.peak_kw} kW.`;
             bBlock.innerHTML = `<h4>building · ${escapeHtml(bldg.id)}${dtag(bldg)}</h4>
+                ${affects(["building load shape & magnitude"])}
                 <div class="chart-grid"><div class="chart-card" data-c="load"></div></div>
                 <p class="pp-note">${caveat}</p>`;
             drawGuarded(bBlock, () => renderBuildingPreview(bBlock.querySelector("[data-c='load']"), data));
@@ -1766,6 +1778,7 @@ async function renderCardPreview(card) {
             const data = await _fetchPreview("population", pop.id);
             if (data.error) throw new Error(data.error);
             pBlock.innerHTML = `<h4>population · ${escapeHtml(pop.id)}${dtag(pop)} — ${(data.axes_distribution || []).length} regions</h4>
+                ${affects(["arrival", "dwell", "energy / required SoC", "region frequency"])}
                 <div class="chart-grid">
                     <div class="chart-card" data-c="arr"></div><div class="chart-card" data-c="dw"></div>
                     <div class="chart-card" data-c="soc"></div><div class="chart-card" data-c="freq"></div>

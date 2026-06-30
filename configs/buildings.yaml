@@ -10,7 +10,7 @@ medium_office_v1:
   archetype: office
   size: med
   occupancy_source: ashrae_90_1_office
-  peak_kw: 500
+  peak_kw: 150
   default_population: consent_default
   doe_prototype: MediumOffice
 
@@ -28,7 +28,7 @@ large_office_v1:
   archetype: office
   size: large
   occupancy_source: ashrae_90_1_office
-  peak_kw: 2000
+  peak_kw: 500
   default_population: stable_commuter_heavy
   doe_prototype: LargeOffice
 

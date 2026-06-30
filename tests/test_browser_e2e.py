@@ -219,23 +219,34 @@ def test_ui_input_previews(page, server):
     card.locator(".mb-population").select_option(
         label="consent_default — Mixed-flex CONSENT-empirical baseline — covers all 5 region archetypes")
 
-    # Integration B: open the Preview panel → its scaffold + all three blocks
-    # appear. `.preview-affects` and the three .pv-block elements are written
-    # before any Plotly draw, so they're present regardless of chart rendering.
+    # Integration B: open the Preview panel → all three blocks appear, and each
+    # carries its OWN per-input "affects:" tag row (replacing the old single
+    # combined line). The affects rows + headings are written before the Plotly
+    # draw, so they're present regardless of chart rendering.
     card.locator(".mb-preview > summary").click()
-    page.wait_for_selector(".building-card .card-preview .preview-affects", timeout=8000)
     host = card.locator(".card-preview")
-    assert host.locator(".preview-affects").count() == 1
     for block in ("location", "building", "population"):
         page.wait_for_selector(
-            f".building-card .card-preview .pv-block[data-block='{block}']", timeout=8000)
+            f".building-card .card-preview .pv-block[data-block='{block}'] .preview-affects",
+            timeout=8000)
         assert host.locator(f".pv-block[data-block='{block}']").count() == 1
-    # the building block uses a REAL ComStock shape normalized to peak_kw (500)
+        # exactly one per-input affects row inside each block
+        assert host.locator(f".pv-block[data-block='{block}'] .preview-affects").count() == 1
+    # per-input affects tags: location drives prices + weather→load; population
+    # drives arrival/dwell/SoC/region.
+    loc_aff = host.locator(".pv-block[data-block='location'] .preview-affects").inner_text()
+    assert "utility prices" in loc_aff and "weather" in loc_aff.lower()
+    pop_aff = host.locator(".pv-block[data-block='population'] .preview-affects").inner_text()
+    for t in ("arrival", "dwell", "region frequency"):
+        assert t in pop_aff
+    bld_aff = host.locator(".pv-block[data-block='building'] .preview-affects").inner_text()
+    assert "building load shape" in bld_aff.lower()
+    # the building block uses a REAL ComStock shape normalized to peak_kw (150)
     page.wait_for_function(
         "document.querySelector(\".building-card .card-preview .pv-block[data-block='building']\")"
         ".textContent.toLowerCase().includes('comstock')",
         timeout=8000)
-    assert "500 kW" in host.locator(".pv-block[data-block='building']").inner_text()
+    assert "150 kW" in host.locator(".pv-block[data-block='building']").inner_text()
 
     # Integration A: clicking the population ⓘ opens a floating popover with a
     # head naming the selection (set before the Plotly draw → robust either way).
