@@ -80,7 +80,7 @@ const DER_GRID_KNOBS = new Map([
 // so every dial that adds randomness/realism lives in one place. The whole
 // `noise` bucket plus the two fixed weather-offset knobs move there.
 //   - noise.profile is represented by the .mb-noise dropdown (not a duplicate widget)
-//   - the per-sample stochastic weather σ is a run-level control (#u-weather-sigma-c)
+//   - the per-sample stochastic weather perturbation is a per-building card control (.mb-weather)
 const PERTURB_WEATHER_KNOBS = new Set([
     "building_load.weather_temp_offset_c",
     "building_load.weather_solar_scale",
@@ -170,12 +170,6 @@ function initRunLevelControls() {
         mbFillSelect(noiseSel, DESCRIPTORS.noise, null);
         noiseSel.value = "tmyx_stochastic";
         noiseSel.addEventListener("change", updateAlphaPlaceholders);
-    }
-    // Weather perturbation select — default none.
-    const wxSel = document.getElementById("u-weather-profile");
-    if (wxSel) {
-        mbFillSelect(wxSel, DESCRIPTORS.weather, null);
-        wxSel.value = "none";
     }
     updateAlphaPlaceholders();
 }
@@ -1074,8 +1068,7 @@ function applyConfig(cfg) {
     set("u-dr-program", cfg.dr_program); set("u-dr-incentive", cfg.dr_incentive_per_kw);
     set("u-dr-penalty", cfg.dr_penalty_per_kwh); set("u-default-policy", cfg.default_policy);
     // Run-level sample-variation controls.
-    set("u-noise-profile", cfg.noise_profile); set("u-weather-profile", cfg.weather_profile);
-    set("u-weather-sigma-c", cfg.weather_sigma_c);
+    set("u-noise-profile", cfg.noise_profile);
     const sh = cfg.shared_overrides || {};
     set("u-axes-alpha", sh["user_behavior.axes_distribution_dirichlet_alpha"]);
     set("u-battery-alpha", sh["ev_fleet.battery_mix_dirichlet_alpha"]);
@@ -1119,8 +1112,6 @@ function buildUnifiedPayload() {
     // behavior so a default run is unchanged). A per-building card's own
     // noise_profile / weather_profile / α override still wins.
     const np = val("u-noise-profile"); if (np) payload.noise_profile = np;
-    const wp = val("u-weather-profile"); if (wp) payload.weather_profile = wp;
-    const wsig = num("u-weather-sigma-c"); if (wsig !== null) payload.weather_sigma_c = wsig;
     // Dirichlet α's flow through shared_overrides (merged into every building,
     // per-building overrides win). Only sent when the user typed an explicit
     // value — a blank input keeps the profile-implied effective default.

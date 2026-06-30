@@ -147,9 +147,9 @@ def test_generate_unified_builds_per_building_config(client, tmp_path):
 
 @pytest.mark.webapp
 def test_generate_unified_run_level_sample_variation(client, tmp_path):
-    """Run-level noise/weather/Dirichlet-α controls flow through the unified
-    endpoint: noise + weather → CLI flags; the two α's → shared_overrides merged
-    into every building. Spawn then immediately kill — no EnergyPlus wait."""
+    """Run-level noise + Dirichlet-α controls flow through the unified endpoint:
+    noise → CLI flag; the two α's → shared_overrides merged into every building.
+    (Weather perturbation stays per-building.) Spawn then immediately kill."""
     payload = {
         "buildings": [
             {"base_scenario": "S01", "seed": 1},
@@ -157,7 +157,7 @@ def test_generate_unified_run_level_sample_variation(client, tmp_path):
         ],
         "output_mode": "shared", "output_path": str(tmp_path / "o"),
         "start_month": "2024-04", "end_month": "2024-04", "samples": 1, "workers": 1,
-        "noise_profile": "clean", "weather_profile": "moderate", "weather_sigma_c": 1.5,
+        "noise_profile": "clean",
         "shared_overrides": {
             "user_behavior.axes_distribution_dirichlet_alpha": 12,
             "ev_fleet.battery_mix_dirichlet_alpha": 7,
@@ -168,10 +168,8 @@ def test_generate_unified_run_level_sample_variation(client, tmp_path):
     job = r.get_json()["job_id"]
     try:
         cmd = webapp.BATCH_JOBS[job]["cmd"]
-        # run-level noise + weather forwarded as CLI flags
+        # run-level noise forwarded as a CLI flag
         assert "--noise-profile" in cmd and cmd[cmd.index("--noise-profile") + 1] == "clean"
-        assert "--weather-profile" in cmd and cmd[cmd.index("--weather-profile") + 1] == "moderate"
-        assert "--weather-sigma-c" in cmd and cmd[cmd.index("--weather-sigma-c") + 1] == "1.5"
         # α's merged into every building via shared_overrides
         cfg = json.loads(list(webapp.RUNS_DIR.glob(f"_unified_cfg_{job}.json"))[0].read_text())
         assert "shared_overrides" not in cfg  # collapsed into each building
@@ -246,23 +244,23 @@ def test_batch_defaults_no_alpha_flags(client, tmp_path):
 
 @pytest.mark.webapp
 def test_index_html_has_run_level_controls():
-    """The run-grid surfaces the four run-level sample-variation controls; app.js
-    populates + wires them with the F2 effective-default pre-fill."""
+    """The run-grid surfaces the run-level sample-variation controls (noise +
+    the two Dirichlet α's); app.js wires them with the F2 effective-default
+    pre-fill. Weather perturbation stays a per-building control."""
     web = Path(__file__).resolve().parents[1] / "tools" / "web" / "static"
     idx = (web / "index.html").read_text()
-    for el in ("u-noise-profile", "u-weather-profile", "u-weather-sigma-c",
-               "u-axes-alpha", "u-battery-alpha"):
+    for el in ("u-noise-profile", "u-axes-alpha", "u-battery-alpha"):
         assert el in idx, f"{el} missing from index.html"
+    # weather perturbation is NOT a run-level control (deliberate per-card design)
+    assert "u-weather-profile" not in idx
     app_js = (web / "app.js").read_text()
     assert "initRunLevelControls" in app_js and "updateAlphaPlaceholders" in app_js
     # F2 effective α pre-fill (30 under tmyx_stochastic, 1e6 otherwise)
     assert "ALPHA_TMYX = 30" in app_js and "ALPHA_OFF = 1e6" in app_js
     # payload wiring: run-level noise/weather + α's into shared_overrides
-    assert "payload.noise_profile" in app_js and "payload.weather_profile" in app_js
+    assert "payload.noise_profile" in app_js
     assert "user_behavior.axes_distribution_dirichlet_alpha" in app_js
     assert "ev_fleet.battery_mix_dirichlet_alpha" in app_js
-    # F4: the stale #u-weather-sigma comment now matches the real control id
-    assert "#u-weather-sigma-c" in app_js
 
 
 @pytest.mark.webapp

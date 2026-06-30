@@ -507,15 +507,9 @@ def api_generate_unified():
         # still wins). Defaults to tmyx_stochastic — today's effective default.
         "--noise-profile", payload.get("noise_profile") or "tmyx_stochastic",
     ]
-    # Run-level weather perturbation default: each building spec may carry its
-    # own weather_profile (written into the config above, which wins); these
-    # flags set the run-level default + an optional explicit per-sample σ.
-    weather_profile = payload.get("weather_profile")
-    if weather_profile:
-        cmd += ["--weather-profile", weather_profile]
-    weather_sigma_c = payload.get("weather_sigma_c")
-    if weather_sigma_c not in (None, "") and float(weather_sigma_c) > 0:
-        cmd += ["--weather-sigma-c", str(float(weather_sigma_c))]
+    # Weather perturbation stays a PER-BUILDING control (each spec's own
+    # weather_profile is written into the config above) — not run-level, per the
+    # deliberate per-card design (see test_ui_perturbations_panel_and_high_low_sync).
     if payload.get("force", True):
         cmd.append("--force")
 
