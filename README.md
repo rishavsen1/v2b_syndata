@@ -246,6 +246,25 @@ buildings:
     seed: 7
 ```
 
+- **`multiplier: N`** (optional, default `1`, must be `>= 1`): expand one entry
+  into **N distinct realizations** of the same config (identical
+  `base_scenario` / `descriptors` / `overrides` / profiles / policy), for
+  deterministic large-scale generation without copy-pasting entries. Replica `k`
+  (`k = 0..N-1`) is given seed `base_seed + k`, so the entry covers the seed
+  range `base_seed .. base_seed + N - 1`. `building_id` is assigned sequentially
+  across the **fully expanded** ordered list, so multipliers compose with
+  multiple entries and with the batch samples/months layer (effective per-unit
+  seed `replica_seed + seed_base + sample`).
+  - The recorded `multi_building_config.json` stores the **fully expanded**
+    building list with each building's concrete seed + `building_id` and no
+    `multiplier` field, so `--from-config` reproduces byte-identically **without
+    re-expanding**. `multiplier` is an input-only convenience.
+  - **Caveat:** because replica seeds are contiguous, space user-set seeds
+    across entries by at least each entry's multiplier so their seed ranges
+    don't overlap (e.g. seeds 100 and 102 with `multiplier: 3` collide at 102).
+    A warning is emitted if the expanded list ends up with duplicate seeds
+    (duplicates produce byte-identical buildings).
+
 - **shared** (default): one concatenated CSV per file with a `building_id`
   column. **per-building**: numbered subfolders `<output-dir>/<building_id>/`,
   each a complete single-building set.

@@ -201,7 +201,17 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
 
 def cmd_generate_multi(args: argparse.Namespace) -> int:
-    """Generate N distinct buildings → optimus-compatible CSVs."""
+    """Generate N distinct buildings → optimus-compatible CSVs.
+
+    The config's ``buildings[]`` entries each describe one building. An entry
+    may carry an optional ``multiplier: int`` (default 1, >= 1): it expands into
+    that many DISTINCT realizations of the same config, each with seed
+    ``base_seed + k`` (k = 0..N-1), letting one entry stand in for N buildings
+    for deterministic large-scale generation. building_id is assigned
+    sequentially across the fully expanded list, and the recorded
+    multi_building_config.json stores the expanded list (so --from-config
+    reproduces byte-identically without re-expanding).
+    """
     import json as _json
 
     from .multi_building import (
@@ -462,7 +472,9 @@ def main(argv: list[str] | None = None) -> int:
         help="generate N distinct buildings in one run → optimus-compatible CSVs",
     )
     gm.add_argument("--config", default=None,
-                    help="multi-building config (.yaml/.json): buildings[] + DR/output globals")
+                    help="multi-building config (.yaml/.json): buildings[] + DR/output globals. "
+                         "Each building may set 'multiplier: N' to expand into N distinct "
+                         "realizations (seeds base..base+N-1) for large-scale generation.")
     gm.add_argument("--from-config", default=None,
                     help="regenerate a prior run from its multi_building_config.json")
     gm.add_argument("--output-dir", required=True)
