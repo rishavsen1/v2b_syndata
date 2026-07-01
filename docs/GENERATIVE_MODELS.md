@@ -12,9 +12,9 @@ arrival time a truncated normal and not a beta?" type questions.
 > comparison. A retrospective model-selection study (see
 > [Empirical model selection](#empirical-model-selection-2026-06) and
 > `docs/experiments/`) shows where the principled choice matches the data
-> (dwell→Weibull) and where it is a deliberate simplification
-> (arrival→TruncNorm). Read the "why" columns as design rationale, and that
-> section for the empirical verdict.
+> (dwell→Weibull) and where the study *motivated a model the generator now
+> ships* (arrival→a per-region truncated-Gaussian **mixture**). Read the "why"
+> columns as design rationale, and that section for the empirical verdict.
 
 ## Two layers
 
@@ -47,8 +47,8 @@ break generation (`distribution_fitter._drop_if_oor`).
 
 | quantity | family | why this family | fit features (source) | parameters · provenance |
 |---|---|---|---|---|
-| arrival hour | TruncNorm(μ, σ) on [6, 20] | unimodal commute peak with a hard physical support (no arrivals at 3 AM); a plain normal leaks mass past midnight | `arrival_hour` (local clock hour of connect) | μ, σ · **calibrated**; trunc [6,20] **fixed** |
-| dwell | Weibull(k, λ) | non-negative, right-skewed duration with a tunable tail; the standard parametric survival/duration family | `dwell_hours` (disconnect − connect) | k, λ · **calibrated** |
+| arrival hour | per-region 2-component truncated-normal (Gaussian) mixture on [4, 22]; single TruncNorm(μ, σ) fallback | arrivals are **bimodal** (morning commute peak + midday shoulder), which a 2-component truncated-Gaussian captures, with a hard daytime support (no 3 AM arrivals) | `arrival_hour` (local clock hour of connect) | per-component w/μ/σ · **calibrated** (single μ,σ for synthetic pops); trunc [4,22] **fixed** |
+| dwell | Weibull(k, λ), optional 2-component Weibull mixture | non-negative, right-skewed duration; a 2-component mixture is used where it beats single-Weibull by a KS margin | `dwell_hours` (disconnect − connect) | k, λ (per component) · **calibrated** |
 | arrival × dwell coupling | Gaussian copula ρ | couples the two marginals (early arrivers stay longer) *without* distorting either marginal — applied on the shared uniform draw | Spearman ρ of (`arrival_hour`, `dwell_hours`) | ρ · **calibrated** |
 | arrival SoC | Beta(α, β) on [0, 1] | natural law for a bounded fraction; α/β set mean and skew independently | *none — SoC is unobserved* (see below) | α, β · **fixed prior** (default Beta(4,6) ≈ 0.40) |
 | departure-SoC requirement | Beta(α, β), else TruncNorm(μ, σ) | same bounded-fraction argument as arrival SoC; the TruncNorm fallback is a simple high-SoC prior when no source data exists | `arrival_prior + kWhDelivered/capacity` | α, β · **calibrated**; fallback μ/σ · **knobs** (`depart_soc_mu`/`sigma`, default 50/5) |
@@ -67,41 +67,46 @@ The rest of this document expands each row.
 
 ---
 
-## Arrival hour — `TruncNorm(μ, σ)` on [6, 20]
+## Arrival hour — per-region truncated-Gaussian mixture on [4, 22]
 
 **Models** the clock hour a car connects.
 
-**Why TruncNorm.** Workplace/commute arrivals cluster around a single morning
-peak — a unimodal, roughly symmetric bump — which a normal captures with two
-parameters. But arrival hour has a *hard physical support*: a Gaussian centered
-at 08:00 with realistic spread puts non-negligible mass before dawn and after
-midnight, which is both unphysical and breaks the no-overnight constraint (C12).
-Truncating to `[6, 20]` cuts that leakage while keeping the closed-form inverse
-CDF the copula needs. A wrapped/von-Mises circular law would model 24h
-periodicity but workplace charging is not periodic (no 1 AM lobe), and it lacks
-the clean truncated-quantile the copula path relies on.
+**Why a truncated-Gaussian mixture.** Real arrivals are **bimodal** — a sharp
+morning-commute peak plus a midday/afternoon shoulder — which a single normal
+underfits (the empirical study cut KS 0.11→0.03 by moving to a 2-component
+mixture). Each component is a normal; their sum captures both modes. Arrival hour
+also has a *hard physical support*: a Gaussian with realistic spread leaks mass
+before dawn / after midnight, which is unphysical and breaks the no-overnight
+constraint (C12). The window is `[4, 22]` — wide enough to capture nearly all
+real arrivals (the old `[6, 20]` structurally discarded ~8% of ACN arrivals)
+while preserving the closed-form truncated quantile the copula needs. A
+wrapped/von-Mises circular law would model 24h periodicity, but workplace
+charging is not periodic (no 1 AM lobe) and lacks the clean truncated quantile.
 
 **Fit features.** `arrival_hour` = local connect hour + min/60 + sec/3600,
 read in the site's wall-clock timezone (`feature_extractor.extract_session`;
 ACN is converted UTC→`America/Los_Angeles` before reading the hour).
 
-> **Optional 2-component mixture (bimodal arrivals).** Real arrivals are often
-> *bimodal* (a sharp morning commute peak + a midday/afternoon shoulder) — a
-> single TruncNorm misses this (the empirical study cut KS 0.108→0.03 with a
-> mixture). Calibration therefore fits a 2-component truncated mixture on the
-> **pooled population** arrivals (arrival is ~independent of the φ/κ/δ region
-> axes, so a *per-region* fit mispools — it must be pooled and broadcast to all
-> regions) and keeps it **only if** it beats the single TruncNorm by a KS margin
-> (`fit_truncnorm_mixture_arrival`). Stored as numeric leaves
-> `arrival.w1/mu1/sigma1/mu2/sigma2`; generation inverts the mixture CDF on the
-> copula's shared uniform (`_mixture_ppf_u`), preserving determinism + the
-> copula. The ACN cohorts use it (validated arrival KS ≈ 0.07 vs source);
-> hand-authored/synthetic populations stay on the single TruncNorm (bit-identical).
+**How it's fit (per region).** Calibration fits arrival **per region**
+(`api._fit_region_arrivals`): each data-rich region gets a 2-component truncated
+mixture (`fit_truncnorm_mixture_arrival`), kept **only if** it beats the single
+TruncNorm by a KS margin; thin regions fall back to the pooled mixture, and
+populations without data to a single TruncNorm. *(This replaced an earlier
+pooled-and-broadcast approach that assumed arrival ⟂ the φ/κ/δ axes and
+mis-served regions whose arrivals genuinely differ — e.g. `rare_consistent`,
+which arrives ~2 h later than the pool.)* Mixture parameters are stored as
+numeric leaves `arrival.w1/mu1/sigma1/mu2/sigma2`; generation inverts the mixture
+CDF on the copula's shared uniform by bisection (`_mixture_ppf_u`), preserving
+determinism + the copula. All calibrated ACN + ElaadNL regions ship a mixture
+(22 `truncnorm_mixture` blocks in `populations.yaml`, validated arrival KS ≈
+0.07–0.08 vs source); hand-authored/synthetic populations stay on the single
+TruncNorm (bit-identical).
 
-**Parameters.** μ, σ fit by MLE under the truncation
-(`fit_truncnorm_arrival`); the `[6, 20]` bounds are fixed in three places
-(`distribution_fitter.ARRIVAL_LO/HI`, `DIST_PARAM_RANGES`, and
-`samplers/sessions_dist.py`). Generation samples via the truncated-normal
+**Parameters.** Per-component w/μ/σ (or a single μ, σ) fit by MLE under the
+truncation (`fit_truncnorm_mixture_arrival` / `fit_truncnorm_arrival`); the
+`[4, 22]` bounds are fixed in three places (`distribution_fitter.ARRIVAL_LO/HI`,
+`DIST_PARAM_RANGES`, and `samplers/sessions_dist.py`, the last read per-region
+from the calibrated block). Generation samples via the (mixture-)truncated
 quantile of the copula's shared uniform (`renderers/sessions.py`).
 
 ---
@@ -124,6 +129,14 @@ dropped (metering noise / failed connects, `MIN_DWELL_HOURS = 0.5`) and
 
 **Parameters.** k, λ via `scipy.stats.weibull_min.fit(arr, floc=0)` (location
 pinned at 0 so it stays a true two-parameter Weibull, `fit_weibull_dwell`).
+
+> **Optional 2-component Weibull mixture.** Where a region's dwell isn't
+> well-captured by one Weibull (e.g. a short top-up mode plus a full-shift mode),
+> calibration fits a 2-component Weibull mixture (`fit_weibull_mixture_dwell`)
+> and keeps it **only if** it beats the single Weibull by a KS margin; it is
+> sampled by the same bisection inverse-CDF on the copula's shared uniform. A few
+> regions ship it (4 `weibull_mixture` blocks in `populations.yaml`); the rest
+> stay single Weibull (bit-identical).
 
 ---
 
@@ -397,18 +410,22 @@ Utrecht), through the same feature pipeline — and ranks them by AIC / BIC / KS
 
 | quantity | chosen | input feature(s) | best by AIC | best by KS | verdict |
 |---|---|---|---|---|---|
-| **arrival hour** | TruncNorm(μ,σ)[6,20] | local connect clock-hour | GaussMix-2 | GaussMix-2 (KS 0.029 vs 0.108) | **deliberate simplification.** Arrival is *bimodal* (morning peak + midday shoulder); 8.3% of ACN arrivals fall outside [6,20] and are structurally discarded. Kept for closed-form copula composability + interpretable μ. |
-| **dwell** | Weibull(k,λ) | disconnect − connect | **Weibull** | **Weibull** (KS 0.102) | **empirically vindicated** — best of the standard duration families on the pooled data, JPL, and ElaadNL; Gamma a close 2nd (per-site winner at Caltech). |
+| **arrival hour** | per-region truncated-Gaussian mixture on [4,22] | local connect clock-hour | GaussMix-2 | GaussMix-2 (KS 0.029 vs 0.108 for a single TruncNorm) | **adopted.** The study motivated it and the generator now **ships** a 2-component truncated-Gaussian mixture per calibrated region (single TruncNorm only for synthetic pops); the window was widened [6,20]→[4,22], recovering the ~8% of arrivals the old bounds discarded. Validated arrival KS ≈ 0.07–0.08 vs source. |
+| **dwell** | Weibull(k,λ) + optional 2-component Weibull mixture | disconnect − connect | **Weibull** | **Weibull** (KS 0.102) | **empirically vindicated** — best of the standard duration families on the pooled data, JPL, and ElaadNL; Gamma a close 2nd (per-site winner at Caltech). A 2-component Weibull mixture is used where it beats single by a KS margin. |
 | **arrival × dwell** | Gaussian copula ρ | Spearman ρ of the two | Frank | n/a | strong **negative** dependence (Kendall τ=−0.44, ρ=−0.60; later arrival → shorter stay), reproduced on ElaadNL. Gaussian ≫ independence but **Frank fits better**; Gaussian kept because it composes with the marginal inverse-CDFs via shared normal scores. |
 | **arrival SoC** | Beta(α,β) prior | **none — unobserved** | n/a | n/a | **no model comparison is possible** (no charger records SoC). Honest prior, correctly *not* derived from kWhRequested. |
 | **departure SoC** | Beta(α,β) | arrival_prior + delivered/capacity | Kumaraswamy (≈Beta, ΔAIC 114) | TruncNorm | Beta ≈ Kumaraswamy → defensible. **Caveat:** partly synthetic — the real signal is delivered/capacity (mean 0.30); the fit inherits the arrival prior's shape. |
 
-Robustness (dwell AIC-winner / arrival [6,20] coverage): Caltech `Gamma/0.95`,
-JPL `Weibull/0.90`, Office001 `Lognormal(n=580)/1.00`, ElaadNL `Weibull/1.00`.
+Robustness (dwell AIC-winner per site): Caltech `Gamma`, JPL `Weibull`,
+Office001 `Lognormal (n=580)`, ElaadNL `Weibull`. (The earlier per-site
+arrival-coverage fractions were measured for the old `[6, 20]` window and no
+longer apply — the window is now `[4, 22]`.)
 
 **Takeaway.** Dwell→Weibull and region-weights→empirical-share are well
-justified. Arrival→TruncNorm is the weakest link (unimodal model of a bimodal
-quantity, support clips ~8% of arrivals) — a deliberate trade for
-composability/interpretability. The copula captures the sign and bulk of a real,
-strong negative dependence; departure-SoC Beta is fine but its fit is partly an
-artifact of the arrival prior. Full tables + plot in `docs/experiments/`.
+justified. Arrival — formerly the weakest link (a single unimodal TruncNorm of a
+bimodal quantity, clipping ~8% of arrivals) — is now a **per-region 2-component
+truncated-Gaussian mixture on [4, 22]** that the generator ships, closing most of
+that gap (validated KS ≈ 0.07–0.08 vs source). The copula captures the sign and
+bulk of a real, strong negative dependence; departure-SoC Beta is fine but its
+fit is partly an artifact of the arrival prior. Full tables + plot in
+`docs/experiments/`.
