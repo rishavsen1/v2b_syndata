@@ -234,8 +234,9 @@ def run_batch(
         "n_failed": 0,
         "samples": [],
         "validation_summary": {
-            "n_units": 0, "n_passed": 0, "n_failed": 0,
-            "total_errors": 0, "failed_units": [],
+            "n_units": 0, "n_passed": 0, "n_failed": 0, "total_errors": 0,
+            "failed_units": [], "n_units_with_warnings": 0, "total_warnings": 0,
+            "warned_units": [],
         },
     }
     manifest_path = output_dir / "batch_manifest.json"
@@ -318,9 +319,13 @@ def _update_validation_summary(manifest: dict[str, Any], res: BatchResult) -> No
     the same top-level summary schema.
     """
     vs = manifest.setdefault("validation_summary", {
-        "n_units": 0, "n_passed": 0, "n_failed": 0,
-        "total_errors": 0, "failed_units": [],
+        "n_units": 0, "n_passed": 0, "n_failed": 0, "total_errors": 0,
+        "failed_units": [], "n_units_with_warnings": 0, "total_warnings": 0,
+        "warned_units": [],
     })
+    vs.setdefault("n_units_with_warnings", 0)
+    vs.setdefault("total_warnings", 0)
+    vs.setdefault("warned_units", [])
     v = res.validation
     # Nested multi-building rollup (has n_units) → aggregate its counts.
     if v and "n_units" in v:
@@ -328,17 +333,27 @@ def _update_validation_summary(manifest: dict[str, Any], res: BatchResult) -> No
         vs["n_passed"] += int(v.get("n_passed", 0))
         vs["n_failed"] += int(v.get("n_failed", 0))
         vs["total_errors"] += int(v.get("total_errors", 0))
+        vs["total_warnings"] += int(v.get("total_warnings", 0))
+        vs["n_units_with_warnings"] += int(v.get("n_units_with_warnings", 0))
         if v.get("n_failed", 0) and len(vs["failed_units"]) < 20:
             vs["failed_units"].append({
                 "month": res.month, "sample": res.sample_idx,
                 "n_errors": int(v.get("total_errors", 0)),
                 "errors": [str(fu) for fu in v.get("failed_units", [])][:5],
             })
+        if v.get("n_units_with_warnings", 0) and len(vs["warned_units"]) < 20:
+            vs["warned_units"].append({
+                "month": res.month, "sample": res.sample_idx,
+                "n_warnings": int(v.get("total_warnings", 0)),
+                "warnings": [str(wu) for wu in v.get("warned_units", [])][:5],
+            })
         return
     # Flat single-manifest validation (plain batch sample).
     vs["n_units"] += 1
     n_err = int(v.get("n_errors", 0)) if v else 0
+    n_warn = int(v.get("n_warnings", 0)) if v else 0
     vs["total_errors"] += n_err
+    vs["total_warnings"] += n_warn
     passed = v.get("passed", not n_err) if v else (res.status == "succeeded")
     if passed:
         vs["n_passed"] += 1
@@ -348,6 +363,13 @@ def _update_validation_summary(manifest: dict[str, Any], res: BatchResult) -> No
             vs["failed_units"].append({
                 "month": res.month, "sample": res.sample_idx,
                 "n_errors": n_err, "errors": list(v.get("errors", []))[:5] if v else [],
+            })
+    if n_warn:
+        vs["n_units_with_warnings"] += 1
+        if len(vs["warned_units"]) < 20:
+            vs["warned_units"].append({
+                "month": res.month, "sample": res.sample_idx,
+                "n_warnings": n_warn, "warnings": list(v.get("warnings", []))[:5] if v else [],
             })
 
 
