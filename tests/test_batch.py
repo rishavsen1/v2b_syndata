@@ -56,6 +56,30 @@ def test_batch_cli_produces_tree(tmp_path: Path):
     assert {s["month"] for s in samples} == {"APR2024", "MAY2024"}
 
 
+def test_batch_manifest_has_validation_summary(tmp_path: Path):
+    """The batch manifest aggregates each sample's auto-validation into a
+    validation_summary, and each sample record carries its own validation."""
+    out = tmp_path / "batch_vs"
+    r = _run([
+        "batch", "--scenario", "S01",
+        "--output-dir", str(out),
+        "--start-month", "2024-04", "--end-month", "2024-04",
+        "--samples-per-month", "2", "--workers", "1",
+    ])
+    assert r.returncode == 0, r.stderr[-500:]
+    m = json.loads((out / "batch_manifest.json").read_text())
+    vs = m["validation_summary"]
+    assert vs["n_units"] == 2
+    assert vs["n_passed"] + vs["n_failed"] == 2
+    assert "total_errors" in vs and "failed_units" in vs
+    for s in m["samples"]:
+        if s["status"] == "succeeded":
+            assert s["validation"] is not None
+            assert "passed" in s["validation"] and "n_errors" in s["validation"]
+    # CLI prints the summary line to stderr.
+    assert "validation:" in r.stderr
+
+
 def test_batch_force_flag_required(tmp_path: Path):
     out = tmp_path / "b"
     args = [

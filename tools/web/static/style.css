@@ -360,6 +360,37 @@ pre {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Post-generation validation badge (shown near run status). */
+.validation-badge {
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+}
+.validation-badge.ok {
+    background: #e8f3ec;
+    border-color: #2e7d4f;
+    color: #1e5e39;
+}
+.validation-badge.fail {
+    background: #fbeceb;
+    border-color: #b3271e;
+    color: #8a1f18;
+}
+.validation-badge .vb-title { font-weight: 600; }
+.validation-badge details { margin-top: 0.4rem; }
+.validation-badge details summary {
+    cursor: pointer;
+    color: var(--primary);
+}
+.validation-badge ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+}
+
 #output-meta {
     font-family: var(--font-mono);
     font-size: 0.8rem;

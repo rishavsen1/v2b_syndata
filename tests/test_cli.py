@@ -239,20 +239,39 @@ def test_cli_generate_multi_weather_solar_sigma(tmp_path: Path, _stub_weather):
     assert "building_load.weather_solar_scale" in unit["buildings"][0]["overrides"]
 
 
-def test_all_jitters_zero_includes_flex_inflex():
-    """F6: _all_jitters_zero must inspect all 8 noise jitter knobs — a run with
-    ONLY load_flex/load_inflex jitter must NOT be treated as clean."""
-    def _manifest(knobs: dict) -> dict:
-        return {"knob_resolution": {k: {"value": v} for k, v in knobs.items()}}
+def test_noise_applied_flag_covers_flex_inflex(tmp_path):
+    """F6: the manifest's validation.noise_applied must recognize load_flex /
+    load_inflex jitter as noise. Auto-validation now runs unconditionally, so the
+    old `_all_jitters_zero` clean-gate was removed — the equivalent guard is that
+    runner records noise_applied=True whenever ANY jitter knob (incl. flex/inflex)
+    is non-zero (runner reads ctx.noise, which spans all 8 jitter knobs)."""
+    from pathlib import Path
 
-    # both new knobs are checked
-    assert "noise.load_flex_jitter_pct" in cli_mod._JITTER_KNOBS
-    assert "noise.load_inflex_jitter_pct" in cli_mod._JITTER_KNOBS
-    # truly clean → True
-    assert cli_mod._all_jitters_zero(_manifest({k: 0.0 for k in cli_mod._JITTER_KNOBS}))
-    # flex-only jitter → NOT clean (regression: previously slipped through)
-    assert not cli_mod._all_jitters_zero(_manifest({"noise.load_flex_jitter_pct": 0.05}))
-    assert not cli_mod._all_jitters_zero(_manifest({"noise.load_inflex_jitter_pct": 0.03}))
+    from v2b_syndata.runner import generate
+
+    config_dir = Path(__file__).resolve().parents[1] / "configs"
+    fast = {
+        "sim_window.mode": "custom",
+        "sim_window.start": "2020-04-01",
+        "sim_window.custom_end": "2020-04-08",
+    }
+
+    # truly clean → noise_applied False
+    _clean = generate(scenario_id="S01", seed=42, output_dir=tmp_path / "clean",
+                      config_dir=config_dir, cli_overrides=dict(fast))
+    assert _clean["validation"]["noise_applied"] is False
+
+    # flex-only jitter → noise_applied True (regression: previously slipped through)
+    m_flex = generate(scenario_id="S01", seed=42, output_dir=tmp_path / "flex",
+                      config_dir=config_dir,
+                      cli_overrides={**fast, "noise.load_flex_jitter_pct": 0.05})
+    assert m_flex["validation"]["noise_applied"] is True
+
+    # inflex-only jitter → noise_applied True
+    m_inflex = generate(scenario_id="S01", seed=42, output_dir=tmp_path / "inflex",
+                        config_dir=config_dir,
+                        cli_overrides={**fast, "noise.load_inflex_jitter_pct": 0.03})
+    assert m_inflex["validation"]["noise_applied"] is True
 
 
 def test_cli_generate_multi_from_config(tmp_path: Path, _stub_weather):

@@ -372,6 +372,53 @@ def test_unified_status_csv_download_fake_job(client, tmp_path):
     assert client.get("/api/generate-unified/nope/status").status_code == 404
 
 
+@pytest.mark.webapp
+def test_validation_badge_and_spinner_static_guard():
+    """index.html/app.js/style.css carry the post-generation spinner + badge."""
+    web = Path(__file__).resolve().parents[1] / "tools" / "web" / "static"
+    idx = (web / "index.html").read_text()
+    app_js = (web / "app.js").read_text()
+    css = (web / "style.css").read_text()
+    # spinner shown during a run
+    assert 'id="gen-spinner"' in idx
+    assert 'class="spinner"' in idx
+    assert "post-generation checks" in idx
+    # validation badge element + JS renderer + CSS classes
+    assert 'id="validation-badge"' in idx
+    assert "renderValidationBadge" in app_js
+    assert "validation_summary" in app_js  # badge reads the manifest summary
+    assert ".validation-badge" in css
+    assert ".validation-badge.ok" in css and ".validation-badge.fail" in css
+
+
+@pytest.mark.webapp
+def test_unified_status_surfaces_validation_summary(client, tmp_path):
+    """The unified status endpoint returns the batch manifest's
+    validation_summary so the UI badge can render it."""
+    import subprocess
+
+    out = tmp_path / "fakevs"
+    out.mkdir(parents=True)
+    (out / "batch_manifest.json").write_text(json.dumps({
+        "batch_id": "x", "kind": "multi_building", "status": "succeeded",
+        "n_total": 2, "n_succeeded": 2, "n_failed": 0, "samples": [],
+        "validation_summary": {
+            "n_units": 2, "n_passed": 1, "n_failed": 1, "total_errors": 3,
+            "failed_units": [{"month": "APR2024", "sample": 0,
+                              "n_errors": 3, "errors": ["D5: unreachable"]}],
+        },
+    }))
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    proc.wait()
+    job = "fakevsjob"
+    webapp.BATCH_JOBS[job] = {"process": proc, "output_path": str(out),
+                             "started_at": 0.0, "cmd": [], "kind": "unified"}
+    st = client.get(f"/api/generate-unified/{job}/status").get_json()
+    vs = st["manifest"]["validation_summary"]
+    assert vs["n_units"] == 2 and vs["n_failed"] == 1
+    assert vs["failed_units"][0]["errors"] == ["D5: unreachable"]
+
+
 # ── full cycle (real EnergyPlus) ─────────────────────────────────────────────
 
 @pytest.mark.real_energyplus
@@ -393,6 +440,10 @@ def test_generate_unified_full_cycle(client, tmp_path):
         if not s["running"]:
             break
     assert (s.get("manifest") or {}).get("status") == "succeeded"
+    # auto-validation summary is surfaced in the status manifest
+    vs = (s.get("manifest") or {}).get("validation_summary") or {}
+    assert vs.get("n_units", 0) >= 1
+    assert vs["n_passed"] + vs["n_failed"] == vs["n_units"]
     # per-building isolation in the served CSV
     csv = client.get(f"/api/generate-unified/{job}/csv/APR2024/0/cars.csv")
     assert csv.status_code == 200

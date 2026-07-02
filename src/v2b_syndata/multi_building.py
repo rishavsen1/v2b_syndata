@@ -79,6 +79,38 @@ def _flat_knobs(manifest: dict) -> dict[str, Any]:
     return {p: e["value"] for p, e in manifest.get("knob_resolution", {}).items()}
 
 
+def _validation_summary(manifests: list[dict], labels: list[dict[str, Any]]) -> dict[str, Any]:
+    """Roll up the per-unit `manifest["validation"]` blocks into one summary.
+
+    `labels[i]` supplies identifying keys (e.g. building_id / month / sample)
+    for the i-th manifest; they are copied into each failed-unit record.
+    """
+    n_units = len(manifests)
+    n_passed = n_failed = total_errors = 0
+    failed_units: list[dict[str, Any]] = []
+    for m, lab in zip(manifests, labels, strict=True):
+        v = m.get("validation") or {}
+        n_err = int(v.get("n_errors", 0))
+        total_errors += n_err
+        if v.get("passed", not n_err):
+            n_passed += 1
+        else:
+            n_failed += 1
+            if len(failed_units) < 20:
+                failed_units.append({
+                    **lab,
+                    "n_errors": n_err,
+                    "errors": list(v.get("errors", []))[:5],
+                })
+    return {
+        "n_units": n_units,
+        "n_passed": n_passed,
+        "n_failed": n_failed,
+        "total_errors": total_errors,
+        "failed_units": failed_units,
+    }
+
+
 def _dr_overrides(cfg: MultiConfig) -> dict[str, Any]:
     """Global DR knob overrides applied to every building (so DR is uniform)."""
     ov: dict[str, Any] = {}
@@ -211,6 +243,13 @@ def generate_multi(
                                         lineterminator="\n")
 
     config = _config_dict(cfg)
+    # Aggregate each building's post-generation validation (from the native
+    # manifests generated in the temp dirs) into the multi-building record.
+    config["validation_summary"] = _validation_summary(
+        manifests,
+        [{"building_id": i, "seed": cfg.buildings[i].seed}
+         for i in range(len(manifests))],
+    )
     (output_dir / "multi_building_config.json").write_text(
         json.dumps(config, indent=2, sort_keys=True) + "\n"
     )
@@ -401,8 +440,10 @@ def _unit_config(
 def _run_one_multi_unit(spec: _MultiUnitSpec) -> BatchResult:
     """Worker: generate one (month, sample) multi-building optimus set."""
     t0 = time.monotonic()
+    validation = None
     try:
-        generate_multi(spec.cfg, spec.unit_dir, spec.config_dir)
+        config = generate_multi(spec.cfg, spec.unit_dir, spec.config_dir)
+        validation = config.get("validation_summary")
         status, err = "succeeded", None
     except Exception as e:  # noqa: BLE001
         status = "failed"
@@ -410,7 +451,7 @@ def _run_one_multi_unit(spec: _MultiUnitSpec) -> BatchResult:
     return BatchResult(
         month=spec.month_label, sample_idx=spec.sample_idx, seed=spec.seed,
         path=f"{spec.month_label}/{spec.sample_idx}", status=status,
-        duration_sec=time.monotonic() - t0, error=err,
+        duration_sec=time.monotonic() - t0, error=err, validation=validation,
     )
 
 
@@ -494,6 +535,10 @@ def generate_multi_batch(
         "n_succeeded": 0,
         "n_failed": 0,
         "samples": [],
+        "validation_summary": {
+            "n_units": 0, "n_passed": 0, "n_failed": 0,
+            "total_errors": 0, "failed_units": [],
+        },
     }
     manifest_path = output_dir / "batch_manifest.json"
     _write_manifest(manifest_path, manifest)
