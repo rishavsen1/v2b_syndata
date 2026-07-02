@@ -45,8 +45,25 @@ _DIRECTIONALITY = {"unidirectional", "bidirectional"}
 _PRICE_TYPES = {"off-peak", "peak"}
 _NEG_TYPES = {"type_i", "type_ii", "type_iii", "type_iv"}
 
-# F4/F5 share tolerance — n=20 is statistically tight at 0.05 (see DESIGN_NOTES Section 6).
+# F4/F5 share tolerance. A FIXED tolerance is statistically wrong for a
+# categorical share sampled over a finite fleet: at n=15 the per-category share
+# std is ~sqrt(p(1-p)/15) ≈ 0.13, so a fixed 0.20 false-flags normal sampling
+# variance, while at n=500 it's far too loose. `_share_tol` scales a 3σ binomial
+# band with fleet size (tight for large fleets, appropriately wide for small),
+# matching the n-aware approach already used by F3. F_SHARE_TOL is kept as a
+# small additive slack floor.
 F_SHARE_TOL = 0.20
+
+
+def _share_tol(p: float, n: int) -> float:
+    """Fleet-size-aware tolerance for a categorical share (3σ binomial + slack).
+
+    p = declared probability, n = fleet size. Returns the max |observed − p|
+    treated as consistent with n draws from a categorical at probability p.
+    """
+    n = max(int(n), 1)
+    sigma = (max(p * (1.0 - p), 0.0) / n) ** 0.5
+    return min(1.0, 3.0 * sigma + 0.02)
 
 
 class ValidationError(Exception):
@@ -591,9 +608,10 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
         n = len(users)
         for nt, expected in zip(NEG_TYPES, neg_mix, strict=True):
             actual = float((users["negotiation_type"] == nt).sum()) / n
-            if abs(actual - expected) > F_SHARE_TOL:
+            tol = _share_tol(expected, n)
+            if abs(actual - expected) > tol:
                 rep.errors.append(
-                    f"F4: negotiation_type {nt} share {actual:.3f} vs {expected:.3f} (tol {F_SHARE_TOL})"
+                    f"F4: negotiation_type {nt} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
     # F5: region shares
@@ -603,9 +621,10 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
         for r in axes:
             actual = float((users["region"] == r["name"]).sum()) / n
             expected = float(r["weight"])
-            if abs(actual - expected) > F_SHARE_TOL:
+            tol = _share_tol(expected, n)
+            if abs(actual - expected) > tol:
                 rep.errors.append(
-                    f"F5: region {r['name']} share {actual:.3f} vs {expected:.3f} (tol {F_SHARE_TOL})"
+                    f"F5: region {r['name']} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
     # G4: (phi, kappa, delta) within declared region bounds
