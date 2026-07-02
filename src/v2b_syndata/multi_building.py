@@ -87,27 +87,38 @@ def _validation_summary(manifests: list[dict], labels: list[dict[str, Any]]) -> 
     """
     n_units = len(manifests)
     n_passed = n_failed = total_errors = 0
+    n_warned = total_warnings = 0
     failed_units: list[dict[str, Any]] = []
+    warned_units: list[dict[str, Any]] = []
     for m, lab in zip(manifests, labels, strict=True):
         v = m.get("validation") or {}
         n_err = int(v.get("n_errors", 0))
+        n_warn = int(v.get("n_warnings", 0))
         total_errors += n_err
+        total_warnings += n_warn
         if v.get("passed", not n_err):
             n_passed += 1
         else:
             n_failed += 1
             if len(failed_units) < 20:
-                failed_units.append({
-                    **lab,
-                    "n_errors": n_err,
-                    "errors": list(v.get("errors", []))[:5],
-                })
+                failed_units.append({**lab, "n_errors": n_err,
+                                     "errors": list(v.get("errors", []))[:5]})
+        if n_warn:
+            n_warned += 1
+            if len(warned_units) < 20:
+                warned_units.append({**lab, "n_warnings": n_warn,
+                                     "warnings": list(v.get("warnings", []))[:5]})
     return {
         "n_units": n_units,
         "n_passed": n_passed,
         "n_failed": n_failed,
         "total_errors": total_errors,
         "failed_units": failed_units,
+        # Soft warnings (e.g. F4/F5 rare-tail fleet-mix draws) — valid data,
+        # surfaced for review but not a failure.
+        "n_units_with_warnings": n_warned,
+        "total_warnings": total_warnings,
+        "warned_units": warned_units,
     }
 
 

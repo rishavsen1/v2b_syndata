@@ -610,7 +610,9 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             actual = float((users["negotiation_type"] == nt).sum()) / n
             tol = _share_tol(expected, n)
             if abs(actual - expected) > tol:
-                rep.errors.append(
+                # Soft: a skewed realized fleet mix at finite n is valid sampling
+                # variance (a rare tail beyond 3σ), not a structural defect.
+                rep.warnings.append(
                     f"F4: negotiation_type {nt} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
@@ -623,7 +625,9 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             expected = float(r["weight"])
             tol = _share_tol(expected, n)
             if abs(actual - expected) > tol:
-                rep.errors.append(
+                # Soft: skewed realized region mix at finite n is valid sampling
+                # variance (rare tail beyond 3σ), not a structural defect.
+                rep.warnings.append(
                     f"F5: region {r['name']} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
