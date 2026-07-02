@@ -54,6 +54,12 @@ class BatchResult:
     status: str               # "succeeded" | "failed"
     duration_sec: float
     error: str | None = None
+    # Post-generation validation rollup for this unit. For a plain-batch sample
+    # it is the single native manifest's `validation` block reshaped to
+    # {passed, n_errors, errors}; for a multi-building unit it is the unit's
+    # `validation_summary` ({n_units, n_passed, n_failed, total_errors, ...}).
+    # None when the unit failed before writing a manifest.
+    validation: dict[str, Any] | None = None
 
 
 def _months_between(start_ym: str, end_ym: str) -> list[tuple[str, datetime]]:
@@ -116,6 +122,9 @@ def _run_one_sample(spec: BatchJobSpec) -> BatchResult:
     except Exception as e:  # noqa: BLE001
         status, err = "failed", f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
 
+    # Read the auto-validation block runner.generate wrote into the manifest.
+    validation = _read_sample_validation(spec.sample_dir)
+
     return BatchResult(
         month=spec.month_label,
         sample_idx=spec.sample_idx,
@@ -124,7 +133,26 @@ def _run_one_sample(spec: BatchJobSpec) -> BatchResult:
         status=status,
         duration_sec=time.monotonic() - t0,
         error=err,
+        validation=validation,
     )
+
+
+def _read_sample_validation(sample_dir: Path) -> dict[str, Any] | None:
+    """Return {passed, n_errors, errors} from a native sample's manifest, or None."""
+    mpath = sample_dir / "manifest.json"
+    if not mpath.exists():
+        return None
+    try:
+        v = json.loads(mpath.read_text()).get("validation")
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not v:
+        return None
+    return {
+        "passed": bool(v.get("passed", not v.get("n_errors", 0))),
+        "n_errors": int(v.get("n_errors", 0)),
+        "errors": list(v.get("errors", []))[:5],
+    }
 
 
 def _format_value(v: Any) -> str:
@@ -205,6 +233,10 @@ def run_batch(
         "n_succeeded": 0,
         "n_failed": 0,
         "samples": [],
+        "validation_summary": {
+            "n_units": 0, "n_passed": 0, "n_failed": 0,
+            "total_errors": 0, "failed_units": [],
+        },
     }
     manifest_path = output_dir / "batch_manifest.json"
     _write_manifest(manifest_path, manifest)
@@ -268,11 +300,55 @@ def _record_result(manifest: dict[str, Any], res: BatchResult) -> None:
         "status": res.status,
         "duration_sec": round(res.duration_sec, 2),
         "error": res.error,
+        "validation": res.validation,
     })
     if res.status == "succeeded":
         manifest["n_succeeded"] += 1
     else:
         manifest["n_failed"] += 1
+    _update_validation_summary(manifest, res)
+
+
+def _update_validation_summary(manifest: dict[str, Any], res: BatchResult) -> None:
+    """Incrementally fold one unit's validation into manifest["validation_summary"].
+
+    A plain-batch unit contributes one native manifest's `validation` block; a
+    multi-building unit contributes its `validation_summary`. Either shape is
+    normalized to (units, passed, failed, errors) here so both batch kinds emit
+    the same top-level summary schema.
+    """
+    vs = manifest.setdefault("validation_summary", {
+        "n_units": 0, "n_passed": 0, "n_failed": 0,
+        "total_errors": 0, "failed_units": [],
+    })
+    v = res.validation
+    # Nested multi-building rollup (has n_units) → aggregate its counts.
+    if v and "n_units" in v:
+        vs["n_units"] += int(v.get("n_units", 0))
+        vs["n_passed"] += int(v.get("n_passed", 0))
+        vs["n_failed"] += int(v.get("n_failed", 0))
+        vs["total_errors"] += int(v.get("total_errors", 0))
+        if v.get("n_failed", 0) and len(vs["failed_units"]) < 20:
+            vs["failed_units"].append({
+                "month": res.month, "sample": res.sample_idx,
+                "n_errors": int(v.get("total_errors", 0)),
+                "errors": [str(fu) for fu in v.get("failed_units", [])][:5],
+            })
+        return
+    # Flat single-manifest validation (plain batch sample).
+    vs["n_units"] += 1
+    n_err = int(v.get("n_errors", 0)) if v else 0
+    vs["total_errors"] += n_err
+    passed = v.get("passed", not n_err) if v else (res.status == "succeeded")
+    if passed:
+        vs["n_passed"] += 1
+    else:
+        vs["n_failed"] += 1
+        if len(vs["failed_units"]) < 20:
+            vs["failed_units"].append({
+                "month": res.month, "sample": res.sample_idx,
+                "n_errors": n_err, "errors": list(v.get("errors", []))[:5] if v else [],
+            })
 
 
 def _write_manifest(path: Path, manifest: dict[str, Any]) -> None:

@@ -328,7 +328,13 @@ def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
         dur_hr = float(row["duration_sec"]) / 3600.0
         need = (r - a) / 100.0 * cap
         avail = max_rate * dur_hr
-        if need > avail * 1.05:
+        # Strict envelope (headroom 1.0): required SoC must be reachable within
+        # the dwell at the max charger rate. Matches the sampler's D5 rejection
+        # (renderers/sessions.py uses `required_kwh > available_kwh`, no slack),
+        # so a clean-profile run that passes the sampler also passes validate.
+        # Noisy runs may still flag here by the documented noise contract — the
+        # manifest records `validation.noise_applied` so callers/UI can note it.
+        if need > avail * 1.0:
             rep.errors.append(
                 f"D5: car {cid} session {row['session_id']} unreachable "
                 f"(need={need:.2f} kWh, avail={avail:.2f} kWh)"

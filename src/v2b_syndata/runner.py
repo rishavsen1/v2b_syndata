@@ -113,6 +113,7 @@ def generate(
     cli_overrides: dict[str, Any] | None = None,
     noise_profile_override: str | None = None,
     strict_e5: bool = False,
+    strict_validate: bool = False,
     descriptor_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run end-to-end generation. Returns the manifest dict.
@@ -223,6 +224,33 @@ def generate(
             "axes_distribution_sampled": ctx.realized_axes_weights,
             "battery_mix_sampled": ctx.realized_battery_mix,
         }
+
+    # Automatic post-generation validation. Runs the NATIVE-schema invariant
+    # checker (A–I incl. D5 reachability) on the CSVs we just wrote, and records
+    # the result in the manifest BEFORE it is serialized. Import lazily to avoid
+    # an import cycle (validate.py imports from renderers/samplers). Never raises
+    # here unless strict_validate=True — generation must complete and report so
+    # callers/UI can surface failures. For NOISY runs some invariants (D5/H2)
+    # can fail by the documented noise contract; `noise_applied` records whether
+    # any jitter knob was non-zero so callers can note that nuance.
+    from .validate import ValidationError, validate  # lazy import — breaks the cycle
+
+    report = validate(output_dir, strict=False)
+    noise_applied = any(v != 0 for v in ctx.noise.values())
+    manifest["validation"] = {
+        "passed": not report.errors,
+        "n_errors": len(report.errors),
+        "n_warnings": len(report.warnings),
+        "errors": report.errors[:50],
+        "warnings": report.warnings[:50],
+        "noise_applied": noise_applied,
+    }
+    if report.errors:
+        logger.warning(
+            "post-generation validation flagged %d error(s) (noise_applied=%s): %s",
+            len(report.errors), noise_applied, report.errors[:3],
+        )
+
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     )
@@ -232,6 +260,12 @@ def generate(
             f"E5 infeasibility: realized max concurrent sessions "
             f"{e5.realized_max_concurrent} > chargers {e5.n_chargers} "
             f"({e5.infeasible_tick_count}/{e5.total_tick_count} ticks affected)."
+        )
+
+    if strict_validate and report.errors:
+        raise ValidationError(
+            f"post-generation validation failed with {len(report.errors)} "
+            f"error(s): {report.errors[:5]}"
         )
 
     return manifest

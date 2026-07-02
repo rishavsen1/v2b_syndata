@@ -1184,13 +1184,20 @@ async function startUnified() {
     const btn = document.getElementById("generate-btn");
     btn.disabled = true;
     status.textContent = "Launching…";
+    document.getElementById("gen-spinner").style.display = "";
+    document.getElementById("validation-badge").style.display = "none";
     try {
         const resp = await fetch("/api/generate-unified", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
         const data = await safeJson(resp);
-        if (!resp.ok) { status.textContent = "Error: " + (data.error || resp.status); btn.disabled = false; return; }
+        if (!resp.ok) {
+            status.textContent = "Error: " + (data.error || resp.status);
+            btn.disabled = false;
+            document.getElementById("gen-spinner").style.display = "none";
+            return;
+        }
         UNIFIED_JOB = { id: data.job_id, output_mode: payload.output_mode };
         document.getElementById("progress").style.display = "";
         status.textContent = `Running job ${data.job_id}…`;
@@ -1198,7 +1205,35 @@ async function startUnified() {
     } catch (e) {
         status.textContent = "Request failed: " + e;
         btn.disabled = false;
+        document.getElementById("gen-spinner").style.display = "none";
     }
+}
+
+// Render the post-generation validation badge from a batch manifest's
+// validation_summary (multi/batch) — green ✓ or red ✗ with an expandable list.
+function renderValidationBadge(vs) {
+    const el = document.getElementById("validation-badge");
+    if (!vs || !vs.n_units) { el.style.display = "none"; return; }
+    const nPassed = vs.n_passed || 0, nUnits = vs.n_units || 0;
+    const failed = (vs.n_failed || 0) > 0;
+    el.className = "validation-badge " + (failed ? "fail" : "ok");
+    let html = `<span class="vb-title">${failed ? "✗" : "✓"} Validation `
+        + `${failed ? "failed" : "passed"} — ${nPassed}/${nUnits} units passed`;
+    if (vs.total_errors) html += ` (${vs.total_errors} errors)`;
+    html += "</span>";
+    const fus = vs.failed_units || [];
+    if (fus.length) {
+        html += "<details><summary>show failing units</summary><ul>";
+        fus.forEach(fu => {
+            const errs = (fu.errors || []).map(e => escapeHtml(String(e))).join("; ");
+            html += `<li>${escapeHtml(JSON.stringify(
+                { month: fu.month, sample: fu.sample, n_errors: fu.n_errors }))}`
+                + (errs ? ` — ${errs}` : "") + "</li>";
+        });
+        html += "</ul></details>";
+    }
+    el.innerHTML = html;
+    el.style.display = "";
 }
 
 async function pollUnified() {
@@ -1217,9 +1252,11 @@ async function pollUnified() {
         return;
     }
     document.getElementById("generate-btn").disabled = false;
+    document.getElementById("gen-spinner").style.display = "none";
     const m = data.manifest || {};
     document.getElementById("status").textContent =
         `Done — ${m.status || "?"} (${m.n_succeeded || 0}/${m.n_total || 0} units, exit ${data.exit_code}).`;
+    renderValidationBadge(m.validation_summary);
     if (m.status === "succeeded" || m.status === "partial") showUnifiedAnalysis(m);
 }
 

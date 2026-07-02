@@ -110,6 +110,13 @@ _VALIDATION_MAY_FAIL: set[tuple] = {
     # Noise that perturbs configured-value invariants — design-time contract.
     # price_jitter changes grid prices (H2 asserts they match configured peak/offpeak).
     _key("noise.price_jitter_pct", 0.30),
+    # Session jitter (arrival-time / arrival-SoC) reshapes the energy budget:
+    # the post-jitter D5 clamp uses a 1.04 headroom (noise.py), so `required_soc`
+    # can sit just above the validator's now-strict 1.0 reachability envelope.
+    # This is the documented noise contract — the manifest records
+    # validation.noise_applied=True so the failure is expected, not a regression.
+    _key("noise.arrival_time_jitter_min", 60.0),
+    _key("noise.soc_arrival_jitter_pct", 0.30),
     # ev_count=1: single sample can't satisfy F4/F5 region/share invariants.
     _key("ev_fleet.ev_count", 1),
     # negotiation_mix collapsed to one type: F1/F2 type-share invariants fail.

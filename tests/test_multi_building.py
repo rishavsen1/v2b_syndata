@@ -157,6 +157,45 @@ def test_generate_multi_batch(tmp_path, config_dir, stub_weather):
         assert sorted(bl["building_id"].unique()) == [0, 1]
 
 
+def test_generate_multi_validation_summary(tmp_path, config_dir, stub_weather):
+    """generate_multi writes a validation_summary aggregating each building's
+    auto-validation into multi_building_config.json."""
+    import json
+    cfg = MultiConfig(_three_specs(), output_mode="shared")
+    out = tmp_path / "vs"
+    config = generate_multi(cfg, out, config_dir)
+    vs = config["validation_summary"]
+    assert vs["n_units"] == 3
+    assert vs["n_passed"] + vs["n_failed"] == 3
+    for k in ("total_errors", "failed_units"):
+        assert k in vs
+    on_disk = json.loads((out / "multi_building_config.json").read_text())
+    assert on_disk["validation_summary"] == vs
+
+
+def test_generate_multi_batch_validation_summary(tmp_path, config_dir, stub_weather):
+    """generate_multi_batch rolls each unit's per-building validation into a
+    batch-level validation_summary in batch_manifest.json."""
+    import json
+    specs = [
+        BuildingSpec("S01", descriptors={"location": "nashville_tn"},
+                     overrides={"ev_fleet.ev_count": 4,
+                                "charging_infra.charger_count": 4}, seed=1000),
+    ]
+    out = tmp_path / "mbvs"
+    manifest = generate_multi_batch(
+        MultiConfig(specs, output_mode="shared"), out, config_dir,
+        start_month="2021-09", end_month="2021-09", samples_per_month=2,
+        workers=1, noise_profile="clean",
+    )
+    vs = manifest["validation_summary"]
+    # 1 building × 2 samples → 2 building-generations aggregated.
+    assert vs["n_units"] == 2
+    assert vs["n_passed"] + vs["n_failed"] == 2
+    on_disk = json.loads((out / "batch_manifest.json").read_text())
+    assert on_disk["validation_summary"] == vs
+
+
 def test_per_building_overrides_isolated(tmp_path, config_dir, stub_weather):
     """Each building's knob overrides apply only to itself (no cross-contamination)."""
     specs = [

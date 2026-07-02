@@ -50,44 +50,44 @@ def cmd_generate(args: argparse.Namespace) -> int:
         print(f"E5 STRICT ERROR: {e}", file=sys.stderr)
         return 2
     print(f"generated {manifest['scenario_id']} seed={manifest['seed']} -> {args.output_dir}")
-    # Auto-validate only when no perturbation was actually applied. Per-jitter
-    # knobs are authoritative — checking profile name alone misses cases where
-    # the user overrode individual jitters under a clean profile (or vice
-    # versa). Run `cli validate <dir>` explicitly for noisy outputs.
-    if _all_jitters_zero(manifest):
-        rep = validate(Path(args.output_dir), strict=False)
-        if not rep.passed:
-            print("VALIDATION FAILED:", file=sys.stderr)
-            for e in rep.errors:
-                print(f"  - {e}", file=sys.stderr)
-            return 1
-        if rep.warnings:
-            for w in rep.warnings:
-                print(f"  warning: {w}", file=sys.stderr)
+    # Auto-validation now runs inside runner.generate for EVERY run and is
+    # recorded in manifest["validation"]. Report it here. For noisy runs some
+    # invariants can fail by the documented noise contract (noise_applied flags
+    # this) — so --strict gates rc=1 on failure regardless, matching the prior
+    # clean-run behavior while now covering noisy runs too.
+    v = manifest.get("validation") or {}
+    errors = v.get("errors", [])
+    warnings_ = v.get("warnings", [])
+    if v.get("passed", True):
+        suffix = f" ({len(warnings_)} warnings)" if warnings_ else ""
+        print(f"validation: OK{suffix}"
+              + (" [noise_applied]" if v.get("noise_applied") else ""))
+    else:
+        print("VALIDATION FAILED"
+              + (" [noise_applied — some failures expected per noise contract]"
+                 if v.get("noise_applied") else "") + ":", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+    for w in warnings_:
+        print(f"  warning: {w}", file=sys.stderr)
+    if args.strict and not v.get("passed", True):
+        return 1
     return 0
 
 
-_JITTER_KNOBS = (
-    "noise.building_load_jitter_pct",
-    "noise.arrival_time_jitter_min",
-    "noise.soc_arrival_jitter_pct",
-    "noise.dr_notification_dropout_prob",
-    "noise.price_jitter_pct",
-    "noise.occupancy_jitter_pct",
-    "noise.load_flex_jitter_pct",
-    "noise.load_inflex_jitter_pct",
-)
-
-
-def _all_jitters_zero(manifest: dict) -> bool:
-    res = manifest.get("knob_resolution", {})
-    for k in _JITTER_KNOBS:
-        entry = res.get(k)
-        if entry is None:
-            continue
-        if float(entry["value"]) != 0.0:
-            return False
-    return True
+def _print_validation_summary(vs: dict | None) -> None:
+    """Print the 'validation: X/Y units passed' line for multi/batch runs."""
+    if not vs:
+        return
+    n_units = vs.get("n_units", 0)
+    n_passed = vs.get("n_passed", 0)
+    total_errors = vs.get("total_errors", 0)
+    line = f"validation: {n_passed}/{n_units} units passed"
+    if total_errors:
+        line += f" ({total_errors} total errors)"
+    print(line, file=sys.stderr)
+    for fu in (vs.get("failed_units") or [])[:5]:
+        print(f"  ✗ {fu}", file=sys.stderr)
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -294,11 +294,13 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
         print(f"multi-building batch {manifest['status']}: "
               f"{manifest['n_succeeded']}/{manifest['n_total']} units "
               f"({len(cfg.buildings)} buildings) -> {output_dir}", file=sys.stderr)
+        _print_validation_summary(manifest.get("validation_summary"))
         return 0 if manifest["status"] in ("succeeded", "partial") else 2
 
     config = generate_multi(cfg, output_dir, Path(args.config_dir))
     print(f"generated {len(config['buildings'])} buildings "
           f"({config['output_mode']}) -> {output_dir}")
+    _print_validation_summary(config.get("validation_summary"))
     return 0
 
 
@@ -344,6 +346,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
     print(f"Batch {manifest['batch_id']} {manifest['status']}: "
           f"{manifest['n_succeeded']}/{manifest['n_total']} succeeded "
           f"({manifest['n_failed']} failed)", file=sys.stderr)
+    _print_validation_summary(manifest.get("validation_summary"))
     return 0 if manifest["status"] in ("succeeded", "partial") else 2
 
 
@@ -441,6 +444,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="override scenario's noise descriptor")
     g.add_argument("--strict-e5", action="store_true",
                    help="Treat E5 infeasibility as an error (rc=2) rather than warning.")
+    g.add_argument("--strict", action="store_true",
+                   help="Return rc=1 if post-generation validation fails.")
     g.set_defaults(func=cmd_generate)
 
     v = sub.add_parser("validate", help="validate an output directory")
