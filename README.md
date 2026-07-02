@@ -290,6 +290,14 @@ buildings:
   relative_humidity_pct, wind_speed_m_s, global_horizontal_w_m2,
   direct_normal_w_m2, diffuse_horizontal_w_m2` (+ `building_id` in shared mode) —
   the three solar-irradiance channels come from the EPW (GHI/DNI/DHI).
+  **Resolution note:** `weather_data.csv` is at the native EPW **hourly**
+  resolution (a 31-day month = 744 rows, last row `… 23:00`), whereas
+  `building_load.csv`, `pv_generation.csv`, and `grid_prices.csv` are **15-min**
+  (2976 rows, last row `… 23:45`). EnergyPlus interpolates the hourly weather to
+  its 15-min timestep internally; the export keeps weather at source resolution.
+  **Resample weather to 15-min (e.g. `df.set_index('datetime').reindex(grid).interpolate()`)
+  before joining it to the 15-min streams**, or the non-hour slots (incl. the
+  final `23:15/23:30/23:45`) will be empty.
 - **Two per-building perturbation layers** (kept distinct):
   - **Weather layer** (`weather_profiles.yaml`, input-side): perturbs the EPW
     EnergyPlus simulates **and** the exported `weather_data.csv` together, so the

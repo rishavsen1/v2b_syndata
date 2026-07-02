@@ -318,10 +318,13 @@ def render(ctx: ScenarioContext) -> None:
                         lo=floor, hi=ceiling,
                     )
 
-                # 5. D5 reachability via rejection.
+                # 5. D5 reachability via rejection. Strict envelope (headroom
+                #    1.0): required_soc must be reachable within the dwell at the
+                #    charger's max rate — otherwise the departure requirement
+                #    exceeds what the EV can physically charge.
                 duration_hr = duration_sec / 3600.0
                 required_kwh = (r_soc_pct - a_soc_pct) / 100.0 * car.capacity_kwh
-                available_kwh = max_charger_rate * duration_hr * 1.05
+                available_kwh = max_charger_rate * duration_hr
                 if required_kwh > available_kwh:
                     continue  # retry whole session
 
