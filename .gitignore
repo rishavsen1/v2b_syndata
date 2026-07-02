@@ -56,3 +56,6 @@ data/load_pipeline_cache
 data/calibration/acn_cache
 data/calibration/elaadnl_cache
 data/calibration/evwatts_cache
+
+# Local-only generated slide decks (kept in-repo on disk, deliberately untracked).
+showcase/decks/
