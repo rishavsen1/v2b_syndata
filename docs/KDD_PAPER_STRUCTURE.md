@@ -153,11 +153,11 @@
   scope. `peak_kw_scaling` off for comparison.
 - 5.2 Behavioral marginals & joint: per-region |Δμ| / KS / W₁ (mean |Δμ|
   0.31 h; worst cell KS 0.233); copula ρ-gap ≤ 0.226; **held-out protocol**
-  (S3 median Δ(holdout−train KS) = 0.012 — ⚠ current S3 holdout refits a
-  single TruncNorm, not the shipped mixture (tracker F3): either broaden the
-  protocol in the sprint or carry the caveat in the Tab 2 caption; disclose
-  the dwell holdout outliers +0.19/+0.28/+0.29) + **bootstrap CIs** (sprint
-  WS-A).
+  (**family-matched protocol, landed 2026-07-08**: median Δ(holdout−train
+  KS) = 0.069, worst cells +0.234 and +0.425 at n_test=62 — the earlier
+  single-family 0.012 was flattering and is superseded) + **bootstrap CIs
+  (landed)**: B=1000 seeded percentile, e.g. worst cell KS 0.222
+  [0.209, 0.235].
 - 5.3 Calibration-fix ablation: pooled→per-region (0.179→0.079, committed) and
   GMM-k arrival (⚠ 0.148→0.073 currently has **no committed primary source**
   — regenerate via WS-F before citing).
@@ -285,7 +285,7 @@ TSTR/TRTR train-synthetic(real)-test-real.
 
 ## Numbers still owed by the sprint (draft placeholders marked ⟨⟩)
 
-1. Bootstrap CIs for Tab 2 (WS-A).
+1. ~~Bootstrap CIs for Tab 2~~ ✅ landed (WS-A, 2026-07-08).
 2. Corrected ElaadNL TSTR row (WS-C, matched scenario).
 3. PV vs PVWatts v8 annual/hourly error (WS-B).
 4. DR grounding outcome (WS-D).

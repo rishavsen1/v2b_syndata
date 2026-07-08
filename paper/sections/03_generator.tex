@@ -7,10 +7,9 @@ random draw is taken from a named, seed-derived substream. This section
 describes the layers in execution order; Figure~\ref{fig:pipeline} gives the
 overview.
 
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  %% Fig 1: pipeline overview (to produce; see KDD_PAPER_STRUCTURE.md)
-  \framebox[\linewidth]{\rule{0pt}{4.2cm} Fig.~1 placeholder: pipeline layers}
+  \includegraphics[width=\textwidth]{figures/fig1_pipeline.pdf}
   \caption{Pipeline overview. Five scenario descriptors and one seed resolve
   into a typed configuration; a sampling DAG produces latent variables and
   renders ten output tables; optional output-side noise, feasibility checks,
@@ -18,7 +17,7 @@ overview.
   perturbed weather realization (left) drives the building simulation, the PV
   model, and the exported weather channel.}
   \label{fig:pipeline}
-\end{figure}
+\end{figure*}
 
 \subsection{Scenario configuration and provenance}
 \label{sec:knobs}

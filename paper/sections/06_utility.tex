@@ -39,7 +39,8 @@ $1.03\times$ (RMSE)---while lagged raw-magnitude transfer degrades to
 $7.4\times$/$6.2\times$: a lag-feature model trained at building scale cannot
 extrapolate to a fleet two orders of magnitude larger, and a 20-vehicle
 aggregate is intrinsically spikier than a 3{,}400-vehicle one. We report both
-rows (Table~\ref{tab:tstr}) and read them as a \emph{scale-shift} result: the
+rows (Table~\ref{tab:tstr}, Fig.~\ref{fig:tstr}) and read them as a
+\emph{scale-shift} result: the
 calibrated behavioral shape carries across cohorts and continents, whereas
 absolute-magnitude transfer requires matching the scenario's fleet scale to
 the target---which is precisely the parameter the generator exposes.\footnote{
@@ -68,6 +69,17 @@ ElaadNL & calendar-only, normalized & \textbf{1.02} & \textbf{1.03} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig5_tstr.pdf}
+  \caption{TSTR/TRTR error ratios of Table~\ref{tab:tstr} (log scale; dashed
+  line is parity). ACN same-cohort transfer sits at or below parity;
+  ElaadNL cross-scale transfer reaches parity only in the calendar-only,
+  unit-mean-normalized regime, isolating shape transfer from magnitude
+  transfer.}
+  \label{fig:tstr}
+\end{figure}
 
 \paragraph{Distribution-shift benchmarks.}
 Because cohorts are first-class configurations, shift experiments come free:

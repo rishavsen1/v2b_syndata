@@ -21,14 +21,23 @@ EnergyPlus:
   prototypes invalidates it automatically — but a bare binary swap that leaves
   the IDFs untouched needs a manual ``rm -rf data/load_pipeline_cache``.
 
+Bootstrap CIs (KDD_READINESS #11):
+  S1 KS / Wasserstein-1 carry 95% percentile CIs from a seeded bootstrap over
+  the SOURCE sessions (default B=1000, base seed 20260708, one hashed
+  sub-stream per region×variable cell — deterministic and order-independent).
+  Disable with ``--bootstrap 0``. Machine-readable CIs are written to
+  ``docs/experiments/s1_fidelity_cis.csv`` alongside CALIBRATION_RESULTS.md.
+
 Usage:
     uv run python tools/validate_calibration.py \\
         --output data/calibration_validation/ \\
         --seeds 50 \\
         --workers 16 \\
         [--sources acn,elaadnl]   # default: both real-calibrated sources
+        [--bootstrap 1000]        # 0 = skip bootstrap CIs
 
 Outputs:
+    docs/experiments/s1_fidelity_cis.csv
     data/calibration_validation/S1_marginals.csv
     data/calibration_validation/S2_joint.csv
     data/calibration_validation/S3_holdout.csv
@@ -63,7 +72,9 @@ from v2b_syndata.calibration.region_assignment import assign_user_to_region  # n
 from v2b_syndata.calibration.sources import CALIBRATION_SOURCES  # noqa: E402
 from v2b_syndata.calibration.distribution_fitter import (  # noqa: E402
     fit_truncnorm_arrival,
+    fit_truncnorm_mixture_arrival,
     fit_weibull_dwell,
+    fit_weibull_mixture_dwell,
 )
 from v2b_syndata.runner import generate as runner_generate  # noqa: E402
 
@@ -380,6 +391,94 @@ def load_generated(source_key: str, seed_dirs: list[Path]) -> pd.DataFrame:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Seeded bootstrap CIs for the S1 fidelity metrics (KDD_READINESS #11)
+# ──────────────────────────────────────────────────────────────────────
+
+# Fixed base seed for the bootstrap; each (source, region, variable) cell
+# derives its own sub-stream from a SHA-256 hash of the cell key (same
+# hash-not-order seeding philosophy as src/v2b_syndata/seeding.py), so adding
+# or reordering cells never shifts another cell's resamples.
+BOOTSTRAP_SEED = 20260708
+BOOTSTRAP_DEFAULT_B = 1000
+
+
+def _cell_rng(source: str, region: str, variable: str,
+              base_seed: int = BOOTSTRAP_SEED) -> np.random.Generator:
+    """Deterministic per-cell RNG, independent of cell iteration order."""
+    import hashlib
+
+    digest = hashlib.sha256(f"{source}|{region}|{variable}".encode()).digest()
+    return np.random.default_rng([base_seed, int.from_bytes(digest[:8], "big")])
+
+
+def ks_w1_vs_fixed(samples: np.ndarray, gen: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Exact two-sample KS statistic and Wasserstein-1 for each ROW of
+    ``samples`` (shape (B, n) or (n,)) against one fixed sample ``gen``.
+
+    Vectorized equivalent of ``scipy.stats.ks_2samp(row, gen).statistic`` and
+    ``scipy.stats.wasserstein_distance(row, gen)`` — gen is sorted once and
+    both metrics are evaluated with searchsorted / a shared quantile grid, so
+    a bootstrap does not re-sort the (large) generated pool B times.
+    """
+    xb = np.sort(np.atleast_2d(np.asarray(samples, dtype=float)), axis=1)
+    gen_sorted = np.sort(np.asarray(gen, dtype=float))
+    n_rows, n = xb.shape
+    m = len(gen_sorted)
+
+    # KS = sup_x |F_src - F_gen|. sup(F_src - F_gen) is attained at src jump
+    # points (right-continuous values); sup(F_gen - F_src) at left limits of
+    # src points (F_src constant between its own points). Ties are handled
+    # because within a tie group the extreme candidate is kept by the max.
+    cdf_r = np.searchsorted(gen_sorted, xb, side="right") / m
+    cdf_l = np.searchsorted(gen_sorted, xb, side="left") / m
+    i_hi = np.arange(1, n + 1) / n
+    i_lo = np.arange(0, n) / n
+    ks = np.maximum((i_hi - cdf_r).max(axis=1), (cdf_l - i_lo).max(axis=1))
+
+    # W1 = ∫₀¹ |Q_src(u) − Q_gen(u)| du, exact on the union quantile grid
+    # {i/n} ∪ {j/m} (both quantile functions are constant between grid points).
+    u_edges = np.union1d(np.arange(1, n + 1) / n, np.arange(1, m + 1) / m)
+    du = np.diff(np.concatenate(([0.0], u_edges)))
+    u_mid = u_edges - du / 2.0
+    idx_s = np.clip(np.ceil(u_mid * n).astype(int) - 1, 0, n - 1)
+    idx_g = np.clip(np.ceil(u_mid * m).astype(int) - 1, 0, m - 1)
+    gen_q = gen_sorted[idx_g]
+    w1 = (np.abs(xb[:, idx_s] - gen_q[None, :]) * du[None, :]).sum(axis=1)
+    return ks, w1
+
+
+def bootstrap_ks_w1(
+    src_vals: np.ndarray,
+    gen_vals: np.ndarray,
+    n_boot: int,
+    rng: np.random.Generator,
+    chunk: int = 128,
+) -> dict[str, float]:
+    """Percentile bootstrap (95%) of the two-sample KS and W₁ statistics.
+
+    Resamples SOURCE sessions with replacement (the generated pool is held
+    fixed — it can be regenerated at will, whereas the real data is the finite
+    sample whose sampling variability we want to quantify). The (B, n) index
+    matrix is drawn once per cell; metric evaluation is vectorized in chunks.
+    """
+    src = np.asarray(src_vals, dtype=float)
+    n = len(src)
+    idx = rng.integers(0, n, size=(n_boot, n))
+    ks_bs = np.empty(n_boot)
+    w1_bs = np.empty(n_boot)
+    for s in range(0, n_boot, chunk):
+        ks_bs[s:s + chunk], w1_bs[s:s + chunk] = ks_w1_vs_fixed(
+            src[idx[s:s + chunk]], gen_vals
+        )
+    ks_lo, ks_hi = np.percentile(ks_bs, [2.5, 97.5])
+    w1_lo, w1_hi = np.percentile(w1_bs, [2.5, 97.5])
+    return {
+        "ks_ci_lo": float(ks_lo), "ks_ci_hi": float(ks_hi),
+        "w1_ci_lo": float(w1_lo), "w1_ci_hi": float(w1_hi),
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────
 # S1: per-region marginal validation
 # ──────────────────────────────────────────────────────────────────────
 
@@ -388,8 +487,14 @@ def s1_marginals(
     source_df: pd.DataFrame,
     generated_df: pd.DataFrame,
     output_root: Path,
+    n_boot: int = BOOTSTRAP_DEFAULT_B,
 ) -> pd.DataFrame:
-    """KS, Wasserstein-1, histogram-overlay plots per (region, variable)."""
+    """KS, Wasserstein-1, histogram-overlay plots per (region, variable).
+
+    When ``n_boot > 0``, seeded bootstrap resampling of the SOURCE sessions
+    (base seed BOOTSTRAP_SEED, per-cell hashed sub-streams) adds 95%
+    percentile CIs for both statistics.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -421,7 +526,7 @@ def s1_marginals(
 
             ks_stat, ks_p = stats.ks_2samp(src_vals, gen_vals)
             w1 = stats.wasserstein_distance(src_vals, gen_vals)
-            rows.append({
+            row = {
                 "source": source_key, "region": region, "variable": var,
                 "n_source": len(src_vals), "n_generated": len(gen_vals),
                 "ks_statistic": float(ks_stat), "ks_pvalue": float(ks_p),
@@ -430,7 +535,13 @@ def s1_marginals(
                 "source_std": float(np.std(src_vals)),
                 "generated_mean": float(np.mean(gen_vals)),
                 "generated_std": float(np.std(gen_vals)),
-            })
+            }
+            if n_boot > 0:
+                rng = _cell_rng(source_key, region, var)
+                row.update(bootstrap_ks_w1(src_vals, gen_vals, n_boot, rng))
+                row["n_boot"] = n_boot
+                row["bootstrap_seed"] = BOOTSTRAP_SEED
+            rows.append(row)
 
             fig, ax = plt.subplots(figsize=(6, 3.5))
             ax.hist(src_vals, bins=40, range=xlim, density=True,
@@ -529,9 +640,33 @@ def s2_joint(
 # ──────────────────────────────────────────────────────────────────────
 
 def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
-    """80/20 split, refit on train, KS on test."""
+    """80/20 split by user, refit on train, KS on test.
+
+    Protocol (F3 repair, 2026-07-08): the train-split refit uses the SAME
+    family-selection procedure that calibration itself ships
+    (`distribution_fitter.fit_region`): a 2-component mixture when it beats
+    the single family by MIXTURE_KS_MARGIN on the train split, else the
+    single family. Previously this refit a single TruncNorm/Weibull even
+    where the shipped block is a mixture — a protocol/model mismatch that
+    made arrival rows systematically pessimistic. The family selected on the
+    train split (`fit_family`) and the family the shipped calibrated block
+    actually carries (`shipped_family`, from configs/populations.yaml) are
+    both recorded so any selection disagreement is visible per cell.
+    """
     rows = []
     regions = sorted(set(source_df["region"]) - {"__unassigned__"})
+
+    # Shipped family per (region, variable) from the live calibrated block.
+    pops_yaml = pyyaml.safe_load(
+        (REPO / "configs" / "populations.yaml").read_text()
+    )
+    pop_block = pops_yaml.get(SOURCE_SPECS[source_key]["population"]) or {}
+    shipped_dists = pop_block.get("region_distributions") or {}
+
+    def _shipped_family(region: str, key: str) -> str:
+        block = (shipped_dists.get(region) or {}).get(key) or {}
+        return str(block.get("dist", ""))
+
     for region in regions:
         src_r = source_df[source_df["region"] == region]
         if len(src_r) < 200:
@@ -545,10 +680,15 @@ def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
         if len(test) < 30:
             continue
 
-        # Fit arrival on train, KS on test
-        for var, fit_fn in [
-            ("arrival_hour", fit_truncnorm_arrival),
-            ("dwell_hours", fit_weibull_dwell),
+        # Refit on train with the shipped family-selection protocol
+        # (mixture-if-it-wins, else single — mirrors fit_region), KS on test.
+        for var, fit_fn, dist_key in [
+            ("arrival_hour",
+             lambda v: fit_truncnorm_mixture_arrival(v) or fit_truncnorm_arrival(v),
+             "arrival"),
+            ("dwell_hours",
+             lambda v: fit_weibull_mixture_dwell(v) or fit_weibull_dwell(v),
+             "dwell"),
         ]:
             train_vals = train[var].dropna().to_numpy()
             test_vals = test[var].dropna().to_numpy()
@@ -598,6 +738,8 @@ def s3_holdout(source_key: str, source_df: pd.DataFrame) -> pd.DataFrame:
             rows.append({
                 "source": source_key, "region": region, "variable": var,
                 "n_train": len(train_vals), "n_test": len(test_vals),
+                "fit_family": str(fit.get("dist", "")),
+                "shipped_family": _shipped_family(region, dist_key),
                 "ks_train": ks_train, "ks_holdout": float(ks_holdout),
                 "delta": float(ks_holdout - ks_train) if not np.isnan(ks_train) else float("nan"),
             })
@@ -856,16 +998,26 @@ def write_results_md(output_root: Path) -> None:
                 for _, r in un.iterrows()
             )
             w(f"- **S0 assignment** — drivers matching no region box (unassigned): {frags}.")
+    s1_has_ci = not s1.empty and "ks_ci_lo" in s1.columns
     if not s1.empty:
         mean_err = (s1["source_mean"] - s1["generated_mean"]).abs().mean()
-        w(f"- **S1 marginals** — mean |Δμ| {f(mean_err)} h across all region×variable "
-          f"cells; KS ≤ {f(s1['ks_statistic'].max(), 2)}.")
+        line = (f"- **S1 marginals** — mean |Δμ| {f(mean_err)} h across all "
+                f"region×variable cells; KS ≤ {f(s1['ks_statistic'].max(), 2)}.")
+        if s1_has_ci:
+            b = int(s1["n_boot"].max())
+            line += (f" 95% bootstrap CIs (B={b}, source resampled, seed "
+                     f"{int(s1['bootstrap_seed'].max())}) in the table and "
+                     "`docs/experiments/s1_fidelity_cis.csv`.")
+        w(line)
     if not s2.empty:
         w(f"- **S2 joint** — max Spearman ρ-gap {f(s2['rho_gap'].max(), 3)}; the "
           "arrival×dwell copula is reproduced.")
     if not s3.empty:
+        worst = s3.loc[s3["delta"].idxmax()]
         w(f"- **S3 held-out** — median Δ(holdout − train KS) {f(s3['delta'].median(), 3)}; "
-          "no systematic overfit.")
+          f"worst cell {'+' if float(worst['delta']) >= 0 else ''}{f(worst['delta'], 3)} "
+          f"({worst['source']} / {reg(worst['region'])} / {reg(worst['variable'])}); "
+          "per-cell Δ in the S3 table.")
     if not s5.empty:
         ww = int(s5["ww_in_range"].astype(str).str.lower().eq("true").sum())
         w(f"- **S5 building load (real-data)** — {ww}/{len(s5)} within the NREL "
@@ -893,15 +1045,33 @@ def write_results_md(output_root: Path) -> None:
     if not s1.empty:
         w("## S1 — Per-region marginals")
         w("")
-        w("| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \\|Δμ\\| | KS | W₁ |")
-        w("|---|---|---|--:|--:|--:|--:|--:|--:|--:|")
+        if s1_has_ci:
+            w("_95% CIs: seeded percentile bootstrap over the SOURCE sessions "
+              f"(B={int(s1['n_boot'].max())}, seed {int(s1['bootstrap_seed'].max())}, "
+              "per-cell hashed sub-streams; generated pool held fixed). "
+              "Machine-readable: `docs/experiments/s1_fidelity_cis.csv`._")
+            w("")
+            w("| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \\|Δμ\\| | KS | KS 95% CI | W₁ | W₁ 95% CI |")
+            w("|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|")
+        else:
+            w("| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \\|Δμ\\| | KS | W₁ |")
+            w("|---|---|---|--:|--:|--:|--:|--:|--:|--:|")
         for _, r in s1.iterrows():
             dmu = abs(float(r["source_mean"]) - float(r["generated_mean"]))
-            w(f"| {r['source']} | {reg(r['region'])} | {reg(r['variable'])} | "
-              f"{int(r['n_source']):,} | {int(r['n_generated']):,} | "
-              f"{f(r['source_mean'])}/{f(r['source_std'])} | "
-              f"{f(r['generated_mean'])}/{f(r['generated_std'])} | {f(dmu)} | "
-              f"{f(r['ks_statistic'], 3)} | {f(r['wasserstein_1'], 2)} |")
+            line = (
+                f"| {r['source']} | {reg(r['region'])} | {reg(r['variable'])} | "
+                f"{int(r['n_source']):,} | {int(r['n_generated']):,} | "
+                f"{f(r['source_mean'])}/{f(r['source_std'])} | "
+                f"{f(r['generated_mean'])}/{f(r['generated_std'])} | {f(dmu)} | "
+                f"{f(r['ks_statistic'], 3)} | "
+            )
+            if s1_has_ci:
+                line += (f"[{f(r['ks_ci_lo'], 3)}, {f(r['ks_ci_hi'], 3)}] | "
+                         f"{f(r['wasserstein_1'], 2)} | "
+                         f"[{f(r['w1_ci_lo'], 2)}, {f(r['w1_ci_hi'], 2)}] |")
+            else:
+                line += f"{f(r['wasserstein_1'], 2)} |"
+            w(line)
         w("")
 
     if not s2.empty:
@@ -915,18 +1085,33 @@ def write_results_md(output_root: Path) -> None:
               f"{f(r['rho_gap'], 3)} |")
         w("")
 
+    s3_has_family = not s3.empty and "fit_family" in s3.columns
     if not s3.empty:
         w("## S3 — Held-out generalization (80/20 by user)")
         w("")
-        w("_Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival "
-          "rows are pessimistic vs the shipped 2-component mixture._")
-        w("")
-        w("| source | region | variable | n train | n test | KS train | KS holdout | Δ |")
-        w("|---|---|---|--:|--:|--:|--:|--:|")
+        if s3_has_family:
+            w("_Δ = holdout − train KS. The train-split refit applies the same "
+              "family-selection protocol calibration ships (2-component mixture "
+              "where it beats the single family by the KS margin, else single); "
+              "`refit family` is the family selected on the train split, "
+              "`shipped` the family in the calibrated block. Judge per-cell Δ, "
+              "not only the median._")
+            w("")
+            w("| source | region | variable | n train | n test | refit family | shipped | KS train | KS holdout | Δ |")
+            w("|---|---|---|--:|--:|---|---|--:|--:|--:|")
+        else:
+            w("_Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival "
+              "rows are pessimistic vs the shipped 2-component mixture._")
+            w("")
+            w("| source | region | variable | n train | n test | KS train | KS holdout | Δ |")
+            w("|---|---|---|--:|--:|--:|--:|--:|")
         for _, r in s3.iterrows():
             d = float(r["delta"])
+            fam = (f"{reg(r['fit_family'])} | {reg(r['shipped_family']) or '—'} | "
+                   if s3_has_family else "")
             w(f"| {r['source']} | {reg(r['region'])} | {reg(r['variable'])} | "
-              f"{int(r['n_train']):,} | {int(r['n_test']):,} | {f(r['ks_train'], 3)} | "
+              f"{int(r['n_train']):,} | {int(r['n_test']):,} | {fam}"
+              f"{f(r['ks_train'], 3)} | "
               f"{f(r['ks_holdout'], 3)} | {('+' if d >= 0 else '')}{f(d, 3)} |")
         w("")
 
@@ -953,6 +1138,53 @@ def write_results_md(output_root: Path) -> None:
               f"{r['expected_ww_range']} | {'✓' if ww_ok else '✗'} | {src} |")
         w("")
 
+    # S5b — rigorous G14 metrics from tools/validate_buildingload.py, if its
+    # committed metrics file is present. Rendered here (previously this section
+    # was hand-merged into the "auto-generated" doc, so any regeneration
+    # silently dropped it — now the tool owns it end-to-end).
+    g14_path = REPO / "data" / "buildingload_reference" / "validation_metrics.json"
+    if not s5.empty and g14_path.exists():
+        import json
+
+        g14 = [e for e in json.loads(g14_path.read_text())
+               if e.get("climate_zone") == "5B"]
+        if g14:
+            w("### S5b — ASHRAE Guideline-14 fidelity vs NREL ComStock "
+              "(CZ-5B, peak_kw_scaling OFF)")
+            w("")
+            w("_Generator's raw single-prototype EnergyPlus load vs the ComStock "
+              "stock-average for each (archetype,size), from "
+              "`tools/validate_buildingload.py` "
+              "(`data/buildingload_reference/validation_metrics.json`). "
+              "G14 thresholds: CV(RMSE) ≤ 30 %, |NMBE| ≤ 10 %._")
+            w("")
+            w("| archetype/size | gen kW (mean) | ComStock kW (mean) | CV(RMSE) % | NMBE % | shape corr (wd) | peak-hr Δ | pass |")
+            w("|---|--:|--:|--:|--:|--:|--:|:-:|")
+            n_pass = 0
+            for e in g14:
+                ok = bool(e.get("cvrmse_pass")) and bool(e.get("nmbe_pass"))
+                n_pass += ok
+                nmbe = float(e["nmbe_pct"])
+                w(f"| {e['archetype']}/{e['size']} | {f(e['gen_mean_kw'], 1)} | "
+                  f"{f(e['ref_mean_kw'], 1)} | {f(e['cv_rmse_pct'], 1)} | "
+                  f"{'+' if nmbe >= 0 else '−'}{f(abs(nmbe), 1)} | "
+                  f"{f(e['shape_corr_weekday'], 3)} | {int(e['peak_hour_err_h'])} | "
+                  f"{'✓' if ok else '✗'} |")
+            w("")
+            w(f"**Interpretation.** {n_pass}/{len(g14)} pass the strict G14 magnitude "
+              "thresholds, but the failure is a documented model-scope difference, "
+              "not a defect. The generator ships a single ASHRAE 90.1-2019 "
+              "(efficient, new-construction) prototype per type — an unmodified "
+              "prototype run gives ~8.4 W/m² for small office, matching the "
+              "generator's ~7.8–8.0 W/m². ComStock is a *stock-weighted average* "
+              "(~15.7 W/m² small office) that includes older, less-efficient "
+              "buildings. The diurnal *shape* is reproduced well (weekday "
+              "correlation 0.71–0.94, peak-hour within ≤3 h). Office "
+              "weekday/weekend ratios run high because the generator zeros "
+              "weekend office occupancy whereas ComStock carries a nonzero "
+              "weekend base load.")
+            w("")
+
     if not s6.empty:
         w("## S6 — Weekly weekday/weekend rhythm")
         w("")
@@ -970,8 +1202,19 @@ def write_results_md(output_root: Path) -> None:
       "(PROJECT_TRACKER W1–W2).")
     w("- **Arrival-SoC is the weakest marginal** — inherits the ~33% ACN "
       "capacity-inference fallback; not for capacity-sensitive analysis.")
-    w("- **S3 holdout uses a single TruncNorm**, so its arrival rows understate the "
-      "shipped mixture.")
+    if s3_has_family:
+        w("- **S3 holdout refits the shipped family** (mixture where calibration "
+          "ships a mixture) on the train split; where `refit family` ≠ `shipped` "
+          "the train split's KS-margin gate chose differently than the full "
+          "sample — read those cells as protocol-consistent, not like-for-like.")
+        w("- **S3's 80/20 split is deterministic by sorted user id**, not random: "
+          "the test fifth can be a systematically different cohort (later "
+          "registrations; a different site mix in the pooled ACN cut), and "
+          "single-site cells have small test n — so a large per-cell Δ mixes "
+          "cohort shift and small-sample noise with any true overfit.")
+    else:
+        w("- **S3 holdout uses a single TruncNorm**, so its arrival rows understate the "
+          "shipped mixture.")
     w("- **S5 building-load now validates against real data** (NREL ComStock/EULP, "
       "no longer self-derived). The shipped single ASHRAE 90.1-2019 prototype is "
       "an efficient new-construction building (~8 W/m² mean for small office), "
@@ -992,6 +1235,20 @@ def write_results_md(output_root: Path) -> None:
     target.write_text("\n".join(out) + "\n")
     log.info("wrote %s", target)
 
+    # Machine-readable S1 fidelity CIs for the paper (Tab 2). Emitted here so
+    # `--md-only` rebuilds keep doc and CSV in lockstep with S1_marginals.csv.
+    if s1_has_ci:
+        ci_cols = [
+            "source", "region", "variable", "n_source", "n_generated",
+            "ks_statistic", "ks_ci_lo", "ks_ci_hi",
+            "wasserstein_1", "w1_ci_lo", "w1_ci_hi",
+            "n_boot", "bootstrap_seed",
+        ]
+        ci_target = REPO / "docs" / "experiments" / "s1_fidelity_cis.csv"
+        ci_target.parent.mkdir(parents=True, exist_ok=True)
+        s1[ci_cols].to_csv(ci_target, index=False)
+        log.info("wrote %s", ci_target)
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Main
@@ -1004,6 +1261,10 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--sources", default="acn,elaadnl",
                    help="comma list of source keys (default: acn,elaadnl)")
+    p.add_argument("-B", "--bootstrap", type=int, default=BOOTSTRAP_DEFAULT_B,
+                   help="bootstrap replicates for S1 KS/W1 95%% CIs "
+                        "(seeded, resamples source sessions; 0 = off; "
+                        f"default {BOOTSTRAP_DEFAULT_B})")
     p.add_argument("--md-only", action="store_true",
                    help="regenerate docs/CALIBRATION_RESULTS.md from existing CSVs and exit")
     args = p.parse_args()
@@ -1039,9 +1300,10 @@ def main() -> int:
         log.info("  source sessions: %d; generated sessions: %d",
                  len(source_data.sessions_df), len(generated))
 
-        # S1
-        log.info("  S1 marginals…")
-        s1_df = s1_marginals(source_key, source_data.sessions_df, generated, output_root)
+        # S1 (with seeded bootstrap CIs unless --bootstrap 0)
+        log.info("  S1 marginals (bootstrap B=%d)…", args.bootstrap)
+        s1_df = s1_marginals(source_key, source_data.sessions_df, generated,
+                             output_root, n_boot=args.bootstrap)
         s1_all.append(s1_df)
 
         # S2

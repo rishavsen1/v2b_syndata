@@ -52,9 +52,20 @@ Region \emph{weights} are the empirical user shares---for ACN:
 rare-consistent 36.1\%, occasional-consistent 39.8\%, regular-charger 23.0\%,
 rare-inconsistent 0.6\%---so the generated population reproduces the observed
 cohort composition, not a designer's guess. The empirical geometry is itself
-informative: real workplace drivers plug in far less often than intuition
-suggests (76\% of ACN drivers at $\phifreq \le 0.3$), which the calibrated
-grids encode and hand-authored grids would have missed.
+informative (Fig.~\ref{fig:axes}): real workplace drivers plug in far less
+often than intuition suggests (76\% of ACN drivers at $\phifreq \le 0.3$),
+which the calibrated grids encode and hand-authored grids would have missed.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig2_axes.pdf}
+  \caption{Region geometries in the $(\phifreq,\kapcons)$ plane. Top: the
+  hand-specified \texttt{consent\_default} grid concentrates mass at high
+  plug-in frequency. Bottom: the ACN-anchored grid, with empirical user-share
+  weights, places 76\% of drivers at $\phifreq \le 0.3$; the dashed box is a
+  region with zero empirical weight.}
+  \label{fig:axes}
+\end{figure}
 
 \subsection{Per-region distribution fitting}
 
@@ -74,7 +85,7 @@ components), a structure a single truncated normal cannot express
 
 \begin{figure}[t]
   \centering
-  \framebox[\linewidth]{\rule{0pt}{3.4cm} Fig.~3 placeholder: arrival mixture}
+  \includegraphics[width=\linewidth]{figures/fig3_arrival.pdf}
   \caption{Arrival-hour density for the largest ACN region: hand-specified
   prior (unimodal truncated normal) versus the fitted two-component mixture
   ($0.42\,\mathcal{N}(8.21, 1.25) + 0.58\,\mathcal{N}(14.54, 3.52)$, truncated

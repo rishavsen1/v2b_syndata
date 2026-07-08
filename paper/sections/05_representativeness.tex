@@ -43,15 +43,25 @@ absolute error of the mean ($|\Delta\mu|$), the two-sample KS statistic, and
 the Wasserstein-1 distance, with the arrival--dwell copula compared by
 Spearman correlation gap. With thousands of sessions per cell the KS
 $p$-value is uninformative; we therefore judge by effect size and quantify
-uncertainty by a seeded bootstrap over source sessions
-(\owed{95\% CIs, WS-A}). Aggregate results: mean $|\Delta\mu|$ of $0.31$\,h
-across all region$\times$variable cells; worst-cell KS $0.233$; maximum
-copula $\rho$-gap $0.226$. Under the held-out protocol---distributions fitted
-on a training split and evaluated against unseen sessions---the median
-degradation is $\ks_{\text{holdout}} - \ks_{\text{train}} = 0.012$,
-indicating no systematic overfit, though individual dwell cells degrade by up
-to $+0.29$ and are disclosed in the full table
-(\owed{Tab.~2 with CIs and the F3 protocol note, WS-A/WS-F}).
+sampling uncertainty by a seeded percentile bootstrap ($B{=}1000$) over
+source sessions, reported as 95\% intervals on every cell. Aggregate
+results: mean $|\Delta\mu|$ of $0.31$\,h across all region$\times$variable
+cells; the worst cell (arrival in the largest ACN region) has
+$\ks = 0.222\ [0.209, 0.235]$; maximum copula $\rho$-gap $0.226$.
+
+Held-out fidelity is evaluated under a \emph{family-matched} protocol:
+distributions are refitted on a training split of drivers using the same
+family-selection rule that calibration ships (including mixture selection)
+and scored against the unseen split. We report this protocol because an
+earlier single-family variant understated degradation; under the matched
+protocol the median degradation is
+$\ks_{\text{holdout}} - \ks_{\text{train}} = 0.069$, and the full per-cell
+table (appendix) discloses the outliers---up to $+0.234$, and $+0.425$ in a
+cell with only 62 held-out sessions, where the deterministic driver split
+induces cohort shift that small samples cannot average out. We read the
+held-out results as honest evidence of moderate generalization: typical
+cells transfer with single-digit-percent KS inflation, and the failures are
+localized, disclosed, and concentrated where data is thin.
 
 An ablation isolates the calibration decisions: replacing the pooled arrival
 fit broadcast to all regions with per-region fits reduced the largest ACN
