@@ -306,25 +306,32 @@ def test_weather_profile_changes_weather_and_load(tmp_path, config_dir, stub_wea
 
 def test_per_building_weather_profile(tmp_path, config_dir, stub_weather):
     """Each building's own weather_profile wins over the batch default — building 0
-    (none) gets no weather offset, building 1 (strong) does."""
+    (unset → batch default "none") gets no weather offset, building 1 (strong) does."""
     import json
     specs = [
         BuildingSpec("S01", descriptors={"location": "nashville_tn"},
                      overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4},
-                     seed=1, weather_profile="none"),
+                     seed=1),  # weather_profile unset → falls back to batch default
         BuildingSpec("S01", descriptors={"location": "nashville_tn"},
                      overrides={"ev_fleet.ev_count": 4, "charging_infra.charger_count": 4},
                      seed=2, weather_profile="strong"),
     ]
     out = tmp_path / "wxpb"
-    generate_multi_batch(MultiConfig(specs, output_mode="shared"), out, config_dir,
-                         start_month="2021-09", end_month="2021-09", samples_per_month=1,
-                         workers=1, noise_profile="clean", weather_profile="none")
+    manifest = generate_multi_batch(
+        MultiConfig(specs, output_mode="shared"), out, config_dir,
+        start_month="2021-09", end_month="2021-09", samples_per_month=1,
+        workers=1, noise_profile="clean", weather_profile="none")
     cfg = json.loads((out / "SEP2021" / "0" / "multi_building_config.json").read_text())
     ov = {b["building_id"]: b["overrides"] for b in cfg["buildings"]}
     assert "building_load.weather_temp_offset_c" not in ov[0]  # profile none → no draw
     assert "building_load.weather_temp_offset_c" in ov[1]       # profile strong → drawn
     assert cfg["buildings"][1]["weather_profile"] == "strong"   # round-trips in config
+    # batch_manifest.json records the *effective* per-building profiles
+    # (spec.weather_profile or the batch default), not just the batch default.
+    assert manifest["weather_profile"] == "none"                # batch-level (unchanged)
+    assert manifest["building_weather_profiles"] == ["none", "strong"]
+    on_disk = json.loads((out / "batch_manifest.json").read_text())
+    assert on_disk["building_weather_profiles"] == ["none", "strong"]
 
 
 def test_regenerate_from_config(tmp_path, config_dir, stub_weather):

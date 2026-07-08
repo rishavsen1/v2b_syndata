@@ -1,0 +1,80 @@
+\section{Representativeness}
+\label{sec:representativeness}
+
+The generators category requires representativeness to be quantified. We
+evaluate the building channel against independent real meter corpora, the
+behavioral channel against the calibration corpora under a held-out protocol
+with bootstrap confidence intervals, and the DER channels against an external
+reference implementation. All evaluations use the clean noise profile and raw
+(non-peak-normalized) simulated magnitudes.
+
+\subsection{Building load versus real meters}
+\label{sec:loadfidelity}
+
+We compare generated load against two independent references: NREL ComStock
+end-use load profiles (climate zones 5B, 3B, 4A, 6A) and nineteen real meters
+from the Building Data Genome~2 corpus, matched by archetype and size.
+Following ASHRAE Guideline~14 we report $\cvrmse{}$ and $\nmbe{}$, together
+with normalized load-shape correlation, peak-hour error, and load factor.
+Generated \emph{shapes} track the real stock well: shape correlation ranges
+$0.71$--$0.94$ across archetypes and peak-hour error is at most three hours.
+Absolute intensity reflects the single-prototype scope: four of five
+archetypes sit 37--54\% below the stock-average ComStock intensity---as
+expected when one code-compliant 2019 prototype represents a heterogeneous
+building stock---while the large-office archetype sits 27\% above
+($\nmbe{} = -27.1\%$). We report these per archetype (Table~\ref{tab:g14})
+rather than in aggregate, and return to the implication in
+\S\ref{sec:limitations}.
+
+\begin{table}[t]
+\caption{Building-load fidelity versus ComStock and BDG2 (ASHRAE G14 metrics),
+per archetype. \owed{Final table from validate\_buildingload via WS-F.}}
+\label{tab:g14}
+\centering\small
+\framebox[\linewidth]{\rule{0pt}{2.2cm} Table 3 placeholder}
+\end{table}
+
+\subsection{Behavioral fidelity: held-out and interval-quantified}
+\label{sec:behfidelity}
+
+For each calibrated population we generate sessions across seeds and compare,
+region by region and variable by variable, against the source corpus: mean
+absolute error of the mean ($|\Delta\mu|$), the two-sample KS statistic, and
+the Wasserstein-1 distance, with the arrival--dwell copula compared by
+Spearman correlation gap. With thousands of sessions per cell the KS
+$p$-value is uninformative; we therefore judge by effect size and quantify
+uncertainty by a seeded bootstrap over source sessions
+(\owed{95\% CIs, WS-A}). Aggregate results: mean $|\Delta\mu|$ of $0.31$\,h
+across all region$\times$variable cells; worst-cell KS $0.233$; maximum
+copula $\rho$-gap $0.226$. Under the held-out protocol---distributions fitted
+on a training split and evaluated against unseen sessions---the median
+degradation is $\ks_{\text{holdout}} - \ks_{\text{train}} = 0.012$,
+indicating no systematic overfit, though individual dwell cells degrade by up
+to $+0.29$ and are disclosed in the full table
+(\owed{Tab.~2 with CIs and the F3 protocol note, WS-A/WS-F}).
+
+An ablation isolates the calibration decisions: replacing the pooled arrival
+fit broadcast to all regions with per-region fits reduced the largest ACN
+region's arrival KS from $0.179$ to $0.079$; admitting mixture families
+(\owed{aggregate arrival KS improvement, regenerated via WS-F}) captures the
+bimodality of Fig.~\ref{fig:arrival}.
+
+\subsection{DER channels}
+\label{sec:derfidelity}
+
+The PV model is deterministic physics, so we validate it against an external
+reference implementation---NREL's PVWatts~v8 via the SAM SDK---under
+identical configuration and the \emph{same} weather file, eliminating
+weather-source confounds. Annual energy agrees to $+1.27\%$ (ours
+164.5\,MWh vs.\ 162.4\,MWh for a 100\,kW$_{\mathrm{DC}}$ system); every
+month agrees within $\pm 2.6\%$; hourly agreement is well inside ASHRAE
+Guideline~14 calibration tolerances ($\cvrmse{} = 15.1\%$,
+$\nmbe{} = +1.3\%$, Pearson $r = 0.994$), and a lag scan confirms exact
+time-axis alignment. A derate-equalized secondary run isolates the pure
+physics difference (isotropic vs.\ Perez transposition, NOCT thermal model)
+at $-2.8\%$; both readings sit comfortably under the 5\% acceptance gate.
+DR event \emph{timing} follows program rules by construction (season,
+notification lead, caps); event \emph{magnitudes}
+\owed{are grounded in published program data, or carried as an explicitly
+stylized prior --- WS-D outcome}, and we state the resolved position in
+\S\ref{sec:limitations}.

@@ -1,0 +1,55 @@
+\section{Limitations and Ethics}
+\label{sec:limitations}
+
+We list the limitations we know of, each with its evaluation consequence.
+
+\paragraph{Single-climate-zone building physics.}
+All prototype models ship in one climate zone (Denver, CZ~5B), while tariffs
+and weather span nine sites. Load-shape fidelity was validated against
+ComStock across four climate zones (\S\ref{sec:loadfidelity}), but absolute
+intensities inherit the single-prototype scope, including the per-archetype
+EUI deviations reported there (four archetypes 37--54\% below stock average;
+large office 27\% above). Claims about absolute energy magnitudes across
+climates should be scoped accordingly; shipping additional climate-zone
+prototypes is mechanical future work.
+
+\paragraph{SoC channels are model priors.}
+Restated once more because it is the release's most important caveat: no
+source measures SoC; both SoC channels follow the explicit reconstruction
+contract of \S\ref{sec:soc}.
+
+\paragraph{Calibration scope.}
+The ACN region grid predates the re-anchoring procedure applied to ElaadNL
+and retains its original geometry; the consistency metric $\kapcons$ is
+origin-dependent; and the Gaussian copula was chosen for closed-form
+inversion although a Frank copula fits the arrival--dwell dependence better
+in several regions --- the transform bias is documented in the repository.
+Held-out dwell fidelity degrades in three cells (up to $+0.29$ KS), disclosed
+in Table~\owed{2}. Arrival tails that approach uniformity are approximated by
+truncated mixtures. The INL cohort is a labeled fixture, not a fitted corpus.
+
+\paragraph{DER channels.}
+PV is validated against an external reference implementation
+(\S\ref{sec:derfidelity}) but not against metered arrays. DR magnitudes are
+\owed{grounded per WS-D, or}\ stylized priors within program-plausible
+ranges; DR timing follows program rules by construction. Tariff prices are
+descriptor constants representative of the named utilities rather than
+imported rate schedules; mapping to a rate database is future work.
+
+\paragraph{Validation tolerances.}
+Two share-consistency checks (negotiation-type and region shares) are
+enforced as soft advisories with a sample-size-aware tolerance rather than
+the original strict specification; all physical and structural invariants
+remain hard.
+
+\paragraph{Ethics and misuse.}
+The release contains no personal data: every driver, vehicle, and session is
+synthetic by construction, and calibration used only public or
+access-approved corpora under their terms, aggregated to distribution
+parameters (no record-level content is redistributed). The residual risks we
+see are epistemic rather than privacy-related: results obtained on synthetic
+data may be over-trusted if the representativeness scope above is ignored,
+and the SoC contract may be mistaken for measurement despite labeling. We
+mitigate both by prominent documentation (datasheet, this section) and by
+shipping the evaluation harnesses so that fidelity claims are re-checkable.
+A fuller statement accompanies the artifact.

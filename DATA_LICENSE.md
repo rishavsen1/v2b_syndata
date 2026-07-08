@@ -2,7 +2,7 @@
 
 The **synthetic datasets** produced by `v2b_syndata` (the generated CSVs —
 `users`, `cars`, `chargers`, `sessions`, `building_load`, `pv_generation`,
-`pv`, `battery`, `battery_dispatch`, `grid_prices`, `dr_events`) and the
+`pv`, `battery`, `grid_prices`, `dr_events`) and the
 original data artifacts committed in this repository (e.g.
 `data/buildingload_reference/` characterizations, calibration result blocks in
 `configs/populations.yaml`) are licensed under the **Creative Commons

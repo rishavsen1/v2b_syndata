@@ -1,0 +1,35 @@
+%% Appendix — no page limit at submission; absorbs main-text overflow at trim.
+\section{Configuration Registry}
+\label{app:knobs}
+%% Full 69-knob table: bucket, name, type, range, default, effect.
+\owed{Auto-generate from configs/knobs.yaml (cli docs-gen output re-formatted).}
+
+\section{Per-Region Fit Tables}
+\label{app:fits}
+%% Complete S1 tables per source: |Δμ|, KS, W1 with bootstrap CIs; copula gaps;
+%% held-out columns with the F3 protocol note; the dwell outlier cells.
+\owed{From regenerated CALIBRATION\_RESULTS via WS-A/WS-F.}
+
+\section{Validation Invariant Catalog}
+\label{app:invariants}
+%% The 59 checks in families A–I, one line each, hard/soft flag.
+\owed{Extract from validate.py; mirrors docs/GENERATION\_PIPELINE.html \S7.}
+
+\section{Reference-Corpus Datasheet Extract}
+\label{app:corpus}
+%% Campus composition table (10 buildings: type, cohort, equipment, PV,
+%% battery, weather profile, seeds); warning profile; manifest schema.
+\owed{From configs/campus\_10.yaml + batch manifests (incl.\ the per-building
+weather recording added in WS-E).}
+
+\section{TSTR Details and Ablations}
+\label{app:tstr}
+%% Model/features/splits; the harness-defect note in full; normalized-variant
+%% definition; per-horizon curves if space allowed them out of §6.
+\owed{From data/tstr/*.json.}
+
+\section{Behavioral Axes Geometries}
+\label{app:axes}
+%% Full-page versions of Fig. 2 for all fitted sources (ACN pooled + per-site,
+%% ElaadNL) with exact box bounds and empirical weights.
+\owed{Matplotlib re-renders; bounds from configs/populations.yaml.}

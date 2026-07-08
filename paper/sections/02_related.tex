@@ -1,0 +1,54 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Real charging datasets.}
+ACN-Data \citep{lee2019acn} remains the reference workplace-charging corpus:
+per-session records from Caltech, JPL, and an office site, including
+driver-entered energy requests. ElaadNL publishes anonymized public-charging
+transactions from the Netherlands \citep{elaadnl2020}, and the DOE-funded
+EV~WATTS program released a large multi-venue evaluation dataset
+\citep{evwatts2023}. The INL EV Project \citep{inl2015evproject} documents an
+earlier (2011--2013) residential fleet. These corpora anchor our calibration
+(\S\ref{sec:calibration}); their limitations---few sites, fixed
+infrastructure, no SoC channel, restricted or aggregated building-side
+data---motivate generation rather than reuse.
+
+\paragraph{Building-energy data and simulation.}
+On the building side, large public resources exist: NREL's ComStock
+\citep{parker2023comstock} provides calibrated end-use load profiles for the
+U.S. commercial stock, and the Building Data Genome~2 project
+\citep{miller2020bdg2} publishes meter data from over a thousand buildings.
+Physics-based simulation via EnergyPlus \citep{crawley2001energyplus} with the
+DOE prototype building models \citep{pnnl_prototypes} is the standard for
+controlled building-load studies. We use simulation as the generative
+mechanism and the public corpora as \emph{ground truth for validation}, which
+keeps the two roles---generation and evaluation---separate by construction.
+
+\paragraph{Synthetic EV-charging data.}
+Session-level generative models appear in charging-infrastructure simulators:
+ACN-Sim \citep{lee2021acnsim} includes generative session models fitted to
+ACN-Data, and ElaadNL distributes simulation profiles derived from its
+transactions. These target the charging channel in isolation. General-purpose
+deep generative models for tabular and time-series data---GAN-based
+\citep{yoon2019timegan,esteban2017rgan} and diffusion-based more
+recently---can imitate a single site's joint distribution, but they offer no
+scenario control (one cannot move the learned site to another climate or
+double its fleet), no mechanism for physical consistency across coupled
+channels, and no per-value auditability. \generator{} takes the opposite
+trade: parametric distribution families joined by an explicit copula, fitted
+per behavioral region, embedded in a physical simulation---less expressive
+than a deep density model at any single site, but controllable, auditable,
+physically coherent across channels, and calibrated across multiple corpora.
+We quantify what this trade costs (and buys) in
+\S\ref{sec:representativeness}--\S\ref{sec:utility}.
+
+\paragraph{Evaluating synthetic data.}
+We follow the two-sided evaluation that has become standard: distributional
+fidelity against held-out real data, and downstream utility via
+train-on-synthetic/test-on-real (TSTR) protocols introduced for medical
+time series \citep{esteban2017rgan}. For building-load fidelity we adopt the
+calibration metrics of ASHRAE Guideline~14 \citep{ashrae2014g14}
+($\cvrmse{}$, $\nmbe{}$), which are the accepted standard for comparing
+simulated to metered building energy. Documentation follows Datasheets for
+Datasets \citep{gebru2021datasheets} and the Croissant machine-readable
+metadata format \citep{akhtar2024croissant}.

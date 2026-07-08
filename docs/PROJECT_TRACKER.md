@@ -26,7 +26,7 @@ source-of-truth for their own metrics. (`CALIBRATION_RESULTS.md` is emitted by
 `tools/validate_calibration.py`; rebuild it cheaply from existing CSVs with
 `--md-only`.) Items below *mirror* their open conclusions for visibility only.
 
-_Last updated: 2026-06-26._
+_Last updated: 2026-07-08._
 
 ---
 
@@ -55,10 +55,9 @@ Active bugs / gaps currently in scope.
 
 | ID | Item | Area | Source/Ref |
 |---|---|---|---|
-| O1 | **B2:** EnergyPlus SIGSEGV on `mixed_use_v1` × hot climate (houston_tx, atlanta_ga) — check `mixed_use_v1.idf` cooling-coil sizing / condenser temps. Transient / not always reproducible. | energyplus | AUDIT_REPORT |
+| O1 | **B2:** EnergyPlus SIGSEGV on `mixed_use_v1` × hot climate (houston_tx, atlanta_ga) — check `mixed_use_v1.idf` cooling-coil sizing / condenser temps. Transient / not always reproducible. **Not reproduced 2026-07-08** (EnergyPlus 24.1.0, `mixed_use_v1` × `houston_tx`, `mode=month`, seed 42, cold `V2B_LOAD_CACHE_DIR` — both composite-prototype E+ sims ran clean). Kept open as transient; if it recurs, capture `eplusout.err` before retrying. | energyplus | AUDIT_REPORT |
 | O2 | **O3:** multi-population calibration not audited — run real ACN-Data calibration per `--population` for `stable_commuter_heavy` and `occasional_visitor_dominant`. | calibration | AUDIT_REPORT |
 | O3 | **O2:** CLI auto-validate skips when any jitter knob is non-zero (`cli.py:33-43`) — either auto-validate noisy outputs with relaxed thresholds or enforce hard-invariant clamps at noise-injection time. | validation | AUDIT_REPORT |
-| O4 | `GENERATIVE_MODELS.md` internal inconsistency: summary-table `depart_soc_mu` default (85, L54) disagrees with prose default (50, L196) — reconcile. | modeling | GENERATIVE_MODELS |
 | O5 | Coverage low-hanging tests: `cli.py` cmd_generate/cmd_validate/list-knobs/list-scenarios subprocess tests; `knob_loader._check_type_and_range` malformed-value; `validate._load_csv/_load_manifest` empty-dir; `dag.py` duplicate-register raise (L78); `runner.py` custom sim_window missing start/end; ~5 `validate.py` error-branch fault-injection. | tests | COVERAGE_REPORT |
 
 ---
@@ -137,3 +136,4 @@ Closed items kept for provenance.
 | ✔4 | ElaadNL region grid re-anchored on its own (φ,κ) cloud (4-box tiling: occasional_consistent / weekly_consistent / regular_commuter + erratic catch-all). Unassigned 76%→0%, 293→1231 drivers fit, near-even thirds; S1 KS 0.11–0.17, S2 ρ-gap ≤0.03. | S0, validate_calibration |
 | ✔6 | EV WATTS upgraded from fixture-only to **real-data calibrated**: ingested the public release (session⋈evse, venue=Business Office) via `tools/ingest_evwatts.py` → 1.36M workplace sessions / 3,356 users; `evwatts_workplace_public` fits 5/5 regions, unassigned 0.4% (no re-anchor needed). Registered in the validation harness. INL remains fixture-only. | tools/ingest_evwatts.py, populations.yaml |
 | ✔5 | Per-building rooftop/carport PV + stationary battery (DER). PVWatts curve from the same perturbed EPW as building load (`pv_generation.csv`), PV + battery specs (`pv.csv`/`battery.csv`), `pv.*`/`battery.*` knobs (default off), CLI + web + multi-building, `der_catalog` presets. 15 new tests; 534 pass. | der_catalog, pv_model, DESIGN_NOTES #32, GENERATIVE_MODELS |
+| ✔7 | **O4:** `GENERATIVE_MODELS.md` `depart_soc_mu` default inconsistency (summary table 85 vs prose 50) — already reconciled in the doc (both the L54 summary table and the L209 prose say **50**); tracker entry was stale, closed 2026-07-08. | GENERATIVE_MODELS L54/L209 |

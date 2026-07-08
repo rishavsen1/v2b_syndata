@@ -536,6 +536,12 @@ def generate_multi_batch(
         "seed_strategy": "building.seed + seed_base + sample",
         "noise_profile": noise_profile,
         "weather_profile": weather_profile,
+        # Effective per-building weather profile (spec.weather_profile wins,
+        # else the batch default above) — the batch-level field alone is
+        # misleading when per-building profiles do the work.
+        "building_weather_profiles": [
+            spec.weather_profile or weather_profile for spec in cfg.buildings
+        ],
         "weather_sigma_c": weather_sigma_c,
         "weather_solar_sigma": weather_solar_sigma,
         "workers": workers,

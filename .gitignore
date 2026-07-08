@@ -48,7 +48,6 @@ showcase/short_overview/__pycache__/
 handoff/
 data/paper_bench/
 data/calibration_validation/
-paper/
 
 # Guard: these are gitignored cache DIRS; the no-slash forms stop a stray
 # symlink at the path itself from being tracked (cf. worktree symlink incident 2026-06-28).

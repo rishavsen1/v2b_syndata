@@ -1,0 +1,10 @@
+Every number in this paper regenerates from the public repository at revision
+\owed{final git SHA, WS-F}: a single driver executes calibration, the
+fidelity suites (S0--S6 with bootstrap confidence intervals), the
+building-load comparison, and the TSTR experiments from committed
+configurations and fixed seeds, and writes the consolidated results file the
+paper cites. Dataset determinism is enforced by regression tests
+(byte-identical output for fixed scenario and seed). The reference corpus
+regenerates from its manifests via the recorded (revision, configuration,
+seed) triplets. Compute: \owed{final statement, WS-F; interim estimate
+${\approx}580$ CPU-hours for the corpus, minutes for any single scenario}.

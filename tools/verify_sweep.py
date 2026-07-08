@@ -16,7 +16,7 @@ Two-part check:
    - Expected ordering: uncontrolled.peak >= scheduled.peak (no scheduler = highest peak)
    - EDF/LLF target_miss_rate <= LRPT (deadline-aware ≥ deadline-blind in oversubscribed regime)
    - energy_fulfillment_rate ∈ [0, 1.5] (1.5 allows uncontrolled overcharge quirk)
-   - n_sessions_satisfied + n_sessions_missed == n_sessions
+   - n_sessions_offered > 0 and n_sessions_admitted + n_sessions_rejected == n_sessions_offered
 
 Exit 0 = all checks pass; 1 = soft warnings; 2 = hard failures.
 """
@@ -154,8 +154,13 @@ def check_algorithm_results(df: pd.DataFrame) -> tuple[list[str], list[str]]:
                 )
             if row["peak_charge_kw"] < 0:
                 errors.append(f"{scenario}/{algo}: peak_charge_kw {row['peak_charge_kw']} < 0")
-            if row["n_sessions"] <= 0:
-                errors.append(f"{scenario}/{algo}: n_sessions == 0 (no sessions?)")
+            if row["n_sessions_offered"] <= 0:
+                errors.append(f"{scenario}/{algo}: n_sessions_offered == 0 (no sessions?)")
+            if row["n_sessions_admitted"] + row["n_sessions_rejected"] != row["n_sessions_offered"]:
+                errors.append(
+                    f"{scenario}/{algo}: admitted ({row['n_sessions_admitted']}) + rejected "
+                    f"({row['n_sessions_rejected']}) != offered ({row['n_sessions_offered']})"
+                )
 
         # 2. Uncontrolled should have highest peak_charge_kw (no scheduling)
         if "uncontrolled" in gdf.index:
