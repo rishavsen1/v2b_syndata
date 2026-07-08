@@ -1,0 +1,98 @@
+%% AUTO-GENERATED from configs/knobs.yaml — regenerate via tools/gen_appendix_knobs.py
+\begin{table*}[h]
+\caption{The complete configuration registry: 69 typed knobs in 9 buckets. Types: cat.\ = categorical; simplex values sum to 1. Defaults shown; ranges/choices in the repository registry.}
+\label{tab:knobs}
+\centering\scriptsize
+\begin{tabular}{@{}llll@{}}
+\toprule
+Knob & Type & Default & Purpose \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{ev\_fleet}} \\
+\texttt{ev\_count} & int & 20 & Number of distinct EVs in fleet \\
+\texttt{battery\_mix} & simplex & [0.2, 0.3, 0.4, 0.1] & Battery class distribution. \\
+\texttt{battery\_heterogeneity} & categorical & mixed & Per-car capacity variance mode. \\
+\texttt{battery\_mix\_dirichlet\_alpha} & float & 1000000.0 & Dirichlet concentration α for per-sample battery mix noise. \\
+\texttt{min\_allowed\_soc} & float & 10.0 & Lower SoC bound (\%) applied to EVERY car in cars.csv, overriding the per-battery-class … \\
+\texttt{max\_allowed\_soc} & float & 90.0 & Upper SoC bound (\%) applied to EVERY car in cars.csv, overriding the per-battery-class … \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{charging\_infra}} \\
+\texttt{charger\_count} & int & 20 &  \\
+\texttt{directionality\_frac} & float & 0.5 & Fraction of chargers that are bidirectional \\
+\texttt{uni\_rate\_kw} & float & 20.0 & Max kW for unidirectional chargers. \\
+\texttt{bi\_rate\_kw} & float & 20.0 & Symmetric ± rate for bidirectional chargers. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{user\_behavior}} \\
+\texttt{axes\_distribution} & list[region] & [{'name': 'stable\_commuter', 'freq': [0.85, 1.0], 'consist': [0.75, 1.0], 'dist\_km': [40, 80], 'weight': 0.35}, {'name': 'flexible\_local', 'freq': [0.7, 0.95], 'consist': [0.5, 0.8], 'dist\_km': [5, 15], 'weight': 0.25}, {'name': 'irregular\_distant', 'freq': [0.4, 0.7], 'consist': [0.2, 0.5], 'dist\_km': [40, 100], 'weight': 0.2}, {'name': 'occasional\_visitor', 'freq': [0.05, 0.2], 'consist': [0.1, 0.4], 'dist\_km': [3, 50], 'weight': 0.1}…] & Region-grid distribution over (φ, κ, δ) axes. \\
+\texttt{negotiation\_mix} & simplex & [0.107, 0.536, 0.321, 0.036] & CONSENT empirical (n=28 survey) \\
+\texttt{w\_multiplier} & vec2 & [1.0, 1.0] & (α\_w1, α\_w2) global scale on CONSENT (w1, w2). \\
+\texttt{min\_depart\_soc} & float & 0.4 & Behavioral floor on required\_soc\_at\_depart (D7). \\
+\texttt{depart\_soc\_mu} & float & 50.0 & Mean (\%) of the fallback TruncNorm for required\_soc\_at\_depart, used only by uncalibrate… \\
+\texttt{depart\_soc\_sigma} & float & 5.0 & Std (\%) of the fallback TruncNorm for required\_soc\_at\_depart (paired with depart\_soc\_mu… \\
+\texttt{weekend\_activity\_factor} & float & 1.0 & Weekend appearance rate as a fraction of the weekday rate φ. \\
+\texttt{axes\_distribution\_dirichlet\_alpha} & float & 1000000.0 & Dirichlet concentration α for per-sample region-weight noise on axes\_distribution. \\
+\texttt{external\_charge\_cost} & float & 0.3 & Outside-option price ($/kWh). \\
+\texttt{menu\_levels} & list[vec2] & [[0.0, 0], [0.0625, 30], [0.1, 15], [0.2, 105]] & (Δe\_max, Δt\_max\_min) per CONSENT negotiation level. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{building\_load}} \\
+\texttt{climate} & categorical & temperate & [NOT CONNECTED] Display label for manifest/UI only. \\
+\texttt{tmyx\_station} & path & USA\_TN\_Nashville.Intl.AP.723270\_TMYx & TMYx station ID (climate.onebuilding.org). \\
+\texttt{weather\_temp\_offset\_c} & float & 0.0 & Weather realization: additive °C offset applied to the EPW dry-bulb temperature EnergyP… \\
+\texttt{weather\_solar\_scale} & float & 1.0 & Weather realization: multiplicative scale on the EPW solar channels (GHI/DNI/DHI) Energ… \\
+\texttt{weather\_dewpoint\_offset\_c} & float & 0.0 & Weather realization (humidity): additive °C offset on the EPW dew-point — the moisture … \\
+\texttt{weather\_wind\_scale} & float & 1.0 & Weather realization: multiplicative scale on EPW wind speed EnergyPlus simulates (drive… \\
+\texttt{archetype} & categorical & office & DOE prototype building family \\
+\texttt{size} & categorical & med & DOE size bin \\
+\texttt{occupancy\_source} & categorical & ashrae\_90\_1\_office & Base occupancy schedule. \\
+\texttt{peak\_kw} & float & 500.0 & Target peak building load. \\
+\texttt{peak\_kw\_scaling} & bool & True & Whether to rescale EnergyPlus output so the peak matches building\_load.peak\_kw. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{utility\_rate}} \\
+\texttt{tariff\_type} & categorical & TOU & Energy-tariff schema. \\
+\texttt{energy\_price\_offpeak} & float & 0.137 & Off-peak energy ($/kWh). \\
+\texttt{energy\_price\_peak} & float & 0.178 &  \\
+\texttt{peak\_window} & vec2 & [6, 22] & (start\_hour, end\_hour) for peak pricing \\
+\texttt{demand\_charge\_per\_kw} & float & 11.67 & Monthly demand charge. \\
+\texttt{dr\_program} & categorical & none & DR program type. \\
+\texttt{dr\_magnitude\_kw\_range} & vec2 & [50.0, 200.0] & Per-event magnitude sample range (min, max kW) \\
+\texttt{dr\_lambda\_base} & float & 0.05 & Baseline Poisson rate (events/hour) before seasonal/temp/dow/tod modulation. \\
+\texttt{dr\_incentive\_per\_kw} & float & 1.0 & DR incentive ($/kW) paid on the committed load-reduction. \\
+\texttt{dr\_penalty\_per\_kwh} & float & 1.0 & DR penalty ($/kWh) charged on energy consumed in excess of the committed firm-service l… \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{sim\_window}} \\
+\texttt{mode} & categorical & month & month = single calendar month anchored at runner's DEFAULT\_SIM\_START; \\
+\texttt{weekdays\_only} & bool & True & When true (default), force a synthetic 5-day week: weekend appearance is hard-zeroed (w… \\
+\texttt{start} & timestamp & null & Window anchor. \\
+\texttt{custom\_end} & timestamp & null & End of window. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{noise}} \\
+\texttt{profile} & categorical & clean & Named profile from configs/noise\_profiles.yaml. \\
+\texttt{building\_load\_jitter\_pct} & float & 0.0 & Multiplicative Gaussian noise std on power\_kw \\
+\texttt{arrival\_time\_jitter\_min} & float & 0.0 & Additive Gaussian noise std on arrival timestamps (minutes) \\
+\texttt{soc\_arrival\_jitter\_pct} & float & 0.0 &  \\
+\texttt{dr\_notification\_dropout\_prob} & float & 0.0 & P(scheduled DR event missing from rendered file) \\
+\texttt{price\_jitter\_pct} & float & 0.0 &  \\
+\texttt{occupancy\_jitter\_pct} & float & 0.0 &  \\
+\texttt{load\_flex\_jitter\_pct} & float & 0.0 & Multiplicative Gaussian std on the EnergyPlus flex (HVAC) load, applied post-simulation. \\
+\texttt{load\_inflex\_jitter\_pct} & float & 0.0 & Multiplicative Gaussian std on the EnergyPlus inflex (lights+plug) load, post-simulatio… \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{pv}} \\
+\texttt{pv\_type} & categorical & none & PV preset → nameplate DC kW (none=off; \\
+\texttt{dc\_capacity\_kw} & float & 0.0 & Explicit PV nameplate DC capacity (kW). \\
+\texttt{module\_type} & categorical & standard & Module family → temperature characteristics (standard c-Si temp\_coeff -0.0035/°C NOCT 4… \\
+\texttt{dc\_ac\_ratio} & float & 1.2 & DC/AC inverter loading ratio. \\
+\texttt{tilt\_deg} & float & 10.0 & Array tilt from horizontal (°). \\
+\texttt{azimuth\_deg} & float & 180.0 & Array azimuth, compass degrees (180 = due South, N-hemisphere optimum). \\
+\texttt{system\_derate} & float & 0.86 & PVWatts total DC→AC derate (soiling/wiring/mismatch/inverter). \\
+\texttt{albedo} & float & 0.2 & Ground reflectance for the POA ground-reflected term. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{battery}} \\
+\texttt{battery\_type} & categorical & none & Battery preset → capacity/power/efficiency (none=off; \\
+\texttt{capacity\_kwh} & float & 0.0 & Explicit usable energy capacity (kWh). \\
+\texttt{power\_kw} & float & 0.0 & Explicit rated power (kW, charge/discharge). \\
+\texttt{round\_trip\_efficiency} & float & 0.9 & AC-AC round-trip efficiency. \\
+\texttt{min\_soc\_pct} & float & 10.0 & Minimum usable state of charge (\%) — lower cycling bound. \\
+\texttt{max\_soc\_pct} & float & 95.0 & Maximum usable state of charge (\%). \\
+\texttt{initial\_soc\_pct} & float & 50.0 & State of charge (\%) at the start of the sim window. \\
+\bottomrule
+\end{tabular}
+\end{table*}
