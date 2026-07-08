@@ -165,6 +165,46 @@ def test_run_tstr_deterministic():
     assert r1["TRTR"] == r2["TRTR"]
 
 
+# --------------------------------------------------------------------------- #
+# normalization + matched-scenario default
+# --------------------------------------------------------------------------- #
+def test_normalize_series_unit_mean_and_zero_preserved():
+    idx = pd.date_range("2020-04-01", periods=4, freq="1h")
+    load = pd.Series([0.0, 10.0, 20.0, 30.0], index=idx)
+    norm = tstr.normalize_series(load, float(load.mean()))
+    assert norm.mean() == pytest.approx(1.0)
+    assert norm.iloc[0] == 0.0  # zeros preserved (unlike z-scoring)
+    # invalid reference means raise
+    for bad in (0.0, -1.0, float("nan")):
+        with pytest.raises(ValueError):
+            tstr.normalize_series(load, bad)
+
+
+def test_normalization_removes_pure_scale_mismatch():
+    """Same generative law at 50x magnitude (pure rescale): raw TSTR is
+    scale-dominated; after per-cohort unit-mean normalization TSTR ~ TRTR."""
+    load_real = _toy_load(400, seed=0) * 50.0
+    load_synth = _toy_load(400, seed=1)
+    raw = tstr.run_tstr(load_real, load_synth, seed=tstr.SEED)
+    real_train_mean = float(tstr.split_real(load_real)[0].mean())
+    norm = tstr.run_tstr(
+        tstr.normalize_series(load_real, real_train_mean),
+        tstr.normalize_series(load_synth, float(load_synth.mean())),
+        seed=tstr.SEED,
+    )
+    assert raw["TSTR_over_TRTR_ratio"]["mae"] > 10  # scale mismatch dominates raw
+    assert norm["TSTR_over_TRTR_ratio"]["mae"] < 3  # shape transfer recovered
+
+
+def test_default_scenario_matched_to_real_source():
+    """Regression for the adverse results_elaadnl.json artifact: the scenario
+    default must follow --real, never silently cross-pair."""
+    assert tstr.DEFAULT_SCENARIO["acn"] == "S_acn_caltech"
+    assert tstr.DEFAULT_SCENARIO["elaadnl"] == "S_elaadnl_public_eu"
+    # every --real choice has a matched default
+    assert set(tstr.DEFAULT_SCENARIO) == {"acn", "elaadnl"}
+
+
 def test_format_table_runs():
     load_real = _toy_load(400, seed=0)
     load_synth = _toy_load(400, seed=1)

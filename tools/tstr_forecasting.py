@@ -71,6 +71,15 @@ SEED = 1234
 LAGS = (1, 2, 3, 24)  # lags in BINS (at the headline 1h freq: t-1,2,3h + t-24h)
 TRAIN_FRAC = 0.6  # of the REAL series: first 60% train, last 40% test (held-out)
 
+# Matched synthetic scenario per real source. The pre-2026-07 harness defaulted
+# --scenario to S_acn_caltech unconditionally, which silently paired
+# `--real elaadnl` with an ACN-calibrated cohort (the adverse
+# results_elaadnl.json artifact). The default now follows --real.
+DEFAULT_SCENARIO = {
+    "acn": "S_acn_caltech",
+    "elaadnl": "S_elaadnl_public_eu",
+}
+
 
 # --------------------------------------------------------------------------- #
 # 1. Sessions -> aggregate load series (the shared reconstruction rule)
@@ -287,6 +296,20 @@ def fit_eval(
 # --------------------------------------------------------------------------- #
 # 5. TSTR experiment
 # --------------------------------------------------------------------------- #
+def normalize_series(load: pd.Series, ref_mean_kw: float) -> pd.Series:
+    """Scale a load series to unit mean using a reference mean (kW).
+
+    Shape-normalized transfer variant: dividing each cohort's series by its
+    OWN training-portion mean removes the magnitude mismatch between cohorts
+    (e.g. a 20-EV synthetic site vs a 481 kW-peak real site) so TSTR probes
+    load-*shape* transfer. Zero stays zero (unlike z-scoring), which matters
+    for series with many empty bins.
+    """
+    if not np.isfinite(ref_mean_kw) or ref_mean_kw <= 0:
+        raise ValueError(f"non-positive reference mean {ref_mean_kw!r} for normalization")
+    return load / ref_mean_kw
+
+
 def split_real(load_real: pd.Series, train_frac: float = TRAIN_FRAC):
     """Chronological split of the real series into (train, test). The test
     tail is the SAME held-out real data used by all three settings."""
@@ -372,8 +395,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--real", default="acn", choices=["acn", "elaadnl"],
                     help="real test dataset (default: acn)")
-    ap.add_argument("--scenario", default="S_acn_caltech",
-                    help="calibrated scenario for the synthetic cohort")
+    ap.add_argument("--scenario", default=None,
+                    help="calibrated scenario for the synthetic cohort "
+                         "(default: matched to --real, see DEFAULT_SCENARIO)")
+    ap.add_argument("--normalize", action="store_true",
+                    help="also report shape-normalized results: each cohort's "
+                         "series scaled to unit mean (real: train-split mean; "
+                         "synth: full-series mean) before feature building")
     ap.add_argument("--freq", default="1h", help="resample frequency (1h, 15min)")
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--sim-months", type=int, default=1,
@@ -382,6 +410,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     help="cap real sessions for a fast smoke run")
     ap.add_argument("--out", default=str(OUT_DIR / "results.json"))
     args = ap.parse_args(argv)
+    if args.scenario is None:
+        args.scenario = DEFAULT_SCENARIO[args.real]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -408,6 +438,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     res_lagged = run_tstr(load_real, load_synth, seed=args.seed, lags=LAGS)
     res_calendar = run_tstr(load_real, load_synth, seed=args.seed, lags=())
 
+    res_lagged_norm = res_calendar_norm = None
+    if args.normalize:
+        real_train_mean = float(split_real(load_real)[0].mean())
+        synth_mean = float(load_synth.mean())
+        load_real_n = normalize_series(load_real, real_train_mean)
+        load_synth_n = normalize_series(load_synth, synth_mean)
+        res_lagged_norm = run_tstr(load_real_n, load_synth_n, seed=args.seed, lags=LAGS)
+        res_calendar_norm = run_tstr(load_real_n, load_synth_n, seed=args.seed, lags=())
+
     out = {
         "generator": gen_stamp,
         "config": {
@@ -430,6 +469,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "results_lagged": res_lagged,
         "results_calendar_only": res_calendar,
     }
+    if args.normalize:
+        out["config"]["normalization"] = (
+            "each cohort's load series scaled to unit mean before feature "
+            "building (real: chronological train-split mean; synth: full-series "
+            "mean); metrics are in per-unit of cohort mean load (shape transfer)."
+        )
+        out["results_lagged_normalized"] = res_lagged_norm
+        out["results_calendar_only_normalized"] = res_calendar_norm
     Path(args.out).write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
 
     print()
@@ -445,6 +492,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(format_table(res_lagged))
     print("\n  [B] CALENDAR-ONLY features (generator-shape fidelity probe):")
     print(format_table(res_calendar))
+    if args.normalize:
+        print("\n  [C] LAGGED, unit-mean normalized (shape transfer):")
+        print(format_table(res_lagged_norm))
+        print("\n  [D] CALENDAR-ONLY, unit-mean normalized (shape transfer):")
+        print(format_table(res_calendar_norm))
     print("=" * 74)
     print(f"  results written -> {args.out}")
     return 0
