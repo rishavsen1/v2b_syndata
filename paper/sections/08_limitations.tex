@@ -30,11 +30,19 @@ truncated mixtures. The INL cohort is a labeled fixture, not a fitted corpus.
 
 \paragraph{DER channels.}
 PV is validated against an external reference implementation
-(\S\ref{sec:derfidelity}) but not against metered arrays. DR magnitudes are
-\owed{grounded per WS-D, or}\ stylized priors within program-plausible
-ranges; DR timing follows program rules by construction. Tariff prices are
-descriptor constants representative of the named utilities rather than
-imported rate schedules; mapping to a rate database is future work.
+(\S\ref{sec:derfidelity}) but not against metered arrays. DR magnitude
+ranges are tariff-derived for BIP and evaluation-consistent for CBP, but the
+uniform \emph{shape} of the magnitude distribution is a modeling choice
+(public evaluations report means, not distributions), and the ELRP range is
+an explicitly stylized prior because per-site nominations are redacted in
+every public evaluation. Our audit also found second-order timing
+simplifications --- notification leads and event caps are conservative
+relative to the tariffs, and the sampler's evening window ends one hour
+before the 8--9\,p.m.\ slot in which recent real ELRP events ran --- which
+we record as tracked issues rather than silently correct after the
+evaluation freeze. Tariff prices are descriptor constants representative of
+the named utilities rather than imported rate schedules; mapping to a rate
+database is future work.
 
 \paragraph{Validation tolerances.}
 Two share-consistency checks (negotiation-type and region shares) are

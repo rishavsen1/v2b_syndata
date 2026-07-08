@@ -106,6 +106,8 @@ Consciously postponed, with the gating condition.
 | K3 | Arrival SoC is unobservable — no charger records SoC, so no model comparison is possible (honest Beta(4,6) prior, not a fit). | soc | GENERATIVE_MODELS |
 | K4 | DR per-event reduction magnitudes use a flat Uniform prior — no published per-event reduction targets available. | dr | GENERATIVE_MODELS |
 | K5 | Source residential / transit-fleet populations from additional datasets to replace synthetic stand-ins. | calibration | CALIBRATION_NOTES |
+| W11 | DR magnitude re-bound (post-freeze): CBP → peak-relative Uniform(0.13,0.39)×peak (or abs (15,235)); BIP add `magnitude ≤ 0.85×peak`, invalid <118 kW peak; ELRP stylized re-bound (5,150). Grounding + citations: docs/experiments/dr_magnitude_grounding.md (2026-07-08). Deferred to avoid breaking corpus regeneration before KDD freeze. | dr | dr_magnitude_grounding |
+| W12 | DR timing fixes (post-freeze): BIP notification 30 min (tariff) vs our 2 h; BIP caps 10 ev/mo & 120 h/yr vs our 4/mo; `_tod_factor` zeroes ≥20:00 so the 8–9 p.m. window of all real PY2023 ELRP events is unreachable; S_dr_elrp.yaml mislabels ELRP as an FPL program. | dr | dr_magnitude_grounding |
 
 ---
 
