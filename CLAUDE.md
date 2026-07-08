@@ -40,6 +40,12 @@ uv run mypy src/v2b_syndata
 uv run python -m v2b_syndata.cli generate --scenario S01 --seed 42 --output-dir data/output/dev/S01/seed42/
 uv run python -m v2b_syndata.cli validate data/output/dev/S01/seed42/
 
+# Multi-building batch (months × samples, optimus CSVs). ALWAYS smoke-test a
+# 1-month × 2-sample slice first; see "Multi-building / batch generation gotchas".
+uv run python -m v2b_syndata.cli generate-multi --config configs/campus_10.yaml \
+    --start-month 2024-01 --end-month 2024-12 --samples-per-month 150 \
+    --noise-profile clean --workers 30 --output-dir data/output/campus10/ --force
+
 # Discoverability
 uv run python -m v2b_syndata.cli list-scenarios
 uv run python -m v2b_syndata.cli list-knobs
@@ -121,11 +127,64 @@ value by editing the relevant library file.
   the EPW that EnergyPlus simulates *and* the exported `weather_data.csv`
   together, so load stays physically faithful to the weather.
 
+### Multi-building / batch generation gotchas (learned the expensive way)
+
+- **Multi-sample batches want `noise_profile: clean` + a weather profile, NOT
+  `tmyx_stochastic`.** Output-side jitter perturbs session SoC/duration *after*
+  the sampler's D5 rejection, so ~half the samples fail D5 validation
+  ("unreachable (need=X, avail=Y)" with need barely over avail). With `clean` +
+  per-sample weather realization you still get genuinely distinct samples
+  (EnergyPlus re-runs each perturbed EPW; the per-sample seed varies sessions)
+  and 100% pass validation. This is the proven overnight/campus recipe.
+- **Per-building `weather_profile:` / `noise_profile:` in the multi-building
+  config win over the batch-level CLI flags** (`multi_building.py::generate_multi_batch`).
+  To mix slight/moderate across buildings in one run, set them per building and
+  do NOT pass `--weather-profile` / `--weather-sigma-c` / `--weather-solar-sigma`.
+- **`building_load.peak_kw_scaling` defaults true** → every sample's peak is
+  renormalized to the building descriptor's `peak_kw` exactly (peak identical
+  across samples; only energy/shape vary). Set it `false` for weather-driven
+  peaks (raw EnergyPlus magnitudes).
+- **`--output-mode per-building` ≠ building-major layout.** It writes integer
+  `0..N-1` subfolders at the *leaf* (`<out>/<MONTH>/<sample>/<bid>/`). For a
+  building-major tree (`parent/b1/<MONTH>/<sample>/`), run one single-building
+  batch per building (split the config; see `configs/_campus_split/`,
+  `tools/run_campus10.sh`).
+- **Seed spacing:** batch adds the per-sample offset (`0..samples_per_month-1`)
+  to each building's base seed — space base seeds by ≥ samples_per_month (and
+  ≥ `multiplier` when used) or (building, sample) seeds collide across entries.
+- **Don't `cli validate` optimus output dirs.** `validate()` expects the
+  *native* schema (`users.csv`, `manifest.json`); generate-multi emits
+  optimus-schema CSVs and validates natively *inside* each unit's generate. The
+  authoritative pass/fail is `batch_manifest.json::validation_summary` (per
+  building) / `multi_building_config.json::validation_summary` (per unit).
+- **Post-run analysis:** `tools/analyze_overnight.py` (single building,
+  slight-vs-moderate trees) and `tools/analyze_campus.py` (building-major
+  `b1..bN` trees) stream every sample → per-sample metrics CSV + self-contained
+  uncertainty-analysis HTML. Reference runs: `data/output/overnight/`,
+  `data/output/campus10/` (18k units, 0 hard errors).
+
 ### Validation (`validate.py`)
 
 Hard invariants (A–H + manifest checks I) raise `ValidationError`; soft checks
 (S) emit warnings. `cli generate` auto-validates only when no jitter was applied;
 run `cli validate <dir>` explicitly for noisy outputs.
+
+## KDD 2027 submission (active sprint — Cycle 1: abstract Jul 19, paper Jul 26 2026)
+
+- **`docs/KDD_SUBMISSION_PLAN.md`** — the sprint plan (workstreams WS-A…WS-H,
+  calendar, gates). **Evidence freeze Jul 17**: after that date, paper numbers
+  change only via the reproducibility driver, never by hand.
+- **`docs/KDD_PAPER_STRUCTURE.md`** — the paper skeleton; claims→evidence map
+  and attack→defense table. Every claim in the paper must trace to a row there.
+- **`docs/KDD_READINESS.md`** — long-lived task tracker (statuses authoritative).
+- Paper source lives in `paper/` (acmart sigconf; 8 content pages at
+  submission + unlimited appendix; single-blind). Numbers cited in the paper
+  must exist in `docs/experiments/PAPER_NUMBERS.md` once WS-F lands.
+- Known truth-traps when writing about the artifact: INL is a **fixture**
+  (65 sessions), not a real calibration corpus; the campus corpus **is**
+  weather-realized but the batch-level manifest field misleadingly reads
+  `none` (per-building profiles win — check per-unit configs); the GMM-k
+  0.148→0.073 ablation needs a committed primary source before citing.
 
 ## Where to look for "why"
 

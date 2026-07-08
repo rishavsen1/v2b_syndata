@@ -1,0 +1,21 @@
+output_mode: shared
+dr_program: CBP
+dr_incentive_per_kw: 13.6
+dr_penalty_per_kwh: 6.0
+default_policy: ILP-MPCFIXEDFSL
+buildings:
+- base_scenario: S01
+  descriptors:
+    building: medium_office_v1
+    location: san_jose_ca
+    population: stable_commuter_heavy
+    equipment: bi_heavy
+  overrides:
+    ev_fleet.ev_count: 30
+    charging_infra.charger_count: 30
+    pv.pv_type: none
+    battery.battery_type: lfp_4h
+    building_load.peak_kw_scaling: false
+  noise_profile: clean
+  weather_profile: slight
+  seed: 4000

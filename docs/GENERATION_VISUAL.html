@@ -1,0 +1,958 @@
+<title>v2b-syndata — A Visual Tour of the Generation Pipeline</title>
+<meta name="description" content="Visual end-to-end walkthrough of how one seed becomes a synthetic V2B dataset — every layer drawn, plus how user behavior is calibrated from real charging data.">
+<style>
+  :root{
+    --navy:#1f4e79; --navy-deep:#132f4a; --navy-mid:#2d6398; --navy-tint:#eaf1f7; --navy-line:#b9c9da;
+    --amber:#d8853b; --amber-deep:#b06a26; --amber-tint:#fdf3e7;
+    --green:#2ca02c; --green-tint:#edf6ed;
+    --paper:#f7f9fb; --surface:#ffffff; --ink:#16202a; --muted:#5d6a77; --border:#dde4ea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;font-size:15.5px;line-height:1.55}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.84em;
+       background:#eef1f4;padding:.05em .35em;border-radius:3px}
+  .mono-plain{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  /* ── hero ─────────────────────────────────────── */
+  .hero{background:linear-gradient(160deg,var(--navy-deep) 0%,var(--navy) 70%,var(--navy-mid) 100%);
+        color:#fff;padding:3.2rem 2rem 2.6rem;overflow:hidden}
+  .hero-inner{max-width:1080px;margin:0 auto}
+  .hero .eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;letter-spacing:.22em;
+        text-transform:uppercase;color:#f0b47c;margin-bottom:.8rem}
+  .hero h1{margin:0;font-size:clamp(1.8rem,4.5vw,3rem);font-weight:800;letter-spacing:-.025em;
+        line-height:1.12;text-wrap:balance;max-width:22ch}
+  .hero p{margin:1rem 0 0;font-size:1.02rem;opacity:.85;max-width:58ch}
+  /* the seed→csv ribbon */
+  .ribbon{margin-top:2.2rem;position:relative;display:flex;align-items:center;gap:0;
+        font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;flex-wrap:wrap;row-gap:.9rem}
+  .rib-node{border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:.4rem .7rem;
+        background:rgba(255,255,255,.07);white-space:nowrap}
+  .rib-node.hot{background:var(--amber);border-color:var(--amber);color:#fff;font-weight:700}
+  .rib-node.end{background:#fff;color:var(--navy);font-weight:700;border-color:#fff}
+  .rib-link{position:relative;width:46px;height:2px;background:rgba(255,255,255,.35);flex-shrink:0}
+  .rib-link::after{content:"";position:absolute;top:-2.5px;left:0;width:7px;height:7px;border-radius:50%;
+        background:#f0b47c;animation:flow 2.4s linear infinite}
+  .rib-link:nth-of-type(4)::after{animation-delay:.4s}
+  .rib-link:nth-of-type(6)::after{animation-delay:.8s}
+  .rib-link:nth-of-type(8)::after{animation-delay:1.2s}
+  .rib-link:nth-of-type(10)::after{animation-delay:1.6s}
+  .rib-link:nth-of-type(12)::after{animation-delay:2.0s}
+  @keyframes flow{from{left:0;opacity:0}15%{opacity:1}85%{opacity:1}to{left:calc(100% - 7px);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.rib-link::after{animation:none;left:calc(50% - 3.5px)}}
+
+  nav.spine{position:sticky;top:0;z-index:60;background:var(--surface);border-bottom:2px solid var(--navy);
+        padding:.4rem 1rem;overflow-x:auto;white-space:nowrap}
+  nav.spine a{color:var(--navy);text-decoration:none;font-size:.75rem;font-weight:700;padding:.22rem .5rem;border-radius:4px}
+  nav.spine a:hover{background:var(--navy-tint)}
+  nav.spine a:focus-visible{outline:2px solid var(--amber)}
+  nav.spine .n{color:var(--amber);font-family:ui-monospace,Menlo,monospace;font-size:.68rem}
+
+  main{max-width:1080px;margin:0 auto;padding:1.8rem 1.3rem 4rem}
+  .act{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+        padding:1.6rem 1.8rem;margin-bottom:1.6rem;scroll-margin-top:3.2rem;position:relative}
+  .act-head{display:flex;align-items:baseline;gap:1rem;border-bottom:2px solid var(--navy-tint);padding-bottom:.6rem;margin-bottom:1rem}
+  .act-num{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:2.2rem;font-weight:700;color:var(--navy-tint);
+        -webkit-text-stroke:1.5px var(--navy);line-height:1}
+  .act h2{margin:0;color:var(--navy);font-size:1.3rem;font-weight:800;letter-spacing:-.015em;text-wrap:balance}
+  .act h2 small{display:block;font-weight:500;font-size:.82rem;color:var(--muted);letter-spacing:0;margin-top:.15rem}
+  h3{color:var(--navy);font-size:1rem;margin:1.2rem 0 .4rem}
+  p{max-width:82ch}
+  .muted{color:var(--muted);font-size:.85rem}
+
+  .truth{background:var(--amber-tint);border:1px solid #f0d9b8;border-left:4px solid var(--amber);border-radius:6px;
+        padding:.6rem .95rem;font-size:.85rem;margin:.8rem 0;max-width:95ch}
+  .truth b:first-child{color:var(--amber-deep)}
+  .okbox{background:var(--green-tint);border:1px solid #cfe4cf;border-left:4px solid var(--green);border-radius:6px;
+        padding:.6rem .95rem;font-size:.85rem;margin:.8rem 0;max-width:95ch}
+
+  /* descriptor cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin:.8rem 0}
+  .dcard{border:1px solid var(--border);border-top:4px solid var(--navy);border-radius:8px;
+        background:#fbfcfd;padding:.7rem .85rem}
+  .dcard.warm{border-top-color:var(--amber)}
+  .dcard h4{margin:0 0 .25rem;font-size:.82rem;color:var(--navy);text-transform:uppercase;letter-spacing:.07em}
+  .dcard.warm h4{color:var(--amber-deep)}
+  .dcard .big{font-weight:800;font-size:1rem;letter-spacing:-.01em}
+  .dcard ul{margin:.35rem 0 0 1rem;padding:0;font-size:.76rem;color:var(--muted)}
+  .dcard li{margin:.12rem 0}
+
+  /* funnel */
+  .funnel{display:flex;flex-direction:column;gap:.35rem;max-width:620px;margin:.8rem 0}
+  .frow{display:flex;align-items:center;gap:.7rem}
+  .fbar{border-radius:5px;color:#fff;font-size:.8rem;font-weight:700;padding:.42rem .8rem;white-space:nowrap}
+  .frow .why{font-size:.76rem;color:var(--muted)}
+  .fb1{background:var(--amber);width:98%}
+  .fb2{background:var(--navy-mid);width:80%}
+  .fb3{background:var(--navy);width:62%}
+  .fb4{background:#8195a8;width:44%}
+
+  /* diagrams */
+  .diagram-wrap{overflow-x:auto;margin:.8rem 0}
+  canvas.plot{border:1px solid var(--border);border-radius:6px;background:#fff;max-width:100%;height:auto;display:block}
+  .plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:.9rem;margin:.8rem 0}
+  .plotcard{border:1px solid var(--border);border-radius:8px;padding:.6rem .7rem;background:#fbfcfd}
+  .plotcard h4{margin:.1rem 0 .4rem;font-size:.8rem;color:var(--navy)}
+  .plotcard .cap{font-size:.72rem;color:var(--muted);margin-top:.35rem;line-height:1.45}
+
+  /* recipe blocks: feature → how it's generated */
+  .recipe{background:#f4f7fa;border:1px solid var(--border);border-radius:6px;
+      padding:.55rem .8rem;margin:.7rem 0;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+      font-size:.74rem;line-height:1.75;overflow-x:auto}
+  .recipe .r{white-space:nowrap}
+  .recipe b{color:var(--navy);font-weight:700}
+  .recipe .a{color:var(--amber);font-weight:700;padding:0 .2rem}
+  .recipe .cm{color:var(--muted)}
+
+  /* DAG */
+  #dagbox{position:relative;min-width:1000px;padding:.5rem 0}
+  #dagsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .dagcols{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:1.5rem;z-index:2}
+  .dnode.desc{border-style:dashed;border-color:#9fb4c7;background:#f4f7fa;color:var(--muted)}
+  .dagcol h4{text-align:center;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+        color:var(--muted);margin:.2rem 0 .6rem}
+  .dagcol{display:flex;flex-direction:column;gap:.45rem}
+  .dnode{border:1.5px solid var(--navy-line);background:#fff;border-radius:6px;text-align:center;
+        font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.74rem;padding:.3rem .4rem;cursor:default;
+        transition:border-color .15s, box-shadow .15s}
+  .dnode.rng{border-color:var(--amber);background:var(--amber-tint)}
+  .dnode.render{background:var(--green-tint);border-color:#a9d3a9}
+  .dnode.hl{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy-tint);}
+  .legend{display:flex;gap:1rem;font-size:.72rem;color:var(--muted);margin:.4rem 0;flex-wrap:wrap}
+  .sw{display:inline-block;width:.85em;height:.85em;border-radius:3px;vertical-align:-.1em;margin-right:.3em;border:1.5px solid var(--navy-line);background:#fff}
+  .sw.rng{border-color:var(--amber);background:var(--amber-tint)}
+  .sw.render{border-color:#a9d3a9;background:var(--green-tint)}
+
+  /* chain diagrams (boxes with arrows) */
+  .chain{display:flex;align-items:stretch;gap:.45rem;flex-wrap:wrap;margin:.7rem 0}
+  .chain .cbox{border:1.5px solid var(--navy-line);border-radius:6px;padding:.45rem .65rem;background:#fff;
+        font-size:.76rem;min-width:7rem;text-align:center}
+  .chain .cbox b{display:block;font-size:.8rem;color:var(--navy)}
+  .chain .cbox.warm{border-color:var(--amber);background:var(--amber-tint)}
+  .chain .cbox.out{border-color:#a9d3a9;background:var(--green-tint)}
+  .chain .arr{align-self:center;color:var(--muted);font-size:1rem;padding:0 .05rem}
+
+  /* rejection loop */
+  .gates{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin:.7rem 0}
+  .gate{border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;background:#fbfcfd;font-size:.76rem}
+  .gate b{display:block;color:var(--navy);font-size:.78rem}
+  .gate .mono{font-size:.68rem}
+
+  /* validation wall */
+  .wall{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+  .brick{border-radius:5px;padding:.3rem .6rem;font-size:.72rem;font-weight:700;border:1px solid var(--border);background:#fbfcfd;color:var(--navy)}
+  .brick.softb{color:#7c8794;font-weight:600}
+
+  /* file grid */
+  .files{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:.55rem;margin:.7rem 0}
+  .fcard{border:1px solid #a9d3a9;border-radius:6px;background:var(--green-tint);padding:.45rem .6rem}
+  .fcard b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#196319;display:block}
+  .fcard span{font-size:.68rem;color:var(--muted)}
+  .fcard.meta{border-color:var(--navy-line);background:var(--navy-tint)}
+  .fcard.meta b{color:var(--navy)}
+
+  /* source cards (calibration) */
+  .srcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin:.8rem 0}
+  .src{border:1px solid var(--border);border-left:5px solid var(--navy);border-radius:8px;background:#fbfcfd;padding:.7rem .9rem}
+  .src h4{margin:0;font-size:.92rem;color:var(--navy)}
+  .src .stat{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:var(--ink);margin-top:.3rem;
+        font-variant-numeric:tabular-nums}
+  .src p{font-size:.76rem;color:var(--muted);margin:.35rem 0 0}
+
+  table{border-collapse:collapse;width:100%;font-size:.78rem;margin:.5rem 0}
+  th,td{border:1px solid var(--border);padding:.3rem .55rem;text-align:left}
+  th{background:var(--navy-tint);color:var(--navy)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tablewrap{overflow-x:auto}
+  ol.steps{font-size:.87rem;max-width:90ch} ol.steps li{margin:.3rem 0}
+  ul.plain{font-size:.85rem} ul.plain li{margin:.2rem 0}
+  footer{color:var(--muted);font-size:.78rem;text-align:center;padding:1.2rem}
+  @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">v2b-syndata · generative pipeline · visual tour</div>
+    <h1>One integer seed walks in.<br>A city block of data walks out.</h1>
+    <p>How the generator turns a scenario name and a seed into a physically-simulated, behaviorally-calibrated,
+       bitwise-reproducible V2B dataset — drawn step by step, with the real numbers at every stage.</p>
+    <div class="ribbon" aria-hidden="true">
+      <span class="rib-node hot">seed 42</span><span class="rib-link"></span>
+      <span class="rib-node">knobs</span><span class="rib-link"></span>
+      <span class="rib-node">RNG streams</span><span class="rib-link"></span>
+      <span class="rib-node">DAG · EnergyPlus</span><span class="rib-link"></span>
+      <span class="rib-node">noise</span><span class="rib-link"></span>
+      <span class="rib-node">validate</span><span class="rib-link"></span>
+      <span class="rib-node end">10 CSVs + manifest</span>
+    </div>
+  </div>
+</div>
+
+<nav class="spine" aria-label="Acts">
+  <a href="#a1"><span class="n">01</span> Inputs</a>
+  <a href="#a2"><span class="n">02</span> Resolution</a>
+  <a href="#a3"><span class="n">03</span> Seeding</a>
+  <a href="#a4"><span class="n">04</span> DAG</a>
+  <a href="#a5"><span class="n">05</span> Building</a>
+  <a href="#a6"><span class="n">06</span> Sessions</a>
+  <a href="#a7"><span class="n">07</span> DER &amp; grid</a>
+  <a href="#a8"><span class="n">08</span> Noise</a>
+  <a href="#a9"><span class="n">09</span> Gates</a>
+  <a href="#a10"><span class="n">10</span> Outputs</a>
+  <a href="#a11"><span class="n">11</span> ★ User calibration</a>
+</nav>
+
+<main>
+
+<!-- ═════════ ACT 1 ═════════ -->
+<section class="act" id="a1">
+  <div class="act-head"><span class="act-num">01</span>
+    <h2>The inputs<small>Five descriptor cards you choose — and the machinery you don't see</small></h2></div>
+
+  <p>A scenario is just five named picks from descriptor libraries, plus a seed. Everything else is expansion.</p>
+  <div class="cards">
+    <div class="dcard"><h4>location</h4><div class="big">san_jose_ca</div>
+      <ul><li>TMYx weather station</li><li>full tariff bundle ($/kWh, window, demand charge)</li><li>DR program eligibility</li><li>9 to choose from</li></ul></div>
+    <div class="dcard"><h4>building</h4><div class="big">medium_office_v1</div>
+      <ul><li>DOE archetype + size → prototype IDF</li><li>occupancy schedule</li><li>design peak_kw</li><li>6 to choose from</li></ul></div>
+    <div class="dcard"><h4>population</h4><div class="big">consent_default</div>
+      <ul><li>behavioral axes grid (φ, κ, δ)</li><li>negotiation mix + fleet spec</li><li>calibrated fits when policy ≠ synthetic</li><li>13 to choose from → Act 11</li></ul></div>
+    <div class="dcard"><h4>equipment</h4><div class="big">balanced_50pct</div>
+      <ul><li>charger count + rates</li><li>bidirectional share (V1G↔V2B)</li><li>6 to choose from</li></ul></div>
+    <div class="dcard"><h4>noise</h4><div class="big">clean</div>
+      <ul><li>output-side measurement noise</li><li>clean ⇒ zero jitter, bitwise output</li><li>6 profiles</li></ul></div>
+  </div>
+
+  <h3>…and the hidden inputs already inside the box</h3>
+  <div class="cards">
+    <div class="dcard warm"><h4>physics</h4><div class="big">EnergyPlus 23.2</div>
+      <ul><li>ASHRAE 90.1-2019 prototype IDFs</li><li>TMYx EPW hourly weather (9 stations)</li><li>ASHRAE occupancy schedules</li></ul></div>
+    <div class="dcard warm"><h4>hardware priors</h4><div class="big">4 EV classes · DER catalog</div>
+      <ul><li>leaf 24 / bolt 40 / m3 75 / rivian 100 kWh</li><li>PV presets 30–600 kW · module NOCT params</li><li>battery presets LFP/NMC × 2h/4h</li></ul></div>
+    <div class="dcard warm"><h4>behavioral priors</h4><div class="big">CONSENT n=28 · fits</div>
+      <ul><li>negotiation clusters (w1, w2)</li><li>calibrated region_distributions (Act 11)</li></ul></div>
+    <div class="dcard warm"><h4>market rules</h4><div class="big">DR program specs</div>
+      <ul><li>CBP 24 h notice · ≤6/mo · May–Oct</li><li>BIP 2 h · ≤4/mo · year-round</li><li>ELRP 2 h · ≤10/mo · May–Oct</li></ul></div>
+  </div>
+
+  <h3>How this layer works <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>scenario + seed</b> <span class="a">→</span> chosen by you <span class="cm">(the only two things you must supply)</span></div>
+    <div class="r"><b>descriptor pick</b> <span class="a">→</span> name looked up in its library YAML <span class="a">→</span> a bundle of knob values (Act 02)</div>
+    <div class="r"><b>hidden inputs</b> <span class="a">→</span> ship with the repo / auto-download <span class="a">→</span> consumed by the layer that needs them <span class="cm">(no user action)</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 2 ═════════ -->
+<section class="act" id="a2">
+  <div class="act-head"><span class="act-num">02</span>
+    <h2>Resolution<small>69 typed knobs, one priority funnel, full provenance</small></h2></div>
+  <p>Descriptors expand into knob values; four sources compete for each knob and the strongest wins.
+     Every resolved value remembers its origin — the manifest can answer <i>“why is this number what it is?”</i> for all 69.</p>
+  <div class="funnel">
+    <div class="frow"><span class="fbar fb1">1 · CLI --override</span><span class="why">source: <code>explicit</code></span></div>
+    <div class="frow"><span class="fbar fb2">2 · scenario YAML overrides</span><span class="why">source: <code>explicit</code></span></div>
+    <div class="frow"><span class="fbar fb3">3 · descriptor expansion</span><span class="why">source: <code>descriptor:*</code> / <code>calibration:*</code> / <code>hand_specified:*</code></span></div>
+    <div class="frow"><span class="fbar fb4">4 · knobs.yaml default</span><span class="why">source: <code>default</code></span></div>
+  </div>
+  <div class="truth"><b>Two channels, one namespace.</b> Registry knobs (<code>ev_fleet.ev_count</code>…) are typed and
+  range-checked from <code>knobs.yaml</code>; <em>deep-channel</em> leaves
+  (<code>user_behavior.region_distributions.&lt;region&gt;.&lt;dist&gt;.&lt;param&gt;</code>) carry the calibrated fits and are
+  validated against <code>DIST_PARAM_RANGES</code> — an out-of-range override is rejected, not clamped.</div>
+
+  <h3>How each knob gets its value <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>every knob</b> <span class="a">→</span> first hit wins: CLI override <span class="a">→</span> scenario overrides <span class="a">→</span> descriptor expansion <span class="a">→</span> knobs.yaml default</div>
+    <div class="r"><b>value</b> <span class="a">→</span> type + range check (registry) or DIST_PARAM_RANGES check (deep) <span class="a">→</span> KnobValue(value, source)</div>
+    <div class="r"><b>manifest.knob_resolution</b> <span class="a">→</span> all 69+ resolved values with their source labels <span class="cm">(the audit trail)</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 3 ═════════ -->
+<section class="act" id="a3">
+  <div class="act-head"><span class="act-num">03</span>
+    <h2>Seeding<small>One seed, hash-keyed into hundreds of independent streams</small></h2></div>
+  <p>Every random draw belongs to a named stream: <code>SeedSequence(seed, spawn_key=SHA-256(node_name)[, car_id])</code>.
+     Keys are content-hashes, <b>not spawn order</b> — adding a new node can never shift another node's randomness.</p>
+  <div class="chain">
+    <div class="cbox warm"><b>seed = 42</b>root entropy</div><span class="arr">→</span>
+    <div class="cbox"><b>SHA-256("A_user")</b>per-car stream, car 0…N</div><span class="arr">·</span>
+    <div class="cbox"><b>SHA-256("sessions:2024-01-03")</b>per car, per day</div><span class="arr">·</span>
+    <div class="cbox"><b>SHA-256("dirichlet:axes")</b>isolated aux stream</div><span class="arr">·</span>
+    <div class="cbox"><b>SHA-256("weather_realization")</b>per-sample weather draw</div>
+  </div>
+  <div class="okbox"><b>The contract this buys:</b> (scenario, seed) → byte-identical CSVs, forever. Guarded by
+  <code>test_reproducibility.py</code> + <code>test_determinism_stress.py</code>; Python's salted <code>hash()</code> is banned.</div>
+
+  <h3>How a random number is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>node stream</b> <span class="a">→</span> SHA-256(node name) as spawn key <span class="a">→</span> SeedSequence(seed, key) <span class="a">→</span> default_rng</div>
+    <div class="r"><b>per-car stream</b> <span class="a">→</span> spawn key = (SHA-256(node), car_id) <span class="cm">— car 7's draws never move car 8's</span></div>
+    <div class="r"><b>per-day stream</b> <span class="a">→</span> node name embeds the date: "sessions:2024-01-03" <span class="cm">— each day independent</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 4 ═════════ -->
+<section class="act" id="a4">
+  <div class="act-head"><span class="act-num">04</span>
+    <h2>The sampling DAG<small>27 nodes, 4 tiers, executed in stable topological order — hover a node to trace its wiring</small></h2></div>
+  <div class="legend">
+    <span><span class="sw" style="border-style:dashed;background:#f4f7fa"></span>Tier 0 — resolved <em>before</em> the DAG runs (Act 02)</span>
+    <span><span class="sw"></span>deterministic packer / physics</span>
+    <span><span class="sw rng"></span>randomness enters here</span>
+    <span><span class="sw render"></span>renders an output CSV</span>
+  </div>
+  <div class="diagram-wrap"><div id="dagbox">
+    <svg id="dagsvg" aria-hidden="true"></svg>
+    <div class="dagcols">
+      <div class="dagcol"><h4>Tier 0 · descriptors</h4>
+        <div class="dnode desc" data-id="d_loc">location</div>
+        <div class="dnode desc" data-id="d_bld">building</div>
+        <div class="dnode desc" data-id="d_pop">population</div>
+        <div class="dnode desc" data-id="d_eq">equipment</div>
+        <div class="dnode desc" data-id="d_nz">noise → Act 08</div>
+      </div>
+      <div class="dagcol"><h4>Tier 1 · roots</h4>
+        <div class="dnode" data-id="C">C · climate</div>
+        <div class="dnode" data-id="A">A · archetype</div>
+        <div class="dnode" data-id="S">S · size</div>
+        <div class="dnode" data-id="O">O · occupancy</div>
+        <div class="dnode" data-id="T">T · tariff</div>
+        <div class="dnode" data-id="U">U · user behavior</div>
+        <div class="dnode" data-id="F">F · fleet</div>
+        <div class="dnode" data-id="X">X · chargers</div>
+      </div>
+      <div class="dagcol"><h4>Tier 1.5 · per-entity</h4>
+        <div class="dnode rng" data-id="A_user">A_user (φ κ δ, type, w1 w2)</div>
+        <div class="dnode rng" data-id="A_fleet">A_fleet (battery, capacity)</div>
+      </div>
+      <div class="dagcol"><h4>Tier 2 · latents</h4>
+        <div class="dnode" data-id="L_flex">L_flex (E+ HVAC kW)</div>
+        <div class="dnode" data-id="L_inflex">L_inflex (E+ lights kW)</div>
+        <div class="dnode" data-id="f_arr">f_arr (arrival dist)</div>
+        <div class="dnode" data-id="f_dwell">f_dwell (dwell dist + ρ)</div>
+        <div class="dnode" data-id="f_soc">f_soc (SoC dists)</div>
+        <div class="dnode" data-id="PV_gen">PV_gen (PVWatts)</div>
+      </div>
+      <div class="dagcol"><h4>Tier 3 · renderers</h4>
+        <div class="dnode render" data-id="building_load">building_load.csv</div>
+        <div class="dnode render rng" data-id="sessions">sessions.csv</div>
+        <div class="dnode render" data-id="users">users.csv</div>
+        <div class="dnode render" data-id="cars">cars.csv</div>
+        <div class="dnode render" data-id="chargers">chargers.csv</div>
+        <div class="dnode render" data-id="grid_prices">grid_prices.csv</div>
+        <div class="dnode render rng" data-id="dr_events">dr_events.csv</div>
+        <div class="dnode render" data-id="pv_generation">pv_generation.csv</div>
+        <div class="dnode render" data-id="pv">pv.csv</div>
+        <div class="dnode render" data-id="battery">battery.csv</div>
+      </div>
+    </div>
+  </div></div>
+  <p class="muted">Edges are the declared parents in <code>dag.py::NODE_TOPOLOGY</code> (solid), plus the dashed
+  Tier-0 feeds that happen at knob-resolution time. <code>sessions.csv</code> is the convergence point — 7 parents —
+  because a charging session must respect the driver, the car, the charger, the distributions <em>and</em> the time grid at once.
+  The <b>noise</b> descriptor is the one Tier-0 pick with no DAG child: it configures the output-noise layer (Act 08),
+  which runs <em>after</em> the DAG.</p>
+
+  <h3>Decoding the short forms</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Symbol</th><th>Tier</th><th>Read as</th><th>What it holds</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-plain">C · A · S · O · T · U · F · X</td><td>1</td><td>Climate · Archetype · Size · Occupancy · Tariff · User-behavior · Fleet · charger infra (X)</td><td>Deterministic bundles of the resolved knobs — no randomness, just packing.</td></tr>
+      <tr><td class="mono-plain">A_user</td><td>1.5</td><td>“Attributes, per user”</td><td>One row per driver: <b>φ</b> (phi — plug-in frequency, 0–1), <b>κ</b> (kappa — schedule consistency, 0–1), <b>δ</b> (delta — daily driving distance, km), CONSENT negotiation <b>type</b> (i–iv), and negotiation weights <b>w1, w2</b>.</td></tr>
+      <tr><td class="mono-plain">A_fleet</td><td>1.5</td><td>“Attributes, per fleet car”</td><td>One row per car: battery <b>class</b> (leaf_24 … rivian_100), <b>capacity_kwh</b>, allowed SoC band.</td></tr>
+      <tr><td class="mono-plain">L_flex / L_inflex</td><td>2</td><td>“Load, flexible / inflexible”</td><td>15-min building-load series from EnergyPlus: flex = HVAC-ish end uses that a controller could shift; inflex = lights + plug loads that must be served as-is.</td></tr>
+      <tr><td class="mono-plain">f_arr / f_dwell / f_soc</td><td>2</td><td>“distribution function of …”</td><td>Per-car <em>distribution parameters</em> (not draws yet): arrival-hour TruncNorm, dwell Weibull + copula ρ, and the two SoC Betas. Act 06 draws from them day by day.</td></tr>
+      <tr><td class="mono-plain">PV_gen</td><td>2</td><td>“PV generation”</td><td>Deterministic 15-min AC power series from the PVWatts chain (Act 07).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="truth"><b>Why “Tier 1.5”?</b> It instantiates <em>entities</em> (drivers, cars) between the scenario-level
+  roots (Tier 1) and the time-resolved latents (Tier 2) — per-entity randomness, one hash-keyed stream per car. And yes,
+  there <em>is</em> a tier before Tier 1: <b>Tier 0, the five descriptors</b> — it doesn't execute inside the DAG (it's the
+  knob-resolution step of Act 02), which is why diagrams often start at Tier 1. It's drawn here (dashed) so the full
+  Tier 0 → 1 → 1.5 → 2 → 3 chain is visible in one place.</div>
+
+  <h3>How each tier generates <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>Tier 0 descriptor</b> <span class="a">→</span> library YAML lookup <span class="a">→</span> knob values <span class="cm">(no RNG — Act 02)</span></div>
+    <div class="r"><b>Tier 1 root</b> <span class="a">→</span> pack resolved knobs into a bundle <span class="cm">(no RNG)</span></div>
+    <div class="r"><b>A_user[car]</b> <span class="a">→</span> region ~ Cat(weights) <span class="a">→</span> (φ,κ,δ) ~ Uniform(region box) <span class="a">→</span> type ~ Cat(mix) <span class="a">→</span> w1,w2 ~ N(cluster)⁺×mult</div>
+    <div class="r"><b>A_fleet[car]</b> <span class="a">→</span> class ~ Cat(battery_mix) <span class="a">→</span> capacity + SoC band from BATTERY_SPECS ∩ knob overrides</div>
+    <div class="r"><b>L_flex, L_inflex</b> <span class="a">→</span> perturbed EPW + prototype IDF <span class="a">→</span> EnergyPlus <span class="a">→</span> J-per-tick ÷ 900 s ÷ 1000 = kW <span class="cm">(Act 05)</span></div>
+    <div class="r"><b>f_arr, f_dwell, f_soc [car]</b> <span class="a">→</span> pick region's calibrated params (else synthetic fallback shaped by that car's φ, κ, δ)</div>
+    <div class="r"><b>PV_gen</b> <span class="a">→</span> same weather <span class="a">→</span> POA <span class="a">→</span> T_cell <span class="a">→</span> DC <span class="a">→</span> AC <span class="cm">(Act 07, no RNG)</span></div>
+    <div class="r"><b>Tier 3 renderer</b> <span class="a">→</span> shape parent latents into one CSV <span class="cm">(sessions + dr_events draw RNG; the rest are deterministic)</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 5 ═════════ -->
+<section class="act" id="a5">
+  <div class="act-head"><span class="act-num">05</span>
+    <h2>Building load<small>Real physics: a perturbed typical year through a DOE prototype</small></h2></div>
+  <div class="chain">
+    <div class="cbox"><b>TMYx EPW</b>hourly weather</div><span class="arr">→</span>
+    <div class="cbox warm"><b>perturb</b>+ΔT · ×solar · +Δdew (RH recomputed) · ×wind</div><span class="arr">→</span>
+    <div class="cbox"><b>prototype IDF</b>archetype × size + ASHRAE occupancy injected</div><span class="arr">→</span>
+    <div class="cbox"><b>EnergyPlus</b>15-min timestep · 8 meters</div><span class="arr">→</span>
+    <div class="cbox"><b>Joules → kW</b>energy-per-tick ÷ 900 s ÷ 1000</div><span class="arr">→</span>
+    <div class="cbox out"><b>building_load.csv</b>peak scaling (optional)</div>
+  </div>
+  <ul class="plain">
+    <li><b>Why ÷ 900 000?</b> EnergyPlus meters report <em>energy in Joules per 15-minute tick</em>. Average power over the
+      tick = energy ÷ time: J ÷ 900 s gives watts, ÷ 1000 more gives kilowatts — so kW = J / (900 × 1000) = J / 900 000.
+      <span class="mono">e.g. 90 MJ in one tick → 90 000 000 / 900 000 = 100 kW</span>.</li>
+    <li><b>flex</b> = Cooling + Heating + Fans + WaterSystems — the schedulable half.</li>
+    <li><b>inflex</b> = Interior/Exterior Lights + Interior/Exterior Equipment — the must-serve half.</li>
+    <li><b>mixed</b> archetype = office and retail prototypes run separately, averaged 50/50.</li>
+    <li><code>peak_kw_scaling: true</code> (default) pins max(power) to the descriptor's peak_kw exactly; <code>false</code> lets weather drive the peak.</li>
+  </ul>
+
+  <h3>How each feature is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>weather frame</b> <span class="a">→</span> EPW(tmyx_station) <span class="a">→</span> +ΔT dry-bulb · ×solar · +Δdew (RH recomputed) · ×wind</div>
+    <div class="r"><b>power_flex_kw[t]</b> <span class="a">→</span> E+ meters Cooling+Heating+Fans+Water <span class="a">→</span> J per tick ÷ 900 s ÷ 1000</div>
+    <div class="r"><b>power_inflex_kw[t]</b> <span class="a">→</span> E+ meters Int/Ext Lights + Int/Ext Equipment <span class="a">→</span> same conversion</div>
+    <div class="r"><b>power_kw[t]</b> <span class="a">→</span> flex + inflex <span class="a">→</span> if peak_kw_scaling: × (peak_kw / max) so max == peak_kw</div>
+  </div>
+  <div class="truth"><b>Same weather everywhere.</b> The <em>one</em> perturbed weather frame feeds EnergyPlus, the PV model,
+  and the exported <code>weather_data.csv</code> — load, PV and weather can never disagree. That's what makes the input-side
+  weather layer physically faithful.</div>
+</section>
+
+<!-- ═════════ ACT 6 ═════════ -->
+<section class="act" id="a6">
+  <div class="act-head"><span class="act-num">06</span>
+    <h2>Sessions<small>Per car, per day: draw from fitted distributions, then survive five gates</small></h2></div>
+
+  <p>Each car appears on a weekday with probability φ. On appearance, one joint draw — arrival and dwell coupled through a
+  Gaussian copula — then the attempt must pass every gate or be redrawn (≤ 5 tries, else the car-day is dropped).
+  <b>Enforcement is rejection, never clamping.</b></p>
+
+  <div class="plots">
+    <div class="plotcard"><h4>Arrival hour — density</h4><canvas class="plot" id="cArr" width="640" height="260"></canvas>
+      <div class="cap"><span style="color:#1f4e79">■</span> synthetic default: TruncNorm(μ 8.5, σ 2(1−κ)), κ=0.85, window [6, 20] &nbsp;·&nbsp;
+      <span style="color:#d8853b">■</span> ACN-calibrated <span class="mono-plain">rare_consistent</span>: 2-component mixture
+      w₁ .42·N(8.21, 1.25) + .58·N(14.54, 3.52), window [4, 22] — the real workplace data is <b>bimodal</b> (morning commute + after-lunch).</div></div>
+    <div class="plotcard"><h4>Dwell hours — density</h4><canvas class="plot" id="cDwell" width="640" height="260"></canvas>
+      <div class="cap"><span style="color:#1f4e79">■</span> synthetic: Weibull(k 2.0, λ 8(0.5+φ)), φ=0.9, clip [0.5, 14] h &nbsp;·&nbsp;
+      <span style="color:#d8853b">■</span> ACN <span class="mono-plain">rare_consistent</span>: Weibull(k 1.17, λ 5.63) — heavier short-stay mass than the synthetic prior.</div></div>
+    <div class="plotcard"><h4>Arrival SoC — density</h4><canvas class="plot" id="cSoc" width="640" height="260"></canvas>
+      <div class="cap"><span style="color:#1f4e79">■</span> synthetic prior: Beta(4, 6) − 0.003·δ shift (drawn at δ=60 km) &nbsp;·&nbsp;
+      <span style="color:#d8853b">■</span> ACN fit: Beta(3.70, 5.59). Clipped to each car's [min, max] SoC band. (SoC is a modeled prior — see Act 11.)</div></div>
+    <div class="plotcard"><h4>One car-day on the clock</h4><canvas class="plot" id="cDay" width="640" height="260"></canvas>
+      <div class="cap">A session lives inside one calendar day (C12), on the 15-min grid, non-overlapping with the car's previous
+      session, and its energy demand must fit the dwell × charger-rate budget (D5).</div></div>
+  </div>
+
+  <h3>How each session field is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>appears today?</b> <span class="a">→</span> Bernoulli(φ) on weekdays <span class="cm">(weekends: φ × weekend_factor, off by default)</span></div>
+    <div class="r"><b>(u_arr, u_dwell)</b> <span class="a">→</span> one Gaussian-copula pair with the region's ρ <span class="cm">(ρ≈0 → independent uniforms)</span></div>
+    <div class="r"><b>arrival</b> <span class="a">→</span> TruncNorm⁻¹(u_arr | μ, σ, window) <span class="a">→</span> snapped to the 15-min grid</div>
+    <div class="r"><b>dwell / duration_sec</b> <span class="a">→</span> Weibull⁻¹(u_dwell | k, λ) <span class="a">→</span> clipped [0.5, 14] h <span class="a">→</span> departure = arrival + dwell</div>
+    <div class="r"><b>arrival_soc</b> <span class="a">→</span> Beta(α, β) − 0.003·δ <span class="a">→</span> clipped to the car's [min, max] band</div>
+    <div class="r"><b>required_soc_at_depart</b> <span class="a">→</span> calibrated Beta (or TruncNorm fallback) <span class="a">→</span> floor max(min_depart, arrival+0.01), cap max_allowed</div>
+    <div class="r"><b>session row</b> <span class="a">→</span> keep only if all 5 gates pass <span class="a">→</span> else redraw (≤ 5 tries) <span class="a">→</span> else drop the car-day</div>
+  </div>
+
+  <h3>The five gates (atomic — fail any ⇒ redraw everything)</h3>
+  <div class="gates">
+    <div class="gate"><b>C12 · same day</b>departure date == arrival date; no overnight stays.</div>
+    <div class="gate"><b>bounds</b>arrival ≥ window start, departure ≤ window end.</div>
+    <div class="gate"><b>non-overlap</b>arrival ≥ this car's previous departure.</div>
+    <div class="gate"><b>D6 · direction</b>required SoC &gt; arrival SoC <span class="mono">floor = max(min_depart, arr + 0.01)</span></div>
+    <div class="gate"><b>D5 · reachability</b><span class="mono">(req−arr)/100 · cap_kWh ≤ rate_kW · dwell_h</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 7 ═════════ -->
+<section class="act" id="a7">
+  <div class="act-head"><span class="act-num">07</span>
+    <h2>DER &amp; the grid<small>PV physics, battery specs, TOU prices, weather-triggered DR</small></h2></div>
+
+  <h3>PV — PVWatts v5 on the same perturbed weather</h3>
+  <div class="chain">
+    <div class="cbox"><b>GHI · DNI · DHI</b>hourly, perturbed</div><span class="arr">→</span>
+    <div class="cbox"><b>POA</b>isotropic transposition, midpoint sun position</div><span class="arr">→</span>
+    <div class="cbox"><b>T_cell</b>NOCT: T + (POA/800)(NOCT−20)</div><span class="arr">→</span>
+    <div class="cbox"><b>DC</b>kW·(POA/1000)(1+γ(T_cell−25))</div><span class="arr">→</span>
+    <div class="cbox out"><b>AC</b>min(DC × 0.86, DC/1.2) — derate + inverter clip</div>
+  </div>
+  <p class="muted">Pure physics, zero RNG. <code>pv_type: none</code> (the default) short-circuits to an all-zero series with no
+  weather I/O — which is how PV was added without breaking the bitwise contract.</p>
+
+  <div class="plots">
+    <div class="plotcard"><h4>TOU price day (defaults)</h4><canvas class="plot" id="cTou" width="640" height="220"></canvas>
+      <div class="cap">$0.137 off-peak / $0.178 peak inside hours [6, 22) — deterministic; the only price randomness is the optional adversarial jitter (Act 8).</div></div>
+    <div class="plotcard"><h4>DR event intensity λ(T, t) — shape</h4><canvas class="plot" id="cDr" width="640" height="220"></canvas>
+      <div class="cap">Thinned inhomogeneous Poisson: λ_base 0.05 ev/h × season gate × weekday 3:1 × temperature ramp (0.1 below 80 °F → 3.0 above 100 °F) × time-of-day (peak 15–17 h, zero outside 12–20 h), capped per program. Notification: CBP 24 h, BIP/ELRP 2 h.</div></div>
+  </div>
+
+  <h3>Stationary battery — specs only, deliberately</h3>
+  <p class="muted">One row: capacity / power / η / SoC window / initial SoC (preset or explicit). No dispatch schedule is generated —
+  dispatch is a <em>decision</em> for the downstream optimizer, not exogenous data.</p>
+
+  <h3>How each feature is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>power_pv_kw[t]</b> <span class="a">→</span> POA(beam+diffuse+ground) <span class="a">→</span> T_cell(NOCT) <span class="a">→</span> DC(temp-derated) <span class="a">→</span> min(DC×0.86, AC rating)</div>
+    <div class="r"><b>price_per_kwh[t]</b> <span class="a">→</span> peak $ if hour ∈ peak_window else off-peak $ <span class="cm">(flat tariff: one price everywhere)</span></div>
+    <div class="r"><b>dr event</b> <span class="a">→</span> Poisson-thin λ_base × season × weekday × temp-ramp × time-of-day <span class="a">→</span> capped per program</div>
+    <div class="r"><b>magnitude_kw</b> <span class="a">→</span> Uniform(dr_magnitude_kw_range) · <b>notified_at</b> <span class="a">→</span> start − program lead (24 h / 2 h)</div>
+    <div class="r"><b>battery.csv row</b> <span class="a">→</span> preset (battery_type) or explicit capacity/power knobs <span class="cm">(no RNG, no dispatch)</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 8 ═════════ -->
+<section class="act" id="a8">
+  <div class="act-head"><span class="act-num">08</span>
+    <h2>Two kinds of randomness<small>Input-side weather realization vs output-side measurement noise</small></h2></div>
+  <div class="plots">
+    <div class="plotcard"><h4>Weather layer (input-side)</h4><canvas class="plot" id="cWx" width="640" height="240"></canvas>
+      <div class="cap">Each sample draws its own ΔT / solar× / Δdew / wind× (profiles: slight σ=1 °C · moderate 2.5 °C · strong 5 °C),
+      then <b>EnergyPlus re-simulates</b>. The whole load curve moves coherently — physically faithful variance, never violates a constraint.</div></div>
+    <div class="plotcard"><h4>Noise layer (output-side)</h4><canvas class="plot" id="cNz" width="640" height="240"></canvas>
+      <div class="cap">Gaussian jitter applied to the <b>finished CSVs</b> (profiles: clean 0 → adversarial 15% load / 45 min arrivals / 20% SoC).
+      Guard rails re-clamp C4/D6 and truncate D5 (headroom 1.04) — but the validator's strict envelope (1.0) can still flag jittered sessions.</div></div>
+  </div>
+  <div class="truth"><b>Field-proven:</b> for Monte-Carlo batches use <code>noise: clean</code> + a weather profile.
+  Diversity comes from the weather re-sim + per-sample seeds; validation stays at 0 hard errors (verified on 18,000 units).
+  <code>tmyx_stochastic</code>-style output jitter flags ~50% of units on strict D5.</div>
+
+  <h3>How each perturbation is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>weather sample</b> <span class="a">→</span> ΔT ~ N(0, σ_T) · solar× ~ N(1, σ_s) · Δdew ~ N(0, σ_d) · wind× ~ N(1, σ_w) <span class="a">→</span> full EnergyPlus re-run</div>
+    <div class="r"><b>noisy load[t]</b> <span class="a">→</span> load[t] × (1 + N(0, jitter_pct)) <span class="a">→</span> clipped ≥ 0</div>
+    <div class="r"><b>noisy arrival</b> <span class="a">→</span> arrival + N(0, jitter_min) <span class="a">→</span> re-snapped to grid, bounded so ≥ 30 min dwell + same day survive (C4/C12)</div>
+    <div class="r"><b>noisy arrival_soc</b> <span class="a">→</span> soc + N(0, jitter) <span class="a">→</span> clamped to [car min, required − 0.1] (D6 survives)</div>
+    <div class="r"><b>D5 repair</b> <span class="a">→</span> truncate required_soc to arrival + rate·dwell·1.04 <span class="a">→</span> drop if unrepairable <span class="a">→</span> counts logged to manifest</div>
+    <div class="r"><b>dr dropout</b> <span class="a">→</span> Bernoulli(p) per event <span class="cm">· </span><b>noisy price[t]</b> <span class="a">→</span> price × (1 + N(0, σ)) <span class="cm">(adversarial only)</span></div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 9 ═════════ -->
+<section class="act" id="a9">
+  <div class="act-head"><span class="act-num">09</span>
+    <h2>The gates at the exit<small>E5 feasibility + nine invariant families, then the manifest seals it</small></h2></div>
+  <p>Before anything ships, the run is checked against the full invariant wall — hard families raise, soft ones warn:</p>
+  <div class="wall">
+    <span class="brick">A · schema</span><span class="brick">B · referential ids</span><span class="brick">C · temporal (C1–C12)</span>
+    <span class="brick">D · SoC physics (D1–D7)</span><span class="brick">E · charger conventions</span>
+    <span class="brick">G · behavioral axes</span><span class="brick">H · tariff / DR rules</span><span class="brick">I · manifest integrity</span>
+    <span class="brick softb">F4/F5 · shares (3σ-binomial, soft)</span><span class="brick softb">S · KS vs fits, energy balance (soft)</span>
+    <span class="brick softb">E5 · concurrency (warn; --strict-e5 raises)</span>
+  </div>
+  <p class="muted">The manifest then records everything needed to re-create or audit the run: every knob with its source,
+  git SHA + version, per-file row counts and SHA-256s, E5 metrics, noise enforcement stats, realized Dirichlet mixes,
+  and the validation verdict itself.</p>
+
+  <h3>How the verdict is generated <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>E5 report</b> <span class="a">→</span> count active sessions per 15-min tick <span class="a">→</span> max vs charger_count <span class="a">→</span> warn (or raise with --strict-e5)</div>
+    <div class="r"><b>validation block</b> <span class="a">→</span> run families A–I + soft S/F4/F5 on the written CSVs <span class="a">→</span> passed / errors / warnings into manifest</div>
+    <div class="r"><b>integrity seals</b> <span class="a">→</span> row counts + SHA-256 per CSV <span class="a">→</span> re-checked by I2/I3 on any later validate</div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 10 ═════════ -->
+<section class="act" id="a10">
+  <div class="act-head"><span class="act-num">10</span>
+    <h2>What walks out<small>10 native CSVs + manifest — or 12 optimus CSVs per building in multi mode</small></h2></div>
+  <div class="files">
+    <div class="fcard"><b>building_load.csv</b><span>15-min · flex/inflex/total kW</span></div>
+    <div class="fcard"><b>sessions.csv</b><span>per session · arrival, dwell, SoC pair</span></div>
+    <div class="fcard"><b>users.csv</b><span>per car · region, φ κ δ, type, w1 w2</span></div>
+    <div class="fcard"><b>cars.csv</b><span>per car · class, capacity, SoC band</span></div>
+    <div class="fcard"><b>chargers.csv</b><span>per charger · direction, ±rates</span></div>
+    <div class="fcard"><b>grid_prices.csv</b><span>15-min · $/kWh, peak flag</span></div>
+    <div class="fcard"><b>dr_events.csv</b><span>per event · window, kW, notified_at</span></div>
+    <div class="fcard"><b>pv_generation.csv</b><span>15-min · AC kW</span></div>
+    <div class="fcard"><b>pv.csv</b><span>1 row · full PVWatts spec</span></div>
+    <div class="fcard"><b>battery.csv</b><span>1 row · specs, no dispatch</span></div>
+    <div class="fcard meta"><b>manifest.json</b><span>provenance + validation verdict</span></div>
+  </div>
+  <p class="muted">Multi-building mode re-shapes these to the optimus schema (adds <code>building_id</code>, <code>time_seconds</code>,
+  energy columns) and adds three files that only exist campus-wide: <code>weather_data.csv</code> (hourly, the exact weather
+  E+ simulated), <code>occupancy.csv</code>, <code>dso_commands.csv</code> + <code>policies.csv</code>. Batch mode wraps everything
+  in months × samples with per-sample weather realizations.</p>
+
+  <h3>How the files land on disk <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><b>native CSVs</b> <span class="a">→</span> written in one fixed order <span class="a">→</span> row count + SHA-256 recorded per file</div>
+    <div class="r"><b>manifest.json</b> <span class="a">→</span> knobs+sources · git SHA · seals · E5 · noise stats · validation verdict</div>
+    <div class="r"><b>optimus set</b> <span class="a">→</span> native tables re-shaped (+building_id, time_seconds, energy) <span class="a">→</span> + weather_data / occupancy / dso_commands / policies</div>
+    <div class="r"><b>batch unit</b> <span class="a">→</span> seed = building.seed + seed_base + sample <span class="a">→</span> own weather draw <span class="a">→</span> own optimus set under MONTH/sample/</div>
+  </div>
+</section>
+
+<!-- ═════════ ACT 11 ═════════ -->
+<section class="act" id="a11">
+  <div class="act-head"><span class="act-num">11</span>
+    <h2>★ Where the humans come from<small>User-behavior generation, and how it's calibrated from ground truth</small></h2></div>
+
+  <h3>The ground-truth sources</h3>
+  <div class="srcgrid">
+    <div class="src"><h4>ACN-Data</h4><div class="stat">Caltech · JPL · Office001 — 2019–21<br>635 users · 41,774 sessions</div>
+      <p>Workplace charging (Caltech testbed). The anchor dataset for the <code>acn_*</code> populations; per-site variants exist (Caltech / JPL / Office001).</p></div>
+    <div class="src"><h4>EV WATTS</h4><div class="stat">public release · venue = Business Office<br>1.36 M workplace sessions · 3,356 users</div>
+      <p>National DOE-funded evaluation dataset; powers <code>evwatts_workplace_public</code> (L2) — the DCFC cohort is defined but not yet calibrated.</p></div>
+    <div class="src"><h4>ElaadNL / 4TU Utrecht</h4><div class="stat">2020–24 · ~55 k sessions · 1,231 drivers fit</div>
+      <p>EU public charging; its region grid was re-anchored on its <em>own</em> (φ, κ) cloud — it does not borrow ACN's geometry.</p></div>
+    <div class="src"><h4>INL EV Project</h4><div class="stat">Phase 1 · 2011–13 · fixture-calibrated</div>
+      <p>Legacy 24 kWh Leaf/Volt residential cohort (<code>inl_residential_legacy</code>) — a deliberate distribution-shift benchmark.</p></div>
+  </div>
+
+  <h3>The calibration pipeline — logs in, distributions out</h3>
+  <div class="chain">
+    <div class="cbox"><b>raw charging logs</b>one normalizer per dataset</div><span class="arr">→</span>
+    <div class="cbox"><b>per-user axes</b>φ frequency · κ consistency · δ distance</div><span class="arr">→</span>
+    <div class="cbox"><b>S0 region assignment</b>each user → a box in (φ, κ) space</div><span class="arr">→</span>
+    <div class="cbox warm"><b>per-region MLE fits</b>arrival · dwell · SoC · copula</div><span class="arr">→</span>
+    <div class="cbox"><b>writer</b>ruamel, comment-preserving</div><span class="arr">→</span>
+    <div class="cbox out"><b>populations.yaml</b>region_distributions + provenance</div>
+  </div>
+
+  <h3>The behavioral coordinate system — real region geometry</h3>
+  <div class="plots">
+    <div class="plotcard"><h4>consent_default (hand-authored, 5 regions)</h4><canvas class="plot" id="cAxes1" width="640" height="480"></canvas>
+      <div class="cap">Boxes = <code>axes_distribution</code> bounds in the (φ, κ) plane, exactly as configured; % = region weight.
+      A driver is assigned a region ~ Categorical(weights), then (φ, κ, δ) ~ Uniform inside the box.</div></div>
+    <div class="plotcard"><h4>acn_workplace_baseline (data-anchored, 4+1 regions)</h4><canvas class="plot" id="cAxes2" width="640" height="480"></canvas>
+      <div class="cap">Weights are the <b>empirical user shares</b> from 632 assigned ACN users. Note the different geometry:
+      real workplace drivers plug in <em>rarely</em> (φ ≤ 0.3 dominates: rare_consistent 36% + occasional_consistent 40%);
+      the erratic catch-all fit 0% of this cohort.</div></div>
+  </div>
+
+  <h3>What exactly gets fitted per region</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Quantity</th><th>Family</th><th>Rule</th><th>Example — ACN <code>rare_consistent</code> (n=4,723 sessions)</th></tr></thead>
+    <tbody>
+      <tr><td>Arrival hour</td><td>TruncNorm, or 2-comp mixture</td><td>mixture kept only if KS improves ≥ 0.02; window [4, 22]</td><td class="mono-plain">mixture: .42·N(8.21, 1.25) + .58·N(14.54, 3.52) · KS .040</td></tr>
+      <tr><td>Dwell hours</td><td>Weibull, or 2-comp mixture</td><td>same mixture rule; MIN_SAMPLES = 30 per fit</td><td class="mono-plain">Weibull(k 1.172, λ 5.626) · KS .063</td></tr>
+      <tr><td>Arrival SoC</td><td>Beta on [0, 1]</td><td rowspan="2"><b>modeled, not measured</b> — see below</td><td class="mono-plain">Beta(3.70, 5.59) · KS .035</td></tr>
+      <tr><td>Departure SoC req.</td><td>Beta on [0, 1]</td><td class="mono-plain">Beta(0.955, 0.316) · KS .255</td></tr>
+      <tr><td>Arrival↔dwell coupling</td><td>Gaussian copula ρ</td><td>via Spearman rank → Gaussian transform</td><td class="mono-plain">ρ = −0.562 (late arrivals stay shorter)</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="truth"><b>The SoC honesty clause.</b> No public charging dataset records state of charge — chargers meter
+  energy, not batteries. Both SoC quantities are therefore <b>modeled priors</b>: arrival SoC is reconstructed by
+  <code>battery_inference</code> from kWh delivered ÷ inferred capacity (capacity inference falls back to class defaults on
+  ~33% of ACN users), and the departure requirement comes from the observed energy <em>request</em>. They are calibrated to be
+  <em>consistent with</em> the ground truth, never claimed to be ground truth. Every fitted leaf carries its provenance
+  (<code>calibration:acn_data_2019_2021_20260628</code>) and fit quality (KS) into the manifest of every run that uses it.</div>
+
+  <h3>Generation time: one driver, five draws</h3>
+  <div class="chain">
+    <div class="cbox warm"><b>region</b>~ Cat(weights)</div><span class="arr">→</span>
+    <div class="cbox warm"><b>(φ, κ, δ)</b>~ U(region box)</div><span class="arr">→</span>
+    <div class="cbox warm"><b>negotiation type</b>~ Cat(.107, .536, .321, .036)</div><span class="arr">→</span>
+    <div class="cbox warm"><b>(w1, w2)</b>~ N(CONSENT cluster)⁺ × mult</div><span class="arr">→</span>
+    <div class="cbox warm"><b>battery class</b>~ Cat(.20, .30, .40, .10)</div><span class="arr">→</span>
+    <div class="cbox out"><b>users.csv + cars.csv</b>then Act 06 samples their days</div>
+  </div>
+  <p class="muted">Synthetic populations (<code>calibration_policy: synthetic</code>, e.g. consent_default, visitor_heavy) use
+  hand-authored region distributions stamped <code>hand_specified:*</code> — <code>cli calibrate</code> deliberately skips them.
+  Calibrated cohorts also disable the synthetic floors (<code>min_depart_soc: 0</code>, <code>weekdays_only: false</code>) so the
+  fitted distributions speak unclamped.</p>
+
+  <h3>How the whole loop generates <span class="mono-plain">→</span></h3>
+  <div class="recipe">
+    <div class="r"><span class="cm">— calibration time (once per dataset) —</span></div>
+    <div class="r"><b>(φ, κ, δ) per real user</b> <span class="a">→</span> computed from that user's session log by the dataset's normalizer</div>
+    <div class="r"><b>region</b> <span class="a">→</span> the (φ, κ) box the user falls in <span class="cm">· </span><b>region weight</b> <span class="a">→</span> empirical share of users in the box</div>
+    <div class="r"><b>arrival / dwell fits</b> <span class="a">→</span> MLE per region <span class="a">→</span> mixture kept only if KS improves ≥ 0.02 (n ≥ 30)</div>
+    <div class="r"><b>SoC fits</b> <span class="a">→</span> reconstruct SoC from kWh delivered ÷ inferred capacity <span class="a">→</span> Beta MLE <span class="cm">(modeled, not measured)</span></div>
+    <div class="r"><b>populations.yaml</b> <span class="a">→</span> writer stores fits + provenance + KS quality <span class="cm">(comment-preserving)</span></div>
+    <div class="r"><span class="cm">— generation time (every run, per car) —</span></div>
+    <div class="r"><b>region</b> <span class="a">→</span> Cat(weights) <span class="a">→</span> <b>(φ, κ, δ)</b> ~ Uniform(box) <span class="a">→</span> <b>type</b> ~ Cat(mix) <span class="a">→</span> <b>w1, w2</b> ~ N(cluster)⁺ × mult <span class="a">→</span> <b>battery</b> ~ Cat(mix)</div>
+    <div class="r"><b>the car's days</b> <span class="a">→</span> Act 06 draws from this region's fitted distributions <span class="cm">(the calibration pays off here)</span></div>
+  </div>
+</section>
+
+<footer>Companion to the exhaustive reference (<code>docs/GENERATION_PIPELINE.html</code>) · every number sourced from
+configs/source at generation of this page · v2b-syndata 2026-07-07</footer>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var NAVY="#1f4e79", AMBER="#d8853b", GRID="#e6ebf0", MUT="#5d6a77";
+
+  function setup(id){
+    var c=document.getElementById(id); if(!c) return null;
+    var dpr=window.devicePixelRatio||1, w=c.width, h=c.height;
+    c.style.width="100%"; c.style.maxWidth=w+"px";
+    c.width=w*dpr; c.height=h*dpr;
+    var x=c.getContext("2d"); x.scale(dpr,dpr);
+    return {x:x,w:w,h:h};
+  }
+  function frame(p,x0,y0,x1,y1){ // axes box
+    p.x.strokeStyle=GRID; p.x.lineWidth=1;
+    p.x.strokeRect(x0,y0,x1-x0,y1-y0);
+  }
+  function plotCurve(p,f,dom,x0,y0,x1,y1,color,fill){
+    var N=240,i,vals=[],mx=0;
+    for(i=0;i<=N;i++){var t=dom[0]+(dom[1]-dom[0])*i/N; var v=f(t); vals.push(v); if(v>mx)mx=v;}
+    if(mx<=0)mx=1;
+    p.x.beginPath();
+    for(i=0;i<=N;i++){
+      var px=x0+(x1-x0)*i/N, py=y1-(y1-y0)*(vals[i]/mx)*0.92;
+      i?p.x.lineTo(px,py):p.x.moveTo(px,py);
+    }
+    if(fill){ p.x.lineTo(x1,y1); p.x.lineTo(x0,y1); p.x.closePath();
+      p.x.globalAlpha=.12; p.x.fillStyle=color; p.x.fill(); p.x.globalAlpha=1; p.x.beginPath();
+      for(i=0;i<=N;i++){var px2=x0+(x1-x0)*i/N, py2=y1-(y1-y0)*(vals[i]/mx)*0.92;
+        i?p.x.lineTo(px2,py2):p.x.moveTo(px2,py2);} }
+    p.x.strokeStyle=color; p.x.lineWidth=2; p.x.stroke();
+  }
+  function xticks(p,dom,x0,x1,y1,fmt,step){
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="center";
+    for(var t=Math.ceil(dom[0]/step)*step;t<=dom[1];t+=step){
+      var px=x0+(x1-x0)*(t-dom[0])/(dom[1]-dom[0]);
+      p.x.fillText(fmt(t),px,y1+13);
+      p.x.strokeStyle=GRID; p.x.beginPath(); p.x.moveTo(px,y1); p.x.lineTo(px,y1+3); p.x.stroke();
+    }
+  }
+  // distributions
+  function nrm(x,mu,s){var z=(x-mu)/s; return Math.exp(-0.5*z*z)/(s*2.50662827);}
+  function weib(x,k,lam){ if(x<=0)return 0; return (k/lam)*Math.pow(x/lam,k-1)*Math.exp(-Math.pow(x/lam,k)); }
+  function betaPdf(x,a,b){ if(x<=0||x>=1)return 0; return Math.pow(x,a-1)*Math.pow(1-x,b-1); }
+
+  // ── arrival ──
+  (function(){
+    var p=setup("cArr"); if(!p)return;
+    var x0=34,y0=10,x1=p.w-12,y1=p.h-26, dom=[4,22];
+    frame(p,x0,y0,x1,y1);
+    plotCurve(p,function(t){return t<6||t>20?0:nrm(t,8.5,2*(1-0.85));},dom,x0,y0,x1,y1,NAVY,true);
+    plotCurve(p,function(t){return 0.42*nrm(t,8.214,1.252)+0.58*nrm(t,14.536,3.522);},dom,x0,y0,x1,y1,AMBER,true);
+    xticks(p,dom,x0,x1,y1,function(t){return t+"h";},3);
+  })();
+
+  // ── dwell ──
+  (function(){
+    var p=setup("cDwell"); if(!p)return;
+    var x0=34,y0=10,x1=p.w-12,y1=p.h-26, dom=[0,14];
+    frame(p,x0,y0,x1,y1);
+    plotCurve(p,function(t){return t<0.5?0:weib(t,2.0,8*(0.5+0.9));},dom,x0,y0,x1,y1,NAVY,true);
+    plotCurve(p,function(t){return weib(t,1.172,5.626);},dom,x0,y0,x1,y1,AMBER,true);
+    xticks(p,dom,x0,x1,y1,function(t){return t+"h";},2);
+  })();
+
+  // ── soc ──
+  (function(){
+    var p=setup("cSoc"); if(!p)return;
+    var x0=34,y0=10,x1=p.w-12,y1=p.h-26, dom=[0,1];
+    frame(p,x0,y0,x1,y1);
+    // synthetic prior: X~Beta(4,6) shifted by −0.003·δ; for δ=60 km the density of X−0.18 at t is betaPdf(t+0.18)
+    plotCurve(p,function(t){return betaPdf(t+0.18,4,6);},dom,x0,y0,x1,y1,NAVY,true);
+    plotCurve(p,function(t){return betaPdf(t,3.70,5.591);},dom,x0,y0,x1,y1,AMBER,true);
+    xticks(p,dom,x0,x1,y1,function(t){return Math.round(t*100)+"%";},0.25);
+  })();
+
+  // ── one car-day ──
+  (function(){
+    var p=setup("cDay"); if(!p)return;
+    var x0=34,y0=14,x1=p.w-12,y1=p.h-30;
+    frame(p,x0,y0,x1,y1);
+    function hx(h){return x0+(x1-x0)*h/24;}
+    // grid ticks 15-min shading band
+    p.x.fillStyle="#f3f6f9"; p.x.fillRect(x0,y0,x1-x0,y1-y0);
+    // prior session (grey)
+    p.x.fillStyle="#cfd8e0"; p.x.fillRect(hx(6.0),y0+22,hx(8.5)-hx(6.0),26);
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="center";
+    p.x.fillText("previous session",(hx(6)+hx(8.5))/2,y0+16);
+    // this session (amber): arrival 9.25 dwell 6.5
+    p.x.fillStyle=AMBER; p.x.fillRect(hx(9.25),y0+72,hx(15.75)-hx(9.25),26);
+    p.x.fillStyle="#fff"; p.x.font="bold 10px ui-monospace,Menlo,monospace";
+    p.x.fillText("session · dwell 6.5 h",(hx(9.25)+hx(15.75))/2,y0+89);
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace";
+    p.x.fillText("arrival ~ f_arr",hx(9.25),y0+66);
+    p.x.fillText("departure < midnight (C12)",hx(15.75),y0+112);
+    // non-overlap arrow
+    p.x.strokeStyle=NAVY; p.x.lineWidth=1.5; p.x.beginPath();
+    p.x.moveTo(hx(8.5),y0+35); p.x.lineTo(hx(9.25),y0+35); p.x.stroke();
+    p.x.fillStyle=NAVY; p.x.fillText("≥",(hx(8.5)+hx(9.25))/2,y0+31);
+    // soc annotation
+    p.x.fillStyle=NAVY; p.x.textAlign="left"; p.x.font="10px ui-monospace,Menlo,monospace";
+    p.x.fillText("arrival_soc 38% → required 72%  ·  D5: (72−38)% × 75 kWh = 25.5 kWh ≤ 20 kW × 6.5 h ✓",x0+6,y1-8);
+    // hour ticks
+    p.x.textAlign="center";
+    for(var h=0;h<=24;h+=6){ p.x.fillStyle=MUT; p.x.fillText(h+":00",hx(h),y1+14);
+      p.x.strokeStyle=GRID; p.x.beginPath(); p.x.moveTo(hx(h),y0); p.x.lineTo(hx(h),y1); p.x.stroke(); }
+  })();
+
+  // ── TOU ──
+  (function(){
+    var p=setup("cTou"); if(!p)return;
+    var x0=44,y0=14,x1=p.w-12,y1=p.h-26;
+    frame(p,x0,y0,x1,y1);
+    function hx(h){return x0+(x1-x0)*h/24;}
+    function py(v){return y1-(y1-y0)*(v-0.10)/(0.10);} // 0.10..0.20 range
+    p.x.strokeStyle=NAVY; p.x.lineWidth=2; p.x.beginPath();
+    p.x.moveTo(hx(0),py(0.137)); p.x.lineTo(hx(6),py(0.137)); p.x.lineTo(hx(6),py(0.178));
+    p.x.lineTo(hx(22),py(0.178)); p.x.lineTo(hx(22),py(0.137)); p.x.lineTo(hx(24),py(0.137)); p.x.stroke();
+    p.x.globalAlpha=.10; p.x.fillStyle=AMBER; p.x.fillRect(hx(6),y0,hx(22)-hx(6),y1-y0); p.x.globalAlpha=1;
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="center";
+    for(var h=0;h<=24;h+=6){p.x.fillText(h+":00",hx(h),y1+13);}
+    p.x.textAlign="left"; p.x.fillStyle=NAVY;
+    p.x.fillText("$0.178 peak",hx(10),py(0.178)-6);
+    p.x.fillText("$0.137 off-peak",hx(0.3),py(0.137)-6);
+  })();
+
+  // ── DR intensity ──
+  (function(){
+    var p=setup("cDr"); if(!p)return;
+    var x0=44,y0=14,x1=p.w-12,y1=p.h-26, dom=[70,105];
+    frame(p,x0,y0,x1,y1);
+    function ramp(T){ if(T<80)return 0.1; if(T<90)return 0.1+(T-80)/10*0.9; if(T<100)return 1.0+(T-90)/10*2.0; return 3.0; }
+    plotCurve(p,ramp,dom,x0,y0,x1,y1,AMBER,true);
+    xticks(p,dom,x0,x1,y1,function(t){return t+"°F";},10);
+    p.x.fillStyle=MUT; p.x.textAlign="left"; p.x.font="10px ui-monospace,Menlo,monospace";
+    p.x.fillText("×0.1",x0+4,y1-4); p.x.fillText("×3.0 cap",x1-58,y0+12);
+  })();
+
+  // ── weather vs noise ──
+  function dayLoad(h){ // schematic office-day load shape (illustrative)
+    return 0.25+0.75*Math.exp(-Math.pow((h-13)/4.2,2))*(h>5&&h<21?1:0.55);
+  }
+  (function(){
+    var p=setup("cWx"); if(!p)return;
+    var x0=34,y0=12,x1=p.w-12,y1=p.h-26;
+    frame(p,x0,y0,x1,y1);
+    var offs=[-0.12,0,0.14], cols=["#8fb2d1",NAVY,"#163a5c"],i;
+    for(i=0;i<3;i++){(function(o,c){
+      plotCurve(p,function(h){return Math.max(0.05,dayLoad(h)+o);},[0,24],x0,y0,x1,y1,c,false);
+    })(offs[i],cols[i]);}
+    xticks(p,[0,24],x0,x1,y1,function(t){return t+"h";},6);
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="left";
+    p.x.fillText("3 samples = 3 EnergyPlus runs (ΔT −2.5 / 0 / +2.9 °C) — smooth, coherent shifts",x0+6,y0+12);
+  })();
+  (function(){
+    var p=setup("cNz"); if(!p)return;
+    var x0=34,y0=12,x1=p.w-12,y1=p.h-26;
+    frame(p,x0,y0,x1,y1);
+    plotCurve(p,function(h){return dayLoad(h);},[0,24],x0,y0,x1,y1,NAVY,false);
+    // deterministic pseudo-noise (no Math.random → stable page)
+    function jit(h){ return dayLoad(h)*(1+0.10*Math.sin(h*9.7)+0.07*Math.sin(h*23.3+1.4)); }
+    plotCurve(p,function(h){return Math.max(0.03,jit(h));},[0,24],x0,y0,x1,y1,AMBER,false);
+    xticks(p,[0,24],x0,x1,y1,function(t){return t+"h";},6);
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="left";
+    p.x.fillText("same run, jitter painted on top — tick-wise measurement error",x0+6,y0+12);
+  })();
+
+  // ── axes grids (Act 11) ──
+  function axesPlot(id, regions, note){
+    var p=setup(id); if(!p)return;
+    var x0=46,y0=16,x1=p.w-14,y1=p.h-40;
+    // frame + gridlines
+    frame(p,x0,y0,x1,y1);
+    p.x.strokeStyle=GRID;
+    for(var g=0.25;g<1;g+=0.25){
+      p.x.beginPath(); p.x.moveTo(x0+(x1-x0)*g,y0); p.x.lineTo(x0+(x1-x0)*g,y1); p.x.stroke();
+      p.x.beginPath(); p.x.moveTo(x0,y1-(y1-y0)*g); p.x.lineTo(x1,y1-(y1-y0)*g); p.x.stroke();
+    }
+    var cols=["#1f4e79","#2d6398","#d8853b","#7b8fa3","#b06a26"];
+    regions.forEach(function(r,i){
+      var rx=x0+(x1-x0)*r.f[0], rw=(x1-x0)*(r.f[1]-r.f[0]);
+      var ry=y1-(y1-y0)*r.c[1], rh=(y1-y0)*(r.c[1]-r.c[0]);
+      p.x.globalAlpha=.16; p.x.fillStyle=cols[i%5]; p.x.fillRect(rx,ry,rw,rh); p.x.globalAlpha=1;
+      p.x.strokeStyle=cols[i%5]; p.x.lineWidth=1.8; p.x.strokeRect(rx,ry,rw,rh);
+      p.x.fillStyle=cols[i%5]; p.x.font="bold 10px ui-monospace,Menlo,monospace"; p.x.textAlign="left";
+      var lx=rx+4, ly=ry+13;
+      p.x.fillText(r.n,lx,ly);
+      p.x.font="10px ui-monospace,Menlo,monospace";
+      p.x.fillText(Math.round(r.w*1000)/10+"%",lx,ly+12);
+    });
+    // axis labels + ticks
+    p.x.fillStyle=MUT; p.x.font="10px ui-monospace,Menlo,monospace"; p.x.textAlign="center";
+    for(var t=0;t<=1.001;t+=0.25){
+      p.x.fillText(t.toFixed(2),x0+(x1-x0)*t,y1+14);
+    }
+    p.x.save(); p.x.translate(14,(y0+y1)/2); p.x.rotate(-Math.PI/2); p.x.textAlign="center";
+    p.x.fillText("κ consistency →",0,0); p.x.restore();
+    p.x.textAlign="center"; p.x.fillText("φ plug-in frequency →",(x0+x1)/2,y1+30);
+    p.x.textAlign="left";
+    for(t=0;t<=1.001;t+=0.25){ p.x.fillText(t.toFixed(2),x0-34,y1-(y1-y0)*t+3); }
+    if(note){ p.x.fillStyle=MUT; p.x.fillText(note,x0+4,y0-4); }
+  }
+  axesPlot("cAxes1",[
+    {n:"stable_commuter",f:[0.85,1.0],c:[0.75,1.0],w:0.35},
+    {n:"flexible_local",f:[0.70,0.95],c:[0.50,0.80],w:0.25},
+    {n:"irregular_distant",f:[0.40,0.70],c:[0.20,0.50],w:0.20},
+    {n:"occasional_visitor",f:[0.05,0.20],c:[0.10,0.40],w:0.10},
+    {n:"erratic",f:[0.30,0.70],c:[0.05,0.30],w:0.10}
+  ]);
+  axesPlot("cAxes2",[
+    {n:"regular_charger",f:[0.30,1.0],c:[0.40,1.0],w:0.231013},
+    {n:"occasional_consistent",f:[0.10,0.30],c:[0.50,1.0],w:0.400316},
+    {n:"rare_consistent",f:[0.0,0.10],c:[0.50,1.0],w:0.362342},
+    {n:"rare_inconsistent",f:[0.0,0.10],c:[0.0,0.50],w:0.006329},
+    {n:"erratic",f:[0.0,0.50],c:[0.0,0.40],w:0.0}
+  ]);
+
+  // ── DAG connectors ──
+  var EDGES=[
+    // Tier 0 → Tier 1 (dashed: happens at knob-resolution time, not inside the DAG)
+    ["d_loc","C"],["d_loc","T"],
+    ["d_bld","A"],["d_bld","S"],["d_bld","O"],
+    ["d_pop","U"],["d_pop","F"],
+    ["d_eq","X"],
+    ["U","A_user"],["F","A_fleet"],
+    ["A","L_flex"],["S","L_flex"],["O","L_flex"],
+    ["A","L_inflex"],["S","L_inflex"],["O","L_inflex"],
+    ["A_user","f_arr"],["A_user","f_dwell"],["A_user","f_soc"],
+    ["X","PV_gen"],
+    ["X","chargers"],["T","grid_prices"],
+    ["T","dr_events"],["C","dr_events"],["building_load","dr_events"],
+    ["A_user","users"],["A_fleet","cars"],
+    ["L_flex","building_load"],["L_inflex","building_load"],
+    ["f_arr","sessions"],["f_dwell","sessions"],["f_soc","sessions"],
+    ["A_user","sessions"],["A_fleet","sessions"],["X","sessions"],["building_load","sessions"],
+    ["PV_gen","pv_generation"],["PV_gen","pv"],["X","battery"]];
+  var box=document.getElementById("dagbox"), svg=document.getElementById("dagsvg");
+  function nodeEl(id){ return box?box.querySelector('[data-id="'+id+'"]'):null; }
+  function drawDag(){
+    if(!box||!svg)return;
+    var br=box.getBoundingClientRect();
+    svg.setAttribute("viewBox","0 0 "+br.width+" "+br.height);
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    EDGES.forEach(function(e){
+      var a=nodeEl(e[0]), b=nodeEl(e[1]); if(!a||!b)return;
+      var ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+      var xA=ra.right-br.left, yA=ra.top+ra.height/2-br.top;
+      var xB=rb.left-br.left,  yB=rb.top+rb.height/2-br.top;
+      // renderers referencing earlier renderer (building_load→dr_events/sessions): route from right edge
+      if(xB<xA){ xA=ra.left-br.left; }
+      var mx=(xA+xB)/2;
+      var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+      path.setAttribute("d","M"+xA+","+yA+" C"+mx+","+yA+" "+mx+","+yB+" "+xB+","+yB);
+      path.setAttribute("fill","none");
+      path.setAttribute("stroke","#c3d2e0");
+      path.setAttribute("stroke-width","1.3");
+      if(e[0].indexOf("d_")===0){ path.setAttribute("stroke-dasharray","4 3"); }
+      path.dataset.a=e[0]; path.dataset.b=e[1];
+      svg.appendChild(path);
+    });
+  }
+  function highlight(id,on){
+    if(!svg)return;
+    Array.prototype.forEach.call(svg.querySelectorAll("path"),function(p){
+      var hit=(p.dataset.a===id||p.dataset.b===id);
+      p.setAttribute("stroke",hit&&on?"#d8853b":"#c3d2e0");
+      p.setAttribute("stroke-width",hit&&on?"2.2":"1.3");
+      var other=null;
+      if(on&&hit){ other=(p.dataset.a===id)?p.dataset.b:p.dataset.a;
+        var el=nodeEl(other); if(el)el.classList.add("hl"); }
+    });
+    if(!on){ Array.prototype.forEach.call(box.querySelectorAll(".dnode.hl"),function(n){n.classList.remove("hl");}); }
+  }
+  if(box){
+    Array.prototype.forEach.call(box.querySelectorAll(".dnode"),function(n){
+      n.addEventListener("mouseenter",function(){highlight(n.dataset.id,true);});
+      n.addEventListener("mouseleave",function(){highlight(n.dataset.id,false);});
+    });
+    drawDag();
+    var t; window.addEventListener("resize",function(){clearTimeout(t);t=setTimeout(drawDag,120);});
+  }
+})();
+</script>

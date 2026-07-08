@@ -1,0 +1,610 @@
+<title>v2b-syndata — Demo Deck</title>
+<meta name="description" content="Presentation deck: the v2b-syndata synthetic V2B dataset generator in 15 screens — problem, claims, DAG, calibration evidence, scale. Arrow keys to navigate.">
+<style>
+  :root{
+    --navy:#1f4e79; --navy-deep:#132f4a; --navy-mid:#2d6398; --navy-tint:#eaf1f7;
+    --amber:#d8853b; --amber-deep:#b06a26; --amber-tint:#fdf3e7;
+    --green:#2ca02c; --paper:#f7f9fb; --ink:#16202a; --muted:#5d6a77; --border:#dde4ea;
+  }
+  *{box-sizing:border-box}
+  html{scroll-snap-type:y mandatory}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;line-height:1.45}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.85em;
+       background:#eef1f4;padding:.05em .35em;border-radius:3px}
+  .mono-plain{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  .slide{min-height:100vh;scroll-snap-align:start;display:flex;flex-direction:column;
+       justify-content:center;padding:4.5vh 7vw;position:relative}
+  .slide.dark{background:linear-gradient(160deg,var(--navy-deep),var(--navy) 75%);color:#fff}
+  .slide.dark .muted{color:#b9cbdd}
+  .eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.85rem;letter-spacing:.2em;
+       text-transform:uppercase;color:var(--amber);margin-bottom:1rem}
+  .slide h1{font-size:clamp(2.2rem,5.5vw,4rem);font-weight:800;letter-spacing:-.025em;line-height:1.1;
+       margin:0 0 1.2rem;text-wrap:balance;max-width:24ch}
+  .slide h2{font-size:clamp(1.6rem,3.6vw,2.5rem);font-weight:800;letter-spacing:-.02em;color:var(--navy);
+       margin:0 0 1.4rem;text-wrap:balance}
+  .slide.dark h2{color:#fff}
+  .slide p.lead{font-size:clamp(1.05rem,1.8vw,1.35rem);max-width:58ch}
+  .muted{color:var(--muted)}
+  .foot{position:absolute;bottom:1.2rem;left:7vw;right:7vw;display:flex;justify-content:space-between;
+       font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:var(--muted)}
+  .slide.dark .foot{color:#8fa8c0}
+
+  .big3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.4rem;margin-top:1rem}
+  .claim{border:2px solid var(--border);border-top:6px solid var(--navy);border-radius:10px;
+       background:#fff;padding:1.4rem 1.5rem}
+  .claim:nth-child(2){border-top-color:var(--amber)}
+  .claim:nth-child(3){border-top-color:var(--green)}
+  .claim h3{margin:0 0 .5rem;font-size:1.3rem;color:var(--navy)}
+  .claim p{margin:0;font-size:.95rem;color:var(--muted)}
+  .claim .proof{margin-top:.8rem;font-family:ui-monospace,Menlo,monospace;font-size:.78rem;color:var(--ink)}
+
+  .pain{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.4rem;margin-top:.5rem}
+  .pain .p{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:1.3rem 1.4rem}
+  .pain .p b{display:block;font-size:1.15rem;margin-bottom:.4rem;color:#f0b47c}
+  .pain .p span{font-size:.95rem;opacity:.85}
+
+  .lanes{display:flex;flex-direction:column;gap:.45rem;margin-top:.4rem;max-width:900px}
+  .lane{display:flex;align-items:center;gap:1rem;border:1.5px solid var(--border);border-left:6px solid var(--navy);
+       border-radius:8px;background:#fff;padding:.6rem 1rem}
+  .lane.warm{border-left-color:var(--amber)}
+  .lane.done{border-left-color:var(--green)}
+  .lane b{min-width:11.5rem;font-size:.95rem;color:var(--navy)}
+  .lane span{font-size:.85rem;color:var(--muted)}
+
+  .cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.6rem;align-items:start}
+  canvas.plot{border:1px solid var(--border);border-radius:8px;background:#fff;max-width:100%;height:auto;display:block}
+  .cap{font-size:.85rem;color:var(--muted);margin-top:.5rem;max-width:60ch}
+  .slide.dark .cap{color:#b9cbdd}
+
+  .stat-row{display:flex;gap:2.5rem;flex-wrap:wrap;margin:1.2rem 0}
+  .stat .v{font-size:clamp(1.8rem,3.5vw,2.8rem);font-weight:800;color:var(--navy);letter-spacing:-.02em;
+       font-variant-numeric:tabular-nums}
+  .slide.dark .stat .v{color:#f0b47c}
+  .stat .k{font-size:.85rem;color:var(--muted);max-width:22ch}
+  .slide.dark .stat .k{color:#b9cbdd}
+
+  .chain{display:flex;align-items:stretch;gap:.5rem;flex-wrap:wrap;margin:1rem 0}
+  .cbox{border:1.5px solid var(--border);border-radius:8px;padding:.6rem .9rem;background:#fff;font-size:.88rem;text-align:center}
+  .cbox b{display:block;color:var(--navy)}
+  .cbox.warm{border-color:var(--amber);background:var(--amber-tint)}
+  .arr{align-self:center;color:var(--muted);font-size:1.2rem}
+
+  .gatewall{display:flex;flex-wrap:wrap;gap:.5rem;margin:.8rem 0;max-width:820px}
+  .gate{border-radius:6px;padding:.45rem .8rem;font-size:.85rem;font-weight:700;background:#fff;
+       border:1.5px solid var(--border);color:var(--navy)}
+  .gate.soft{color:#7c8794;font-weight:600}
+
+  .filestrip{display:flex;flex-wrap:wrap;gap:.5rem;margin:.8rem 0;max-width:900px}
+  .f{font-family:ui-monospace,Menlo,monospace;font-size:.78rem;background:#eef6ee;border:1px solid #a9d3a9;
+       color:#196319;border-radius:6px;padding:.35rem .6rem}
+  .f.m{background:var(--navy-tint);border-color:var(--navy);color:var(--navy)}
+
+  .truth{background:var(--amber-tint);border:1.5px solid #f0d9b8;border-left:6px solid var(--amber);border-radius:8px;
+       padding:.9rem 1.2rem;font-size:1rem;margin:1rem 0;max-width:72ch}
+
+  /* DAG (ported from the visual tour, compacted for a slide) */
+  .diagram-wrap{overflow-x:auto;margin:.4rem 0}
+  #dagbox{position:relative;min-width:960px;padding:.3rem 0}
+  #dagsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .dagcols{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:1.3rem;z-index:2}
+  .dagcol h4{text-align:center;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;
+       color:var(--muted);margin:.15rem 0 .45rem}
+  .dagcol{display:flex;flex-direction:column;gap:.38rem}
+  .dnode{border:1.5px solid #b9c9da;background:#fff;border-radius:6px;text-align:center;
+       font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;padding:.26rem .35rem;cursor:default;
+       transition:border-color .15s, box-shadow .15s}
+  .dnode.rng{border-color:var(--amber);background:var(--amber-tint)}
+  .dnode.render{background:#eef6ee;border-color:#a9d3a9}
+  .dnode.desc{border-style:dashed;border-color:#9fb4c7;background:#f4f7fa;color:var(--muted)}
+  .dnode.hl{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy-tint)}
+  .legend{display:flex;gap:1rem;font-size:.72rem;color:var(--muted);margin:.3rem 0;flex-wrap:wrap}
+  .sw{display:inline-block;width:.85em;height:.85em;border-radius:3px;vertical-align:-.1em;margin-right:.3em;
+       border:1.5px solid #b9c9da;background:#fff}
+  .sw.rng{border-color:var(--amber);background:var(--amber-tint)}
+  .sw.render{border-color:#a9d3a9;background:#eef6ee}
+  .sw.desc{border-style:dashed;border-color:#9fb4c7;background:#f4f7fa}
+
+  /* calibration detail tables */
+  table.cal{border-collapse:collapse;width:100%;font-size:.8rem;margin:.5rem 0;background:#fff}
+  table.cal th,table.cal td{border:1px solid var(--border);padding:.32rem .55rem;text-align:left;vertical-align:top}
+  table.cal th{background:var(--navy-tint);color:var(--navy);white-space:nowrap}
+  .tablewrap{overflow-x:auto;max-width:1000px}
+  .pill{display:inline-block;font-size:.66rem;font-weight:700;border-radius:3px;padding:.08em .45em;vertical-align:.08em}
+  .pill.fit{background:var(--amber);color:#fff}
+  .pill.hand{background:#8a94a0;color:#fff}
+
+  .navhint{position:fixed;bottom:1rem;right:1.2rem;z-index:99;font-family:ui-monospace,Menlo,monospace;
+       font-size:.72rem;color:var(--muted);background:rgba(255,255,255,.85);border:1px solid var(--border);
+       border-radius:6px;padding:.3rem .6rem}
+  #counter{position:fixed;bottom:1rem;left:1.2rem;z-index:99;font-family:ui-monospace,Menlo,monospace;
+       font-size:.72rem;color:var(--muted);background:rgba(255,255,255,.85);border:1px solid var(--border);
+       border-radius:6px;padding:.3rem .6rem}
+  ul.talk{font-size:1.02rem;max-width:64ch;margin:.4rem 0;padding-left:1.2rem}
+  ul.talk li{margin:.45rem 0}
+  @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div id="counter">1 / 12</div>
+<div class="navhint">← → / space to navigate</div>
+
+<!-- 1 · TITLE -->
+<section class="slide dark" id="s1">
+  <div class="eyebrow">v2b-syndata · synthetic V2B dataset generator</div>
+  <h1>One integer seed walks in.<br>A city block of data walks out.</h1>
+  <p class="lead">A configurable generator for vehicle-to-building research data:
+  physically simulated, behaviorally calibrated, reproducible to the byte.</p>
+  <div class="foot"><span>rishav.sen@vanderbilt.edu</span><span>arrow keys →</span></div>
+</section>
+
+<!-- 2 · PROBLEM -->
+<section class="slide dark" id="s2">
+  <h2>The data we need doesn't exist</h2>
+  <div class="pain">
+    <div class="p"><b>Private</b><span>Real charging logs identify drivers and buildings — they rarely leave the utility or campus that collected them.</span></div>
+    <div class="p"><b>Site-locked</b><span>The public exceptions cover a handful of sites. You can't ask Caltech's dataset what Miami retail looks like — or what 500 EVs would do.</span></div>
+    <div class="p"><b>Missing the key variable</b><span>No charger ever records battery state of charge. The quantity every V2B optimizer schedules around is absent from every dataset.</span></div>
+  </div>
+  <p class="lead" style="margin-top:1.6rem">So V2B methods get evaluated on data that is small, fixed, and blind to SoC.</p>
+  <div class="foot"><span>the problem</span><span>2</span></div>
+</section>
+
+<!-- 3 · CLAIMS -->
+<section class="slide" id="s3">
+  <h2>Our answer: generate it — under three guarantees</h2>
+  <div class="big3">
+    <div class="claim"><h3>Physical</h3>
+      <p>Building load is a real EnergyPlus simulation of DOE prototype buildings under real (TMYx) weather — not a shape template.</p>
+      <div class="proof">ASHRAE 90.1 prototypes · 15-min · 8 end-use meters</div></div>
+    <div class="claim"><h3>Calibrated</h3>
+      <p>Driver behavior is fitted per-region from four real charging datasets, with fit quality reported and provenance stamped on every value.</p>
+      <div class="proof">ACN · EV WATTS · ElaadNL · INL — MLE + KS per region</div></div>
+    <div class="claim"><h3>Reproducible</h3>
+      <p>A scenario file plus one integer seed regenerates the dataset byte-for-byte. Every run ships a manifest that can audit or re-create it.</p>
+      <div class="proof">(scenario, seed) → identical SHA-256s, forever</div></div>
+  </div>
+  <div class="foot"><span>three claims — the rest of this deck is evidence</span><span>3</span></div>
+</section>
+
+<!-- 4 · PIPELINE -->
+<section class="slide" id="s4">
+  <h2>The pipeline in one picture</h2>
+  <div class="lanes">
+    <div class="lane"><b>Inputs</b><span>5 descriptor picks (site, building, population, chargers, noise) + 1 seed — everything else ships in the box</span></div>
+    <div class="lane"><b>Knob resolution</b><span>expands to 69 typed knobs; CLI ≻ scenario ≻ descriptor ≻ default; every value remembers its source</span></div>
+    <div class="lane"><b>Seeding</b><span>SHA-256-keyed RNG streams — per node, per car, per day; order-independent by construction</span></div>
+    <div class="lane warm"><b>Sampling DAG</b><span>27 nodes, 4 tiers: EnergyPlus building load · per-driver attributes · fitted distributions · session rejection sampling</span></div>
+    <div class="lane"><b>Output noise</b><span>optional measurement-noise layer (default: off — clean)</span></div>
+    <div class="lane"><b>Validation</b><span>9 hard invariant families (A–I) + feasibility checks, verdict sealed into the manifest</span></div>
+    <div class="lane done"><b>Outputs</b><span>10 CSVs + manifest per building — or an 18,000-sample campus batch</span></div>
+  </div>
+  <div class="foot"><span>full detail: docs/GENERATION_VISUAL.html · docs/GENERATION_PIPELINE.html</span><span>4</span></div>
+</section>
+
+<!-- 5 · PHYSICAL -->
+<section class="slide" id="s5">
+  <h2>Claim 1 — Physical: real building physics, one weather truth</h2>
+  <div class="chain">
+    <div class="cbox"><b>TMYx weather</b>hourly EPW</div><span class="arr">→</span>
+    <div class="cbox warm"><b>perturb</b>ΔT · ×solar · Δdew · ×wind</div><span class="arr">→</span>
+    <div class="cbox"><b>DOE prototype</b>office / retail / mixed</div><span class="arr">→</span>
+    <div class="cbox"><b>EnergyPlus</b>15-min · 8 meters</div><span class="arr">→</span>
+    <div class="cbox"><b>flex + inflex kW</b>J ÷ 900 s ÷ 1000</div>
+  </div>
+  <ul class="talk">
+    <li>The <b>same perturbed weather frame</b> drives the building simulation, the PV model, and the exported weather file — the dataset can never disagree with itself.</li>
+    <li>Load splits into <b>flexible</b> (HVAC — what a controller can shift) and <b>inflexible</b> (lights + plugs — must serve).</li>
+    <li>Weather perturbation gives each Monte-Carlo sample its own physically-consistent year — variance without breaking physics.</li>
+  </ul>
+  <div class="foot"><span>claim 1 / 3 · physical</span><span>5</span></div>
+</section>
+
+<!-- 6 · THE DAG -->
+<section class="slide" id="sdag">
+  <h2>Under the hood: the sampling DAG <span class="muted" style="font-size:1rem;font-weight:500">— hover a node to trace its wiring</span></h2>
+  <div class="legend">
+    <span><span class="sw desc"></span>Tier 0 — descriptors (resolved before the DAG runs)</span>
+    <span><span class="sw"></span>deterministic packer / physics</span>
+    <span><span class="sw rng"></span>randomness enters here</span>
+    <span><span class="sw render"></span>renders an output CSV</span>
+  </div>
+  <div class="diagram-wrap"><div id="dagbox">
+    <svg id="dagsvg" aria-hidden="true"></svg>
+    <div class="dagcols">
+      <div class="dagcol"><h4>Tier 0 · descriptors</h4>
+        <div class="dnode desc" data-id="d_loc">location</div>
+        <div class="dnode desc" data-id="d_bld">building</div>
+        <div class="dnode desc" data-id="d_pop">population</div>
+        <div class="dnode desc" data-id="d_eq">equipment</div>
+        <div class="dnode desc" data-id="d_nz">noise → post-DAG layer</div>
+      </div>
+      <div class="dagcol"><h4>Tier 1 · roots</h4>
+        <div class="dnode" data-id="C">C · climate</div>
+        <div class="dnode" data-id="A">A · archetype</div>
+        <div class="dnode" data-id="S">S · size</div>
+        <div class="dnode" data-id="O">O · occupancy</div>
+        <div class="dnode" data-id="T">T · tariff</div>
+        <div class="dnode" data-id="U">U · user behavior</div>
+        <div class="dnode" data-id="F">F · fleet</div>
+        <div class="dnode" data-id="X">X · chargers</div>
+      </div>
+      <div class="dagcol"><h4>Tier 1.5 · per-entity</h4>
+        <div class="dnode rng" data-id="A_user">A_user · per driver: φ κ δ, type, w1 w2</div>
+        <div class="dnode rng" data-id="A_fleet">A_fleet · per car: battery, capacity</div>
+      </div>
+      <div class="dagcol"><h4>Tier 2 · latents</h4>
+        <div class="dnode" data-id="L_flex">L_flex · E+ HVAC kW</div>
+        <div class="dnode" data-id="L_inflex">L_inflex · E+ lights kW</div>
+        <div class="dnode" data-id="f_arr">f_arr · arrival dist</div>
+        <div class="dnode" data-id="f_dwell">f_dwell · dwell dist + ρ</div>
+        <div class="dnode" data-id="f_soc">f_soc · SoC dists</div>
+        <div class="dnode" data-id="PV_gen">PV_gen · PVWatts</div>
+      </div>
+      <div class="dagcol"><h4>Tier 3 · renderers</h4>
+        <div class="dnode render" data-id="building_load">building_load.csv</div>
+        <div class="dnode render rng" data-id="sessions">sessions.csv</div>
+        <div class="dnode render" data-id="users">users.csv</div>
+        <div class="dnode render" data-id="cars">cars.csv</div>
+        <div class="dnode render" data-id="chargers">chargers.csv</div>
+        <div class="dnode render" data-id="grid_prices">grid_prices.csv</div>
+        <div class="dnode render rng" data-id="dr_events">dr_events.csv</div>
+        <div class="dnode render" data-id="pv_generation">pv_generation.csv</div>
+        <div class="dnode render" data-id="pv">pv.csv</div>
+        <div class="dnode render" data-id="battery">battery.csv</div>
+      </div>
+    </div>
+  </div></div>
+  <p class="cap" style="max-width:90ch">27 nodes in 5 tiers, executed in stable topological order; RNG streams are hash-keyed
+  per node/car/day, so the graph can grow without moving anyone's randomness. <b>sessions.csv</b> converges 7 parents —
+  a session must satisfy the driver, the car, the charger, the fitted distributions and the time grid at once.</p>
+  <div class="foot"><span>architecture</span><span>6</span></div>
+</section>
+
+<!-- 7 · CALIBRATED: sources + axes -->
+<section class="slide" id="s6">
+  <h2>Claim 2 — Calibrated: real drivers define the behavior space</h2>
+  <div class="cols2">
+    <div>
+      <div class="stat-row">
+        <div class="stat"><div class="v">635</div><div class="k">ACN users · 41,774 sessions (Caltech/JPL/Office, 2019–21)</div></div>
+        <div class="stat"><div class="v">1.36 M</div><div class="k">EV WATTS workplace sessions · 3,356 users</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat"><div class="v">55 k</div><div class="k">ElaadNL/Utrecht EU sessions · 1,231 drivers fit</div></div>
+        <div class="stat"><div class="v">4</div><div class="k">independent ground-truth datasets, each with its own normalizer</div></div>
+      </div>
+      <p class="cap">Every real driver becomes a point in a behavioral coordinate system —
+      <b>φ</b> how often they plug in, <b>κ</b> how consistent their timing is, <b>δ</b> how far they drive.
+      Regions of that plane are fitted separately, and a driver's region shapes everything they do.</p>
+    </div>
+    <div>
+      <canvas class="plot" id="cAxes" width="620" height="430"></canvas>
+      <p class="cap"><b>The honest surprise we kept:</b> real workplace drivers plug in <em>rarely</em> —
+      76% of ACN users sit at φ ≤ 0.3 (left boxes). The hand-authored grid would have missed this; the calibrated grid <em>is</em> the data.</p>
+    </div>
+  </div>
+  <div class="foot"><span>claim 2 / 3 · calibrated</span><span>7</span></div>
+</section>
+
+<!-- 7 · CALIBRATED: fits -->
+<section class="slide" id="s7">
+  <h2>…and real distributions replace textbook priors</h2>
+  <div class="cols2">
+    <div>
+      <canvas class="plot" id="cArr" width="620" height="330"></canvas>
+      <p class="cap"><span style="color:#1f4e79">■</span> synthetic prior: one morning peak ·
+      <span style="color:#d8853b">■</span> fitted to ACN <span class="mono-plain">rare_consistent</span> (n=4,723 sessions):
+      <b>bimodal</b> — morning commute + after-lunch arrivals. Mixtures are kept only when they beat the single fit by KS ≥ 0.02.</p>
+    </div>
+    <div>
+      <ul class="talk">
+        <li>Per region we fit: <b>arrival</b> (TruncNorm ± mixture), <b>dwell</b> (Weibull ± mixture), <b>SoC</b> (Betas), and an <b>arrival↔dwell copula</b> (ρ = −0.56 here: late arrivals stay shorter).</li>
+        <li>Every fitted value carries its <b>provenance</b> (<span class="mono-plain">calibration:acn_data_2019_2021</span>) and <b>KS fit quality</b> into every dataset that uses it.</li>
+      </ul>
+      <div class="truth"><b>The honesty clause:</b> no charger records SoC — anywhere. Our SoC quantities are
+      <b>modeled priors</b> reconstructed from energy delivered ÷ inferred capacity. Calibrated to be consistent with
+      ground truth; never claimed to <em>be</em> ground truth.</div>
+    </div>
+  </div>
+  <div class="foot"><span>claim 2 / 3 · calibrated</span><span>8</span></div>
+</section>
+
+<!-- 9 · CALIBRATION: the complete recipe -->
+<section class="slide" id="scal1">
+  <h2>EV user calibration — the complete recipe</h2>
+  <div class="chain">
+    <div class="cbox"><b>raw logs</b>one normalizer per dataset</div><span class="arr">→</span>
+    <div class="cbox"><b>per-user axes</b>φ · κ · δ from each user's history</div><span class="arr">→</span>
+    <div class="cbox"><b>S0 region assignment</b>user → box in (φ, κ) plane</div><span class="arr">→</span>
+    <div class="cbox warm"><b>per-region MLE fits</b>5 quantities</div><span class="arr">→</span>
+    <div class="cbox"><b>writer</b>comment-preserving YAML</div><span class="arr">→</span>
+    <div class="cbox"><b>populations.yaml</b>fits + provenance + KS</div>
+  </div>
+  <div class="tablewrap"><table class="cal">
+    <thead><tr><th>Quantity</th><th>Family</th><th>Fitting rule</th><th>Worked example — ACN <span class="mono-plain">rare_consistent</span> (n = 4,723 sessions)</th></tr></thead>
+    <tbody>
+      <tr><td>Arrival hour</td><td>TruncNorm, or 2-component mixture</td><td>MLE on window [4, 22] h; mixture kept <b>only if</b> KS improves ≥ 0.02</td><td class="mono-plain">.42·N(8.21, 1.25) + .58·N(14.54, 3.52) · KS .040</td></tr>
+      <tr><td>Dwell hours</td><td>Weibull, or 2-component mixture</td><td>MLE on positive dwell; same mixture rule; every fit needs n ≥ 30</td><td class="mono-plain">Weibull(k 1.172, λ 5.626) · KS .063</td></tr>
+      <tr><td>Arrival SoC</td><td>Beta on [0, 1]</td><td>fit on <b>reconstructed</b> SoC (see below)</td><td class="mono-plain">Beta(3.70, 5.59) · KS .035</td></tr>
+      <tr><td>Departure SoC req.</td><td>Beta on [0, 1]</td><td>from the observed energy <em>request</em></td><td class="mono-plain">Beta(0.955, 0.316) · KS .255</td></tr>
+      <tr><td>Arrival ↔ dwell coupling</td><td>Gaussian copula ρ</td><td>Spearman rank corr. → Gaussian transform</td><td class="mono-plain">ρ = −0.562 — late arrivals stay shorter</td></tr>
+    </tbody>
+  </table></div>
+  <div class="truth" style="margin-top:.6rem"><b>SoC reconstruction (the honesty clause in full):</b> chargers meter energy,
+  never battery state. Arrival SoC = 1 − (kWh delivered ÷ inferred battery capacity); capacity is inferred per user from
+  their max observed session energy, falling back to class defaults for ~33% of ACN users. Departure requirement ∝ the
+  energy the driver <em>asked for</em>. Both are priors made <em>consistent with</em> ground truth — and stamped as such.</div>
+  <div class="foot"><span>claim 2 / 3 · calibrated — method</span><span>9</span></div>
+</section>
+
+<!-- 10 · CALIBRATION: population catalog -->
+<section class="slide" id="scal2">
+  <h2>The population catalog — 13 cohorts, two authorship policies</h2>
+  <div class="tablewrap"><table class="cal">
+    <thead><tr><th>Population</th><th>Policy</th><th>Anchored on</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-plain">acn_workplace_baseline</td><td><span class="pill fit">fitted</span></td><td>ACN 2019–21 · 635 users · 41,774 sessions</td><td>Caltech + JPL + Office001 pooled; weights = empirical user shares</td></tr>
+      <tr><td class="mono-plain">acn_caltech / acn_jpl / acn_office001</td><td><span class="pill fit">fitted</span></td><td>same corpus, per site</td><td>site-level variants for cross-site transfer studies</td></tr>
+      <tr><td class="mono-plain">evwatts_workplace_public</td><td><span class="pill fit">fitted</span></td><td>EV WATTS · 1.36 M workplace sessions · 3,356 users</td><td>5/5 regions fit; 0.4% users unassigned</td></tr>
+      <tr><td class="mono-plain">elaadnl_public_eu</td><td><span class="pill fit">fitted</span></td><td>ElaadNL/4TU Utrecht 2020–24 · ~55 k sessions · 1,231 drivers</td><td>region grid <b>re-anchored on its own (φ, κ) cloud</b> — 4-box tiling (occasional_consistent / weekly_consistent / regular_commuter + erratic); unassigned 76% → 0%</td></tr>
+      <tr><td class="mono-plain">inl_residential_legacy</td><td><span class="pill fit">fitted</span></td><td>INL EV Project Phase 1 · 2011–13</td><td>24 kWh Leaf/Volt era — a deliberate distribution-shift benchmark</td></tr>
+      <tr><td class="mono-plain">evwatts_dcfc_public</td><td><span class="pill hand">defined</span></td><td>—</td><td>DCFC cohort declared, calibration pending</td></tr>
+      <tr><td class="mono-plain">consent_default · stable_commuter_heavy · visitor_heavy · occasional_commuter · flexible_workforce</td><td><span class="pill hand">hand-authored</span></td><td>domain knowledge</td><td>stamped <span class="mono-plain">hand_specified:*</span>; <code>calibrate</code> deliberately skips them</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="talk" style="font-size:.92rem">
+    <li><b>Independence by design:</b> each dataset gets its own normalizer and its own region geometry — ElaadNL does not borrow ACN's boxes.</li>
+    <li><b>Calibrated cohorts drop the synthetic guardrails</b> (<span class="mono-plain">min_depart_soc: 0</span>, weekends enabled) so the fitted distributions speak unclamped.</li>
+    <li><b>Every fitted leaf is provenance-stamped</b> (<span class="mono-plain">calibration:acn_data_2019_2021_20260628</span>) — any downstream dataset can be audited back to its ground truth.</li>
+  </ul>
+  <div class="foot"><span>claim 2 / 3 · calibrated — catalog</span><span>10</span></div>
+</section>
+
+<!-- 11 · REPRODUCIBLE -->
+<section class="slide" id="s8">
+  <h2>Claim 3 — Reproducible: the dataset is a function</h2>
+  <div class="chain">
+    <div class="cbox warm"><b>seed 42</b></div><span class="arr">+</span>
+    <div class="cbox"><b>scenario.yaml</b></div><span class="arr">→</span>
+    <div class="cbox"><b>SHA-256-keyed RNG streams</b>per node · per car · per day</div><span class="arr">→</span>
+    <div class="cbox"><b>identical CSVs</b>every run, every machine</div>
+  </div>
+  <ul class="talk">
+    <li>Randomness is keyed by <b>content hashes, not execution order</b> — adding a feature can't silently shift anyone else's data.</li>
+    <li>The manifest seals every run: all 69 knob values <b>with their sources</b>, git SHA, per-file SHA-256s, and the validation verdict.</li>
+    <li>Practical payoff: a collaborator can regenerate your exact dataset from a 2 kB config — no 50 GB transfers, no "which version?"</li>
+  </ul>
+  <div class="foot"><span>claim 3 / 3 · reproducible</span><span>11</span></div>
+</section>
+
+<!-- 12 · VALIDITY -->
+<section class="slide" id="s9">
+  <h2>Every sample is checked before it ships</h2>
+  <p class="lead">Sessions are generated by <b>rejection, not clamping</b> — a candidate session must survive five physical
+  gates (same-day, in-window, non-overlapping, SoC-increasing, <b>energy-reachable within the dwell at the charger's rate</b>).
+  Then the whole dataset passes the invariant wall:</p>
+  <div class="gatewall">
+    <span class="gate">A schema</span><span class="gate">B referential</span><span class="gate">C temporal ×12</span>
+    <span class="gate">D SoC physics ×7</span><span class="gate">E charger rules</span><span class="gate">G behavior bounds</span>
+    <span class="gate">H tariff/DR rules</span><span class="gate">I manifest integrity</span>
+    <span class="gate soft">+ soft: share drift (3σ) · KS vs fits · concurrency</span>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="v">18,000</div><div class="k">samples in our latest campus batch</div></div>
+    <div class="stat"><div class="v">0</div><div class="k">hard validation errors</div></div>
+    <div class="stat"><div class="v">40+</div><div class="k">invariants checked per sample</div></div>
+  </div>
+  <div class="foot"><span>validity</span><span>12</span></div>
+</section>
+
+<!-- 13 · SCALE & CONTROL -->
+<section class="slide" id="s10">
+  <h2>Scale and control: from one building to a campus</h2>
+  <ul class="talk">
+    <li><b>One config = one experiment.</b> Swap the site (9 cities), building (6 DOE types), population (13 cohorts — 8 data-calibrated), chargers (V1G → full V2B), PV/battery — each swap is one line.</li>
+    <li><b>Monte-Carlo built in:</b> months × samples batches where each sample gets its own weather realization and seed — a full 10-building campus × 12 months × 150 samples generated overnight.</li>
+    <li><b>Distribution-shift benchmarks for free:</b> train on ACN-calibrated workplace, test on ElaadNL EU public or 2011-era INL residential.</li>
+  </ul>
+  <div class="stat-row">
+    <div class="stat"><div class="v">10</div><div class="k">buildings, distinct types + DER, one campus config</div></div>
+    <div class="stat"><div class="v">150</div><div class="k">weather-realized samples per building-month</div></div>
+    <div class="stat"><div class="v">~8 h</div><div class="k">wall-clock for all 18,000 EnergyPlus units (30 workers)</div></div>
+  </div>
+  <div class="foot"><span>scale</span><span>13</span></div>
+</section>
+
+<!-- 14 · WHAT YOU GET -->
+<section class="slide" id="s11">
+  <h2>What a consumer of the data receives</h2>
+  <div class="filestrip">
+    <span class="f">building_load.csv</span><span class="f">sessions.csv</span><span class="f">users.csv</span>
+    <span class="f">cars.csv</span><span class="f">chargers.csv</span><span class="f">grid_prices.csv</span>
+    <span class="f">dr_events.csv</span><span class="f">pv_generation.csv</span><span class="f">pv.csv</span>
+    <span class="f">battery.csv</span><span class="f m">manifest.json — full provenance</span>
+  </div>
+  <ul class="talk">
+    <li>15-minute timeseries + per-entity tables, one coherent story per (building, month, seed).</li>
+    <li>Multi-building exports add <span class="mono-plain">building_id</span>, campus-wide DR commands, the exact simulated weather, and occupancy — drop-in for downstream simulators.</li>
+    <li>Everything regenerable: the manifest <em>is</em> the dataset's recipe.</li>
+  </ul>
+  <div class="foot"><span>outputs</span><span>14</span></div>
+</section>
+
+<!-- 15 · CLOSE -->
+<section class="slide dark" id="s12">
+  <h2>Where to go deeper</h2>
+  <ul class="talk">
+    <li><b>Live demo</b> — the web tool builds a scenario in clicks and generates before your eyes (<span class="mono-plain">tools/web</span>).</li>
+    <li><b>Visual tour</b> — 11 illustrated acts, every layer drawn: <span class="mono-plain">docs/GENERATION_VISUAL.html</span></li>
+    <li><b>Exhaustive reference</b> — every knob, node, invariant and file: <span class="mono-plain">docs/GENERATION_PIPELINE.html</span></li>
+    <li><b>Uncertainty analysis</b> — 18,000-sample campus report: <span class="mono-plain">data/output/campus10/analysis.html</span></li>
+  </ul>
+  <p class="lead" style="margin-top:1.5rem">Questions — or shall we generate your scenario right now?</p>
+  <div class="foot"><span>v2b-syndata · 2026</span><span>15 / 15</span></div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+  var NAVY="#1f4e79", AMBER="#d8853b", GRID="#e6ebf0", MUT="#5d6a77";
+  function setup(id){
+    var c=document.getElementById(id); if(!c)return null;
+    var dpr=window.devicePixelRatio||1,w=c.width,h=c.height;
+    c.style.width="100%";c.style.maxWidth=w+"px";
+    c.width=w*dpr;c.height=h*dpr;
+    var x=c.getContext("2d");x.scale(dpr,dpr);
+    return {x:x,w:w,h:h};
+  }
+  function nrm(x,mu,s){var z=(x-mu)/s;return Math.exp(-0.5*z*z)/(s*2.50662827);}
+
+  // ── ACN axes grid (the calibration visual) ──
+  (function(){
+    var p=setup("cAxes"); if(!p)return;
+    var x0=52,y0=18,x1=p.w-16,y1=p.h-44;
+    p.x.strokeStyle=GRID;p.x.strokeRect(x0,y0,x1-x0,y1-y0);
+    for(var g=0.25;g<1;g+=0.25){
+      p.x.beginPath();p.x.moveTo(x0+(x1-x0)*g,y0);p.x.lineTo(x0+(x1-x0)*g,y1);p.x.stroke();
+      p.x.beginPath();p.x.moveTo(x0,y1-(y1-y0)*g);p.x.lineTo(x1,y1-(y1-y0)*g);p.x.stroke();
+    }
+    var regions=[
+      {n:"regular_charger",f:[0.30,1.0],c:[0.40,1.0],w:23.1,col:"#1f4e79"},
+      {n:"occasional_consistent",f:[0.10,0.30],c:[0.50,1.0],w:40.0,col:"#2d6398"},
+      {n:"rare_consistent",f:[0.0,0.10],c:[0.50,1.0],w:36.2,col:"#d8853b"},
+      {n:"rare_inconsistent",f:[0.0,0.10],c:[0.0,0.50],w:0.6,col:"#7b8fa3"},
+      {n:"erratic (0%)",f:[0.0,0.50],c:[0.0,0.40],w:0,col:"#b8c4cf"}
+    ];
+    regions.forEach(function(r){
+      var rx=x0+(x1-x0)*r.f[0],rw=(x1-x0)*(r.f[1]-r.f[0]);
+      var ry=y1-(y1-y0)*r.c[1],rh=(y1-y0)*(r.c[1]-r.c[0]);
+      p.x.globalAlpha=.17;p.x.fillStyle=r.col;p.x.fillRect(rx,ry,rw,rh);p.x.globalAlpha=1;
+      p.x.strokeStyle=r.col;p.x.lineWidth=2;p.x.strokeRect(rx,ry,rw,rh);
+      p.x.fillStyle=r.col;p.x.font="bold 11px ui-monospace,Menlo,monospace";p.x.textAlign="left";
+      p.x.fillText(r.n,rx+5,ry+15);
+      if(r.w>0){p.x.font="12px ui-monospace,Menlo,monospace";p.x.fillText(r.w+"%",rx+5,ry+29);}
+    });
+    p.x.fillStyle=MUT;p.x.font="11px ui-monospace,Menlo,monospace";p.x.textAlign="center";
+    for(var t=0;t<=1.001;t+=0.25){p.x.fillText(t.toFixed(2),x0+(x1-x0)*t,y1+16);}
+    p.x.fillText("φ plug-in frequency →",(x0+x1)/2,y1+34);
+    p.x.save();p.x.translate(16,(y0+y1)/2);p.x.rotate(-Math.PI/2);
+    p.x.fillText("κ consistency →",0,0);p.x.restore();
+    p.x.textAlign="left";
+    p.x.fillText("acn_workplace_baseline — weights = 632 real users' shares",x0+4,y0-5);
+  })();
+
+  // ── arrival bimodal ──
+  (function(){
+    var p=setup("cArr"); if(!p)return;
+    var x0=40,y0=16,x1=p.w-14,y1=p.h-30,dom=[4,22];
+    p.x.strokeStyle=GRID;p.x.strokeRect(x0,y0,x1-x0,y1-y0);
+    function plot(f,color){
+      var N=240,vals=[],mx=0,i;
+      for(i=0;i<=N;i++){var t=dom[0]+(dom[1]-dom[0])*i/N;var v=f(t);vals.push(v);if(v>mx)mx=v;}
+      p.x.beginPath();
+      for(i=0;i<=N;i++){var px=x0+(x1-x0)*i/N,py=y1-(y1-y0)*(vals[i]/mx)*0.9;
+        i?p.x.lineTo(px,py):p.x.moveTo(px,py);}
+      p.x.lineTo(x1,y1);p.x.lineTo(x0,y1);p.x.closePath();
+      p.x.globalAlpha=.13;p.x.fillStyle=color;p.x.fill();p.x.globalAlpha=1;
+      p.x.beginPath();
+      for(i=0;i<=N;i++){var px2=x0+(x1-x0)*i/N,py2=y1-(y1-y0)*(vals[i]/mx)*0.9;
+        i?p.x.lineTo(px2,py2):p.x.moveTo(px2,py2);}
+      p.x.strokeStyle=color;p.x.lineWidth=2.4;p.x.stroke();
+    }
+    plot(function(t){return t<6||t>20?0:nrm(t,8.5,0.3*2);},NAVY);
+    plot(function(t){return 0.42*nrm(t,8.214,1.252)+0.58*nrm(t,14.536,3.522);},AMBER);
+    p.x.fillStyle=MUT;p.x.font="11px ui-monospace,Menlo,monospace";p.x.textAlign="center";
+    for(var h=4;h<=22;h+=3){p.x.fillText(h+"h",x0+(x1-x0)*(h-4)/18,y1+16);}
+    p.x.textAlign="left";p.x.fillText("arrival-hour density",x0+4,y0-4);
+  })();
+
+  // ── DAG connectors (slide 6) ──
+  var EDGES=[
+    ["d_loc","C"],["d_loc","T"],
+    ["d_bld","A"],["d_bld","S"],["d_bld","O"],
+    ["d_pop","U"],["d_pop","F"],
+    ["d_eq","X"],
+    ["U","A_user"],["F","A_fleet"],
+    ["A","L_flex"],["S","L_flex"],["O","L_flex"],
+    ["A","L_inflex"],["S","L_inflex"],["O","L_inflex"],
+    ["A_user","f_arr"],["A_user","f_dwell"],["A_user","f_soc"],
+    ["X","PV_gen"],
+    ["X","chargers"],["T","grid_prices"],
+    ["T","dr_events"],["C","dr_events"],["building_load","dr_events"],
+    ["A_user","users"],["A_fleet","cars"],
+    ["L_flex","building_load"],["L_inflex","building_load"],
+    ["f_arr","sessions"],["f_dwell","sessions"],["f_soc","sessions"],
+    ["A_user","sessions"],["A_fleet","sessions"],["X","sessions"],["building_load","sessions"],
+    ["PV_gen","pv_generation"],["PV_gen","pv"],["X","battery"]];
+  var box=document.getElementById("dagbox"), svg=document.getElementById("dagsvg");
+  function nodeEl(id){ return box?box.querySelector('[data-id="'+id+'"]'):null; }
+  function drawDag(){
+    if(!box||!svg)return;
+    var br=box.getBoundingClientRect();
+    if(br.width<10)return;
+    svg.setAttribute("viewBox","0 0 "+br.width+" "+br.height);
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    EDGES.forEach(function(e){
+      var a=nodeEl(e[0]), b=nodeEl(e[1]); if(!a||!b)return;
+      var ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+      var xA=ra.right-br.left, yA=ra.top+ra.height/2-br.top;
+      var xB=rb.left-br.left,  yB=rb.top+rb.height/2-br.top;
+      if(xB<xA){ xA=ra.left-br.left; }
+      var mx=(xA+xB)/2;
+      var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+      path.setAttribute("d","M"+xA+","+yA+" C"+mx+","+yA+" "+mx+","+yB+" "+xB+","+yB);
+      path.setAttribute("fill","none");
+      path.setAttribute("stroke","#c3d2e0");
+      path.setAttribute("stroke-width","1.2");
+      if(e[0].indexOf("d_")===0){ path.setAttribute("stroke-dasharray","4 3"); }
+      path.dataset.a=e[0]; path.dataset.b=e[1];
+      svg.appendChild(path);
+    });
+  }
+  function highlight(id,on){
+    if(!svg||!box)return;
+    Array.prototype.forEach.call(svg.querySelectorAll("path"),function(p){
+      var hit=(p.dataset.a===id||p.dataset.b===id);
+      p.setAttribute("stroke",hit&&on?"#d8853b":"#c3d2e0");
+      p.setAttribute("stroke-width",hit&&on?"2.2":"1.2");
+      if(on&&hit){ var other=(p.dataset.a===id)?p.dataset.b:p.dataset.a;
+        var el=nodeEl(other); if(el)el.classList.add("hl"); }
+    });
+    if(!on){ Array.prototype.forEach.call(box.querySelectorAll(".dnode.hl"),function(n){n.classList.remove("hl");}); }
+  }
+  if(box){
+    Array.prototype.forEach.call(box.querySelectorAll(".dnode"),function(n){
+      n.addEventListener("mouseenter",function(){highlight(n.dataset.id,true);});
+      n.addEventListener("mouseleave",function(){highlight(n.dataset.id,false);});
+    });
+    drawDag();
+    var rt; window.addEventListener("resize",function(){clearTimeout(rt);rt=setTimeout(drawDag,120);});
+    // fonts/layout can settle after first paint — redraw once more
+    setTimeout(drawDag,300);
+  }
+
+  // ── keyboard navigation ──
+  var slides=Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var counter=document.getElementById("counter");
+  function current(){
+    var mid=window.innerHeight/2, best=0, bd=1e9;
+    slides.forEach(function(s,i){
+      var r=s.getBoundingClientRect(),d=Math.abs(r.top+r.height/2-mid);
+      if(d<bd){bd=d;best=i;}
+    });
+    return best;
+  }
+  function go(i){
+    i=Math.max(0,Math.min(slides.length-1,i));
+    slides[i].scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  function updateCounter(){ if(counter)counter.textContent=(current()+1)+" / "+slides.length; }
+  window.addEventListener("scroll",function(){requestAnimationFrame(updateCounter);},{passive:true});
+  window.addEventListener("keydown",function(e){
+    if(e.key==="ArrowRight"||e.key==="ArrowDown"||e.key===" "||e.key==="PageDown"){e.preventDefault();go(current()+1);}
+    else if(e.key==="ArrowLeft"||e.key==="ArrowUp"||e.key==="PageUp"){e.preventDefault();go(current()-1);}
+    else if(e.key==="Home"){e.preventDefault();go(0);}
+    else if(e.key==="End"){e.preventDefault();go(slides.length-1);}
+  });
+  updateCounter();
+})();
+</script>

@@ -1,0 +1,259 @@
+# campus_10.yaml — 10-building commercial campus, single site (San Jose, CA).
+#
+# Batch run: 1 year (12 months) x 150 samples/month = 1,800 samples/building.
+#
+#   uv run python -m v2b_syndata.cli generate-multi \
+#     --config configs/campus_10.yaml \
+#     --start-month 2024-01 --end-month 2024-12 --samples-per-month 150 \
+#     --noise-profile tmyx_stochastic --workers 8 \
+#     --output-dir data/output/campus10/ --force
+#
+# Do NOT pass --weather-profile / --weather-sigma-c / --weather-solar-sigma on
+# the CLI: those force one value on EVERY building. Instead each building sets
+# its own weather_profile below (per-building wins over the batch default,
+# multi_building.py:509), giving the requested slight/moderate mix in ONE run.
+#
+# A campus is one geographic site → every building shares location: san_jose_ca.
+# Variety is carried by building type, population (commute pattern), equipment
+# (V2B / bidirectional share), PV size, battery chemistry/duration, weather
+# realization, and fleet. output_mode: shared tags every row with building_id
+# and emits one campus-wide dso_commands.csv per sample.
+#
+# WEATHER: input-side per-sample realization. slight = ~±1°C / ±2% solar;
+# moderate = ~±2.5°C / ±5% solar (see configs/weather_profiles.yaml). Each
+# sample draws a fresh offset seeded by its per-sample seed, so EnergyPlus
+# re-simulates perturbed weather and weather_data.csv matches. 5 buildings
+# slight, 5 moderate.
+#
+# NOISE: every building uses 'clean' (no output-side jitter). Sample diversity
+# still comes from (a) the per-sample weather realization above — each sample's
+# building_load is a different EnergyPlus run — and (b) the per-sample seed,
+# which varies sessions/SoC/arrivals. Because clean applies no post-render
+# jitter, the D5 SoC-reachability invariant the sampler enforces is never
+# violated, so every sample passes validation. (tmyx_stochastic would add
+# distribution jitter but nudges ~50% of samples past the D5 bound.)
+#
+# SEEDS: base seeds spaced by 1000. Batch adds the per-sample offset (0..149) to
+# each building's base, so with 150 samples/month the ranges never collide
+# (building k spans seed k000..k149). Keep spacing >= samples-per-month.
+#
+# PV sizing tracks roof area/building size (none → rooftop_xl 600 kW). Battery
+# mixes LFP/NMC and 2h/4h durations, with 3 buildings intentionally storage-free
+# for heterogeneity.
+
+output_mode: shared
+dr_program: CBP
+dr_incentive_per_kw: 13.6
+dr_penalty_per_kwh: 6.0
+default_policy: ILP-MPCFIXEDFSL
+
+buildings:
+  # 1. HQ office tower — large commuter fleet, heavy V2B, large rooftop + NMC 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: large_office_v1,
+        location: san_jose_ca,
+        population: stable_commuter_heavy,
+        equipment: bi_heavy,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 60,
+        charging_infra.charger_count: 60,
+        pv.pv_type: rooftop_large,
+        battery.battery_type: nmc_4h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 1000
+
+  # 2. Medium office A — mixed-flex baseline, full V2B, medium PV + LFP 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: consent_default,
+        equipment: bi_only,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 30,
+        charging_infra.charger_count: 30,
+        pv.pv_type: none,
+        battery.battery_type: lfp_2h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: slight
+    seed: 2000
+
+  # 3. Medium office B — hybrid workforce, balanced chargers, PV only (no storage)
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: flexible_workforce,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 25,
+        charging_infra.charger_count: 25,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 3000
+
+  # 4. R&D lab — stable on-site staff, heavy V2B, medium PV + LFP 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: stable_commuter_heavy,
+        equipment: bi_heavy,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 30,
+        charging_infra.charger_count: 30,
+        pv.pv_type: none,
+        battery.battery_type: lfp_4h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: slight
+    seed: 4000
+
+  # 5. Satellite small office — occasional mix, small rooftop, no storage
+  - base_scenario: S01
+    descriptors:
+      {
+        building: small_office_v1,
+        location: san_jose_ca,
+        population: occasional_commuter,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 12,
+        charging_infra.charger_count: 12,
+        pv.pv_type: rooftop_small,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 5000
+
+  # 6. Mixed-use (office + retail ground floor) — large PV + NMC 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: mixed_use_v1,
+        location: san_jose_ca,
+        population: consent_default,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 35,
+        charging_infra.charger_count: 35,
+        pv.pv_type: rooftop_large,
+        battery.battery_type: nmc_2h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: slight
+    seed: 6000
+
+  # 7. Strip-mall amenities — evening-peaking visitors, V1G, carport PV + LFP 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: retail_strip_mall,
+        location: san_jose_ca,
+        population: visitor_heavy,
+        equipment: uni_only,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 25,
+        charging_infra.charger_count: 25,
+        pv.pv_type: carport,
+        battery.battery_type: lfp_2h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 7000
+
+  # 8. Big-box retail — all-day visitors, V1G, XL rooftop + NMC 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: retail_standalone,
+        location: san_jose_ca,
+        population: visitor_heavy,
+        equipment: uni_only,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 40,
+        charging_infra.charger_count: 40,
+        pv.pv_type: rooftop_xl,
+        battery.battery_type: nmc_4h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: slight
+    seed: 8000
+
+  # 9. Startup small office — hybrid, full V2B, no PV/storage (baseline building)
+  - base_scenario: S01
+    descriptors:
+      {
+        building: small_office_v1,
+        location: san_jose_ca,
+        population: flexible_workforce,
+        equipment: bi_only,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 10,
+        charging_infra.charger_count: 10,
+        pv.pv_type: none,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 9000
+
+  # 10. Conference/mixed center — visitors, DCFC fast chargers, carport PV + LFP 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: mixed_use_v1,
+        location: san_jose_ca,
+        population: occasional_commuter,
+        equipment: high_power_dcfc,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: none,
+        battery.battery_type: lfp_4h,
+        building_load.peak_kw_scaling: false,
+      }
+    noise_profile: clean
+    weather_profile: slight
+    seed: 10000

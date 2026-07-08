@@ -1,0 +1,21 @@
+output_mode: shared
+dr_program: CBP
+dr_incentive_per_kw: 13.6
+dr_penalty_per_kwh: 6.0
+default_policy: ILP-MPCFIXEDFSL
+buildings:
+- base_scenario: S01
+  descriptors:
+    building: retail_strip_mall
+    location: san_jose_ca
+    population: visitor_heavy
+    equipment: uni_only
+  overrides:
+    ev_fleet.ev_count: 25
+    charging_infra.charger_count: 25
+    pv.pv_type: carport
+    battery.battery_type: lfp_2h
+    building_load.peak_kw_scaling: false
+  noise_profile: clean
+  weather_profile: moderate
+  seed: 7000

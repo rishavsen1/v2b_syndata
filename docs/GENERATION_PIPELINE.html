@@ -1,0 +1,704 @@
+<title>v2b-syndata — The Complete Generation Pipeline</title>
+<meta name="description" content="End-to-end reference for the v2b-syndata generative pipeline: every input (explicit and hidden), every layer, every knob, node, and output file.">
+<style>
+  :root{
+    --navy:#1f4e79; --navy-2:#2d6398; --navy-tint:#eef3f8; --navy-tint-2:#e2ebf4;
+    --amber:#d8853b; --amber-tint:#fdf4ea; --amber-border:#f0d9b8;
+    --green:#2ca02c; --green-tint:#eef7ee;
+    --paper:#fcfcfa; --surface:#ffffff; --ink:#1c2126; --muted:#5b6570;
+    --border:#dfe3e8; --code-bg:#f2f4f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font-family:-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;
+       font-size:15px;line-height:1.55}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.86em;
+       background:var(--code-bg);padding:.05em .35em;border-radius:3px}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+      padding: .8rem 1rem;overflow-x:auto;font-size:.8rem;line-height:1.5}
+  pre code{background:none;padding:0}
+
+  header.masthead{background:var(--navy);color:#fff;padding:2.2rem 2rem 1.8rem}
+  header.masthead h1{margin:0;font-size:1.7rem;font-weight:750;letter-spacing:-.015em;text-wrap:balance}
+  header.masthead p{margin:.5rem 0 0;opacity:.88;font-size:.95rem;max-width:62ch}
+  header.masthead .meta{margin-top:.9rem;font-size:.76rem;opacity:.75;
+       font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+  nav.toc{position:sticky;top:0;z-index:50;background:var(--surface);
+      border-bottom:2px solid var(--navy);padding:.45rem 1.2rem;overflow-x:auto;white-space:nowrap}
+  nav.toc a{color:var(--navy);text-decoration:none;font-size:.78rem;font-weight:600;
+      padding:.25rem .55rem;border-radius:4px}
+  nav.toc a:hover,nav.toc a:focus{background:var(--navy-tint);outline:2px solid transparent}
+  nav.toc a:focus-visible{outline:2px solid var(--amber)}
+  nav.toc .sep{color:var(--border);margin:0 .1rem}
+
+  main{max-width:1160px;margin:0 auto;padding:1.6rem 1.4rem 4rem}
+  section{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+      padding:1.3rem 1.6rem;margin-bottom:1.4rem;scroll-margin-top:3.4rem}
+  h2{color:var(--navy);font-size:1.28rem;margin:.1rem 0 .35rem;letter-spacing:-.01em;text-wrap:balance}
+  h2 .stage{display:inline-block;background:var(--navy);color:#fff;border-radius:4px;
+      font-size:.68rem;font-weight:700;letter-spacing:.08em;padding:.18em .5em;
+      vertical-align:.18em;margin-right:.55rem;text-transform:uppercase}
+  h3{color:var(--navy);font-size:1.0rem;margin:1.25rem 0 .35rem}
+  h4{color:var(--ink);font-size:.9rem;margin:1rem 0 .25rem}
+  p{max-width:88ch}
+  .muted{color:var(--muted);font-size:.85rem}
+  .lead{font-size:.95rem;max-width:88ch}
+
+  .tablewrap{overflow-x:auto;margin:.5rem 0}
+  table{border-collapse:collapse;width:100%;font-size:.8rem}
+  th,td{border:1px solid var(--border);padding:.3rem .55rem;text-align:left;vertical-align:top}
+  th{background:var(--navy-tint);color:var(--navy);font-weight:700;white-space:nowrap}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:nth-child(even){background:#fafbfc}
+
+  .take{background:var(--amber-tint);border:1px solid var(--amber-border);
+      border-left:4px solid var(--amber);border-radius:6px;padding:.65rem 1rem;
+      font-size:.86rem;margin:.7rem 0;max-width:96ch}
+  .ok{background:var(--green-tint);border:1px solid #cfe8cf;border-left:4px solid var(--green);
+      border-radius:6px;padding:.65rem 1rem;font-size:.86rem;margin:.7rem 0;max-width:96ch}
+
+  .tag{display:inline-block;font-size:.66rem;font-weight:700;letter-spacing:.06em;
+      text-transform:uppercase;border-radius:3px;padding:.1em .45em;vertical-align:.1em}
+  .tag.hidden-input{background:var(--amber);color:#fff}
+  .tag.explicit{background:var(--navy);color:#fff}
+  .tag.soft{background:#8a94a0;color:#fff}
+  .tag.hard{background:var(--navy-2);color:#fff}
+  .tag.det{background:var(--green);color:#fff}
+  .tag.rng{background:var(--amber);color:#fff}
+
+  /* pipeline map */
+  .pipe{display:flex;flex-direction:column;gap:0;margin:1rem 0}
+  .lane{border:1px solid var(--border);border-left:5px solid var(--navy);border-radius:6px;
+      background:var(--surface);padding:.6rem .9rem;display:flex;gap:.9rem;align-items:flex-start}
+  .lane.alt{border-left-color:var(--amber)}
+  .lane.final{border-left-color:var(--green)}
+  .lane .lane-label{min-width:9.5rem;flex-shrink:0}
+  .lane .lane-label b{display:block;font-size:.8rem;color:var(--navy);letter-spacing:.02em}
+  .lane.alt .lane-label b{color:var(--amber)}
+  .lane.final .lane-label b{color:var(--green)}
+  .lane .lane-label span{font-size:.68rem;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+  .chip{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;
+      background:var(--navy-tint);border:1px solid var(--navy-tint-2);color:var(--navy);
+      border-radius:4px;padding:.14em .5em;white-space:nowrap}
+  .chip.warm{background:var(--amber-tint);border-color:var(--amber-border);color:#9a5c22}
+  .chip.out{background:var(--green-tint);border-color:#cfe8cf;color:#1e7a1e}
+  .flow-arrow{text-align:center;color:var(--muted);font-size:.95rem;line-height:1.5;padding:.05rem 0}
+
+  details{border:1px solid var(--border);border-radius:6px;margin:.6rem 0;background:var(--surface)}
+  details summary{cursor:pointer;padding:.5rem .8rem;font-weight:700;color:var(--navy);
+      font-size:.88rem;user-select:none}
+  details summary:focus-visible{outline:2px solid var(--amber)}
+  details[open] summary{border-bottom:1px solid var(--border)}
+  details .inner{padding:.5rem .8rem .8rem}
+
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:.9rem;margin:.6rem 0}
+  .panel{border:1px solid var(--border);border-radius:6px;padding:.7rem .95rem;background:#fbfcfd}
+  .panel h4{margin:.1rem 0 .35rem}
+  .panel ul{margin:.2rem 0 .2rem 1.1rem;padding:0;font-size:.83rem}
+  .panel li{margin:.18rem 0}
+  ul.plain{font-size:.87rem}
+  ul.plain li{margin:.22rem 0}
+  ol.steps{font-size:.88rem;max-width:96ch}
+  ol.steps li{margin:.3rem 0}
+  .kbd-chain{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.8rem;
+      background:var(--code-bg);border-radius:4px;padding:.3rem .6rem;display:inline-block}
+  footer{color:var(--muted);font-size:.78rem;text-align:center;padding:1rem}
+  @media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth} }
+</style>
+
+<header class="masthead">
+  <h1>v2b-syndata — the complete generation pipeline</h1>
+  <p>Every input (explicit and hidden), every layer, every knob, node, constraint and output file of the synthetic
+     V2B dataset generator — from a scenario name and an integer seed to bitwise-reproducible CSVs.</p>
+  <div class="meta">repo: v2b_syndata · engine: forward-sampling DAG + EnergyPlus 23.2 · 9 knob buckets / 69 knobs · 27 DAG nodes · 10 native CSVs + manifest · 12 optimus CSVs</div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#map">Map</a><span class="sep">·</span>
+  <a href="#inputs">1 Inputs</a><span class="sep">·</span>
+  <a href="#resolution">2 Resolution</a><span class="sep">·</span>
+  <a href="#seeding">3 Seeding</a><span class="sep">·</span>
+  <a href="#dag">4 DAG</a><span class="sep">·</span>
+  <a href="#subsystems">5 Subsystems</a><span class="sep">·</span>
+  <a href="#noise">6 Noise</a><span class="sep">·</span>
+  <a href="#validation">7 Validation</a><span class="sep">·</span>
+  <a href="#outputs">8 Outputs</a><span class="sep">·</span>
+  <a href="#orchestration">9 Orchestration</a><span class="sep">·</span>
+  <a href="#contract">10 Contract</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════ MAP ══════════════════════════ -->
+<section id="map">
+  <h2><span class="stage">Map</span>The pipeline at a glance</h2>
+  <p class="lead">One generation run is a strict top-to-bottom pass through seven layers. Orchestration
+  (batch / multi-building / web) wraps the whole stack and re-enters it once per (building, month, sample) unit.
+  Blue lanes are deterministic machinery, the amber lane is where randomness enters, the green lane is what lands on disk.</p>
+
+  <div class="pipe">
+    <div class="lane">
+      <div class="lane-label"><b>L0 · Inputs</b><span>§1</span></div>
+      <div class="chips">
+        <span class="chip">scenario.yaml</span><span class="chip">seed</span><span class="chip">--override</span>
+        <span class="chip">5 descriptors</span>
+        <span class="chip warm">TMYx EPW weather</span><span class="chip warm">DOE prototype IDFs</span>
+        <span class="chip warm">ASHRAE schedules</span><span class="chip warm">calibrated region fits</span>
+        <span class="chip warm">BATTERY_SPECS</span><span class="chip warm">CONSENT clusters</span>
+        <span class="chip warm">DER catalog</span><span class="chip warm">DR program specs</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane">
+      <div class="lane-label"><b>L1 · Resolution</b><span>§2</span></div>
+      <div class="chips">
+        <span class="chip">expand_descriptors()</span><span class="chip">resolve_knobs()</span>
+        <span class="chip">priority: CLI &gt; scenario &gt; descriptor &gt; default</span>
+        <span class="chip">KnobValue(value, source)</span><span class="chip">deep channel (region_distributions)</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane">
+      <div class="lane-label"><b>L2 · Seeding</b><span>§3</span></div>
+      <div class="chips">
+        <span class="chip">SeedSequence(seed, spawn_key=SHA-256(node))</span>
+        <span class="chip">rng_for_node()</span><span class="chip">rng_for_car()</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane alt">
+      <div class="lane-label"><b>L3 · DAG sampling</b><span>§4–5 · randomness lives here</span></div>
+      <div class="chips">
+        <span class="chip">T1 roots: C A S O T U F X</span>
+        <span class="chip">T1.5: A_user A_fleet</span>
+        <span class="chip">T2: L_flex L_inflex f_arr f_dwell f_soc PV_gen</span>
+        <span class="chip">T3: 10 renderers</span>
+        <span class="chip warm">EnergyPlus subprocess</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane">
+      <div class="lane-label"><b>L4 · Output noise</b><span>§6</span></div>
+      <div class="chips">
+        <span class="chip">apply_noise()</span><span class="chip">8 jitter channels</span>
+        <span class="chip">post-jitter D5 enforcement</span><span class="chip">clean → no-op</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane">
+      <div class="lane-label"><b>L5 · Feasibility + validation</b><span>§7</span></div>
+      <div class="chips">
+        <span class="chip">E5 concurrency check</span><span class="chip">invariants A–I</span>
+        <span class="chip">soft checks S / F4 / F5</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane final">
+      <div class="lane-label"><b>L6 · Persistence</b><span>§8</span></div>
+      <div class="chips">
+        <span class="chip out">10 native CSVs</span><span class="chip out">manifest.json (provenance)</span>
+        <span class="chip out">optimus export (12 CSVs)</span>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+    <div class="lane">
+      <div class="lane-label"><b>L7 · Orchestration</b><span>§9 · wraps L0–L6</span></div>
+      <div class="chips">
+        <span class="chip">batch (months × samples)</span><span class="chip">generate-multi (N buildings)</span>
+        <span class="chip">multi-batch (buildings × months × samples)</span>
+        <span class="chip warm">per-sample weather realization → L0</span>
+        <span class="chip">web tool</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="take"><b>The one non-obvious arrow:</b> the input-side <em>weather realization</em> layer belongs to
+  orchestration (L7) but injects into L0 — each (sample) draws per-building offsets
+  (<code>weather_temp_offset_c</code>, <code>weather_solar_scale</code>, <code>weather_dewpoint_offset_c</code>,
+  <code>weather_wind_scale</code>) that perturb the EPW <em>before</em> EnergyPlus runs. It is entirely distinct from
+  the output-side noise layer (L4) — see §6.</div>
+</section>
+
+<!-- ══════════════════════════ 1 INPUTS ══════════════════════════ -->
+<section id="inputs">
+  <h2><span class="stage">§1</span>Inputs — explicit and hidden</h2>
+
+  <h3>1a · Explicit inputs <span class="tag explicit">user-facing</span></h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Input</th><th>What it is</th><th>How it influences generation</th></tr></thead>
+    <tbody>
+      <tr><td><code>scenario_id</code></td><td>One of 60 YAMLs in <code>configs/scenarios/</code> naming 4 required descriptors (<code>location</code>, <code>building</code>, <code>population</code>, <code>equipment</code>) + optional <code>noise</code>, + optional <code>overrides</code> map.</td><td>Sole declarative entry point; everything else expands from it. <code>S01</code> = canonical default (Nashville medium office, CONSENT population, balanced chargers, clean noise), with <em>empty</em> overrides by design.</td></tr>
+      <tr><td><code>seed</code></td><td>One integer.</td><td>Root entropy of every RNG sub-stream (§3). Same (scenario, seed) ⇒ byte-identical CSVs.</td></tr>
+      <tr><td><code>--override bucket.knob=value</code></td><td>Repeatable CLI knob overrides (YAML-parsed).</td><td>Highest priority in the resolution chain (§2); recorded in manifest as <code>source: explicit</code>.</td></tr>
+      <tr><td>descriptor: <b>location</b> (9 entries)</td><td>City + TMYx weather station + full tariff bundle.</td><td>→ 8 knobs: climate label, <code>tmyx_station</code> (drives EnergyPlus + PV weather), tariff type, peak/off-peak $/kWh, peak window, demand charge, DR program.</td></tr>
+      <tr><td>descriptor: <b>building</b> (6 entries)</td><td>DOE archetype + size + occupancy source + design peak.</td><td>→ 4 knobs: <code>archetype</code>, <code>size</code> (jointly select the prototype IDF), <code>occupancy_source</code>, <code>peak_kw</code>. Carries a loose <code>default_population</code> hint (D21).</td></tr>
+      <tr><td>descriptor: <b>population</b> (13 entries)</td><td>Behavioral cohort: axes grid over (φ, κ, δ), negotiation mix, fleet spec, and — when calibrated — fitted <code>region_distributions</code>.</td><td>→ 8 registry knobs + the entire deep channel. <code>calibration_policy</code> stamps provenance: <code>synthetic</code> (hand-authored) vs <code>acn_data</code> / <code>evwatts</code> / <code>inl_ev_project</code> / <code>elaadnl_open_2020</code> (fitted).</td></tr>
+      <tr><td>descriptor: <b>equipment</b> (6 entries)</td><td>Charger fleet: count, bidirectional fraction, rates.</td><td>→ 4 knobs. Rates gate the D5 reachability rejection in sessions; count gates E5 concurrency.</td></tr>
+      <tr><td>descriptor: <b>noise</b> (6 profiles)</td><td>Output-side measurement-noise preset.</td><td>→ 9 <code>noise.*</code> knobs (§6). <code>clean</code> ⇒ all zero ⇒ deterministic outputs.</td></tr>
+      <tr><td><code>sim_window.*</code></td><td><code>mode</code> ∈ month / full_year / custom, <code>start</code>, <code>custom_end</code>, <code>weekdays_only</code>.</td><td>Sets the datetime grid of every timeseries and the day loop of sessions. <code>weekdays_only=true</code> (default) hard-zeroes weekend sessions.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1b · Hidden / static inputs <span class="tag hidden-input">baked in</span></h3>
+  <p class="lead">These never appear in a scenario YAML but shape every run. Changing any of them changes outputs.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Hidden input</th><th>Where</th><th>Content &amp; influence</th></tr></thead>
+    <tbody>
+      <tr><td>TMYx EPW weather files</td><td><code>data/stations/</code> (auto-downloaded from climate.onebuilding.org, cached; <code>$V2B_WEATHER_CACHE</code>)</td><td>Hourly dry-bulb, dew-point, GHI/DNI/DHI, wind for the 9 supported stations. The typical-year weather that EnergyPlus simulates and PV transposes. Perturbation knobs modify it in-memory before both.</td></tr>
+      <tr><td>DOE prototype IDF models</td><td><code>src/v2b_syndata/load_pipeline/data/prototypes/</code></td><td>ASHRAE 90.1-2019 PNNL prototypes (Denver CZ 5B): OfficeSmall / OfficeMedium / OfficeLarge / RetailStripmall / RetailStandalone. <code>mixed</code> = 50/50 office+retail composite (two runs, averaged). The entire physics of the building lives here.</td></tr>
+      <tr><td>ASHRAE occupancy schedules</td><td>hard-coded in <code>samplers/load.py</code></td><td>24-hour weekday/weekend occupancy-fraction arrays per <code>occupancy_source</code> (office: day-peaking, weekend ≈ 0; retail: evening-peaking, weekend active; mixed: composite). Injected into the IDF's <code>BLDG_OCC_SCH*</code> schedules — modulates internal gains only; <b>sessions are population-driven, not occupancy-driven</b>.</td></tr>
+      <tr><td>EV battery classes</td><td><code>BATTERY_SPECS</code> in <code>samplers/per_entity.py</code></td><td><code>leaf_24</code> 24 kWh · <code>bolt_40</code> 40 kWh · <code>m3_75</code> 75 kWh · <code>rivian_100</code> 100 kWh (native SoC 10–100%, overridden fleet-wide by <code>min/max_allowed_soc</code> knobs, defaults 10/90). Capacity feeds the D5 energy budget.</td></tr>
+      <tr><td>CONSENT negotiation clusters</td><td><code>CONSENT_CLUSTERS</code> in <code>per_entity.py</code> (n=28 survey)</td><td>Per-type (w1, w2) means/stds: type_i (.0489/.1250), type_ii (.0133/.0346), type_iii (.0362/.0673), type_iv (0/.1083). Drawn normal, clipped ≥ 0, scaled by <code>w_multiplier</code>.</td></tr>
+      <tr><td>DER catalog</td><td><code>der_catalog.py</code></td><td>PV presets (DC kW): rooftop_small 30 · rooftop_medium 100 · rooftop_large 250 · rooftop_xl 600 · carport 200. Module params: standard −0.35%/°C·NOCT 45 / premium −0.30·44 / thin_film −0.25·47. Battery presets: lfp_2h 200 kWh·100 kW·η.90 / lfp_4h 400·100·.90 / nmc_2h 200·100·.92 / nmc_4h 400·100·.92.</td></tr>
+      <tr><td>DR program constants</td><td><code>PROGRAM_SPECS</code> in <code>samplers/dr_sampler.py</code></td><td>CBP: May–Oct, 24 h notice, 4 h events, ≤6/mo, 50–200 kW · BIP: year-round, 2 h, ≤4/mo, 100–500 kW · ELRP: May–Oct, 2 h, ≤10/mo &amp; ≤10/season, 50–300 kW. Plus λ-modulation: weekday 3:1, temperature ramp (0.1 below 80 °F → 3.0 above 100 °F), time-of-day peak 15–17 h, zero outside 12–20 h (D63: λ in events/hour).</td></tr>
+      <tr><td><code>DEFAULT_SIM_START</code></td><td><code>runner.py</code></td><td><code>datetime(2020, 4, 1)</code> — the anchor when <code>sim_window.start</code> is null (DESIGN_NOTES §1).</td></tr>
+      <tr><td>EnergyPlus 23.2 binary</td><td>discovered via <code>ep_runner.discover_energyplus()</code></td><td>External simulator; <b>no silent stub fallback in production</b> (raises <code>EnergyPlusBinaryNotFound</code>). Tests stub it via conftest.</td></tr>
+      <tr><td>Calibration fits</td><td><code>region_distributions</code> blocks inside <code>configs/populations.yaml</code></td><td>Written by <code>cli calibrate</code> from real charging logs (ACN 2019–21 n=646 users; EV WATTS 1.36 M workplace sessions; INL; ElaadNL Utrecht). Per region: arrival TruncNorm(±mixture), dwell Weibull(±mixture), SoC Betas, Gaussian-copula ρ. <b>SoC is never recorded by any charger</b> — always a modeled prior reconstructed from kWh delivered/requested.</td></tr>
+      <tr><td>Generator identity</td><td>git SHA + <code>__version__</code></td><td>Stamped into every manifest for provenance (<code>generator_git_sha</code>, <code>generator_version</code>).</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ══════════════════════════ 2 RESOLUTION ══════════════════════════ -->
+<section id="resolution">
+  <h2><span class="stage">§2</span>Layer 1 — Descriptor expansion &amp; knob resolution</h2>
+
+  <p class="lead">Everything the DAG consumes is a <b>knob</b>: a typed, ranged, defaulted value in a flat
+  <code>bucket.name</code> namespace. Resolution happens once, up front, and every resolved value remembers where it came from.</p>
+
+  <h3>Priority chain</h3>
+  <p class="kbd-chain">CLI --override &nbsp;≻&nbsp; scenario YAML overrides &nbsp;≻&nbsp; descriptor expansion &nbsp;≻&nbsp; knobs.yaml default</p>
+  <p>Each resolved knob is a <code>KnobValue(value, source)</code>; source ∈ <code>explicit</code> ·
+  <code>descriptor:&lt;name&gt;</code> · <code>calibration:&lt;provenance&gt;</code> ·
+  <code>hand_specified:&lt;population&gt;</code> · <code>default</code> — all recorded in the manifest's <code>knob_resolution</code>.</p>
+
+  <h3>Two channels</h3>
+  <div class="grid2">
+    <div class="panel"><h4>Registry channel</h4>
+      <ul><li>Paths declared in <code>configs/knobs.yaml</code> (the 69 knobs below).</li>
+      <li>Typed: int / float / bool / categorical / simplex / vec2 / list / path / timestamp, each with range or choices.</li></ul></div>
+    <div class="panel"><h4>Deep channel</h4>
+      <ul><li><code>user_behavior.region_distributions.&lt;region&gt;.&lt;dist&gt;.&lt;param&gt;</code> leaves (calibrated fits).</li>
+      <li>Validated against <code>DIST_PARAM_RANGES</code> (e.g. arrival.mu ∈ [4, 22], dwell.lambda ∈ [0.01, 24]); out-of-range ⇒ <code>KnobValidationError</code>. Metadata leaves (n_samples, ks_fit_quality) are filtered out, not knobs.</li></ul></div>
+  </div>
+
+  <h3>What each descriptor expands into</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Descriptor</th><th class="num">Knobs</th><th>Expansion</th></tr></thead>
+    <tbody>
+      <tr><td><b>location</b></td><td class="num">8</td><td><code>building_load.climate/.tmyx_station</code> + <code>utility_rate.tariff_type/.energy_price_offpeak/.energy_price_peak/.peak_window/.demand_charge_per_kw/.dr_program</code></td></tr>
+      <tr><td><b>building</b></td><td class="num">4</td><td><code>building_load.archetype/.size/.occupancy_source/.peak_kw</code></td></tr>
+      <tr><td><b>population</b></td><td class="num">8 + deep</td><td><code>user_behavior.axes_distribution/.negotiation_mix/.w_multiplier/.weekend_activity_factor</code> + <code>ev_fleet.ev_count/.battery_mix/.battery_heterogeneity</code> + every <code>region_distributions</code> leaf</td></tr>
+      <tr><td><b>equipment</b></td><td class="num">4</td><td><code>charging_infra.charger_count/.directionality_frac/.uni_rate_kw/.bi_rate_kw</code></td></tr>
+      <tr><td><b>noise</b></td><td class="num">9</td><td><code>noise.profile</code> + the 8 jitter knobs (§6)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The full knob registry — 9 buckets, 69 knobs</h3>
+
+  <details open><summary>ev_fleet (6)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>ev_count</code></td><td>int [1, 1000]</td><td class="num">20</td><td>Number of EVs → rows of cars/users, session volume.</td></tr>
+    <tr><td><code>battery_mix</code></td><td>simplex over 4 classes</td><td class="num">[.20, .30, .40, .10]</td><td>Class shares (leaf_24/bolt_40/m3_75/rivian_100). Capacity → D5 budget.</td></tr>
+    <tr><td><code>battery_heterogeneity</code></td><td>homog | mixed</td><td>mixed</td><td>Per-car class draw vs single modal class.</td></tr>
+    <tr><td><code>battery_mix_dirichlet_alpha</code></td><td>float [1, 1e6]</td><td class="num">1e6</td><td>Per-sample Dirichlet jitter on the mix; 1e6 ≈ off (bitwise); batch mode uses 30.</td></tr>
+    <tr><td><code>min_allowed_soc</code></td><td>float [0, 100]</td><td class="num">10</td><td>Fleet-wide SoC floor (%), overrides class native.</td></tr>
+    <tr><td><code>max_allowed_soc</code></td><td>float [0, 100]</td><td class="num">90</td><td>Fleet-wide SoC ceiling; caps required-SoC and arrival band.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>charging_infra (4)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>charger_count</code></td><td>int [1, 500]</td><td class="num">20</td><td>Rows of chargers.csv; E5 concurrency cap.</td></tr>
+    <tr><td><code>directionality_frac</code></td><td>float [0, 1]</td><td class="num">0.50</td><td>Share bidirectional (min_rate = −max_rate).</td></tr>
+    <tr><td><code>uni_rate_kw</code></td><td>float [3.3, 350]</td><td class="num">20</td><td>Uni max kW; gates D5 reachability.</td></tr>
+    <tr><td><code>bi_rate_kw</code></td><td>float [3.3, 350]</td><td class="num">20</td><td>Bi symmetric ± kW; same D5 coupling.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>user_behavior (10 + deep channel)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>axes_distribution</code></td><td>list of region boxes</td><td>5-region grid</td><td>Weighted boxes over (φ freq, κ consistency, δ km): stable_commuter .35, flexible_local .25, irregular_distant .20, occasional_visitor .10, erratic .10. Per-user values ~ Uniform within the assigned box.</td></tr>
+    <tr><td><code>negotiation_mix</code></td><td>simplex over 4 types</td><td class="num">[.107, .536, .321, .036]</td><td>CONSENT empirical type shares (n=28).</td></tr>
+    <tr><td><code>w_multiplier</code></td><td>vec2 [0.1, 5]²</td><td class="num">[1, 1]</td><td>(α_w1, α_w2) global scale on CONSENT weights; E5 sweep lever.</td></tr>
+    <tr><td><code>min_depart_soc</code></td><td>float [0, 1]</td><td class="num">0.40</td><td>Behavioral floor on required departure SoC — synthetic populations only; calibrated cohorts set 0 so the fitted soc_depart Beta is unclamped.</td></tr>
+    <tr><td><code>depart_soc_mu</code> / <code>depart_soc_sigma</code></td><td>float</td><td class="num">50 / 5</td><td>Fallback TruncNorm for required SoC when no calibrated soc_depart exists.</td></tr>
+    <tr><td><code>weekend_activity_factor</code></td><td>float [0, 5]</td><td class="num">1.0</td><td>Weekend appearance rate ×φ; inert unless <code>sim_window.weekdays_only=false</code>.</td></tr>
+    <tr><td><code>axes_distribution_dirichlet_alpha</code></td><td>float [1, 1e6]</td><td class="num">1e6</td><td>Per-sample region-weight jitter; 1e6 ≈ off; batch uses 30.</td></tr>
+    <tr><td><code>external_charge_cost</code></td><td>float [0.10, 1.00]</td><td class="num">0.30</td><td>Outside-option $/kWh (CONSENT); consumed downstream, not rendered.</td></tr>
+    <tr><td><code>menu_levels</code></td><td>list of vec2</td><td>4 levels</td><td>(Δe_max, Δt_max_min) per negotiation level, for ψ canonical-menu computation.</td></tr>
+    <tr><td><code>region_distributions.*</code></td><td>deep channel</td><td>—</td><td>Calibrated per-region arrival/dwell/soc/copula parameters (§5b).</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>building_load (11)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>climate</code></td><td>categorical</td><td>temperate</td><td>Display label only (manifest/UI); real weather = tmyx_station (D37).</td></tr>
+    <tr><td><code>tmyx_station</code></td><td>path</td><td>Nashville 723270</td><td>The EPW EnergyPlus + PV consume.</td></tr>
+    <tr><td><code>weather_temp_offset_c</code></td><td>float [−15, 15]</td><td class="num">0</td><td>Additive °C on dry-bulb — EPW + exported weather_data.csv together.</td></tr>
+    <tr><td><code>weather_solar_scale</code></td><td>float [0.5, 1.5]</td><td class="num">1.0</td><td>× GHI/DNI/DHI.</td></tr>
+    <tr><td><code>weather_dewpoint_offset_c</code></td><td>float [−15, 15]</td><td class="num">0</td><td>Additive °C on dew-point; RH recomputed (Magnus) for consistency.</td></tr>
+    <tr><td><code>weather_wind_scale</code></td><td>float [0, 3]</td><td class="num">1.0</td><td>× wind speed (infiltration driver).</td></tr>
+    <tr><td><code>archetype</code> / <code>size</code></td><td>categorical</td><td>office / med</td><td>Select the DOE prototype IDF.</td></tr>
+    <tr><td><code>occupancy_source</code></td><td>categorical</td><td>ashrae_90_1_office</td><td>Occupancy schedule injected into the IDF (internal gains only).</td></tr>
+    <tr><td><code>peak_kw</code></td><td>float [50, 5000]</td><td class="num">500</td><td>Target peak when scaling on.</td></tr>
+    <tr><td><code>peak_kw_scaling</code></td><td>bool</td><td>true</td><td>true: rescale so max(power_kw) == peak_kw exactly (cross-scenario comparability; peak identical across samples). false: raw EnergyPlus magnitudes, weather-driven peaks.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>utility_rate (10)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>tariff_type</code></td><td>flat | TOU | demand_charge | DR</td><td>TOU</td><td>Price schema of grid_prices.csv (DR <em>events</em> gated by dr_program, not this).</td></tr>
+    <tr><td><code>energy_price_offpeak</code> / <code>energy_price_peak</code></td><td>float</td><td class="num">.137 / .178</td><td>$/kWh (SVP commercial defaults).</td></tr>
+    <tr><td><code>peak_window</code></td><td>vec2 hours</td><td class="num">[6, 22]</td><td>Peak-price hours.</td></tr>
+    <tr><td><code>demand_charge_per_kw</code></td><td>float [0, 50]</td><td class="num">11.67</td><td>$/kW·mo — consumed by simulators, not rendered.</td></tr>
+    <tr><td><code>dr_program</code></td><td>none | CBP | BIP | ELRP</td><td>none</td><td>Enables DR event sampling; sets lead time, season, caps.</td></tr>
+    <tr><td><code>dr_magnitude_kw_range</code></td><td>vec2</td><td class="num">[50, 200]</td><td>Per-event magnitude sampling range.</td></tr>
+    <tr><td><code>dr_lambda_base</code></td><td>float [0, 10]</td><td class="num">0.05</td><td>Baseline Poisson rate, events/hour (D63), before seasonal/temp/dow/tod modulation.</td></tr>
+    <tr><td><code>dr_incentive_per_kw</code> / <code>dr_penalty_per_kwh</code></td><td>float [0, 100]</td><td class="num">1 / 1</td><td>Consumed by the optimus export (dso_commands), not the single-building generator.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>sim_window (4)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>mode</code></td><td>month | full_year | custom</td><td>month</td><td>month: snap anchor to day 1, run to end-of-month · full_year: Jan 1 → Jan 1+1y · custom: literal start/end.</td></tr>
+    <tr><td><code>weekdays_only</code></td><td>bool</td><td>true</td><td>Hard-zero weekend sessions (synthetic 5-day week); calibrated cohorts set false.</td></tr>
+    <tr><td><code>start</code> / <code>custom_end</code></td><td>timestamp</td><td>null</td><td>Window anchor / custom end. Null start → DEFAULT_SIM_START 2020-04-01.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>noise (9)</summary><div class="inner"><p class="muted">Profile + the 8 jitter channels — full semantics in §6.</p></div></details>
+
+  <details open><summary>pv (8)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>pv_type</code></td><td>none + 5 presets</td><td>none</td><td>On/off + sizing (30/100/250/600/200 kW DC). Anything ≠ none enables PV.</td></tr>
+    <tr><td><code>dc_capacity_kw</code></td><td>float [0, 5000]</td><td class="num">0</td><td>&gt;0 overrides the preset. ac = dc / dc_ac_ratio.</td></tr>
+    <tr><td><code>module_type</code></td><td>standard | premium | thin_film</td><td>standard</td><td>Temperature coefficient + NOCT.</td></tr>
+    <tr><td><code>dc_ac_ratio</code></td><td>float [1.0, 1.6]</td><td class="num">1.2</td><td>Inverter loading; midday clipping.</td></tr>
+    <tr><td><code>tilt_deg</code> / <code>azimuth_deg</code></td><td>float</td><td class="num">10 / 180</td><td>Array geometry (ballasted flat roof, due south).</td></tr>
+    <tr><td><code>system_derate</code></td><td>float [0.5, 1.0]</td><td class="num">0.86</td><td>PVWatts total DC→AC losses.</td></tr>
+    <tr><td><code>albedo</code></td><td>float [0, 0.9]</td><td class="num">0.2</td><td>Ground-reflected POA term.</td></tr>
+  </tbody></table></div></div></details>
+
+  <details open><summary>battery (7)</summary><div class="inner"><div class="tablewrap"><table>
+    <thead><tr><th>Knob</th><th>Type / range</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+    <tr><td><code>battery_type</code></td><td>none + 4 presets</td><td>none</td><td>On/off + sizing (lfp/nmc × 2h/4h). Specs only — <b>no dispatch schedule</b> (dispatch is a downstream control decision).</td></tr>
+    <tr><td><code>capacity_kwh</code> / <code>power_kw</code></td><td>float</td><td class="num">0 / 0</td><td>&gt;0 overrides preset.</td></tr>
+    <tr><td><code>round_trip_efficiency</code></td><td>float [0.5, 1]</td><td class="num">0.9</td><td>AC-AC (LFP ≈ .90, NMC ≈ .92).</td></tr>
+    <tr><td><code>min_soc_pct</code> / <code>max_soc_pct</code> / <code>initial_soc_pct</code></td><td>float [0, 100]</td><td class="num">10 / 95 / 50</td><td>Cycling window + initial state.</td></tr>
+  </tbody></table></div></div></details>
+</section>
+
+<!-- ══════════════════════════ 3 SEEDING ══════════════════════════ -->
+<section id="seeding">
+  <h2><span class="stage">§3</span>Layer 2 — Seeding: hash-keyed, order-independent randomness</h2>
+  <p class="lead">Every random draw in the pipeline comes from a named sub-stream derived from the single seed —
+  keyed by a <b>SHA-256 hash of the node name</b>, never by spawn order.</p>
+  <pre><code>stable_int(name)  = int.from_bytes(SHA256(name)[:4], "big")
+node stream       = default_rng(SeedSequence(entropy=seed, spawn_key=(stable_int(node),)))
+per-car stream    = default_rng(SeedSequence(entropy=seed, spawn_key=(stable_int(node), car_id)))
+date-keyed stream = rng_for_car(seed, f"sessions:{day.isoformat()}", car_id)   # sessions day loop</code></pre>
+  <ul class="plain">
+    <li><b>Adding a node never shifts existing seeds</b> — hash keys are position-free. (Python's salted <code>hash()</code> is banned.)</li>
+    <li>Auxiliary draws get their own streams (e.g. <code>dirichlet:axes</code>, <code>weather_realization</code>, <code>weather_realization_solar/_dewpoint/_wind</code>) so they can't perturb per-car streams.</li>
+    <li>Rejection sampling consumes RNG deterministically — retries advance the same stream, so results stay bit-stable.</li>
+    <li>Guarded by <code>test_reproducibility.py</code> and <code>test_determinism_stress.py</code>.</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════ 4 DAG ══════════════════════════ -->
+<section id="dag">
+  <h2><span class="stage">§4</span>Layer 3 — The sampling DAG (27 nodes, 4 tiers)</h2>
+  <p class="lead"><code>dag.py::NODE_TOPOLOGY</code> declares every node and its parents; the graph is validated acyclic
+  and executed in <code>lexicographical_topological_sort</code> order. Tier 1 roots are <b>deterministic knob
+  packers</b> (no RNG); randomness enters at Tier 1.5/2; Tier 3 renders CSVs.</p>
+
+  <h3>Tier 1 — exogenous roots <span class="tag det">deterministic</span></h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Root</th><th>Stands for</th><th>Packs</th></tr></thead><tbody>
+    <tr><td><code>C</code></td><td>Climate</td><td><code>building_load.climate</code> label (weather itself = tmyx_station).</td></tr>
+    <tr><td><code>A</code></td><td>Archetype</td><td>office / retail / mixed → prototype IDF family.</td></tr>
+    <tr><td><code>S</code></td><td>Size</td><td>small / med / large → specific prototype.</td></tr>
+    <tr><td><code>O</code></td><td>Occupancy source</td><td>ASHRAE schedule variant for IDF injection.</td></tr>
+    <tr><td><code>T</code></td><td>Tariff</td><td>All 8 utility_rate fields (prices, window, demand charge, DR program + magnitude + λ).</td></tr>
+    <tr><td><code>U</code></td><td>User behavior</td><td>axes_distribution, negotiation_mix, w_multiplier, min_depart_soc, external_charge_cost, menu_levels + hydrated region_distributions.</td></tr>
+    <tr><td><code>F</code></td><td>Fleet</td><td>ev_count, battery_mix, battery_heterogeneity.</td></tr>
+    <tr><td><code>X</code></td><td>Charging infra</td><td>charger_count, directionality_frac, uni/bi rates.</td></tr>
+  </tbody></table></div>
+
+  <h3>Tiers 1.5 → 3 — full node table</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Node</th><th>Tier</th><th>Parents</th><th>RNG</th><th>Produces</th></tr></thead><tbody>
+    <tr><td><code>A_user</code></td><td>1.5</td><td>U</td><td><span class="tag rng">per-car</span></td><td>Per car: region (weighted, optionally Dirichlet-jittered), φ·κ·δ ~ Uniform(region box), negotiation type ~ Categorical(mix), (w1, w2) ~ clipped Normal(CONSENT cluster) × w_multiplier.</td></tr>
+    <tr><td><code>A_fleet</code></td><td>1.5</td><td>F</td><td><span class="tag rng">per-car</span></td><td>Per car: battery class ~ Categorical(mix) (or modal if homog), capacity + SoC bounds from BATTERY_SPECS ∩ fleet-wide knob overrides.</td></tr>
+    <tr><td><code>L_flex</code></td><td>2</td><td>A, S, O</td><td><span class="tag det">EnergyPlus</span></td><td>15-min flexible kW: Cooling + Heating + Fans + WaterSystems meters (§5a). Optional post-sim jitter knob.</td></tr>
+    <tr><td><code>L_inflex</code></td><td>2</td><td>A, S, O</td><td><span class="tag det">EnergyPlus</span></td><td>15-min inflexible kW: Interior/Exterior Lights + Interior/Exterior Equipment.</td></tr>
+    <tr><td><code>f_arr</code></td><td>2</td><td>A_user</td><td><span class="tag det">params</span></td><td>Per-car arrival-hour distribution: TruncNorm(μ 8.5, σ 2(1−κ)) fallback or calibrated (±2-component mixture), truncation window [6, 20] legacy / [4, 22] calibrated.</td></tr>
+    <tr><td><code>f_dwell</code></td><td>2</td><td>A_user</td><td><span class="tag det">params</span></td><td>Per-car dwell distribution: Weibull(k 2.0, λ 8(0.5+φ)) fallback or calibrated (±mixture), clip [0.5, 14] h, plus copula ρ.</td></tr>
+    <tr><td><code>f_soc</code></td><td>2</td><td>A_user</td><td><span class="tag det">params</span></td><td>Per-car arrival-SoC Beta(4, 6) shifted −0.003·δ, clipped to the car's SoC band; plus soc_depart Beta or TruncNorm fallback.</td></tr>
+    <tr><td><code>PV_gen</code></td><td>2</td><td>X</td><td><span class="tag det">physics</span></td><td>15-min AC PV series from the <em>same perturbed weather</em> as building load (§5c). All-zeros when pv off (no weather I/O — preserves bitwise contract).</td></tr>
+    <tr><td><code>chargers.csv</code></td><td>3</td><td>X</td><td><span class="tag det">—</span></td><td>Charger catalog.</td></tr>
+    <tr><td><code>grid_prices.csv</code></td><td>3</td><td>T</td><td><span class="tag det">—</span></td><td>15-min tariff series (peak/off-peak per window).</td></tr>
+    <tr><td><code>dr_events.csv</code></td><td>3</td><td>T, C, building_load</td><td><span class="tag rng">Poisson</span></td><td>DR events via thinned inhomogeneous Poisson (§5d).</td></tr>
+    <tr><td><code>users.csv</code></td><td>3</td><td>A_user</td><td><span class="tag det">—</span></td><td>Driver profiles.</td></tr>
+    <tr><td><code>cars.csv</code></td><td>3</td><td>A_fleet</td><td><span class="tag det">—</span></td><td>Fleet specs.</td></tr>
+    <tr><td><code>building_load.csv</code></td><td>3</td><td>L_flex, L_inflex</td><td><span class="tag det">—</span></td><td>Load table; peak scaling applied here.</td></tr>
+    <tr><td><code>sessions.csv</code></td><td>3</td><td>f_arr, f_dwell, f_soc, A_user, A_fleet, X, building_load</td><td><span class="tag rng">per-car·day</span></td><td>Charging sessions via 5-constraint atomic rejection (§5b).</td></tr>
+    <tr><td><code>pv_generation.csv</code> / <code>pv.csv</code></td><td>3</td><td>PV_gen</td><td><span class="tag det">—</span></td><td>PV timeseries / spec row.</td></tr>
+    <tr><td><code>battery.csv</code></td><td>3</td><td>X</td><td><span class="tag det">—</span></td><td>Stationary battery spec row (no dispatch).</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- ══════════════════════════ 5 SUBSYSTEMS ══════════════════════════ -->
+<section id="subsystems">
+  <h2><span class="stage">§5</span>Subsystem deep dives</h2>
+
+  <h3 id="s5a">5a · Building load — the EnergyPlus pipeline</h3>
+  <ol class="steps">
+    <li><b>Prototype:</b> (archetype, size) → ASHRAE 90.1-2019 PNNL Denver-CZ5B IDF (OfficeSmall / OfficeMedium / OfficeLarge / RetailStripmall / RetailStandalone); <code>mixed</code> = office + retail runs averaged 50/50.</li>
+    <li><b>Occupancy injection:</b> the chosen <code>ashrae_90_1_*</code> weekly schedule replaces the IDF's <code>BLDG_OCC_SCH*</code> objects (weekday day-peaking office / evening retail; office weekends ≈ 0).</li>
+    <li><b>Weather:</b> EPW for <code>tmyx_station</code> (auto-downloaded, cached) perturbed in-memory: +temp offset, ×solar scale, +dew-point offset (RH recomputed via Magnus), ×wind scale. The <em>same</em> perturbed frame is exported to <code>weather_data.csv</code> and fed to PV — load, PV and exported weather can never disagree.</li>
+    <li><b>Simulation:</b> RunPeriod = sim window year, Timestep 4 (15-min), 8 end-use meters → <code>eplusmtr.csv</code> in joules.</li>
+    <li><b>Parsing:</b> kW = J / 900 000; <b>flex</b> = Cooling + Heating + Fans + WaterSystems, <b>inflex</b> = Interior/Exterior Lights + Interior/Exterior Equipment; reindexed to the canonical 15-min grid.</li>
+    <li><b>Peak scaling:</b> if <code>peak_kw_scaling</code> (default), flex+inflex rescaled so max(total) = <code>peak_kw</code> exactly; else raw magnitudes (weather-driven peaks).</li>
+  </ol>
+
+  <h3 id="s5b">5b · Sessions — distributions, copula, and the 5-constraint rejection</h3>
+  <p>Per car, per day (weekdays, unless <code>weekdays_only=false</code>): appear with prob. φ (weekends: φ × weekend_activity_factor). On appearance, draw a session with up to <b>5 retries</b>, each attempt atomic:</p>
+  <div class="grid2">
+    <div class="panel"><h4>Draws</h4><ul>
+      <li><b>Arrival</b>: TruncNorm (or 2-comp mixture) via inverse-CDF on a copula uniform.</li>
+      <li><b>Dwell</b>: Weibull (or mixture), clipped; shares a Gaussian-copula pair with arrival when ρ ≥ 1e-9 (ρ fixed per car before the day loop — C4 region-stable).</li>
+      <li><b>Arrival SoC</b>: shifted, clipped Beta.</li>
+      <li><b>Required SoC</b>: calibrated Beta or TruncNorm(85, 5) fallback, floored at max(min_depart_soc, arrival + 0.01) and capped at max_allowed_soc.</li>
+    </ul></div>
+    <div class="panel"><h4>Reject if any of</h4><ul>
+      <li><b>C12</b> — departure crosses midnight (no overnight).</li>
+      <li><b>Time bounds</b> — outside the sim grid.</li>
+      <li><b>Non-overlap</b> — collides with the car's prior session.</li>
+      <li><b>D6</b> — required ≤ arrival (structural floor).</li>
+      <li><b>D5</b> — energy unreachable: (required−arrival)/100 × capacity &gt; max_rate × dwell.</li>
+    </ul><p class="muted">All retries exhausted, or floor ≥ ceiling (arrived too charged) → the car-day is dropped. Enforcement by <b>rejection, not clamping</b> (DESIGN_NOTES §4).</p></div>
+  </div>
+
+  <h3 id="s5c">5c · PV — PVWatts v5 on the same weather</h3>
+  <ol class="steps">
+    <li>Resolve spec from <code>der_catalog</code> (preset or explicit kW); <code>pv_type: none</code> ⇒ all-zero series, zero I/O.</li>
+    <li>Hourly perturbed EPW → 15-min grid (forward-fill); solar geometry evaluated at each tick's <b>midpoint</b> (+7.5 min).</li>
+    <li>Isotropic transposition: POA = beam + sky-diffuse (1+cos β)/2 + ground-reflected · albedo (1−cos β)/2.</li>
+    <li>Cell temp (NOCT): T<sub>cell</sub> = T<sub>db</sub> + (POA/800)(NOCT−20); DC = dc_kW · (POA/1000)(1 + γ(T<sub>cell</sub>−25)); AC = min(DC · derate, ac_kW).</li>
+  </ol>
+  <p class="muted">Pure deterministic physics — no RNG. PV varies across samples only through the weather realization.</p>
+
+  <h3 id="s5d">5d · Grid prices &amp; DR events</h3>
+  <ul class="plain">
+    <li><b>grid_prices.csv</b>: 15-min series from the tariff bundle — flat (single price, all off-peak) or TOU (peak price inside <code>peak_window</code> hours). Deterministic.</li>
+    <li><b>dr_events.csv</b>: Lewis-thinned inhomogeneous Poisson. λ(t) = <code>dr_lambda_base</code> (events/hour, D63) × seasonal gate × weekday 3:1 × temperature ramp (0.1 below 80 °F → 3.0 above 100 °F, driven by the EPW's daily max dry-bulb) × time-of-day (peak 15–17 h, zero outside 12–20 h), capped by program monthly/seasonal maxima. Magnitude ~ U(dr_magnitude_kw_range); notification lead: CBP 24 h, BIP/ELRP 2 h. <code>dr_program: none</code> ⇒ empty file.</li>
+  </ul>
+
+  <h3 id="s5e">5e · Stationary battery</h3>
+  <p>Specs-only row (capacity, power, η, SoC window, initial SoC) from preset or explicit knobs. <b>Deliberately no dispatch schedule</b> — dispatch is endogenous to the downstream V2B optimization, not exogenous data (PROJECT_TRACKER 2026-06-29 decision).</p>
+</section>
+
+<!-- ══════════════════════════ 6 NOISE ══════════════════════════ -->
+<section id="noise">
+  <h2><span class="stage">§6</span>Layer 4 — Output noise (and how it differs from weather)</h2>
+
+  <div class="grid2">
+    <div class="panel"><h4>Weather layer — input-side</h4>
+      <ul><li>Perturbs the EPW <em>before</em> EnergyPlus/PV; exported weather matches.</li>
+      <li>Physically faithful: load stays exactly f(weather).</li>
+      <li>Presets (<code>weather_profiles.yaml</code>): none · slight (σ 1 °C / 2% solar / 0.5 °C dew / 5% wind) · moderate (2.5 / 5% / 1.5 / 10%) · strong (5 / 10% / 3 / 20%).</li>
+      <li>Never violates validation — variance is upstream of all constraints.</li></ul></div>
+    <div class="panel"><h4>Noise layer — output-side</h4>
+      <ul><li>Perturbs the <em>rendered CSVs</em> after generation (measurement noise).</li>
+      <li>Can push sessions past constraints enforced during sampling → D5 flags.</li>
+      <li>Presets (<code>noise_profiles.yaml</code>): clean · light_noise · realistic_noise · adversarial · tmyx_stochastic · custom.</li></ul></div>
+  </div>
+
+  <h3>The 8 jitter channels × 5 non-custom profiles</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Channel (target)</th><th class="num">clean</th><th class="num">light</th><th class="num">realistic</th><th class="num">adversarial</th><th class="num">tmyx_stochastic</th></tr></thead>
+    <tbody>
+      <tr><td><code>building_load_jitter_pct</code> (power)</td><td class="num">0</td><td class="num">.02</td><td class="num">.05</td><td class="num">.15</td><td class="num">.05</td></tr>
+      <tr><td><code>arrival_time_jitter_min</code> (sessions)</td><td class="num">0</td><td class="num">5</td><td class="num">15</td><td class="num">45</td><td class="num">5</td></tr>
+      <tr><td><code>soc_arrival_jitter_pct</code> (sessions)</td><td class="num">0</td><td class="num">.03</td><td class="num">.08</td><td class="num">.20</td><td class="num">.03</td></tr>
+      <tr><td><code>dr_notification_dropout_prob</code> (dr_events)</td><td class="num">0</td><td class="num">0</td><td class="num">.02</td><td class="num">.10</td><td class="num">0</td></tr>
+      <tr><td><code>price_jitter_pct</code> (grid_prices)</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">.05</td><td class="num">0</td></tr>
+      <tr><td><code>occupancy_jitter_pct</code> (inflex load)</td><td class="num">0</td><td class="num">.05</td><td class="num">.10</td><td class="num">.25</td><td class="num">.08</td></tr>
+      <tr><td><code>load_flex_jitter_pct</code> (post-sim flex)</td><td class="num">0</td><td class="num">.05</td><td class="num">.05</td><td class="num">.05</td><td class="num">.05</td></tr>
+      <tr><td><code>load_inflex_jitter_pct</code> (post-sim inflex)</td><td class="num">0</td><td class="num">.03</td><td class="num">.03</td><td class="num">.03</td><td class="num">.03</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Guard rails inside the noise layer</h3>
+  <ul class="plain">
+    <li><b>C4 forward-shift bound</b> — arrival jitter clamped so ≥ 30 min dwell survives and C12 (same-day) holds.</li>
+    <li><b>D6 clamp</b> — jittered arrival SoC clamped to [car min, required − 0.1] so ordering survives.</li>
+    <li><b>Post-jitter D5 enforcement</b> (<code>_enforce_d5_post_jitter</code>) — required SoC truncated to arrival + rate·dwell·1.04 headroom, floored at arrival + 0.01; irreparable sessions dropped; truncation/relaxation/drop counts recorded in <code>manifest.noise.d5_enforcement</code>.</li>
+  </ul>
+
+  <div class="take"><b>Field-proven interaction:</b> even with those guard rails, <code>tmyx_stochastic</code>-class
+  jitter nudges ~50% of multi-sample batch units past the validator's <em>strict</em> D5 envelope (validator headroom 1.0
+  vs enforcement 1.04). For Monte-Carlo batches, the proven recipe is <b><code>noise: clean</code> + a weather profile</b>:
+  full sample diversity (weather re-sim + per-sample seed), zero hard errors — verified at 18,000 units / 0 errors on the campus10 run.</div>
+</section>
+
+<!-- ══════════════════════════ 7 VALIDATION ══════════════════════════ -->
+<section id="validation">
+  <h2><span class="stage">§7</span>Layer 5 — Feasibility &amp; validation</h2>
+
+  <h3>E5 — charger-concurrency feasibility (hybrid enforcement)</h3>
+  <p>Realized max simultaneous sessions vs <code>charger_count</code> on the 15-min grid.
+  Default: <b>warn</b> + record <code>{realized_max_concurrent, n_chargers, infeasible, infeasible_tick_count/fraction}</code>
+  in the manifest; <code>--strict-e5</code>: raise (rc 2). (DESIGN_NOTES §30.)</p>
+
+  <h3>Invariant families A–I <span class="tag hard">hard</span> &nbsp;+ soft checks <span class="tag soft">warn</span></h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Family</th><th>Checks</th></tr></thead>
+    <tbody>
+      <tr><td><b>A</b> Schema</td><td>A1 files exist · A2 exact columns · A3 dtypes parse · A4 no NaN · A5 categorical domains.</td></tr>
+      <tr><td><b>B</b> Referential</td><td>B1 users↔cars id sets equal · B2 sessions.car_id ⊆ cars · B3–B7 id uniqueness (cars, users, sessions, chargers, dr_events).</td></tr>
+      <tr><td><b>C</b> Temporal</td><td>C1/C2 15-min strictly monotone grids · C3 load ∥ prices timestamps · C4 arrival &lt; departure · C5 sessions inside window · C6 duration consistent · C7 per-car non-overlap · C8–C11 DR event ordering, window, program lead · C12 no overnight sessions.</td></tr>
+      <tr><td><b>D</b> Physical / SoC</td><td>D1 SoC bounds sane · D2 capacity &gt; 0 · D3 arrival SoC in band · D4 required SoC in band · <b>D5 reachability (strict envelope: need ≤ max_rate·dwell, headroom 1.0)</b> · D6 required &gt; arrival · D7 required ≥ min_depart_soc (relaxed only when post-jitter d5_enforcement ran).</td></tr>
+      <tr><td><b>E</b> Chargers</td><td>E1–E4 rate-sign conventions (uni min=0; bi min&lt;0, symmetric within 1%) · E5 concurrency (soft at validate time).</td></tr>
+      <tr><td><b>F</b> CONSENT shares</td><td>F1/F2 w1,w2 ≥ 0, finite · F3 cluster means within 2σ (n-aware) · <b>F4 negotiation-type shares</b> and <b>F5 region shares</b>: <span class="tag soft">soft</span> within 3σ-binomial + 0.02 slack — tolerance scales with fleet size (small fleets get wide bands).</td></tr>
+      <tr><td><b>G</b> Behavioral axes</td><td>G1 φ ∈ [0,1] · G2 κ ∈ [0,1] · G3 δ ≥ 0 · G4 (φ,κ,δ) inside the declared region box · G5 calibrated regions ⊆ axes grid (G5b/c soft converse).</td></tr>
+      <tr><td><b>H</b> Tariff / DR</td><td>H1 flat ⇒ single price · H2 TOU window/prices match config · H3/H7 program active but no events (seasonal warns) · H4 none ⇒ no events · H6 magnitudes in range · H8 notification lead per program · H9 monthly/seasonal caps.</td></tr>
+      <tr><td><b>I</b> Manifest</td><td>I1 manifest exists + keys · I2 row counts match files · I3 SHA-256s match files · I4 every knob path is a valid registry/deep entry.</td></tr>
+      <tr><td><b>S</b> Soft</td><td>S2 per-region KS distance vs the calibration fit quality · S3 aggregate energy-balance sanity.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted"><code>cli generate</code> auto-validates (result recorded in the manifest; only strict mode raises);
+  <code>cli validate &lt;dir&gt;</code> re-runs the suite on native outputs. Optimus outputs are validated <em>natively inside</em>
+  each unit — see §9.</p>
+</section>
+
+<!-- ══════════════════════════ 8 OUTPUTS ══════════════════════════ -->
+<section id="outputs">
+  <h2><span class="stage">§8</span>Layer 6 — What is finally generated</h2>
+
+  <h3>Native schema (single building) — 10 CSVs + manifest</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>File</th><th>Resolution</th><th>Columns</th></tr></thead>
+    <tbody>
+      <tr><td><code>building_load.csv</code></td><td>15-min</td><td>datetime, power_flex_kw, power_inflex_kw, power_kw</td></tr>
+      <tr><td><code>cars.csv</code></td><td>static</td><td>car_id, capacity_kwh, min_allowed_soc, max_allowed_soc, battery_class</td></tr>
+      <tr><td><code>users.csv</code></td><td>static</td><td>car_id, region, phi, kappa, delta_km, negotiation_type, w1, w2</td></tr>
+      <tr><td><code>chargers.csv</code></td><td>static</td><td>charger_id, directionality, min_rate_kw, max_rate_kw</td></tr>
+      <tr><td><code>grid_prices.csv</code></td><td>15-min</td><td>datetime, price_per_kwh, type (peak/off-peak)</td></tr>
+      <tr><td><code>dr_events.csv</code></td><td>event</td><td>event_id, start, end, magnitude_kw, notified_at</td></tr>
+      <tr><td><code>sessions.csv</code></td><td>session</td><td>session_id, car_id, building_id, arrival, departure, duration_sec, arrival_soc, required_soc_at_depart, previous_day_external_use_soc</td></tr>
+      <tr><td><code>pv_generation.csv</code></td><td>15-min</td><td>datetime, power_pv_kw</td></tr>
+      <tr><td><code>pv.csv</code></td><td>static</td><td>pv_id, pv_type, dc_capacity_kw, ac_capacity_kw, dc_ac_ratio, tilt_deg, azimuth_deg, module_type, system_derate, temp_coeff_per_c, noct_c, albedo</td></tr>
+      <tr><td><code>battery.csv</code></td><td>static</td><td>battery_id, battery_type, capacity_kwh, power_kw, round_trip_efficiency, min_soc_pct, max_soc_pct, initial_soc_pct</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>manifest.json — the provenance record</h4>
+  <ul class="plain">
+    <li><code>scenario_id</code>, <code>seed</code>, <code>knob_overrides</code> (CLI), <code>knob_resolution</code> — <b>every knob with its resolved value and source label</b>.</li>
+    <li><code>noise_profile</code>, <code>generator_git_sha</code>, <code>generator_version</code>, <code>generated_at</code>.</li>
+    <li><code>csv_row_counts</code> + <code>csv_sha256</code> per file (integrity, checked by I2/I3).</li>
+    <li><code>e5</code> block (concurrency), <code>noise.d5_enforcement</code> stats (when jitter ran), <code>realized_distributions</code> (sampled axes/battery mixes when Dirichlet active).</li>
+    <li><code>validation</code> block: passed, n_errors/warnings, first 50 messages, <code>noise_applied</code> flag.</li>
+  </ul>
+
+  <h3>Optimus schema (generate-multi export) — 12 CSVs</h3>
+  <p class="lead">Deterministic re-shaping of native outputs for the downstream simulator (optimus-persist-multi):
+  adds <code>building_id</code> everywhere, <code>time_seconds</code> + energy columns on timeseries, plus three files that
+  don't exist natively.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>File</th><th>Delta vs native</th></tr></thead>
+    <tbody>
+      <tr><td><code>building_load.csv</code></td><td>+ time_seconds, energy_kwh(_flexible/_inflexible), power_kw_flexible/inflexible, building_id</td></tr>
+      <tr><td><code>cars.csv</code></td><td>+ soc (first-arrival SoC), frequency (φ), user_type (region index), building_id</td></tr>
+      <tr><td><code>chargers.csv</code></td><td>rates re-encoded as "(min, max)" string, + building_id</td></tr>
+      <tr><td><code>sessions.csv</code></td><td>duration_sec → duration, + building_id (departure/arrival_soc dropped — implied by duration/soc fields kept)</td></tr>
+      <tr><td><code>grid_prices.csv</code></td><td>+ building_id</td></tr>
+      <tr><td><code>weather_data.csv</code> <span class="tag explicit">new</span></td><td>Hourly perturbed EPW (14 channels: dry-bulb, dew-point, RH, wind, GHI/DNI/DHI, pressure, IR, sky cover…) — the exact weather EnergyPlus simulated.</td></tr>
+      <tr><td><code>occupancy.csv</code> <span class="tag explicit">new</span></td><td>Hourly ASHRAE occupancy fractions per building.</td></tr>
+      <tr><td><code>pv_generation.csv</code> / <code>pv.csv</code> / <code>battery.csv</code></td><td>+ time_seconds/energy_kwh_pv (gen), + building_id.</td></tr>
+      <tr><td><code>dso_commands.csv</code> <span class="tag explicit">new</span></td><td>Global DR: start/end, fsl (=magnitude_kw), program, incentive, penalty (from <code>dr_incentive_per_kw</code> / <code>dr_penalty_per_kwh</code> globals).</td></tr>
+      <tr><td><code>policies.csv</code> <span class="tag explicit">new</span></td><td>building_id → control policy (default <code>ILP-MPCFIXEDFSL</code>).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="take"><b>Resolution caveat:</b> <code>weather_data.csv</code> and <code>occupancy.csv</code> are <b>hourly</b>;
+  everything else is 15-min. Resample before joining on a shared index. And <code>cli validate</code> does <b>not</b> apply to
+  optimus dirs (no users.csv/manifest.json) — the authoritative result is the <code>validation_summary</code> in
+  <code>multi_building_config.json</code> / <code>batch_manifest.json</code>.</div>
+</section>
+
+<!-- ══════════════════════════ 9 ORCHESTRATION ══════════════════════════ -->
+<section id="orchestration">
+  <h2><span class="stage">§9</span>Layer 7 — Orchestration: batch, multi-building, web</h2>
+
+  <h3>Entry points (CLI)</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Subcommand</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>generate</code></td><td>Single (scenario, seed) → native CSVs. <b>Deprecated</b> in favor of generate-multi / web.</td></tr>
+      <tr><td><code>generate-multi</code></td><td>N distinct buildings → optimus CSVs; with <code>--start-month</code> becomes the unified batch (below).</td></tr>
+      <tr><td><code>batch</code></td><td>Single scenario × months × samples → native tree <code>&lt;scenario&gt;/&lt;MONTH&gt;/&lt;sample&gt;/</code>; subprocess-isolated workers; defaults tmyx_stochastic + Dirichlet α=30.</td></tr>
+      <tr><td><code>validate</code></td><td>A–I suite on a native output dir.</td></tr>
+      <tr><td><code>calibrate</code></td><td>Fit region distributions from a real dataset; write back into populations.yaml (ruamel, comment-preserving).</td></tr>
+      <tr><td><code>list-scenarios</code> / <code>list-knobs</code> / <code>docs-gen</code> / <code>bench</code></td><td>Discovery, docs regeneration, ACN-Sim scheduling baseline.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>generate-multi — one run, N buildings</h3>
+  <ol class="steps">
+    <li>Config YAML: globals (<code>output_mode</code>, <code>dr_program</code>, <code>dr_incentive_per_kw</code>, <code>dr_penalty_per_kwh</code>, <code>default_policy</code>) + <code>buildings[]</code>, each with base_scenario, descriptor swaps, overrides, seed, optional per-building <code>noise_profile</code> / <code>weather_profile</code> / <code>policy</code> / <code>multiplier</code>.</li>
+    <li><b>multiplier: N</b> expands one entry into N distinct realizations (seeds base…base+N−1); building_id assigned sequentially across the fully-expanded list.</li>
+    <li>Each building runs the full L0–L6 stack natively in an isolated tempdir, then converts to optimus tables.</li>
+    <li><b>Output modes:</b> <code>shared</code> (one CSV set, building_id column) or <code>per-building</code> (integer subfolders <code>0..N−1</code> — note: <em>not</em> a building-major tree; for <code>parent/b1..bN</code> run one batch per building).</li>
+    <li>Writes <code>multi_building_config.json</code>: expanded specs + globals + per-building validation rollup — the regeneration recipe (<code>--from-config</code> reproduces byte-identically).</li>
+  </ol>
+
+  <h3>Unified batch — buildings × months × samples</h3>
+  <ol class="steps">
+    <li>Tree: <code>&lt;out&gt;/&lt;MONTH&gt;/&lt;sample&gt;/</code> (one optimus set per unit).</li>
+    <li><b>Seed strategy:</b> <code>building.seed + seed_base + sample</code> — space building base seeds ≥ samples_per_month or ranges collide.</li>
+    <li><b>Weather realization:</b> per building, its own <code>weather_profile</code> (else the batch default) → σ's; each (unit, building) draws temp/solar/dewpoint/wind offsets from streams <code>weather_realization*</code> seeded by the per-sample seed, pinned as explicit knob overrides. Explicit per-building offsets in the spec win. CLI <code>--weather-sigma-c/--weather-solar-sigma</code> override σ for <em>every</em> building (power-user).</li>
+    <li>ProcessPool over units; <code>batch_manifest.json</code> records config, seed strategy, per-unit results and a batch-wide <code>validation_summary</code>.</li>
+  </ol>
+
+  <h3>Web tool</h3>
+  <p>Flask + vanilla JS (<code>tools/web/</code>): descriptor/knob/scenario/DER catalog browsing, per-building cards with
+  knob panels, PV/battery pickers, per-building weather noise, run-level output-mode toggle (shared vs per-building),
+  single-shot generation with CSV previews, batch submission with live progress, ZIP download, distribution plots per building_id.</p>
+
+  <h3>Post-run analysis (repo tooling)</h3>
+  <p><code>tools/analyze_overnight.py</code> (single building, slight-vs-moderate trees) and
+  <code>tools/analyze_campus.py</code> (building-major <code>b1..bN</code>) stream every sample → per-sample metrics CSV +
+  self-contained uncertainty-analysis HTML (CV rankings, P5–P95 bands, per-building box plots).</p>
+</section>
+
+<!-- ══════════════════════════ 10 CONTRACT ══════════════════════════ -->
+<section id="contract">
+  <h2><span class="stage">§10</span>The reproducibility contract &amp; the gotchas that bite</h2>
+
+  <div class="ok"><b>The contract:</b> (scenario, seed) → byte-identical CSVs, when noise = clean, Dirichlet α's at their
+  1e6 off-defaults, and DER off-by-default preserved. Every stochastic feature added later (Dirichlet mixes, weather
+  realizations, PV/battery) was designed to be <em>exactly off</em> at defaults so the historical bitstream is untouched.
+  Every unit is regenerable from <code>seed + config</code> (<code>--from-config</code>).</div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Gotcha</th><th>Reality</th></tr></thead>
+    <tbody>
+      <tr><td>tmyx_stochastic in multi-sample batches</td><td>Output jitter lands after D5 rejection → ~50% of units flag D5 at validation. Use <b>clean + weather profile</b> for valid Monte-Carlo variance.</td></tr>
+      <tr><td>Global <code>--weather-profile</code> vs per-building</td><td>Per-building <code>weather_profile:</code> in the config wins; the CLI flag is only the fallback default — don't pass it when mixing profiles.</td></tr>
+      <tr><td><code>peak_kw_scaling</code> default</td><td>true ⇒ every sample's peak == descriptor peak_kw exactly (variance only in energy/shape). Set false for weather-driven peaks.</td></tr>
+      <tr><td><code>--output-mode per-building</code></td><td>Leaf-level <code>0..N−1</code> folders under MONTH/sample — not a building-major tree. Building-major = one single-building batch per building.</td></tr>
+      <tr><td>Seed spacing</td><td>Batch adds 0..samples−1 to each base seed; space bases ≥ samples_per_month (and ≥ multiplier).</td></tr>
+      <tr><td><code>cli validate</code> on optimus dirs</td><td>Fails on schema (native-only). Read <code>validation_summary</code> from the batch/config manifests instead.</td></tr>
+      <tr><td><code>climate</code> knob</td><td>Label only. The weather that matters is <code>tmyx_station</code>.</td></tr>
+      <tr><td>Occupancy vs sessions</td><td>Occupancy schedules shape <em>building load</em> only; EV sessions come from the population axes — deliberately decoupled.</td></tr>
+      <tr><td>weather_data.csv resolution</td><td>Hourly (native EPW), everything else 15-min — resample before joining.</td></tr>
+      <tr><td>SoC "data"</td><td>No public charger dataset records SoC. All SoC quantities are modeled priors (reconstructed from kWh delivered/requested) — never treat them as measured ground truth.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="muted">Deeper rationale: <code>docs/DESIGN_NOTES.md</code> (numbered §1–32, cited from source),
+  <code>docs/GENERATIVE_MODELS.md</code> (distribution-family verdicts), <code>docs/KNOB_REFERENCE.md</code> (auto-generated registry),
+  <code>docs/PROJECT_TRACKER.md</code> (live decisions log).</p>
+</section>
+
+</main>
+<footer>v2b-syndata · generation-pipeline reference · generated 2026-07-07 from source at <code>a4c42ad</code>+</footer>
