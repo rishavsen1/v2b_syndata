@@ -6,7 +6,7 @@
 > (full, ~overnight-safe) or `--steps collect` (rebuild this file from
 > existing artifacts).
 
-- **Git revision:** `a63c73ed2257fbde03766db1630d5ab5f3497f52` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
+- **Git revision:** `ea5fb2a604e278e6ac01d918379c3b4bd1f1998b`
 - **Determinism:** all steps seeded (generation: SHA-keyed node streams; S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000; TSTR: seed 1234; ablation: deterministic EM). Two consecutive driver runs must reproduce this file bit-for-bit; wall-times below are the recorded measurement from `docs/experiments/repro_runtimes.json` (written once; see driver docstring).
 - **No timestamps in this file by design** — the git SHA pins the revision; `docs/CALIBRATION_RESULTS.md` carries its own generation date.
 
