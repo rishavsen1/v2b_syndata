@@ -1006,9 +1006,12 @@ evwatts_workplace_public:
         3, 80], weight: 0.005687}
     - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0], 
         dist_km: [5, 60], weight: 0.304999}
+    # weight 0.510626 → 0.510625 (−1e-6, WS-F 2026-07-08): the calibrated
+    # shares summed to 1.000001, tripping the knob loader's |Σw−1| ≤ 1e-6
+    # gate and making S_evwatts_workplace ungenerable.
     - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
-            10, 80], weight: 0.510626}
-    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80], 
+            10, 80], weight: 0.510625}
+    - {name: erratic, freq: [0.0, 0.5], consist: [0.0, 0.4], dist_km: [3, 80],
         weight: 0.003292}
 
   negotiation:

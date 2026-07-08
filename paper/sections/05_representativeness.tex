@@ -27,11 +27,23 @@ rather than in aggregate, and return to the implication in
 \S\ref{sec:limitations}.
 
 \begin{table}[t]
-\caption{Building-load fidelity versus ComStock and BDG2 (ASHRAE G14 metrics),
-per archetype. \owed{Final table from validate\_buildingload via WS-F.}}
+\caption{Building-load fidelity versus ComStock (ASHRAE G14 metrics) per
+archetype: mean generated vs.\ reference power, $\cvrmse{}$, $\nmbe{}$
+(positive = generator under-predicts), weekday shape correlation, and
+peak-hour error.}
 \label{tab:g14}
 \centering\small
-\framebox[\linewidth]{\rule{0pt}{2.2cm} Table 3 placeholder}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Archetype & gen kW & ref kW & $\cvrmse{}$\% & $\nmbe{}$\% & shape $r$ & $\Delta$pk h \\
+\midrule
+office/small & 4.1 & 8.0 & 56.7 & $+49.1$ & 0.71 & 1 \\
+office/med & 43.3 & 68.7 & 47.2 & $+37.0$ & 0.91 & 2 \\
+office/large & 773.1 & 608.3 & 43.7 & $-27.1$ & 0.94 & 3 \\
+retail/med & 27.9 & 60.6 & 59.3 & $+54.0$ & 0.91 & 1 \\
+retail/large & 21.5 & 36.6 & 51.6 & $+41.2$ & 0.87 & 1 \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \subsection{Behavioral fidelity: held-out and interval-quantified}
@@ -45,9 +57,12 @@ Spearman correlation gap. With thousands of sessions per cell the KS
 $p$-value is uninformative; we therefore judge by effect size and quantify
 sampling uncertainty by a seeded percentile bootstrap ($B{=}1000$) over
 source sessions, reported as 95\% intervals on every cell. Aggregate
-results: mean $|\Delta\mu|$ of $0.31$\,h across all region$\times$variable
-cells; the worst cell (arrival in the largest ACN region) has
-$\ks = 0.222\ [0.209, 0.235]$; maximum copula $\rho$-gap $0.226$.
+results over the 36 region$\times$variable cells of the six evaluated
+sources: mean $|\Delta\mu|$ of $0.44$\,h; the worst well-sampled cell
+(arrival in the largest ACN region) has $\ks = 0.222\ [0.209, 0.235]$, and
+the global worst is a 41-user single-site cell at $\ks = 0.239$ with a
+correspondingly wide interval $[0.146, 0.385]$; maximum copula $\rho$-gap
+$0.226$.
 
 Held-out fidelity is evaluated under a \emph{family-matched} protocol:
 distributions are refitted on a training split of drivers using the same
@@ -55,19 +70,26 @@ family-selection rule that calibration ships (including mixture selection)
 and scored against the unseen split. We report this protocol because an
 earlier single-family variant understated degradation; under the matched
 protocol the median degradation is
-$\ks_{\text{holdout}} - \ks_{\text{train}} = 0.069$, and the full per-cell
-table (appendix) discloses the outliers---up to $+0.234$, and $+0.425$ in a
-cell with only 62 held-out sessions, where the deterministic driver split
-induces cohort shift that small samples cannot average out. We read the
-held-out results as honest evidence of moderate generalization: typical
-cells transfer with single-digit-percent KS inflation, and the failures are
-localized, disclosed, and concentrated where data is thin.
+$\ks_{\text{holdout}} - \ks_{\text{train}} = 0.064$, and the full per-cell
+table (appendix) discloses the outliers: $+0.425$ in a cell with only 62
+held-out sessions, where the deterministic driver split induces cohort
+shift that small samples cannot average out, but also $+0.372$ in a
+well-sampled cell ($n_{\text{test}} = 1{,}386$), which cannot be attributed
+to sampling noise and indicates genuine within-region driver heterogeneity.
+We read the held-out results as honest evidence of moderate generalization:
+typical cells transfer with single-digit-percent KS inflation; the failures
+are localized and disclosed, mostly---but not exclusively---where data is
+thin.
 
-An ablation isolates the calibration decisions: replacing the pooled arrival
-fit broadcast to all regions with per-region fits reduced the largest ACN
-region's arrival KS from $0.179$ to $0.079$; admitting mixture families
-(\owed{aggregate arrival KS improvement, regenerated via WS-F}) captures the
-bimodality of Fig.~\ref{fig:arrival}.
+A regenerated ablation isolates the two calibration decisions
+(fitted-CDF-versus-source KS, the fitter's own quality metric): replacing the
+pooled arrival fit broadcast to all regions with per-region fits reduces the
+largest ACN region's arrival KS from $0.196$ to $0.040$; admitting mixture
+families improves mean ACN arrival KS from $0.100$ to $0.042$, and across
+all fourteen cells where the selection rule chose a mixture, from $0.134$ to
+$0.035$ --- capturing the bimodality of Fig.~\ref{fig:arrival}. Dwell
+mixtures fire more conservatively (four of sixteen cells; $0.127$ to
+$0.102$).
 
 \subsection{DER channels}
 \label{sec:derfidelity}

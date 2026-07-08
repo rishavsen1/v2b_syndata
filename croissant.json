@@ -45,7 +45,7 @@
   "@type": "sc:Dataset",
   "conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "v2b_syndata",
-  "description": "Configurable synthetic Vehicle-to-Building (V2B) EV-charging dataset GENERATOR. A (scenario YAML, knob overrides, seed) triple forward-samples bitwise-identical CSVs: EV users, cars, chargers, charging sessions, EnergyPlus building load, rooftop PV, stationary battery specs, grid tariffs, and demand-response events. Behavioral distributions are calibrated from public ACN-Data and ElaadNL charging logs; state-of-charge is modeled from a prior (never observed). This record describes one generated dataset instance (one scenario-seed output directory). See docs/DATASHEET.md, docs/ETHICS.md, docs/CALIBRATION_RESULTS.md.",
+  "description": "Configurable synthetic Vehicle-to-Building (V2B) EV-charging dataset GENERATOR. A (scenario YAML, knob overrides, seed) triple forward-samples bitwise-identical CSVs: EV users, cars, chargers, charging sessions, EnergyPlus building load, rooftop PV, stationary battery specs, grid tariffs, and demand-response events. Behavioral distributions are calibrated from public ACN-Data, ElaadNL, and EV WATTS charging logs; state-of-charge is modeled from a prior (never observed). This record describes one generated dataset instance (one scenario-seed output directory). A frozen 18,000-unit reference corpus (10 buildings x 12 months x 150 seeded samples, ~19 GiB) is released alongside the generator (see docs/experiments/DEPOSIT_PLAN.md). See docs/DATASHEET.md, docs/ETHICS.md, docs/CALIBRATION_RESULTS.md.",
   "version": "0.1.0",
   "isLiveDataset": true,
   "datePublished": "2026-06-29",
@@ -71,8 +71,8 @@
   "license": "https://spdx.org/licenses/MIT.html",
   "url": "https://github.com/rishavsen1/v2b_syndata",
   "citeAs": "v2b_syndata: a configurable synthetic Vehicle-to-Building EV-charging dataset generator (KDD 2027 Datasets & Benchmarks submission).",
-  "dataBiases": "Calibration rests on US workplace charging (ACN-Data: Caltech/JPL/Office001) and one Netherlands site (ElaadNL); EV WATTS and INL are tiny synthetic fixtures excluded from all fidelity numbers. Building load ships a single ASHRAE 90.1-2019 efficient prototype in one climate zone (Denver CZ-5B), running ~30-50% below the ComStock stock-weighted average. Not representative of residential charging, non-US/EU behavior, or older building stock. See docs/ETHICS.md.",
-  "dataCollection": "Two-stage: (1) offline calibration fits per-region distribution parameters from real public charging logs (ACN-Data, ElaadNL) into configs/populations.yaml, with a MIN_SAMPLES=30 floor before a region is marked calibrated; (2) generation forward-samples CSVs under a SHA-keyed RNG so a (scenario, overrides, seed) triple is bitwise-reproducible. Building load is computed with EnergyPlus 23.x at generation time. State-of-charge is never recorded in any source and is drawn from a Beta/normal prior (mean approx 0.40), not fit. See docs/GENERATIVE_MODELS.md.",
+  "dataBiases": "Calibration rests on US workplace charging (ACN-Data: Caltech/JPL/Office001, plus the EV WATTS public workplace/public-L2 release under a port-as-proxy user identity) and one Netherlands network (ElaadNL); INL is a tiny synthetic fixture excluded from all fidelity numbers and released only as a labeled distribution-shift benchmark. Building load ships a single ASHRAE 90.1-2019 efficient prototype in one climate zone (Denver CZ-5B), with four of five archetypes 37-54% below the ComStock stock-weighted average intensity (large office 27% above). Not representative of residential charging, non-US/EU behavior, or older building stock. See docs/ETHICS.md.",
+  "dataCollection": "Two-stage: (1) offline calibration fits per-region distribution parameters from real public charging logs (ACN-Data, ElaadNL, EV WATTS) into configs/populations.yaml, with a MIN_SAMPLES=30 floor before a region is marked calibrated; (2) generation forward-samples CSVs under a SHA-keyed RNG so a (scenario, overrides, seed) triple is bitwise-reproducible. Building load is computed with EnergyPlus at generation time (the bundled DOE prototype models are pinned to EnergyPlus 24.1). State-of-charge is never recorded in any source and is drawn from a Beta/normal prior (mean approx 0.40), not fit. See docs/GENERATIVE_MODELS.md.",
   "personalSensitiveInformation": "None. Output is fully synthetic; identifiers are sequential synthetic keys. Calibration corpora are public aggregates consumed only as distribution parameters; no raw source record is redistributed. See docs/ETHICS.md.",
   "distribution": [
     {
@@ -1109,7 +1109,7 @@
       "@type": "cr:RecordSet",
       "@id": "dr_events",
       "name": "dr_events",
-      "description": "Demand-response events. One record per event; file is header-only when program=none. Magnitudes are a Uniform prior (no real-data fit).",
+      "description": "Demand-response events. One record per event; file is header-only when program=none. Magnitude ranges are tariff-derived for BIP and consistent with statewide program evaluations for CBP; the ELRP range is an explicitly stylized prior (per-site nominations are redacted in public evaluations); the uniform shape of the magnitude distribution is a modeling choice. See docs/experiments/dr_magnitude_grounding.md.",
       "key": {
         "@id": "dr_events/event_id"
       },

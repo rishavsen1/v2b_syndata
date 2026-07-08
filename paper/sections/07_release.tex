@@ -19,8 +19,8 @@ wind draws re-simulated through EnergyPlus) with the clean noise profile.
 
 \paragraph{Corpus integrity, stated fully.}
 Every unit passes all hard validation invariants (zero errors across 18{,}000
-units). Soft advisories are disclosed rather than suppressed: units may carry
-warnings for charger-concurrency near saturation (a scenario-design property)
+units). Soft advisories are disclosed rather than suppressed --- 11{,}920 of
+the 18{,}000 units carry at least one --- typically warnings for charger-concurrency near saturation (a scenario-design property)
 and for DR programs whose season excludes the simulated month; the released
 corpus documentation includes the complete warning profile. One recording
 subtlety is worth stating because it misled our own internal audit: weather
@@ -51,7 +51,9 @@ and the deposit through the review period and beyond; issues and corrections
 are tracked publicly.
 
 \paragraph{Compute.}
-One dataset unit (one building-month) costs ${\sim}117$\,s on one core,
-dominated by EnergyPlus; the 18{,}000-unit corpus took ${\approx}580$
-CPU-hours (${\approx}8$\,h wall-clock on 30 workers). Single-scenario
-generation for interactive use completes in roughly two minutes.
+One dataset unit (one building-month) costs $49$\,s on average
+(${\sim}117$\,s when the EnergyPlus load cache is cold), dominated by the
+building simulation; the 18{,}000-unit corpus (19.5\,GB) took
+${\approx}246$ CPU-hours, ${\approx}8.2$\,h wall-clock on 30 workers.
+Single-scenario generation for interactive use completes in roughly two
+minutes.

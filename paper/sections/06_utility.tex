@@ -32,13 +32,13 @@ synthetic data acting as a regularizer when features are weak.
 \paragraph{Cross-scale transfer (ElaadNL).}
 The ElaadNL experiment is deliberately harder: the matched synthetic scenario
 is a single 20-vehicle building, while the real series aggregates a
-network-scale cohort (${\sim}3{,}400$ vehicle identifiers; 481\,kW observed
-peak versus 26\,kW synthetic). Shape transfer again reaches parity---the
+network-scale cohort (1{,}231 drivers in the fitted workplace cohort;
+481\,kW observed peak versus 26\,kW synthetic). Shape transfer again reaches parity---the
 calendar-only, unit-mean-normalized ratio is $1.02\times$ (MAE) and
 $1.03\times$ (RMSE)---while lagged raw-magnitude transfer degrades to
 $7.4\times$/$6.2\times$: a lag-feature model trained at building scale cannot
-extrapolate to a fleet two orders of magnitude larger, and a 20-vehicle
-aggregate is intrinsically spikier than a 3{,}400-vehicle one. We report both
+extrapolate to a fleet sixty times larger, and a 20-vehicle aggregate is
+intrinsically spikier than a 1{,}231-driver one. We report both
 rows (Table~\ref{tab:tstr}, Fig.~\ref{fig:tstr}) and read them as a
 \emph{scale-shift} result: the
 calibrated behavioral shape carries across cohorts and continents, whereas

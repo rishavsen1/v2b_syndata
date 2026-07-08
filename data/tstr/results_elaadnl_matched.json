@@ -19,7 +19,7 @@
     "train_frac": 0.6
   },
   "generator": {
-    "generator_git_sha": "e936d97746fe54e81ba0ec0bc658ee5247a83a1f",
+    "generator_git_sha": "a63c73ed2257fbde03766db1630d5ab5f3497f52",
     "generator_version": "0.1.0",
     "n_sessions": 75,
     "scenario_id": "S_elaadnl_public_eu",

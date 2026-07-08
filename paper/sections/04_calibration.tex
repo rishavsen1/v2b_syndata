@@ -26,17 +26,18 @@ benchmark rather than claimed as a calibration corpus.
 \begin{table}[t]
 \caption{Calibration sources. ``Fitted'' populations carry per-region MLE
 parameters with recorded provenance; the INL cohort is a labeled fixture.
-\owed{Regenerate counts with WS-F; EV WATTS row from populations.yaml
-metadata.}}
+Scales are the fitted cohorts (ACN: 632 of 635 loaded users assigned;
+ElaadNL: workplace cohort of a 55{,}379-session raw archive; EV~WATTS uses
+charge-port identifiers as driver proxies).}
 \label{tab:sources}
 \centering\small
 \begin{tabular}{@{}lllll@{}}
 \toprule
-Corpus & Span & Venue & Scale & Policy \\
+Corpus & Span & Venue & Fitted scale & Policy \\
 \midrule
-ACN-Data & 2019--21 & workplace (3 sites) & 632 users / 41{,}774 sessions & fitted \\
-EV~WATTS & 2019--23 & workplace (public rel.) & 1{,}265{,}017 sessions & fitted \\
-ElaadNL & 2020--24 & EU public & 55{,}379 sessions / 1{,}231 drivers & fitted \\
+ACN-Data & 2019--21 & workplace (3 sites) & 632 users / 41{,}774 sess. & fitted \\
+EV~WATTS & 2019--23 & workplace (public) & 3{,}356 ports / 1{,}265{,}017 sess. & fitted \\
+ElaadNL & 2020--24 & EU public & 1{,}231 drivers / 55{,}201 sess. & fitted \\
 INL EVP & 2011--13 & residential & fixture (65 sessions) & fixture \\
 \bottomrule
 \end{tabular}
@@ -53,7 +54,7 @@ rare-consistent 36.1\%, occasional-consistent 39.8\%, regular-charger 23.0\%,
 rare-inconsistent 0.6\%---so the generated population reproduces the observed
 cohort composition, not a designer's guess. The empirical geometry is itself
 informative (Fig.~\ref{fig:axes}): real workplace drivers plug in far less
-often than intuition suggests (76\% of ACN drivers at $\phifreq \le 0.3$),
+often than intuition suggests (77\% of ACN drivers at $\phifreq \le 0.3$),
 which the calibrated grids encode and hand-authored grids would have missed.
 
 \begin{figure}[t]
@@ -62,7 +63,7 @@ which the calibrated grids encode and hand-authored grids would have missed.
   \caption{Region geometries in the $(\phifreq,\kapcons)$ plane. Top: the
   hand-specified \texttt{consent\_default} grid concentrates mass at high
   plug-in frequency. Bottom: the ACN-anchored grid, with empirical user-share
-  weights, places 76\% of drivers at $\phifreq \le 0.3$; the dashed box is a
+  weights, places 77\% of drivers at $\phifreq \le 0.3$; the dashed box is a
   region with zero empirical weight.}
   \label{fig:axes}
 \end{figure}
@@ -78,7 +79,8 @@ Mixture fits require at least 60 sessions and any fit at least 30; smaller
 cells fall back to pooled fits. Fitting is per region rather than pooled: the
 largest ACN region (rare-consistent, 36\% of drivers) arrives systematically
 later than the pooled corpus, and replacing a broadcast pooled fit with its
-own fit reduced its arrival KS from $0.179$ to $0.079$. The fitted arrival
+own fit reduces its fitted-CDF-versus-source arrival KS from $0.196$ to
+$0.040$ (\S\ref{sec:behfidelity}). The fitted arrival
 distribution for that region is bimodal (morning and early-afternoon
 components), a structure a single truncated normal cannot express
 (Fig.~\ref{fig:arrival}).
