@@ -40,6 +40,7 @@ dev = [
     "pytest-playwright>=0.5",
     "ruff>=0.6",
     "mypy>=1.8",
+    "nrel-pysam>=7.1.1.post1",
 ]
 
 [tool.pytest.ini_options]
