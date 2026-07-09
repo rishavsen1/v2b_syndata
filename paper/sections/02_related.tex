@@ -1,54 +1,116 @@
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{Real charging datasets.}
-ACN-Data \citep{lee2019acn} remains the reference workplace-charging corpus:
-per-session records from Caltech, JPL, and an office site, including
-driver-entered energy requests. ElaadNL publishes anonymized public-charging
-transactions from the Netherlands \citep{elaadnl2020}, and the DOE-funded
-EV~WATTS program released a large multi-venue evaluation dataset
-\citep{evwatts2023}. The INL EV Project \citep{inl2015evproject} documents an
-earlier (2011--2013) residential fleet. These corpora anchor our calibration
-(\S\ref{sec:calibration}); their limitations---few sites, fixed
-infrastructure, no SoC channel, restricted or aggregated building-side
-data---motivate generation rather than reuse.
+We situate \generator{} against five bodies of work: the demand-side V2B
+methods that consume coupled data; the real EV-charging datasets that
+motivate generation; the building-energy corpora and simulators we use as
+physical ground truth; the statistical and deep-generative approaches to
+synthesizing charging and load data; and the evaluation and documentation
+standards for synthetic data. Table~\ref{tab:related} summarizes where we
+differ.
+
+\paragraph{V2B/V2G methods need coupled data.}
+A large literature develops optimization and learning methods for smart
+charging, vehicle-to-grid, and vehicle-to-building coordination---scheduling
+charging against time-of-use tariffs and demand charges, using parked fleets
+for building peak shaving, and co-optimizing storage and on-site
+PV~\owed{cite: 1--2 V2G/V2B optimization or control surveys}. These methods
+are developed and compared on data that couples building load, charging
+sessions, tariffs, and distributed energy resources on a common clock.
+Because such coupled data is rarely available, evaluations often stitch
+together a charging dataset from one source, a load profile from another, and
+a synthetic tariff, with no guarantee that the channels are mutually
+consistent. \generator{} targets exactly this gap: a coherent, controllable,
+multi-channel instance generator for the problems these methods solve.
+
+\paragraph{Real EV-charging datasets.}
+The public charging corpora are few and site-specific. ACN-Data
+\citep{lee2019acn} provides workplace sessions from three California sites
+with driver-entered energy requests; ElaadNL releases anonymized
+public-charging transactions from the Netherlands \citep{elaadnl2020}; the
+DOE-funded EV~WATTS program published a large multi-venue U.S. evaluation
+dataset \citep{evwatts2023}; and the earlier INL EV Project documented a
+2011--2013 residential fleet \citep{inl2015evproject}. Each is confined to a
+fixed set of venues and infrastructures, none couples building-side load, and
+critically, none records battery state of charge---charging equipment meters
+delivered energy, not the battery. These corpora anchor our calibration
+(\S\ref{sec:calibration}); their coverage and access limits, and the absent
+SoC channel, are what generation is meant to overcome.
 
 \paragraph{Building-energy data and simulation.}
-On the building side, large public resources exist: NREL's ComStock
-\citep{parker2023comstock} provides calibrated end-use load profiles for the
-U.S. commercial stock, and the Building Data Genome~2 project
-\citep{miller2020bdg2} publishes meter data from over a thousand buildings.
-Physics-based simulation via EnergyPlus \citep{crawley2001energyplus} with the
-DOE prototype building models \citep{pnnl_prototypes} is the standard for
-controlled building-load studies. We use simulation as the generative
-mechanism and the public corpora as \emph{ground truth for validation}, which
-keeps the two roles---generation and evaluation---separate by construction.
+On the building side, substantial public resources exist and we consume them
+as \emph{ground truth} rather than as competitors. NREL's ComStock provides
+calibrated end-use load profiles for the U.S. commercial building stock
+\citep{parker2023comstock}, and the Building Data Genome~2 project publishes
+metered data from over a thousand non-residential buildings
+\citep{miller2020bdg2}; both serve as validation references
+(\S\ref{sec:loadfidelity}). Our building channel is produced by physics-based
+simulation: EnergyPlus \citep{crawley2001energyplus} driven by the DOE
+prototype building models \citep{pnnl_prototypes}, with on-site PV modeled by
+the PVWatts algorithm \citep{dobos2014pvwatts}. Keeping simulation
+(generation) and metered corpora (evaluation) in separate roles is a
+deliberate design choice that avoids validating a model against itself.
 
-\paragraph{Synthetic EV-charging data.}
-Session-level generative models appear in charging-infrastructure simulators:
-ACN-Sim \citep{lee2021acnsim} includes generative session models fitted to
-ACN-Data, and ElaadNL distributes simulation profiles derived from its
-transactions. These target the charging channel in isolation. General-purpose
-deep generative models for tabular and time-series data---GAN-based
-\citep{yoon2019timegan,esteban2017rgan} and diffusion-based more
-recently---can imitate a single site's joint distribution, but they offer no
-scenario control (one cannot move the learned site to another climate or
-double its fleet), no mechanism for physical consistency across coupled
-channels, and no per-value auditability. \generator{} takes the opposite
-trade: parametric distribution families joined by an explicit copula, fitted
-per behavioral region, embedded in a physical simulation---less expressive
-than a deep density model at any single site, but controllable, auditable,
-physically coherent across channels, and calibrated across multiple corpora.
-We quantify what this trade costs (and buys) in
-\S\ref{sec:representativeness}--\S\ref{sec:utility}.
+\paragraph{Statistical and simulation models of charging behavior.}
+The classical approach to synthetic charging demand fits parametric
+distributions to observed behavior---arrival times, dwell (connection)
+durations, and energy per session---often with Gaussian-mixture or related
+families, and composes them into aggregate load
+models~\owed{cite: 1--2 statistical EV-load / GMM charging-behavior papers}.
+Charging-infrastructure simulators embed such models: ACN-Sim includes a
+generative session model fitted to ACN-Data \citep{lee2021acnsim}, and
+ElaadNL distributes simulation profiles derived from its transactions
+\citep{elaadnl2020}. \generator{} is in this lineage but extends it on three
+axes: it fits distributions \emph{per behavioral region} rather than
+per site aggregate, links arrival and dwell with an explicit copula, and
+calibrates the same parametric interface across multiple independent corpora,
+while embedding the behavioral model inside a physical building simulation so
+that the charging and load channels are jointly consistent.
 
-\paragraph{Evaluating synthetic data.}
-We follow the two-sided evaluation that has become standard: distributional
-fidelity against held-out real data, and downstream utility via
-train-on-synthetic/test-on-real (TSTR) protocols introduced for medical
-time series \citep{esteban2017rgan}. For building-load fidelity we adopt the
-calibration metrics of ASHRAE Guideline~14 \citep{ashrae2014g14}
-($\cvrmse{}$, $\nmbe{}$), which are the accepted standard for comparing
-simulated to metered building energy. Documentation follows Datasheets for
-Datasets \citep{gebru2021datasheets} and the Croissant machine-readable
-metadata format \citep{akhtar2024croissant}.
+\paragraph{Deep generative models for tabular and time-series data.}
+A parallel line learns the joint distribution of a dataset with deep
+generative models---recurrent and conditional GANs
+\citep{esteban2017rgan,yoon2019timegan} and, more recently, score-based
+diffusion models for time series \citep{tashiro2021csdi}, with domain
+variants for energy load and charging
+data~\owed{cite: optional energy/load GAN or diffusion paper}. These models
+can capture rich dependence at a single site, but they imitate one observed
+distribution without exposing scenario controls (one cannot relocate a
+learned site to a new climate or resize its fleet), provide no mechanism for
+physical consistency across coupled channels, and are not reproducible or
+auditable at the level of individual values. We deliberately trade the
+expressiveness of a learned joint density for a parametric, copula-coupled,
+physically-grounded model that is controllable, per-value auditable, and
+bitwise reproducible; \S\ref{sec:representativeness}--\S\ref{sec:utility}
+quantify what this trade costs and returns.
+
+\paragraph{Evaluating and documenting synthetic data.}
+We adopt the two-sided evaluation now standard for synthetic data:
+distributional fidelity against held-out real data, and downstream utility
+via the train-on-synthetic/test-on-real (TSTR) protocol introduced for
+medical time series \citep{esteban2017rgan}. For building-load fidelity we
+use the calibration metrics of ASHRAE Guideline~14 \citep{ashrae2014g14}
+($\cvrmse{}$, $\nmbe{}$), the accepted standard for comparing simulated to
+metered building energy. For documentation and discoverability we follow
+Datasheets for Datasets \citep{gebru2021datasheets} and the Croissant
+machine-readable metadata format \citep{akhtar2024croissant}.
+
+\begin{table}[t]
+\caption{Positioning. \generator{} is the only approach that is coupled
+across channels, physically grounded, calibrated to multiple real corpora,
+and bitwise reproducible with per-value provenance.}
+\label{tab:related}
+\centering\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & Coupled & Physically & Multi-corpus & Reproducible \\
+Approach & channels & grounded & calibrated & + provenance \\
+\midrule
+Real charging datasets & no & --- & --- & --- \\
+Building corpora (ComStock/BDG2) & no & yes & --- & partial \\
+Charging simulators (ACN-Sim) & no & no & single & partial \\
+Deep generative (GAN/diffusion) & rarely & no & single & no \\
+\textbf{\generator{}} & \textbf{yes} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
+\bottomrule
+\end{tabular}
+\end{table}
