@@ -14,7 +14,7 @@ A large literature develops optimization and learning methods for smart
 charging, vehicle-to-grid, and vehicle-to-building coordination---scheduling
 charging against time-of-use tariffs and demand charges, using parked fleets
 for building peak shaving, and co-optimizing storage and on-site
-PV~\owed{cite: 1--2 V2G/V2B optimization or control surveys}. These methods
+PV~\owed{cite: peer-reviewed V2G/smart-charging optimization survey --- deep-research found no verified canonical anchor; see docs/RELATED\_WORK\_RESEARCH.md}. These methods
 are developed and compared on data that couples building load, charging
 sessions, tariffs, and distributed energy resources on a common clock.
 Because such coupled data is rarely available, evaluations often stitch
@@ -55,8 +55,9 @@ deliberate design choice that avoids validating a model against itself.
 The classical approach to synthetic charging demand fits parametric
 distributions to observed behavior---arrival times, dwell (connection)
 durations, and energy per session---often with Gaussian-mixture or related
-families, and composes them into aggregate load
-models~\owed{cite: 1--2 statistical EV-load / GMM charging-behavior papers}.
+families, and composes them into aggregate load models
+\citep{xydas2016datadriven,quirostortos2015statistical}; ACN-Data itself
+demonstrates Gaussian-mixture fits to charging parameters \citep{lee2019acn}.
 Charging-infrastructure simulators embed such models: ACN-Sim includes a
 generative session model fitted to ACN-Data \citep{lee2021acnsim}, and
 ElaadNL distributes simulation profiles derived from its transactions
@@ -72,8 +73,9 @@ A parallel line learns the joint distribution of a dataset with deep
 generative models---recurrent and conditional GANs
 \citep{esteban2017rgan,yoon2019timegan} and, more recently, score-based
 diffusion models for time series \citep{tashiro2021csdi}, with domain
-variants for energy load and charging
-data~\owed{cite: optional energy/load GAN or diffusion paper}. These models
+variants for building load \citep{wang2020generating}, EV charging
+\citep{li2024diffcharge}, and---closest to our setting---building load
+conditioned on PV and EVs \citep{li2025cgan}. These models
 can capture rich dependence at a single site, but they imitate one observed
 distribution without exposing scenario controls (one cannot relocate a
 learned site to a new climate or resize its fleet), provide no mechanism for
