@@ -274,3 +274,63 @@ second pass should verify each before use:
 | ACN-Data | VERIFIED (key corrected) | yes |
 | ACN-Sim | VERIFIED (authors corrected) | yes |
 | ElaadNL, EV WATTS, INL, EnergyPlus, PNNL, PVWatts, ComStock, BDG2, TimeGAN, CSDI, RCGAN, ASHRAE G14, Datasheets, Croissant | NOT COVERED this pass | leads listed above; follow-up needed |
+
+---
+
+# Pass 2 (2026-07-09) — Gap-1 survey + existing-citation verification
+
+> Run `wf_c26bce62-427`: 5 angles · 26 sources · 124 claims extracted · 25
+> reached verification · **18 confirmed (3–0) · 7 killed** · synthesis + the
+> remaining verification votes **failed on the session usage limit** (resets
+> 7pm America/Chicago) — JOB 2 items below marked accordingly. Resume with
+> `Workflow({scriptPath: ".../deep-research-wf_c26bce62-427.js", resumeFromRunId: "wf_c26bce62-427"})`
+> — completed agents return cached.
+
+## JOB 1 — V2G/smart-charging survey: RESOLVED (over-delivered)
+
+Four peer-reviewed anchors verified 3–0 via Crossref/Semantic Scholar:
+
+1. **García-Villalobos, Zamora, San Martín, Asensio, Aperribay (2014).**
+   *Plug-in electric vehicles in electric distribution networks: A review of
+   smart charging approaches.* RSER 38:717–731. DOI 10.1016/j.rser.2014.07.040.
+   442 (Crossref) / 483 (S2) citations; publicationTypes: Review.
+   → **cited in §2** as `garciavillalobos2014smartcharging`.
+2. **Tan, Ramachandaramurthy, Yong (2016).** *Integration of electric vehicles
+   in smart grid: A review on vehicle to grid technologies and optimization
+   techniques.* RSER 53:720–732 (Jan 2016). DOI 10.1016/j.rser.2015.09.012.
+   **798 citations** (Crossref). → **cited in §2** as `tan2016v2g` (covers the
+   V2G-optimization half of the sentence).
+3. Yilmaz & Krein (2013). *Review of the Impact of Vehicle-to-Grid
+   Technologies on Distribution Systems and Utility Interfaces.* IEEE TPEL
+   28(12):5673–5689. DOI 10.1109/TPEL.2012.2227500. ⚠ Do **not** conflate with
+   their other 2013 review (charger topologies, 28(5):2151–2169,
+   DOI 10.1109/TPEL.2012.2212917) — both verified, distinct papers.
+4. Dahiwale, Rather, Mitra (2024). *A Comprehensive Review of Smart Charging
+   Strategies for Electric Vehicles and Way Forward.* IEEE T-ITS
+   25(9):10462–10482. DOI 10.1109/TITS.2024.3365581 (note: DOI suffix 3365581,
+   not the Xplore article number). Scope caveat (vote 0–0, unresolved): its
+   abstract does not explicitly cover V2G/PV co-optimization — reserve as an
+   optional "recent survey" citation.
+5. Sadeghian, Oshnoei, Mohammadi-ivatloo, Vahidinasab, Anvari-Moghaddam
+   (2022). *A comprehensive review on electric vehicles smart charging…*
+   J. Energy Storage 54:105241. DOI 10.1016/j.est.2022.105241. Metadata
+   verified 3–0; its "highly-cited" claim vote **failed on limit** — usable
+   as a metadata-verified alternative.
+
+## JOB 2 — 14 existing citations: INCOMPLETE (usage limit)
+
+Verification votes for the EV WATTS OSTI/DOI claims (incl. a candidate DOI
+`10.15483/…`), the "exact bibliographic locators" batch (EnergyPlus, PNNL
+prototypes, PVWatts, ComStock, BDG2, TimeGAN, CSDI, RCGAN, G14, Datasheets,
+Croissant, ElaadNL/4TU, INL), and synthesis all failed with "session limit."
+**Status: still TODO-verify in references.bib.** Resume the run (cached
+prefix) after the limit resets to finish these.
+
+## Refuted / unresolved votes this pass
+- Dahiwale scope-match claim and its V2G-coverage caveat: vote 0–0 (verifiers
+  died on limit) — recorded, not counted as confirmed.
+
+## Bib/paper changes made from this pass
+- Added `garciavillalobos2014smartcharging`, `tan2016v2g` to references.bib.
+- §2's last `\owed{cite}` (V2G/smart-charging surveys) resolved with the pair.
+- Remaining unverified: the 14 JOB-2 entries (still carry `TODO verify` notes).
