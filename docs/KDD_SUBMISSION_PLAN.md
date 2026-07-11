@@ -6,6 +6,26 @@
 > Created 2026-07-07; **rev 2 (2026-07-08)** after adversarial verification
 > and CFP confirmation.
 
+
+## Status 2026-07-11 (D4)
+
+All experimental workstreams COMPLETE, ahead of the D10 freeze:
+- WS-A ✅ (CIs + family-matched S3; honest medians 0.064/0.069) · WS-B ✅
+  (PV +1.27%) · WS-C ✅ (matched ElaadNL + split-claim framing) · WS-D ✅
+  (grounding memo) · WS-E ✅ (all 5) · WS-F ✅ (repro driver; PAPER_NUMBERS
+  deterministic) · citations ✅ (4 passes, zero unverified) · adversarial
+  review ✅ (all 20 fixes applied).
+- NEW post-review experiments (2026-07-11): V2B dispatch LP (29.4% peak
+  shave; 0 relaxations; ACN-Sim cross-check) and TSTR scale/duration study
+  (shape parity at every scale; raw gap mostly fleet scale; residual =
+  activity rate). Both wired into repro_paper.py + PAPER_NUMBERS.
+- Paper: full draft, mathematized (§3/§4/§5/§6), review-corrected, compiles;
+  repo URL inserted. Remaining \owed: Zenodo DOI, final SHA.
+- OPEN (user): OpenReview profiles + abstract ≤ Jul 18; Zenodo DOI ≤ Jul 24;
+  author block; PDF read-through. OPEN (assistant): full-run determinism
+  re-verification; final consistency sweep; page-boundary decision deferred
+  by user ("don't worry about page limits right now").
+
 ## The real calendar (CFP verified 2026-07-08)
 
 | Date | Day | Milestone |

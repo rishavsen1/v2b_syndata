@@ -260,13 +260,13 @@
 
 | Attack | Defense |
 |---|---|
-| "Benchmark doesn't exercise V2B discharge" | §7 scope stmt + specs-vs-decisions argument; shift benchmarks as utility surface |
-| "Fidelity numbers are in-sample" | held-out S3 (+F3 broadening or caveat) + bootstrap CIs in Tab 2 |
-| "PV/DR unvalidated" | §5.4 PVWatts cross-validation; DR grounded-or-stylized |
+| "Benchmark doesn't exercise V2B discharge" | **CLOSED 2026-07-11**: LP dispatch baseline (V2B 29.4% vs V1G 18.7% peak shave, 0 relaxations, ACN-Sim cross-check) — §6 + app:dispatch |
+| "Fidelity numbers are in-sample" | **CLOSED**: family-matched held-out (median 0.064, outliers disclosed) + B=1000 CIs on every cell |
+| "PV/DR unvalidated" | **CLOSED**: PV +1.27% vs PVWatts v8 (§5.3); DR grounded (BIP/CBP) or stylized-declared (ELRP) |
 | "One climate zone" | §8 + multi-CZ shape validation |
 | "SoC is fabricated" | intro-level honesty + §4 contract |
 | "Only 2–3 real corpora; INL is fake" | INL labeled fixture everywhere; claim scoped to 3 |
-| "ElaadNL TSTR fails" | corrected matched-scenario run; parity scoped to ACN; shift framing |
+| "ElaadNL TSTR fails" | **CLOSED 2026-07-11**: scale/duration study — shape parity in every arm; raw gap mostly scale (7.38→3.05); residual = activity rate, quantified — §6 + app:tstr |
 | "Copula misspecified (Frank > Gaussian)" | §8 W5 statement + inversion-tractability rationale |
 | "Region grid stale for ACN" | §4/§8 W8 statement |
 | "F4/F5 tolerance loosened" | §8 validation-scope statement |
