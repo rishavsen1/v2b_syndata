@@ -267,7 +267,15 @@ BUILDING_ORDER: list[str] = []  # filled in main()
 
 
 def main():
-    global BUILDING_ORDER
+    global BUILDING_ORDER, BASE, OUT_HTML, OUT_CSV
+    import argparse
+    ap = argparse.ArgumentParser(description="Building-major campus analysis (b1..bN tree)")
+    ap.add_argument("--base", default=str(BASE),
+                    help="campus output dir with b1..bN subfolders (default: campus10)")
+    args = ap.parse_args()
+    BASE = Path(args.base).resolve()
+    OUT_HTML = BASE / "analysis.html"
+    OUT_CSV = BASE / "analysis_summary.csv"
     bdirs = sorted([p for p in BASE.glob("b*") if p.is_dir()],
                    key=lambda p: int(p.name[1:]) if p.name[1:].isdigit() else 999)
     if not bdirs:
@@ -365,8 +373,8 @@ def render_html(df, specs, per_bldg, stats_all, charts):
     n_slight = sum(1 for b in BUILDING_ORDER if specs[b]["weather"] == "slight")
     n_mod = sum(1 for b in BUILDING_ORDER if specs[b]["weather"] == "moderate")
 
-    html = f"""<title>Campus dataset — 10-building uncertainty analysis</title>
-<meta name="description" content="Fundamental + uncertainty analysis of the 10-building San Jose synthetic V2B campus ({n} weather-perturbed monthly samples).">
+    html = f"""<title>Campus dataset — {nb}-building uncertainty analysis</title>
+<meta name="description" content="Fundamental + uncertainty analysis of the {nb}-building San Jose synthetic V2B campus ({n} weather-perturbed monthly samples).">
 <style>
   :root{{--navy:#1f4e79;--amber:#d8853b;--bg:#fafafa;--surface:#fff;--border:#e0e0e0;--muted:#666;--ink:#222;}}
   *{{box-sizing:border-box}} body{{margin:0;font-family:-apple-system,Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}}
@@ -387,13 +395,13 @@ def render_html(df, specs, per_bldg, stats_all, charts):
   .tablewrap{{overflow-x:auto}}
 </style>
 <header>
-  <h1>Synthetic V2B campus — 10-building fundamental &amp; uncertainty analysis</h1>
+  <h1>Synthetic V2B campus — {nb}-building fundamental &amp; uncertainty analysis</h1>
   <p>San Jose commercial campus · {nb} buildings · {total_ev} EVs / {total_chg} chargers · {total_pv_kw:,.0f} kW PV · output noise <b>clean</b> · per-building weather perturbation ({n_slight} slight + {n_mod} moderate) · {n:,} monthly samples (Jan–Dec, 150/mo/building)</p>
 </header>
 <main>
   <section>
     <h2>What this dataset is</h2>
-    <p class="muted">A commercial campus of <b>{nb} distinct buildings</b> (offices, retail, mixed-use) on one San Jose site, laid out building-major under <code>data/output/campus10/b1 … b{nb}</code>. Each building has <b>1,800 monthly samples</b> (12 months × 150), every sample a <b>physically faithful</b> per-sample weather realization (the EPW is perturbed and EnergyPlus re-run) with <b>no output-side noise</b>. So cross-sample spread is genuine weather-driven (and EV-stochastic) uncertainty. Peak load is <b>not</b> normalized (<code>peak_kw_scaling: false</code>), so peaks move with the weather.</p>
+    <p class="muted">A commercial campus of <b>{nb} distinct buildings</b> (offices, retail, mixed-use) on one San Jose site, laid out building-major under <code>{BASE.parent.name}/{BASE.name}/b1 … b{nb}</code>. Each building has <b>1,800 monthly samples</b> (12 months × 150), every sample a <b>physically faithful</b> per-sample weather realization (the EPW is perturbed and EnergyPlus re-run) with <b>no output-side noise</b>. So cross-sample spread is genuine weather-driven (and EV-stochastic) uncertainty. Peak load is <b>not</b> normalized (<code>peak_kw_scaling: false</code>), so peaks move with the weather.</p>
     <div class="kpis">
       <div class="kpi"><div class="v">{sum_peak_p95:,.0f} kW</div><div class="k">Σ building peak (P95, non-coincident upper bound)</div></div>
       <div class="kpi"><div class="v">{sum_netpeak_p95:,.0f} kW</div><div class="k">Σ net peak after PV (P95)</div></div>

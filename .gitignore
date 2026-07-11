@@ -58,3 +58,6 @@ data/calibration/evwatts_cache
 
 # Local-only generated slide decks (kept in-repo on disk, deliberately untracked).
 showcase/decks/
+paper/
+main.*
+pdflatex*
