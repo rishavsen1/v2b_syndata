@@ -362,3 +362,44 @@ prefix) after the limit resets to finish these.
 - **Remaining 13** (ElaadNL/4TU, INL, EnergyPlus, PNNL prototypes, PVWatts,
   ComStock, BDG2, TimeGAN, CSDI, RGAN, ASHRAE G14, Datasheets, Croissant):
   handed to a direct Crossref/DataCite/publisher lookup pass (not fan-out).
+
+---
+
+# Pass 4 (2026-07-10) — direct-lookup verification of the remaining 13: ALL RESOLVED
+
+> Single agent, direct authoritative lookups (Crossref/DataCite JSON APIs,
+> OSTI, NeurIPS proceedings, arXiv, energycodes.gov, 4TU.ResearchData) — the
+> right tool where two fan-out passes failed. Every entry now VERIFIED or
+> CORRECTED; **references.bib carries zero TODO-verify notes.**
+
+Highlights / corrections folded into the bib:
+1. **PNNL 90.1-2019 prototypes:** no dedicated standard-edition report exists
+   (PNNL-29236 does not exist; Goel et al. is PNNL-23269, covers ≤90.1-2010;
+   PNNL-32815 is the Appendix-G PRM variant, a different artifact). Correct
+   citation = DOE BECP prototype-models page (`pnnl_prototypes`, accessed
+   2026-07-10) + Thornton et al. 2011 PNNL-20405 methodology
+   (`thornton2011achieving`) — both now cited in §2.
+2. **Croissant:** two real versions (DEEM@SIGMOD '24, 21 authors; NeurIPS '24
+   D&B, 31 authors). Cite the NeurIPS archival version. The author spelling
+   "Goeffry Thomas" is as published — do not "fix."
+3. **ElaadNL:** our exact calibration release has a 4TU.ResearchData DOI —
+   de Bont et al. 2025, *Electric Vehicle Charging Session Data of Large
+   Office Parking Lot*, DOI 10.4121/80ef3824-3f5d-4e45-8794-3b8791efbd13.v2
+   (v2, 2020-08→2024-10, ~55k sessions, ~300 charge points, CC BY-NC-SA 4.0)
+   — added as `debont2025elaad_utrecht`, cited alongside the platform.
+4. **ASHRAE G14:** editions 2002 / 2014 / **2023** (current; title
+   "…Energy, Demand and Water Savings"). Bib updated to 14-2023 (key kept).
+5. **INL:** authors are Smart & Salisbury; INL/EXT-15-35584, 2015, DOI
+   10.2172/1369632 — confirmed.
+6. **ComStock:** Parker, Horsey, Dahlhausen, Praprost, CaraDonna, LeBar, Klun;
+   NREL/TP-5500-83819, 2023, DOI 10.2172/1967948 — confirmed exactly.
+7. **PVWatts v5:** techreport (not article), NREL/TP-6A20-62641, 2014, DOI
+   10.2172/1158421 — bib entry type fixed.
+8. EnergyPlus / BDG2 / Datasheets / TimeGAN / CSDI / RGAN all field-verified
+   (title casings + BDG2 comma-title + Gebru DOI 10.1145/3458723 corrected).
+   BDG2 is Scientific Data 7:368 (article number, not issue).
+
+Status: **citation verification COMPLETE** — every entry in references.bib is
+authority-verified; optional uncited alternates (Mwasilu, Yilmaz&Krein,
+Sadeghian, Dahiwale, Lin survey, ERGAN, CENTS, Li 2026) remain catalogued in
+passes 1–3 above for reviewer-response use.
