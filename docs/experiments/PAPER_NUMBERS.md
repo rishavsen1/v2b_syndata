@@ -6,7 +6,7 @@
 > (full, ~overnight-safe) or `--steps collect` (rebuild this file from
 > existing artifacts).
 
-- **Git revision:** `18b85ec39155536f451f92238cd2b90a22c296cc` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
+- **Git revision:** `71639063168898476b328bbd3593489747a231bc` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
 - **Determinism:** all steps seeded (generation: SHA-keyed node streams; S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000; TSTR: seed 1234; ablation: deterministic EM). Two consecutive driver runs must reproduce this file bit-for-bit; wall-times below are the recorded measurement from `docs/experiments/repro_runtimes.json` (written once; see driver docstring).
 - **No timestamps in this file by design** — the git SHA pins the revision; `docs/CALIBRATION_RESULTS.md` carries its own generation date.
 
@@ -115,12 +115,17 @@ Generating command: `uv run python tools/validate_pv.py` (requires PySAM; not re
 | ElaadNL | lagged, normalized | 4.19 | 3.72 | `data/tstr/results_elaadnl_matched.json` |
 | ElaadNL | calendar-only, raw | 1.32 | 1.31 | `data/tstr/results_elaadnl_matched.json` |
 | ElaadNL | calendar-only, normalized | 1.02 | 1.03 | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL (scale-matched, 12 synth months) | lagged, raw | 4.31 | 4.30 | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | lagged, normalized | 5.25 | 4.62 | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | calendar-only, raw | 3.21 | 2.95 | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | calendar-only, normalized | 1.01 | 1.02 | `data/tstr/results_elaadnl_scale.json` |
 
 | context quantity | value | source |
 |---|---|---|
 | ACN synthetic cohort | scenario S_acn_caltech, seed 1234, 90 sessions | `data/tstr/results.json` |
 | ElaadNL synthetic cohort | scenario S_elaadnl_public_eu, seed 1234, 75 sessions, mean 2.16 kW, peak 26.0 kW | `data/tstr/results_elaadnl_matched.json` |
 | ElaadNL real series | mean 33.15 kW, peak 481.1 kW, 35,980 hourly bins | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL scale-matched cohort (headline arm C: 12 synth months, ev_count 1000 / charger_count 500 = knob caps; real cohort 1,231 drivers) | 64,334 sessions, mean 190.94 kW, peak 1061.4 kW | `data/tstr/results_elaadnl_scale.json` |
 | ElaadNL real cohort identifiers (workplace venue filter) | 1,231 drivers (raw archive: 3,409 identifiers, `docs/CALIBRATION_NOTES.md`) | `sources_summary.csv` |
 | superseded artifact (mismatched-scenario ElaadNL run, kept as evidence per §6 footnote) | `data/tstr/results_elaadnl.json` (scenario S_acn_caltech) | repo |
 
@@ -139,7 +144,25 @@ Generating commands: `uv run python tools/tstr_forecasting.py --real acn --out d
 | per-unit generation cost | 49.2 s (mean over 18,000 units, 1 core each) | batch manifests (`duration_sec`) |
 | corpus compute | 246 CPU-hours (30 workers ≈ 8.2 h wall) | batch manifests |
 
-## 10. Reproduction compute (this driver, recorded measurement)
+## 10. V2B dispatch baseline (LP peak shave, one released unit)
+
+_Unit `data/output/campus10/b1/JUL2024/0` (60 cars, 48/60 bidirectional chargers, 400 kWh / 100 kW battery, PV, TOU prices). LP is deterministic (no RNG; unique optimum under the 1e-4 price tie-break); the CSV's `solve_s` wall-time column is the sole non-deterministic field and is not cited here. Formulation and reconstruction rules: `docs/experiments/v2b_dispatch.md`._
+
+| arm | monthly peak net (kW) | peak reduction | energy cost (USD) | status | source |
+|---|--:|--:|--:|---|---|
+| uncontrolled | 1,871.5 | 0.0% | 113,732.18 | simulated | `v2b_dispatch.csv` |
+| v1g | 1,521.8 | 18.7% | 113,709.25 | optimal | `v2b_dispatch.csv` |
+| v2b | 1,321.0 | 29.4% | 113,640.91 | optimal | `v2b_dispatch.csv` |
+| acnsim_llf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
+| acnsim_uncontrolled_crosscheck | 1,922.2 | -2.7% | 114,297.01 | simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered) | `v2b_dispatch.csv` |
+
+- Feasibility: 0 required-SoC relaxations, 0 horizon-clipped windows, 0 skipped sessions over 1242 sessions; 1002/1242 sessions bidirectional-assigned (deterministic round-robin).
+- V2B arm energy detail: 21,587 kWh EV charged, 595 kWh EV discharged, 5,298 kWh stationary-battery throughput.
+- ACN-Sim cross-check: LLF (stock V1G, building-load-unaware, uncontended charger pool = semantic twin of the uncontrolled arm) reproduces the uncontrolled peak to +0.0 kW — the demand model is independently validated by an established simulator; see `v2b_dispatch.md` for why no stock ACN-Sim algorithm is comparable to LP-V1G.
+
+Generating command: `uv run python tools/repro_paper.py --steps v2b_dispatch` (wraps `tools/bench_v2b_dispatch.py`).
+
+## 11. Reproduction compute (this driver, recorded measurement)
 
 | step | wall time |
 |---|--:|
@@ -148,8 +171,9 @@ Generating commands: `uv run python tools/tstr_forecasting.py --real acn --out d
 | tstr_acn | 0.1 min |
 | tstr_elaadnl | 0.3 min |
 | ablation | 0.4 min |
+| v2b_dispatch | 0.1 min |
 | collect | 0.0 min |
-| **total** | **8.8 min** |
+| **total** | **8.9 min** |
 
 _Measured once on a 32-core workstation (EnergyPlus 24.1, load caches warm) and recorded in `docs/experiments/repro_runtimes.json`; re-runs embed the recorded values so this file stays bit-reproducible. Delete that JSON or pass `--record-runtimes` to re-measure._
 

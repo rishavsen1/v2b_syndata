@@ -49,6 +49,10 @@ Usage
   uv run python tools/tstr_forecasting.py --freq 15min
   uv run python tools/tstr_forecasting.py --real elaadnl
   uv run python tools/tstr_forecasting.py --quick          # tiny month, fast
+  # scale study: 12 consecutive synthetic months, scale-matched fleet
+  uv run python tools/tstr_forecasting.py --real elaadnl --normalize \
+      --months 12 --override 'ev_fleet.ev_count=1000' \
+      --override 'charging_infra.charger_count=500'
 """
 from __future__ import annotations
 
@@ -188,23 +192,43 @@ def load_real_sessions(source: str, sites: tuple[str, ...] | None = None) -> lis
     ]
 
 
-def generate_synthetic_cohort(
-    scenario_id: str, seed: int, sim_months: int, work_dir: Path,
-) -> tuple[list[Session], dict[str, Any]]:
-    """Generate a synthetic cohort and convert its sessions to Session records.
+def month_starts(base: pd.Timestamp, n_months: int) -> list[pd.Timestamp]:
+    """First-of-month anchors for `n_months` consecutive months from `base`.
+
+    `base` is snapped to the first of its containing month (matching the
+    runner's `sim_window.mode=month` semantics), so the windows tile the
+    calendar with no gap and no overlap.
+    """
+    if n_months < 1:
+        raise ValueError(f"n_months must be >= 1, got {n_months}")
+    first = pd.Timestamp(base).normalize().replace(day=1)
+    return [first + pd.DateOffset(months=k) for k in range(n_months)]
+
+
+def _base_sim_start(scenario_id: str, overrides: dict[str, Any]) -> pd.Timestamp:
+    """Base month anchor for multi-month generation, mirroring the runner's
+    resolution: CLI override > scenario YAML `overrides` > DEFAULT_SIM_START."""
+    if "sim_window.start" in overrides:
+        return pd.Timestamp(overrides["sim_window.start"])
+    import yaml
+
+    scn = yaml.safe_load(
+        (REPO / "configs" / "scenarios" / f"{scenario_id}.yaml").read_text())
+    raw = (scn.get("overrides") or {}).get("sim_window.start")
+    if raw is not None:
+        return pd.Timestamp(raw)
+    from v2b_syndata.runner import DEFAULT_SIM_START
+
+    return pd.Timestamp(DEFAULT_SIM_START)
+
+
+def _sessions_from_dir(work_dir: Path) -> list[Session]:
+    """Read one generated month directory into Session records.
 
     Synthetic delivered energy is reconstructed from the SoC swing:
         kwh = capacity_kwh * (required_soc_at_depart - arrival_soc) / 100
-    (SoC columns are in percent). Returns (sessions, generator_stamp).
+    (SoC columns are in percent).
     """
-    from v2b_syndata.runner import generate
-
-    work_dir.mkdir(parents=True, exist_ok=True)
-    overrides: dict[str, Any] = {}
-    manifest = generate(
-        scenario_id=scenario_id, seed=seed, output_dir=work_dir,
-        config_dir=REPO / "configs", cli_overrides=overrides or None,
-    )
     sess = pd.read_csv(work_dir / "sessions.csv")
     cars = pd.read_csv(work_dir / "cars.csv")[["car_id", "capacity_kwh"]]
     df = sess.merge(cars, on="car_id", how="left")
@@ -213,19 +237,88 @@ def generate_synthetic_cohort(
     df["dwell_hours"] = (df["depart"] - df["connect"]).dt.total_seconds() / 3600.0
     soc_swing = (df["required_soc_at_depart"] - df["arrival_soc"]).clip(lower=0.0)
     df["kwh"] = df["capacity_kwh"] * soc_swing / 100.0
-
-    sessions = [
+    return [
         Session(connect=r.connect, dwell_hours=float(r.dwell_hours), kwh=float(r.kwh))
         for r in df.itertuples()
         if r.dwell_hours > 0 and np.isfinite(r.kwh)
     ]
+
+
+def generate_synthetic_cohort(
+    scenario_id: str, seed: int, sim_months: int, work_dir: Path,
+    overrides: dict[str, Any] | None = None,
+) -> tuple[list[Session], dict[str, Any]]:
+    """Generate a synthetic cohort and convert its sessions to Session records.
+
+    `sim_months` > 1 generates that many CONSECUTIVE calendar months (knob
+    override `sim_window.start` advanced one month at a time from the
+    scenario's own anchor) and concatenates the sessions. The fleet is the
+    SAME across months: user/car latents are seeded by node name + car_id
+    (not by date), while per-day session draws are keyed by the absolute
+    date (`sessions:<ISO date>` RNG streams), so each month is a genuinely
+    distinct realization of the same cohort — a longitudinal series, not
+    twelve copies of one month. Requires `sim_window.mode=month` semantics
+    (the default for calibrated scenarios).
+
+    `overrides` are knob overrides ('bucket.knob' -> value) forwarded to
+    every `generate()` call (e.g. ev_fleet.ev_count for scale-matching).
+
+    Default path (sim_months=1, no overrides) is byte-identical to the
+    historical single-month harness: one generate() call with
+    cli_overrides=None and no sim_window injection.
+
+    Returns (sessions, generator_stamp).
+    """
+    from v2b_syndata.runner import generate
+
+    overrides = dict(overrides or {})
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    sessions: list[Session] = []
+    per_month: list[dict[str, Any]] = []
+    manifest: dict[str, Any] = {}
+    starts = (month_starts(_base_sim_start(scenario_id, overrides), sim_months)
+              if sim_months > 1 else [None])
+
+    for k, start in enumerate(starts):
+        cli_overrides = dict(overrides)
+        if start is not None and k > 0:
+            # Month 0 keeps the scenario's own anchor (no injected start) so
+            # the first month is bit-identical to the single-month run.
+            cli_overrides["sim_window.start"] = start.date().isoformat()
+        month_dir = work_dir if sim_months == 1 else work_dir / f"m{k:02d}"
+        manifest = generate(
+            scenario_id=scenario_id, seed=seed, output_dir=month_dir,
+            config_dir=REPO / "configs", cli_overrides=cli_overrides or None,
+        )
+        month_sessions = _sessions_from_dir(month_dir)
+        sessions.extend(month_sessions)
+        e5 = manifest.get("e5") or {}
+        val = manifest.get("validation") or {}
+        per_month.append({
+            "month_start": (start.date().isoformat() if start is not None
+                            else "scenario-default"),
+            "n_sessions": len(month_sessions),
+            "e5_realized_max_concurrent": e5.get("realized_max_concurrent"),
+            "e5_n_chargers": e5.get("n_chargers"),
+            "e5_infeasible": e5.get("infeasible"),
+            "validation_passed": val.get("passed"),
+            "validation_n_errors": val.get("n_errors"),
+            "validation_n_warnings": val.get("n_warnings"),
+        })
+
+    connects = pd.to_datetime([s.connect for s in sessions])
+    ends = connects + pd.to_timedelta([s.dwell_hours for s in sessions], unit="h")
     stamp = {
         "scenario_id": scenario_id,
         "seed": seed,
         "generator_version": manifest.get("generator_version"),
         "generator_git_sha": manifest.get("generator_git_sha"),
-        "sim_window": [str(df["connect"].min()), str(df["depart"].max())],
+        "sim_window": [str(connects.min()), str(ends.max())],
         "n_sessions": len(sessions),
+        "sim_months": sim_months,
+        "knob_overrides": {k: str(v) for k, v in sorted(overrides.items())},
+        "per_month": per_month,
     }
     return sessions, stamp
 
@@ -390,7 +483,7 @@ def format_table(res: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--real", default="acn", choices=["acn", "elaadnl"],
@@ -404,23 +497,56 @@ def main(argv: Sequence[str] | None = None) -> int:
                          "synth: full-series mean) before feature building")
     ap.add_argument("--freq", default="1h", help="resample frequency (1h, 15min)")
     ap.add_argument("--seed", type=int, default=SEED)
-    ap.add_argument("--sim-months", type=int, default=1,
-                    help="(informational) synthetic sim window length")
+    ap.add_argument("--months", "--sim-months", type=int, default=1,
+                    dest="months",
+                    help="number of CONSECUTIVE synthetic months to generate "
+                         "and concatenate (sim_window.start advanced one month "
+                         "at a time from the scenario's anchor); default 1 = "
+                         "historical single-month behavior")
+    ap.add_argument("--override", action="append", default=[],
+                    metavar="bucket.knob=value",
+                    help="repeatable knob override forwarded to every "
+                         "generate() call (YAML-parsed value), e.g. "
+                         "--override 'ev_fleet.ev_count=1000'")
     ap.add_argument("--quick", action="store_true",
                     help="cap real sessions for a fast smoke run")
     ap.add_argument("--out", default=str(OUT_DIR / "results.json"))
-    args = ap.parse_args(argv)
+    return ap
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_arg_parser().parse_args(argv)
     if args.scenario is None:
         args.scenario = DEFAULT_SCENARIO[args.real]
 
+    knob_overrides: dict[str, Any] = {}
+    if args.override:
+        from v2b_syndata.knob_loader import parse_overrides
+        knob_overrides = parse_overrides(args.override)
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/4] generating synthetic cohort ({args.scenario}, seed={args.seed}) ...")
+    print(f"[1/4] generating synthetic cohort ({args.scenario}, seed={args.seed}, "
+          f"months={args.months}"
+          + (f", overrides={knob_overrides}" if knob_overrides else "") + ") ...")
     with tempfile.TemporaryDirectory() as td:
         synth_sessions, gen_stamp = generate_synthetic_cohort(
-            args.scenario, args.seed, args.sim_months, Path(td) / "syn")
+            args.scenario, args.seed, args.months, Path(td) / "syn",
+            overrides=knob_overrides)
     print(f"      synthetic sessions: {len(synth_sessions)}  "
           f"(gen v{gen_stamp['generator_version']} @ {str(gen_stamp['generator_git_sha'])[:10]})")
+    for pm in gen_stamp["per_month"]:
+        flags = []
+        if pm.get("e5_infeasible"):
+            flags.append("E5-INFEASIBLE")
+        if pm.get("validation_n_errors"):
+            flags.append(f"{pm['validation_n_errors']} validation errors")
+        if pm.get("validation_n_warnings"):
+            flags.append(f"{pm['validation_n_warnings']} validation warnings")
+        print(f"      month {pm['month_start']}: {pm['n_sessions']} sessions, "
+              f"E5 max concurrent {pm['e5_realized_max_concurrent']}"
+              f"/{pm['e5_n_chargers']} chargers"
+              + (f"  [{'; '.join(flags)}]" if flags else ""))
 
     print(f"[2/4] loading real {args.real} sessions ...")
     real_sessions = load_real_sessions(args.real)
@@ -453,6 +579,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "real_source": args.real, "scenario": args.scenario,
             "freq": args.freq, "seed": args.seed, "lags": list(LAGS),
             "train_frac": TRAIN_FRAC,
+            "sim_months": args.months,
+            "knob_overrides": {k: str(v) for k, v in sorted(knob_overrides.items())},
             "session_to_load_assumption":
                 "uniform constant-power spread of delivered energy over "
                 "connect->disconnect dwell window (energy-rectangle proxy); "

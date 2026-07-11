@@ -1,0 +1,302 @@
+{
+  "config": {
+    "feature_sets": {
+      "calendar_only": "hour-of-day, day-of-week only (isolates generator load-shape fidelity; no persistence)",
+      "lagged": "hour-of-day, day-of-week, lagged load (realistic operational forecaster; partly persistence)"
+    },
+    "freq": "1h",
+    "knob_overrides": {},
+    "lags": [
+      1,
+      2,
+      3,
+      24
+    ],
+    "normalization": "each cohort's load series scaled to unit mean before feature building (real: chronological train-split mean; synth: full-series mean); metrics are in per-unit of cohort mean load (shape transfer).",
+    "real_source": "elaadnl",
+    "scenario": "S_elaadnl_public_eu",
+    "seed": 1234,
+    "session_to_load_assumption": "uniform constant-power spread of delivered energy over connect->disconnect dwell window (energy-rectangle proxy); identical rule applied to real and synthetic.",
+    "sim_months": 12,
+    "train_frac": 0.6
+  },
+  "generator": {
+    "generator_git_sha": "50b369d639f022808f5c42ba330fbdc04b4c7229",
+    "generator_version": "0.1.0",
+    "knob_overrides": {},
+    "n_sessions": 1104,
+    "per_month": [
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 5,
+        "month_start": "2020-04-01",
+        "n_sessions": 75,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 8,
+        "month_start": "2020-05-01",
+        "n_sessions": 97,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 7,
+        "month_start": "2020-06-01",
+        "n_sessions": 90,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 8,
+        "month_start": "2020-07-01",
+        "n_sessions": 117,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 6,
+        "month_start": "2020-08-01",
+        "n_sessions": 92,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 7,
+        "month_start": "2020-09-01",
+        "n_sessions": 90,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 9,
+        "month_start": "2020-10-01",
+        "n_sessions": 93,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 7,
+        "month_start": "2020-11-01",
+        "n_sessions": 88,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 9,
+        "month_start": "2020-12-01",
+        "n_sessions": 95,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 9,
+        "month_start": "2021-01-01",
+        "n_sessions": 85,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 8,
+        "month_start": "2021-02-01",
+        "n_sessions": 83,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      },
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 8,
+        "month_start": "2021-03-01",
+        "n_sessions": 99,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      }
+    ],
+    "scenario_id": "S_elaadnl_public_eu",
+    "seed": 1234,
+    "sim_months": 12,
+    "sim_window": [
+      "2020-04-01 07:00:00",
+      "2021-03-31 19:00:00"
+    ]
+  },
+  "real_series": {
+    "end": "2024-10-02 16:00:00",
+    "mean_kw": 33.149175847692426,
+    "n_bins": 35980,
+    "peak_kw": 481.1124817631258,
+    "start": "2020-08-25 13:00:00",
+    "total_mwh": 1192.7073469999734
+  },
+  "results_calendar_only": {
+    "TRTR": {
+      "mae": 41.659007371251235,
+      "mape": 56.35614704287626,
+      "rmse": 87.08162597189624
+    },
+    "TRTS": {
+      "mae": 14.59282260780785,
+      "mape": 1490.1272442411212,
+      "rmse": 28.107041136527002
+    },
+    "TSTR": {
+      "mae": 54.48477893653152,
+      "mape": 40.4893385591919,
+      "rmse": 112.80245188340808
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 12.825771565280284,
+      "mape": -15.866808483684359,
+      "rmse": 25.720825911511838
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 1.3078751121211618,
+      "mape": 0.7184546972025474,
+      "rmse": 1.2953645573845014
+    },
+    "sample_counts": {
+      "real_test": 14392,
+      "real_train": 21588,
+      "synth": 8748
+    }
+  },
+  "results_calendar_only_normalized": {
+    "TRTR": {
+      "mae": 2.416638374994887,
+      "mape": 56.35614710861858,
+      "rmse": 5.051603779061721
+    },
+    "TRTS": {
+      "mae": 0.6447028329189557,
+      "mape": 229.36595220766839,
+      "rmse": 1.393118175408317
+    },
+    "TSTR": {
+      "mae": 2.4390284051561406,
+      "mape": 54.46993166194149,
+      "rmse": 5.1587271545107525
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 0.022390030161253627,
+      "mape": -1.8862154466770917,
+      "rmse": 0.1071233754490315
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 1.0092649485305392,
+      "mape": 0.9665304400060978,
+      "rmse": 1.0212058150508645
+    },
+    "sample_counts": {
+      "real_test": 14392,
+      "real_train": 21588,
+      "synth": 8748
+    }
+  },
+  "results_lagged": {
+    "TRTR": {
+      "mae": 7.125202979112421,
+      "mape": 14.974139350196136,
+      "rmse": 17.93868333851632
+    },
+    "TRTS": {
+      "mae": 1.0789447702598387,
+      "mape": 103.45073310853765,
+      "rmse": 2.6737154621926695
+    },
+    "TSTR": {
+      "mae": 49.15038168868551,
+      "mape": 36.84533009645518,
+      "rmse": 104.90139978650387
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 42.02517870957309,
+      "mape": 21.871190746259042,
+      "rmse": 86.96271644798756
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 6.898102669182924,
+      "mape": 2.460597516475801,
+      "rmse": 5.847775882261607
+    },
+    "sample_counts": {
+      "real_test": 14368,
+      "real_train": 21564,
+      "synth": 8724
+    }
+  },
+  "results_lagged_normalized": {
+    "TRTR": {
+      "mae": 0.41333291480539264,
+      "mape": 14.974139345153661,
+      "rmse": 1.0406227434620103
+    },
+    "TRTS": {
+      "mae": 0.3172172173413766,
+      "mape": 57.55435774763181,
+      "rmse": 0.8121673776258888
+    },
+    "TSTR": {
+      "mae": 1.2421222706635415,
+      "mape": 26.26954373287812,
+      "rmse": 2.941923636649898
+    },
+    "TSTR_minus_TRTR": {
+      "mae": 0.828789355858149,
+      "mape": 11.295404387724458,
+      "rmse": 1.9013008931878879
+    },
+    "TSTR_over_TRTR_ratio": {
+      "mae": 3.0051375687038218,
+      "mape": 1.754327452641222,
+      "rmse": 2.8270798953158742
+    },
+    "sample_counts": {
+      "real_test": 14368,
+      "real_train": 21564,
+      "synth": 8724
+    }
+  },
+  "synth_series": {
+    "end": "2021-03-31 18:00:00",
+    "mean_kw": 2.7780894395508784,
+    "n_bins": 8748,
+    "peak_kw": 56.004892940491914,
+    "start": "2020-04-01 07:00:00",
+    "total_mwh": 24.30272641719108
+  }
+}

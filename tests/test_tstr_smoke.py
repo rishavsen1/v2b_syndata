@@ -205,6 +205,115 @@ def test_default_scenario_matched_to_real_source():
     assert set(tstr.DEFAULT_SCENARIO) == {"acn", "elaadnl"}
 
 
+# --------------------------------------------------------------------------- #
+# multi-month generation (--months) + knob-override passthrough
+# --------------------------------------------------------------------------- #
+def test_month_starts_tiling():
+    starts = tstr.month_starts(pd.Timestamp("2020-04-17 09:30"), 12)
+    assert len(starts) == 12
+    assert starts[0] == pd.Timestamp("2020-04-01")   # snapped to first-of-month
+    assert starts[1] == pd.Timestamp("2020-05-01")
+    assert starts[-1] == pd.Timestamp("2021-03-01")  # wraps the year boundary
+    # consecutive months tile the calendar: each start is the next month's 1st
+    for a, b in zip(starts, starts[1:], strict=False):
+        assert b == a + pd.DateOffset(months=1)
+    with pytest.raises(ValueError):
+        tstr.month_starts(pd.Timestamp("2020-04-01"), 0)
+
+
+def _fake_generate_factory(calls: list[dict]):
+    """A stand-in for v2b_syndata.runner.generate that records its call args
+    and writes a minimal per-month sessions.csv/cars.csv (2 sessions)."""
+    def fake_generate(*, scenario_id, seed, output_dir, config_dir,
+                      cli_overrides=None, **kw):
+        calls.append({"scenario_id": scenario_id, "seed": seed,
+                      "cli_overrides": cli_overrides})
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        start = pd.Timestamp((cli_overrides or {}).get(
+            "sim_window.start", "2020-04-01"))
+        pd.DataFrame({
+            "car_id": [1, 2],
+            "arrival": [start + pd.Timedelta(hours=8),
+                        start + pd.Timedelta(hours=9)],
+            "departure": [start + pd.Timedelta(hours=12),
+                          start + pd.Timedelta(hours=17)],
+            "arrival_soc": [40.0, 50.0],
+            "required_soc_at_depart": [80.0, 90.0],
+        }).to_csv(output_dir / "sessions.csv", index=False)
+        pd.DataFrame({"car_id": [1, 2], "capacity_kwh": [60.0, 80.0]}
+                     ).to_csv(output_dir / "cars.csv", index=False)
+        return {
+            "generator_version": "test", "generator_git_sha": "deadbeef",
+            "e5": {"realized_max_concurrent": 2, "n_chargers": 20,
+                   "infeasible": False},
+            "validation": {"passed": True, "n_errors": 0, "n_warnings": 0},
+        }
+    return fake_generate
+
+
+def test_generate_cohort_single_month_default_path(tmp_path, monkeypatch):
+    """months=1, no overrides => exactly one generate() call with
+    cli_overrides=None and NO sim_window.start injection (the byte-identical
+    historical path)."""
+    import v2b_syndata.runner as runner
+    calls: list[dict] = []
+    monkeypatch.setattr(runner, "generate", _fake_generate_factory(calls))
+    sessions, stamp = tstr.generate_synthetic_cohort(
+        "S_elaadnl_public_eu", 1234, 1, tmp_path / "syn")
+    assert len(calls) == 1
+    assert calls[0]["cli_overrides"] is None
+    assert len(sessions) == 2
+    assert stamp["sim_months"] == 1
+    assert stamp["knob_overrides"] == {}
+    assert len(stamp["per_month"]) == 1
+    assert stamp["per_month"][0]["month_start"] == "scenario-default"
+
+
+def test_generate_cohort_multi_month_consecutive_and_overrides(tmp_path, monkeypatch):
+    """months=3 + knob overrides: month 0 keeps the scenario anchor (no
+    injected start), months 1..2 advance sim_window.start by one calendar
+    month; the knob overrides are forwarded to EVERY call; sessions
+    concatenate across months."""
+    import v2b_syndata.runner as runner
+    calls: list[dict] = []
+    monkeypatch.setattr(runner, "generate", _fake_generate_factory(calls))
+    sessions, stamp = tstr.generate_synthetic_cohort(
+        "S_elaadnl_public_eu", 1234, 3, tmp_path / "syn",
+        overrides={"ev_fleet.ev_count": 1000,
+                   "charging_infra.charger_count": 500})
+    assert len(calls) == 3
+    # month 0: scenario anchor, no injected start; overrides still forwarded
+    assert "sim_window.start" not in calls[0]["cli_overrides"]
+    assert calls[0]["cli_overrides"]["ev_fleet.ev_count"] == 1000
+    # months 1..2: consecutive first-of-month anchors from the scenario's
+    # own sim_window.start (S_elaadnl_public_eu => 2020-04-01)
+    assert calls[1]["cli_overrides"]["sim_window.start"] == "2020-05-01"
+    assert calls[2]["cli_overrides"]["sim_window.start"] == "2020-06-01"
+    for c in calls:
+        assert c["cli_overrides"]["charging_infra.charger_count"] == 500
+        assert c["seed"] == 1234  # same fleet: seed constant across months
+    assert len(sessions) == 6  # 2 per month, concatenated
+    assert stamp["sim_months"] == 3
+    assert stamp["n_sessions"] == 6
+    assert [pm["n_sessions"] for pm in stamp["per_month"]] == [2, 2, 2]
+    assert stamp["knob_overrides"] == {
+        "charging_infra.charger_count": "500", "ev_fleet.ev_count": "1000"}
+
+
+def test_cli_months_flag_and_alias():
+    """--months and the legacy --sim-months spelling parse to the same dest;
+    --override is repeatable; defaults preserve the historical behavior."""
+    ap = tstr.build_arg_parser()
+    a = ap.parse_args(["--months", "12", "--override", "a.b=1",
+                       "--override", "c.d=2"])
+    assert a.months == 12 and a.override == ["a.b=1", "c.d=2"]
+    b = ap.parse_args(["--sim-months", "3"])
+    assert b.months == 3
+    d = ap.parse_args([])
+    assert d.months == 1 and d.override == []
+
+
 def test_format_table_runs():
     load_real = _toy_load(400, seed=0)
     load_synth = _toy_load(400, seed=1)
