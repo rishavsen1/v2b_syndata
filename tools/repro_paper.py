@@ -515,7 +515,7 @@ def step_collect(args) -> None:
     w("")
 
     # ── 3. Shipped mixture example (Fig 3, §4.3) ───────────────────────
-    w("## 3. Shipped arrival mixture, largest ACN region (Fig 3, §4.3)")
+    w("## 3. Shipped arrival mixture, rare-consistent ACN region (Fig 3, §4.3)")
     w("")
     rc = pops["acn_workplace_baseline"]["region_distributions"]["rare_consistent"]["arrival"]
     w(f"- `rare_consistent` arrival = {rc['w1']:.2f}·N({rc['mu1']:.2f}, "
@@ -548,7 +548,7 @@ def step_collect(args) -> None:
       f"[{_fmt(worst['ks_ci_lo'])}, {_fmt(worst['ks_ci_hi'])}] "
       f"({worst['source']} / {worst['region']} / {worst['variable']}, "
       f"n={int(worst['n_source']):,}) | `S1_marginals.csv` |")
-    w(f"| S1 arrival KS, largest ACN region (acn/rare_consistent) | "
+    w(f"| S1 arrival KS, rare-consistent ACN region (36% of drivers) | "
       f"{_fmt(rc_row['ks_statistic'])} [{_fmt(rc_row['ks_ci_lo'])}, "
       f"{_fmt(rc_row['ks_ci_hi'])}] | `S1_marginals.csv` |")
     w(f"| S2 max copula ρ-gap | {_fmt(s2['rho_gap'].max())} "

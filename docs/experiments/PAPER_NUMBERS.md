@@ -6,7 +6,7 @@
 > (full, ~overnight-safe) or `--steps collect` (rebuild this file from
 > existing artifacts).
 
-- **Git revision:** `ea5fb2a604e278e6ac01d918379c3b4bd1f1998b`
+- **Git revision:** `18b85ec39155536f451f92238cd2b90a22c296cc` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
 - **Determinism:** all steps seeded (generation: SHA-keyed node streams; S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000; TSTR: seed 1234; ablation: deterministic EM). Two consecutive driver runs must reproduce this file bit-for-bit; wall-times below are the recorded measurement from `docs/experiments/repro_runtimes.json` (written once; see driver docstring).
 - **No timestamps in this file by design** — the git SHA pins the revision; `docs/CALIBRATION_RESULTS.md` carries its own generation date.
 
@@ -43,7 +43,7 @@ Generating command: `uv run python tools/repro_paper.py --steps ablation` (sourc
 
 Generating command: `uv run python tools/validate_calibration.py --seeds 50 --workers 16 --sources acn,acn_caltech,acn_jpl,acn_office001,elaadnl,evwatts --bootstrap 1000`.
 
-## 3. Shipped arrival mixture, largest ACN region (Fig 3, §4.3)
+## 3. Shipped arrival mixture, rare-consistent ACN region (Fig 3, §4.3)
 
 - `rare_consistent` arrival = 0.42·N(8.21, 1.25) + 0.58·N(14.54, 3.52), truncated to [4, 22] h; fit KS 0.040 (n = 4,676).
 - Source: `configs/populations.yaml` (`acn_workplace_baseline.region_distributions.rare_consistent.arrival`).
@@ -55,7 +55,7 @@ Generating command: `uv run python tools/validate_calibration.py --seeds 50 --wo
 | S1 mean \|Δμ\| (all 36 region×variable cells, all 6 sources) | 0.44 h | `S1_marginals.csv` |
 | S1 mean \|Δμ\| excl. evwatts (30 cells; pre-WS-F aggregate for continuity) | 0.37 h | `S1_marginals.csv` |
 | S1 max KS (worst cell) | 0.239 [0.146, 0.385] (acn_office001 / rare_consistent / arrival_hour, n=41) | `S1_marginals.csv` |
-| S1 arrival KS, largest ACN region (acn/rare_consistent) | 0.222 [0.209, 0.235] | `S1_marginals.csv` |
+| S1 arrival KS, rare-consistent ACN region (36% of drivers) | 0.222 [0.209, 0.235] | `S1_marginals.csv` |
 | S2 max copula ρ-gap | 0.226 (acn_office001 / occasional_consistent) | `S2_joint.csv` |
 | S3 median Δ(holdout − train KS) | 0.064 (36 cells) | `S3_holdout.csv` |
 | S3 median Δ excl. evwatts (26 cells; pre-WS-F scope for continuity) | 0.069 | `S3_holdout.csv` |
