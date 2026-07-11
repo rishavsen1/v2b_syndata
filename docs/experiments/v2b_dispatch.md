@@ -26,8 +26,8 @@ minimize `P + 1e-4 * dt * sum price*(c + bc)` subject to, per step t, `load + su
 | arm | peak net (kW) | peak reduction | energy cost (USD) | cost reduction | EV charged (kWh) | EV discharged (kWh) | battery throughput (kWh) | status | LP size (var / constr) | solve (s) |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|--:|
 | uncontrolled | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated | — | 0.00 |
-| v1g | 1,521.8 | 18.7% | 113,709.25 | 0.0% | 20,991.7 | 0.0 | 0.0 | optimal | 77,173 / 41,562 | 0.31 |
-| v2b | 1,321.0 | 29.4% | 113,640.91 | 0.1% | 21,586.7 | 594.9 | 5,298.2 | optimal | 117,324 / 44,538 | 1.60 |
+| v1g | 1,521.8 | 18.7% | 113,709.25 | 0.0% | 20,991.7 | 0.0 | 0.0 | optimal | 77,173 / 41,562 | 0.32 |
+| v2b | 1,321.0 | 29.4% | 113,640.91 | 0.1% | 21,586.7 | 594.9 | 5,298.2 | optimal | 117,324 / 44,538 | 1.68 |
 | acnsim_llf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 0.98 |
 | acnsim_uncontrolled_crosscheck | 1,922.2 | -2.7% | 114,297.01 | -0.5% | 24,165.0 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered) | — | 0.49 |
 

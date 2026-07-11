@@ -543,10 +543,13 @@ def write_outputs(data_dir: Path, out_dir: Path, result: dict) -> None:
     arms: dict[str, dict] = result["arms"]
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # solve_s deliberately excluded: wall-time is the one nondeterministic
+    # quantity and lives in the memo / repro_runtimes.json, keeping this CSV
+    # byte-stable across runs (determinism gate).
     cols = ["arm", "peak_net_kw", "peak_reduction_pct", "energy_cost_usd",
             "cost_reduction_pct", "ev_charge_kwh", "ev_discharge_kwh",
             "batt_throughput_kwh", "status", "n_var", "n_constraints",
-            "solve_s", "n_sessions", "n_relaxed", "n_clipped", "n_skipped",
+            "n_sessions", "n_relaxed", "n_clipped", "n_skipped",
             "n_bidirectional_sessions"]
     rows = []
     for name, r in arms.items():

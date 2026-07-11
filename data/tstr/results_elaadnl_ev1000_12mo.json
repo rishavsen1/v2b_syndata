@@ -24,7 +24,7 @@
     "train_frac": 0.6
   },
   "generator": {
-    "generator_git_sha": "50b369d639f022808f5c42ba330fbdc04b4c7229",
+    "generator_git_sha": "052b8a1b09a28d70b62184b13dc530108b7a0995",
     "generator_version": "0.1.0",
     "knob_overrides": {
       "charging_infra.charger_count": "500",

@@ -1,6 +1,6 @@
-arm,peak_net_kw,peak_reduction_pct,energy_cost_usd,cost_reduction_pct,ev_charge_kwh,ev_discharge_kwh,batt_throughput_kwh,status,n_var,n_constraints,solve_s,n_sessions,n_relaxed,n_clipped,n_skipped,n_bidirectional_sessions
-uncontrolled,1871.542,0.0,113732.18,0.0,20991.7,0.0,0.0,simulated,0,0,0.0,1242,0,0,0,1002
-v1g,1521.759,18.69,113709.25,0.02,20991.7,0.0,0.0,optimal,77173,41562,0.31,1242,0,0,0,1002
-v2b,1321.044,29.414,113640.91,0.08,21586.7,594.9,5298.2,optimal,117324,44538,1.6,1242,0,0,0,1002
-acnsim_llf_crosscheck,1871.542,0.0,113732.18,0.0,20991.7,0.0,0.0,"simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered)",0,0,0.98,1242,0,0,0,1002
-acnsim_uncontrolled_crosscheck,1922.244,-2.709,114297.01,-0.497,24165.0,0.0,0.0,"simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered)",0,0,0.49,1242,0,0,0,1002
+arm,peak_net_kw,peak_reduction_pct,energy_cost_usd,cost_reduction_pct,ev_charge_kwh,ev_discharge_kwh,batt_throughput_kwh,status,n_var,n_constraints,n_sessions,n_relaxed,n_clipped,n_skipped,n_bidirectional_sessions
+uncontrolled,1871.542,0.0,113732.18,0.0,20991.7,0.0,0.0,simulated,0,0,1242,0,0,0,1002
+v1g,1521.759,18.69,113709.25,0.02,20991.7,0.0,0.0,optimal,77173,41562,1242,0,0,0,1002
+v2b,1321.044,29.414,113640.91,0.08,21586.7,594.9,5298.2,optimal,117324,44538,1242,0,0,0,1002
+acnsim_llf_crosscheck,1871.542,0.0,113732.18,0.0,20991.7,0.0,0.0,"simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered)",0,0,1242,0,0,0,1002
+acnsim_uncontrolled_crosscheck,1922.244,-2.709,114297.01,-0.497,24165.0,0.0,0.0,"simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered)",0,0,1242,0,0,0,1002

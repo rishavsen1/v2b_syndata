@@ -5,6 +5,7 @@
       "lagged": "hour-of-day, day-of-week, lagged load (realistic operational forecaster; partly persistence)"
     },
     "freq": "1h",
+    "knob_overrides": {},
     "lags": [
       1,
       2,
@@ -15,14 +16,29 @@
     "scenario": "S_acn_caltech",
     "seed": 1234,
     "session_to_load_assumption": "uniform constant-power spread of delivered energy over connect->disconnect dwell window (energy-rectangle proxy); identical rule applied to real and synthetic.",
+    "sim_months": 1,
     "train_frac": 0.6
   },
   "generator": {
-    "generator_git_sha": "a63c73ed2257fbde03766db1630d5ab5f3497f52",
+    "generator_git_sha": "052b8a1b09a28d70b62184b13dc530108b7a0995",
     "generator_version": "0.1.0",
+    "knob_overrides": {},
     "n_sessions": 90,
+    "per_month": [
+      {
+        "e5_infeasible": false,
+        "e5_n_chargers": 20,
+        "e5_realized_max_concurrent": 5,
+        "month_start": "scenario-default",
+        "n_sessions": 90,
+        "validation_n_errors": 0,
+        "validation_n_warnings": 2,
+        "validation_passed": true
+      }
+    ],
     "scenario_id": "S_acn_caltech",
     "seed": 1234,
+    "sim_months": 1,
     "sim_window": [
       "2020-04-01 08:00:00",
       "2020-04-30 21:15:00"
