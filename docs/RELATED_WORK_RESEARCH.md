@@ -334,3 +334,31 @@ prefix) after the limit resets to finish these.
 - Added `garciavillalobos2014smartcharging`, `tan2016v2g` to references.bib.
 - §2's last `\owed{cite}` (V2G/smart-charging surveys) resolved with the pair.
 - Remaining unverified: the 14 JOB-2 entries (still carry `TODO verify` notes).
+
+---
+
+# Pass 3 (2026-07-10) — resumed run, completed
+
+> Resume of `wf_c26bce62-427` with cached prefix. JOB 1 exhaustively confirmed
+> (5 verified survey anchors); JOB 2: **only EV WATTS verified** — the other 13
+> again produced no surviving claims (fan-out search is the wrong tool for
+> known-DOI verification; a direct-lookup pass is running instead).
+
+- **EV WATTS (VERIFIED, folded into bib):** Pritchard, Ewan. *EV Watts Public
+  Database.* OSTI 1970735, **DOI 10.15483/1970735** (DataCite publisher: NREL).
+  Year ambiguous (DOI registered 2023; DataCite publicationYear 2025; OSTI
+  "publication date" is a rolling last-updated field) → cite with access date.
+  Open sub-question: whether OSTI 1967948 is a companion report worth citing.
+- **DOI traps recorded:** García-Villalobos is `10.1016/j.rser.2014.07.040`
+  (the `.05.040` variant resolves to an unrelated paper — our bib is correct);
+  Mwasilu et al. 2014 = RSER **34**:501–516 (~1023 cites), DOI likely
+  `10.1016/j.rser.2014.03.031` but medium-confidence (conflicting verifier
+  side-evidence) — NOT added to bib, not needed.
+- **Attribution correction:** the prompt's lead misattributed RSER 38:717–731
+  to Mwasilu; that is García-Villalobos.
+- JOB 1 ledger unchanged from pass 2 (Tan 2016 + García-Villalobos cited;
+  Yilmaz&Krein 2013 / Sadeghian 2022 / Dahiwale 2024 as verified alternates;
+  Dahiwale scope caveat: abstract lacks V2G/PV/peak-shaving terms).
+- **Remaining 13** (ElaadNL/4TU, INL, EnergyPlus, PNNL prototypes, PVWatts,
+  ComStock, BDG2, TimeGAN, CSDI, RGAN, ASHRAE G14, Datasheets, Croissant):
+  handed to a direct Crossref/DataCite/publisher lookup pass (not fan-out).
