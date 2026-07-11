@@ -17,14 +17,27 @@ Runs, in order, with fixed seeds:
                      (matched scenario S_elaadnl_public_eu, seed 1234)
                      → data/tstr/results_elaadnl_matched.json. One run emits
                      BOTH raw and unit-mean-normalized regimes.
-  5. ablation      — mixture / per-region arrival+dwell fit ablation (below)
+  5. tstr_scale    — TSTR scale/duration study (ElaadNL): 12-month same-fleet,
+                     scale-matched 1-month (ev_count 1000 / charger_count 500,
+                     the knob caps), and the headline 12-month scale-matched
+                     arm → data/tstr/results_elaadnl_scale.json (combined,
+                     keyed; baseline embedded) + per-arm JSONs.
+  6. ablation      — mixture / per-region arrival+dwell fit ablation (below)
                      → docs/experiments/mixture_ablation.csv (+ .md) and
                      docs/experiments/sources_summary.csv. Regenerates the
                      "GMM-k mixture" and "pooled-broadcast vs per-region"
                      claims from committed primary sources (the planning-doc
                      0.148→0.073 number had no committed source; whatever this
                      step produces supersedes it).
-  6. collect       — consolidates every headline number the paper cites into
+  7. v2b_dispatch  — tools/bench_v2b_dispatch.py: LP peak-shave dispatch
+                     baseline (uncontrolled / V1G / V2B) on the released
+                     campus10 unit b1/JUL2024/0, plus ACN-Sim V1G
+                     cross-check rows via the repo bench machinery →
+                     docs/experiments/v2b_dispatch.csv (+ .md memo).
+                     Deterministic (no RNG; unique LP optimum under the
+                     price tie-break) except the solve_s wall-time column,
+                     which collect does not cite.
+  8. collect       — consolidates every headline number the paper cites into
                      docs/experiments/PAPER_NUMBERS.md with value, source
                      artifact, generating command, git SHA, and the compute
                      statement.
@@ -74,6 +87,8 @@ ABLATION_CSV = DOCS_EXP / "mixture_ablation.csv"
 ABLATION_MD = DOCS_EXP / "mixture_ablation.md"
 SOURCES_SUMMARY = DOCS_EXP / "sources_summary.csv"
 CAMPUS_DIR = REPO / "data" / "output" / "campus10"
+V2B_DISPATCH_CSV = DOCS_EXP / "v2b_dispatch.csv"
+V2B_DISPATCH_UNIT = CAMPUS_DIR / "b1" / "JUL2024" / "0"
 
 # Full calibrated-source list (WS-A caveat): the acn per-site cohorts must be
 # included or the regenerated CALIBRATION_RESULTS.md drops them. evwatts is
@@ -87,7 +102,26 @@ CAL_SOURCES = "acn,acn_caltech,acn_jpl,acn_office001,elaadnl,evwatts"
 ABLATION_SOURCES = ["acn", "acn_caltech", "acn_jpl", "acn_office001", "elaadnl"]
 
 STEPS = ["calibration", "buildingload", "tstr_acn", "tstr_elaadnl",
-         "ablation", "collect"]
+         "tstr_scale", "ablation", "v2b_dispatch", "collect"]
+
+# TSTR scale study (review attack: "one synthetic month, 20-vehicle building
+# vs the 1,231-driver multi-year real aggregate"). Three arms on top of the
+# committed baseline, all seed 1234, scenario S_elaadnl_public_eu:
+#   A  12 consecutive synthetic months, same 20-EV fleet   (--months 12)
+#   B  1 month, scale-matched fleet ev_count=1000 (knob cap; real cohort is
+#      1,231 drivers), charger_count=500 (knob cap)
+#   C  both (headline arm)
+_SCALE_OVR = ["--override", "ev_fleet.ev_count=1000",
+              "--override", "charging_infra.charger_count=500"]
+TSTR_SCALE_ARMS = {
+    "arm_a_12mo_ev20": (["--months", "12"],
+                        TSTR_DIR / "results_elaadnl_12mo.json"),
+    "arm_b_1mo_ev1000": (_SCALE_OVR,
+                         TSTR_DIR / "results_elaadnl_ev1000.json"),
+    "arm_c_12mo_ev1000": (["--months", "12", *_SCALE_OVR],
+                          TSTR_DIR / "results_elaadnl_ev1000_12mo.json"),
+}
+TSTR_SCALE_JSON = TSTR_DIR / "results_elaadnl_scale.json"
 
 
 def _run(cmd: list[str], name: str) -> None:
@@ -122,8 +156,44 @@ def step_tstr_elaadnl(args) -> None:
          "tstr_elaadnl")
 
 
+def step_tstr_scale(args) -> None:
+    """TSTR scale/duration study (ElaadNL): three arms over the committed
+    1-month/20-EV baseline, then a combined keyed JSON. Deterministic given
+    the fixed seeds (generation: SHA-keyed node streams; TSTR: seed 1234)."""
+    for arm, (extra, out) in TSTR_SCALE_ARMS.items():
+        _run([sys.executable, str(REPO / "tools" / "tstr_forecasting.py"),
+              "--real", "elaadnl", "--normalize", *extra, "--out", str(out)],
+             f"tstr_scale/{arm}")
+    combined = {
+        "description": (
+            "TSTR scale/duration study on ElaadNL (workplace venue filter): "
+            "closes the 'one synthetic month, 20-vehicle building vs a "
+            "1,231-driver multi-year real aggregate' scale mismatch. "
+            "ev_count=1000 / charger_count=500 are the knob-registry caps "
+            "(configs/knobs.yaml); the real cohort is 1,231 drivers, so the "
+            "matched fleet is capped ~19% below the real driver count. All "
+            "arms: scenario S_elaadnl_public_eu, seed 1234, --normalize."),
+        "baseline_1mo_ev20": json.loads(
+            (TSTR_DIR / "results_elaadnl_matched.json").read_text()),
+    }
+    for arm, (_extra, out) in TSTR_SCALE_ARMS.items():
+        combined[arm] = json.loads(out.read_text())
+    TSTR_SCALE_JSON.write_text(
+        json.dumps(combined, indent=2, sort_keys=True) + "\n")
+    print(f"wrote {TSTR_SCALE_JSON}", flush=True)
+
+
+def step_v2b_dispatch(args) -> None:
+    """LP peak-shave dispatch baseline (uncontrolled / V1G / V2B) on one
+    released corpus unit. Deterministic except the solve_s wall-time column
+    (collect only cites the deterministic columns)."""
+    _run([sys.executable, str(REPO / "tools" / "bench_v2b_dispatch.py"),
+          "--data-dir", str(V2B_DISPATCH_UNIT), "--out-dir", str(DOCS_EXP)],
+         "v2b_dispatch")
+
+
 # ──────────────────────────────────────────────────────────────────────
-# Step 5 — mixture / per-region fit ablation (deterministic; no RNG)
+# Step 6 — mixture / per-region fit ablation (deterministic; no RNG)
 # ──────────────────────────────────────────────────────────────────────
 
 def _cdf_from_fit(fit: dict):
@@ -314,7 +384,7 @@ def step_ablation(args) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Step 6 — collect: PAPER_NUMBERS.md
+# Step 8 — collect: PAPER_NUMBERS.md
 # ──────────────────────────────────────────────────────────────────────
 
 def _git_sha() -> str:
@@ -689,6 +759,15 @@ def step_collect(args) -> None:
     ratio_row(tstr_ela, "ElaadNL", "calendar-only, normalized",
               "results_calendar_only_normalized",
               "data/tstr/results_elaadnl_matched.json")
+    scale = json.loads(TSTR_SCALE_JSON.read_text())
+    arm_c = scale["arm_c_12mo_ev1000"]
+    for regime, key in [("lagged, raw", "results_lagged"),
+                        ("lagged, normalized", "results_lagged_normalized"),
+                        ("calendar-only, raw", "results_calendar_only"),
+                        ("calendar-only, normalized",
+                         "results_calendar_only_normalized")]:
+        ratio_row(arm_c, "ElaadNL (scale-matched, 12 synth months)", regime,
+                  key, "data/tstr/results_elaadnl_scale.json")
     w("")
     w("| context quantity | value | source |")
     w("|---|---|---|")
@@ -707,6 +786,12 @@ def step_collect(args) -> None:
       f"{_fmt(tstr_ela['real_series']['peak_kw'], 1)} kW, "
       f"{int(tstr_ela['real_series']['n_bins']):,} hourly bins | "
       "`data/tstr/results_elaadnl_matched.json` |")
+    w(f"| ElaadNL scale-matched cohort (headline arm C: 12 synth months, "
+      f"ev_count 1000 / charger_count 500 = knob caps; real cohort 1,231 "
+      f"drivers) | {arm_c['generator']['n_sessions']:,} sessions, mean "
+      f"{_fmt(arm_c['synth_series']['mean_kw'], 2)} kW, peak "
+      f"{_fmt(arm_c['synth_series']['peak_kw'], 1)} kW | "
+      "`data/tstr/results_elaadnl_scale.json` |")
     w(f"| ElaadNL real cohort identifiers (workplace venue filter) | "
       f"{int(srcsum.loc['elaadnl', 'n_users']):,} drivers "
       f"(raw archive: 3,409 identifiers, `docs/CALIBRATION_NOTES.md`) | "
@@ -749,8 +834,54 @@ def step_collect(args) -> None:
       f"(30 workers ≈ {campus['cpu_hours'] / 30:.1f} h wall) | batch manifests |")
     w("")
 
-    # ── 10. Compute statement for this driver ──────────────────────────
-    w("## 10. Reproduction compute (this driver, recorded measurement)")
+    # ── 10. V2B dispatch baseline (§6 / utility) ───────────────────────
+    w("## 10. V2B dispatch baseline (LP peak shave, one released unit)")
+    w("")
+    w("_Unit `data/output/campus10/b1/JUL2024/0` (60 cars, 48/60 "
+      "bidirectional chargers, 400 kWh / 100 kW battery, PV, TOU prices). "
+      "LP is deterministic (no RNG; unique optimum under the 1e-4 price "
+      "tie-break); the CSV's `solve_s` wall-time column is the sole "
+      "non-deterministic field and is not cited here. Formulation and "
+      "reconstruction rules: `docs/experiments/v2b_dispatch.md`._")
+    w("")
+    disp = pd.read_csv(V2B_DISPATCH_CSV).set_index("arm")
+    w("| arm | monthly peak net (kW) | peak reduction | energy cost (USD) | "
+      "status | source |")
+    w("|---|--:|--:|--:|---|---|")
+    for arm in disp.index:
+        r = disp.loc[arm]
+        w(f"| {arm} | {float(r['peak_net_kw']):,.1f} | "
+          f"{float(r['peak_reduction_pct']):.1f}% | "
+          f"{float(r['energy_cost_usd']):,.2f} | {r['status']} | "
+          f"`v2b_dispatch.csv` |")
+    d = disp.loc["v2b"]
+    w("")
+    w(f"- Feasibility: {int(d['n_relaxed'])} required-SoC relaxations, "
+      f"{int(d['n_clipped'])} horizon-clipped windows, "
+      f"{int(d['n_skipped'])} skipped sessions over "
+      f"{int(d['n_sessions'])} sessions; "
+      f"{int(d['n_bidirectional_sessions'])}/{int(d['n_sessions'])} "
+      "sessions bidirectional-assigned (deterministic round-robin).")
+    w(f"- V2B arm energy detail: {float(d['ev_charge_kwh']):,.0f} kWh EV "
+      f"charged, {float(d['ev_discharge_kwh']):,.0f} kWh EV discharged, "
+      f"{float(d['batt_throughput_kwh']):,.0f} kWh stationary-battery "
+      "throughput.")
+    if "acnsim_llf_crosscheck" in disp.index:
+        dpk = (float(disp.loc["acnsim_llf_crosscheck", "peak_net_kw"])
+               - float(disp.loc["uncontrolled", "peak_net_kw"]))
+        w(f"- ACN-Sim cross-check: LLF (stock V1G, building-load-unaware, "
+          f"uncontended charger pool = semantic twin of the uncontrolled "
+          f"arm) reproduces the uncontrolled peak to {dpk:+.1f} kW — the "
+          "demand model is independently validated by an established "
+          "simulator; see `v2b_dispatch.md` for why no stock ACN-Sim "
+          "algorithm is comparable to LP-V1G.")
+    w("")
+    w("Generating command: `uv run python tools/repro_paper.py --steps "
+      "v2b_dispatch` (wraps `tools/bench_v2b_dispatch.py`).")
+    w("")
+
+    # ── 11. Compute statement for this driver ──────────────────────────
+    w("## 11. Reproduction compute (this driver, recorded measurement)")
     w("")
     if runtimes:
         w("| step | wall time |")
@@ -785,7 +916,9 @@ STEP_FNS = {
     "buildingload": step_buildingload,
     "tstr_acn": step_tstr_acn,
     "tstr_elaadnl": step_tstr_elaadnl,
+    "tstr_scale": step_tstr_scale,
     "ablation": step_ablation,
+    "v2b_dispatch": step_v2b_dispatch,
     "collect": step_collect,
 }
 
