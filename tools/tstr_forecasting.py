@@ -25,6 +25,11 @@ Pipeline
 3. Features = lagged load (t-1,t-2,t-3,t-24), hour-of-day, day-of-week.
 4. Fixed-seed HistGradientBoostingRegressor (deterministic). 1-step-ahead.
 5. Metrics: MAE, RMSE, MAPE. Writes data/tstr/results.json + prints a table.
+6. Uncertainty: seeded PAIRED percentile bootstrap over the held-out real
+   test bins (default B=1000) — the same resampled bin indices are applied
+   to both models' per-bin errors, so the per-replicate TSTR/TRTR ratio
+   differences out bin-selection noise. 95% CIs land in a new 'ci' block per
+   results section; all pre-existing JSON fields are unchanged.
 
 Reproducible with one command; every result is stamped with the generator
 version + git sha (from the synthetic cohort's manifest) so a baseline run on
@@ -57,6 +62,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import tempfile
 from collections.abc import Sequence
@@ -74,6 +80,7 @@ OUT_DIR = REPO / "data" / "tstr"
 SEED = 1234
 LAGS = (1, 2, 3, 24)  # lags in BINS (at the headline 1h freq: t-1,2,3h + t-24h)
 TRAIN_FRAC = 0.6  # of the REAL series: first 60% train, last 40% test (held-out)
+CI_B = 1000  # paired-bootstrap replicates for the 95% ratio CIs (0 disables)
 
 # Matched synthetic scenario per real source. The pre-2026-07 harness defaulted
 # --scenario to S_acn_caltech unconditionally, which silently paired
@@ -376,14 +383,86 @@ def metrics(y_true: np.ndarray, y_pred: np.ndarray, eps_frac: float = 0.05) -> d
     return {"mae": mae, "rmse": rmse, "mape": mape}
 
 
+def fit_predict(
+    X_train: pd.DataFrame, y_train: pd.Series,
+    X_test: pd.DataFrame, seed: int = SEED,
+) -> np.ndarray:
+    model = make_model(seed)
+    model.fit(X_train.values, y_train.values)
+    return model.predict(X_test.values)
+
+
 def fit_eval(
     X_train: pd.DataFrame, y_train: pd.Series,
     X_test: pd.DataFrame, y_test: pd.Series, seed: int = SEED,
 ) -> dict[str, float]:
-    model = make_model(seed)
-    model.fit(X_train.values, y_train.values)
-    pred = model.predict(X_test.values)
-    return metrics(y_test.values, pred)
+    return metrics(y_test.values, fit_predict(X_train, y_train, X_test, seed))
+
+
+# --------------------------------------------------------------------------- #
+# 4b. Paired bootstrap CIs on the TSTR/TRTR ratio
+# --------------------------------------------------------------------------- #
+def _ci_rng(label: str, base_seed: int = SEED) -> np.random.Generator:
+    """Deterministic per-regime RNG, independent of evaluation order.
+
+    Same pattern as tools/validate_calibration.py `_cell_rng`: the sub-stream
+    is keyed off a SHA-256 hash of the regime label (never Python's salted
+    `hash()`), so adding a regime never shifts the draws of existing ones.
+    """
+    digest = hashlib.sha256(f"tstr-ci|{label}".encode()).digest()
+    return np.random.default_rng([base_seed, int.from_bytes(digest[:8], "big")])
+
+
+def paired_bootstrap_ci(
+    y_true: np.ndarray,
+    pred_tstr: np.ndarray,
+    pred_trtr: np.ndarray,
+    n_boot: int,
+    rng: np.random.Generator,
+    chunk: int = 128,
+) -> dict[str, Any]:
+    """95% percentile CIs for TSTR/TRTR MAE, RMSE, and their ratios.
+
+    PAIRED design: both models are evaluated on the SAME held-out real test
+    bins, so each replicate resamples one set of bin indices i.i.d. with
+    replacement and applies it to BOTH models' per-bin errors before
+    recomputing MAE/RMSE and the TSTR/TRTR ratio. Resampling the two error
+    vectors independently would ignore the (typically strong) positive
+    correlation of the models' errors and overstate the ratio's variance.
+    The (B, n) index matrix is drawn once; evaluation is chunked.
+    """
+    y = np.asarray(y_true, dtype=float)
+    err_s = np.asarray(pred_tstr, dtype=float) - y   # TSTR per-bin error
+    err_r = np.asarray(pred_trtr, dtype=float) - y   # TRTR per-bin error
+    abs_s, abs_r = np.abs(err_s), np.abs(err_r)
+    sq_s, sq_r = err_s ** 2, err_r ** 2
+    n = len(y)
+    idx = rng.integers(0, n, size=(n_boot, n))
+
+    mae_s = np.empty(n_boot)
+    mae_r = np.empty(n_boot)
+    rmse_s = np.empty(n_boot)
+    rmse_r = np.empty(n_boot)
+    for k in range(0, n_boot, chunk):
+        ix = idx[k:k + chunk]
+        mae_s[k:k + chunk] = abs_s[ix].mean(axis=1)
+        mae_r[k:k + chunk] = abs_r[ix].mean(axis=1)
+        rmse_s[k:k + chunk] = np.sqrt(sq_s[ix].mean(axis=1))
+        rmse_r[k:k + chunk] = np.sqrt(sq_r[ix].mean(axis=1))
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio_mae = mae_s / mae_r
+        ratio_rmse = rmse_s / rmse_r
+
+    def ci95(v: np.ndarray) -> list[float]:
+        lo, hi = np.percentile(v, [2.5, 97.5])
+        return [float(lo), float(hi)]
+
+    return {
+        "TSTR": {"mae": ci95(mae_s), "rmse": ci95(rmse_s)},
+        "TRTR": {"mae": ci95(mae_r), "rmse": ci95(rmse_r)},
+        "TSTR_over_TRTR_ratio": {"mae": ci95(ratio_mae), "rmse": ci95(ratio_rmse)},
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -414,8 +493,17 @@ def split_real(load_real: pd.Series, train_frac: float = TRAIN_FRAC):
 def run_tstr(
     load_real: pd.Series, load_synth: pd.Series, seed: int = SEED,
     lags: Sequence[int] = LAGS,
+    n_boot: int = CI_B, ci_label: str | None = None,
 ) -> dict[str, Any]:
-    """Compute TRTR / TSTR / TRTS on a common held-out REAL test split."""
+    """Compute TRTR / TSTR / TRTS on a common held-out REAL test split.
+
+    When ``n_boot > 0`` (default) a seeded paired percentile bootstrap over
+    the held-out test bins adds a ``ci`` block (95% intervals for TSTR/TRTR
+    MAE, RMSE, and the ratios). The bootstrap sub-stream is keyed off
+    ``ci_label`` (default derived from the feature set) so every reported
+    regime gets an independent, order-insensitive stream. All previously
+    emitted fields are byte-identical to the pre-CI harness.
+    """
     real_train, real_test = split_real(load_real)
 
     Xr_tr, yr_tr = build_features(real_train, lags)
@@ -428,14 +516,16 @@ def run_tstr(
             f"real_train={len(Xr_tr)} real_test={len(Xr_te)} synth={len(Xs)}"
         )
 
-    trtr = fit_eval(Xr_tr, yr_tr, Xr_te, yr_te, seed)          # real -> real
-    tstr = fit_eval(Xs, ys, Xr_te, yr_te, seed)                # synth -> real
+    pred_trtr = fit_predict(Xr_tr, yr_tr, Xr_te, seed)         # real -> real
+    pred_tstr = fit_predict(Xs, ys, Xr_te, seed)               # synth -> real
+    trtr = metrics(yr_te.values, pred_trtr)
+    tstr = metrics(yr_te.values, pred_tstr)
     trts = fit_eval(Xr_tr, yr_tr, Xs, ys, seed)                # real -> synth
 
     def gap(a: dict, b: dict) -> dict:
         return {m: a[m] - b[m] for m in ("mae", "rmse", "mape")}
 
-    return {
+    res: dict[str, Any] = {
         "TRTR": trtr, "TSTR": tstr, "TRTS": trts,
         "TSTR_minus_TRTR": gap(tstr, trtr),
         "TSTR_over_TRTR_ratio": {m: (tstr[m] / trtr[m] if trtr[m] else float("inf"))
@@ -445,6 +535,24 @@ def run_tstr(
             "synth": int(len(Xs)),
         },
     }
+    if n_boot > 0:
+        label = ci_label or ("lagged" if lags else "calendar_only")
+        res["ci"] = {
+            "method": (
+                "paired percentile bootstrap: held-out real test bins "
+                "resampled i.i.d. with replacement; the SAME resample "
+                "indices are applied to both models' per-bin errors before "
+                "recomputing MAE/RMSE and the TSTR/TRTR ratio per replicate; "
+                "interval = 2.5-97.5 percentiles across replicates."
+            ),
+            "n_boot": int(n_boot),
+            "base_seed": int(seed),
+            "label": label,
+            **paired_bootstrap_ci(
+                yr_te.values, pred_tstr, pred_trtr, n_boot,
+                _ci_rng(label, seed)),
+        }
+    return res
 
 
 # --------------------------------------------------------------------------- #
@@ -480,6 +588,13 @@ def format_table(res: dict[str, Any]) -> str:
                  f"{g['mae']:+8.3f}  {g['rmse']:+8.3f}  {g['mape']:+7.2f}")
     lines.append(f"  TSTR / TRTR ratio (1.0 = perfect transfer):  "
                  f"{r['mae']:8.2f}x {r['rmse']:8.2f}x {r['mape']:7.2f}x")
+    ci = res.get("ci")
+    if ci:
+        c = ci["TSTR_over_TRTR_ratio"]
+        lines.append(
+            f"  ratio 95% CI (paired bootstrap, B={ci['n_boot']}):    "
+            f"MAE [{c['mae'][0]:.2f}, {c['mae'][1]:.2f}]  "
+            f"RMSE [{c['rmse'][0]:.2f}, {c['rmse'][1]:.2f}]")
     return "\n".join(lines)
 
 
@@ -508,6 +623,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
                     help="repeatable knob override forwarded to every "
                          "generate() call (YAML-parsed value), e.g. "
                          "--override 'ev_fleet.ev_count=1000'")
+    ap.add_argument("--n-boot", type=int, default=CI_B, dest="n_boot",
+                    help="paired-bootstrap replicates for the 95%% ratio CIs "
+                         f"(default {CI_B}; 0 disables the ci blocks)")
     ap.add_argument("--quick", action="store_true",
                     help="cap real sessions for a fast smoke run")
     ap.add_argument("--out", default=str(OUT_DIR / "results.json"))
@@ -561,8 +679,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("[4/4] running TRTR / TSTR / TRTS (lagged + calendar-only) ...")
     # Two feature sets: the operational forecaster (with lags) and the
     # generator-fidelity probe (calendar-only). See build_features docstring.
-    res_lagged = run_tstr(load_real, load_synth, seed=args.seed, lags=LAGS)
-    res_calendar = run_tstr(load_real, load_synth, seed=args.seed, lags=())
+    res_lagged = run_tstr(load_real, load_synth, seed=args.seed, lags=LAGS,
+                          n_boot=args.n_boot, ci_label="lagged")
+    res_calendar = run_tstr(load_real, load_synth, seed=args.seed, lags=(),
+                            n_boot=args.n_boot, ci_label="calendar_only")
 
     res_lagged_norm = res_calendar_norm = None
     if args.normalize:
@@ -570,8 +690,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         synth_mean = float(load_synth.mean())
         load_real_n = normalize_series(load_real, real_train_mean)
         load_synth_n = normalize_series(load_synth, synth_mean)
-        res_lagged_norm = run_tstr(load_real_n, load_synth_n, seed=args.seed, lags=LAGS)
-        res_calendar_norm = run_tstr(load_real_n, load_synth_n, seed=args.seed, lags=())
+        res_lagged_norm = run_tstr(
+            load_real_n, load_synth_n, seed=args.seed, lags=LAGS,
+            n_boot=args.n_boot, ci_label="lagged_normalized")
+        res_calendar_norm = run_tstr(
+            load_real_n, load_synth_n, seed=args.seed, lags=(),
+            n_boot=args.n_boot, ci_label="calendar_only_normalized")
 
     out = {
         "generator": gen_stamp,
@@ -590,6 +714,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                           "(realistic operational forecaster; partly persistence)",
                 "calendar_only": "hour-of-day, day-of-week only "
                                  "(isolates generator load-shape fidelity; no persistence)",
+            },
+            "ci": {
+                "n_boot": args.n_boot,
+                "base_seed": args.seed,
+                "design": "paired percentile bootstrap over held-out real "
+                          "test bins (same resample indices applied to both "
+                          "models' per-bin errors); per-regime SHA-256 "
+                          "hash-keyed sub-streams; 2.5-97.5 percentiles.",
             },
         },
         "real_series": _series_summary(load_real),

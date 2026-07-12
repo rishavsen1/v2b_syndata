@@ -156,6 +156,51 @@ def test_run_tstr_insufficient_samples_raises():
         tstr.run_tstr(load_real, load_synth)
 
 
+def test_ci_deterministic_given_seed():
+    """The paired-bootstrap ci block is bit-reproducible for a given
+    (seed, label) and independent of evaluation order; a different label
+    keys a different sub-stream (validate_calibration _cell_rng pattern)."""
+    load_real = _toy_load(400, seed=0)
+    load_synth = _toy_load(400, seed=1)
+    r1 = tstr.run_tstr(load_real, load_synth, seed=7, n_boot=200, ci_label="x")
+    r2 = tstr.run_tstr(load_real, load_synth, seed=7, n_boot=200, ci_label="x")
+    assert r1["ci"] == r2["ci"]
+    assert r1["ci"]["n_boot"] == 200 and r1["ci"]["base_seed"] == 7
+    for blk in ("TSTR", "TRTR", "TSTR_over_TRTR_ratio"):
+        lo, hi = r1["ci"][blk]["mae"]
+        assert lo <= hi
+    # different label => different resample stream => different interval
+    r3 = tstr.run_tstr(load_real, load_synth, seed=7, n_boot=200, ci_label="y")
+    assert r3["ci"]["TSTR_over_TRTR_ratio"] != r1["ci"]["TSTR_over_TRTR_ratio"]
+    # n_boot=0 disables the block; pre-CI fields are untouched
+    r0 = tstr.run_tstr(load_real, load_synth, seed=7, n_boot=0)
+    assert "ci" not in r0
+    assert r0["TSTR"] == r1["TSTR"] and r0["TSTR_over_TRTR_ratio"] == r1["TSTR_over_TRTR_ratio"]
+
+
+def test_paired_bootstrap_pairing_correctness():
+    """If model A's per-bin error is exactly 2x model B's on EVERY bin, the
+    paired ratio is exactly 2.0 in every replicate (same resample indices
+    applied to both error vectors), so the ratio CI degenerates to [2, 2].
+    Independent (unpaired) resampling would spread the interval."""
+    rng_data = np.random.default_rng(3)
+    y = rng_data.uniform(1.0, 10.0, size=100)
+    e = rng_data.normal(0.0, 1.0, size=100)
+    pred_b = y + e          # TRTR-role model
+    pred_a = y + 2.0 * e    # TSTR-role model: |err_a| = 2|err_b| per bin
+    ci = tstr.paired_bootstrap_ci(
+        y, pred_a, pred_b, n_boot=200, rng=np.random.default_rng(0))
+    assert ci["TSTR_over_TRTR_ratio"]["mae"] == pytest.approx([2.0, 2.0])
+    assert ci["TSTR_over_TRTR_ratio"]["rmse"] == pytest.approx([2.0, 2.0])
+    # the per-model CIs themselves do vary across replicates
+    lo, hi = ci["TSTR"]["mae"]
+    assert hi > lo > 0
+    # and the same replicate indices reproduce with the same rng seed
+    ci2 = tstr.paired_bootstrap_ci(
+        y, pred_a, pred_b, n_boot=200, rng=np.random.default_rng(0))
+    assert ci == ci2
+
+
 def test_run_tstr_deterministic():
     load_real = _toy_load(400, seed=0)
     load_synth = _toy_load(400, seed=1)

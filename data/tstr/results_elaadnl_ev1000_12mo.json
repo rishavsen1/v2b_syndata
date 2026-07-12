@@ -1,5 +1,10 @@
 {
   "config": {
+    "ci": {
+      "base_seed": 1234,
+      "design": "paired percentile bootstrap over held-out real test bins (same resample indices applied to both models' per-bin errors); per-regime SHA-256 hash-keyed sub-streams; 2.5-97.5 percentiles.",
+      "n_boot": 1000
+    },
     "feature_sets": {
       "calendar_only": "hour-of-day, day-of-week only (isolates generator load-shape fidelity; no persistence)",
       "lagged": "hour-of-day, day-of-week, lagged load (realistic operational forecaster; partly persistence)"
@@ -24,7 +29,7 @@
     "train_frac": 0.6
   },
   "generator": {
-    "generator_git_sha": "052b8a1b09a28d70b62184b13dc530108b7a0995",
+    "generator_git_sha": "787f0f892c42c2639249c9285754386c46670a4a",
     "generator_version": "0.1.0",
     "knob_overrides": {
       "charging_infra.charger_count": "500",
@@ -195,6 +200,42 @@
       "mape": 8.259744487039528,
       "rmse": 2.945902798163827
     },
+    "ci": {
+      "TRTR": {
+        "mae": [
+          40.41165318942312,
+          42.780565756721884
+        ],
+        "rmse": [
+          85.25785081758946,
+          88.6956345467255
+        ]
+      },
+      "TSTR": {
+        "mae": [
+          130.01240366638498,
+          136.97866954658738
+        ],
+        "rmse": [
+          252.20273711270738,
+          260.6919183903408
+        ]
+      },
+      "TSTR_over_TRTR_ratio": {
+        "mae": [
+          3.135245606658443,
+          3.2747887843456507
+        ],
+        "rmse": [
+          2.8864766058893716,
+          3.004467154883608
+        ]
+      },
+      "base_seed": 1234,
+      "label": "calendar_only",
+      "method": "paired percentile bootstrap: held-out real test bins resampled i.i.d. with replacement; the SAME resample indices are applied to both models' per-bin errors before recomputing MAE/RMSE and the TSTR/TRTR ratio per replicate; interval = 2.5-97.5 percentiles across replicates.",
+      "n_boot": 1000
+    },
     "sample_counts": {
       "real_test": 14392,
       "real_train": 21588,
@@ -226,6 +267,42 @@
       "mae": 1.0099932126601898,
       "mape": 0.9732377341070197,
       "rmse": 1.022907475191923
+    },
+    "ci": {
+      "TRTR": {
+        "mae": [
+          2.342998542396199,
+          2.4906905170640203
+        ],
+        "rmse": [
+          4.945828561251605,
+          5.157591523095608
+        ]
+      },
+      "TSTR": {
+        "mae": [
+          2.361282954284995,
+          2.518413610370443
+        ],
+        "rmse": [
+          5.060777516701222,
+          5.274878921944767
+        ]
+      },
+      "TSTR_over_TRTR_ratio": {
+        "mae": [
+          1.0065907423160483,
+          1.0133406226230328
+        ],
+        "rmse": [
+          1.0208166958175897,
+          1.024980261358389
+        ]
+      },
+      "base_seed": 1234,
+      "label": "calendar_only_normalized",
+      "method": "paired percentile bootstrap: held-out real test bins resampled i.i.d. with replacement; the SAME resample indices are applied to both models' per-bin errors before recomputing MAE/RMSE and the TSTR/TRTR ratio per replicate; interval = 2.5-97.5 percentiles across replicates.",
+      "n_boot": 1000
     },
     "sample_counts": {
       "real_test": 14392,
@@ -259,6 +336,42 @@
       "mape": 3.573359060176424,
       "rmse": 4.302540433711684
     },
+    "ci": {
+      "TRTR": {
+        "mae": [
+          6.840564182746365,
+          7.396468875735507
+        ],
+        "rmse": [
+          17.148897130225745,
+          18.638930645809012
+        ]
+      },
+      "TSTR": {
+        "mae": [
+          29.53218993975074,
+          31.83137771627785
+        ],
+        "rmse": [
+          74.84097684235195,
+          79.37574010743374
+        ]
+      },
+      "TSTR_over_TRTR_ratio": {
+        "mae": [
+          4.177600690358679,
+          4.4543439913639835
+        ],
+        "rmse": [
+          4.1383785648487335,
+          4.486660385780741
+        ]
+      },
+      "base_seed": 1234,
+      "label": "lagged",
+      "method": "paired percentile bootstrap: held-out real test bins resampled i.i.d. with replacement; the SAME resample indices are applied to both models' per-bin errors before recomputing MAE/RMSE and the TSTR/TRTR ratio per replicate; interval = 2.5-97.5 percentiles across replicates.",
+      "n_boot": 1000
+    },
     "sample_counts": {
       "real_test": 14368,
       "real_train": 21564,
@@ -290,6 +403,42 @@
       "mae": 5.252219226877697,
       "mape": 2.183679884766307,
       "rmse": 4.620410202904716
+    },
+    "ci": {
+      "TRTR": {
+        "mae": [
+          0.39828612658118223,
+          0.42870648986255677
+        ],
+        "rmse": [
+          0.9972733634107682,
+          1.0780353529884381
+        ]
+      },
+      "TSTR": {
+        "mae": [
+          2.106502375159775,
+          2.2379645176558385
+        ],
+        "rmse": [
+          4.707356753393317,
+          4.90326020584071
+        ]
+      },
+      "TSTR_over_TRTR_ratio": {
+        "mae": [
+          5.122303963620064,
+          5.3837580842266455
+        ],
+        "rmse": [
+          4.496084136139464,
+          4.769948786965478
+        ]
+      },
+      "base_seed": 1234,
+      "label": "lagged_normalized",
+      "method": "paired percentile bootstrap: held-out real test bins resampled i.i.d. with replacement; the SAME resample indices are applied to both models' per-bin errors before recomputing MAE/RMSE and the TSTR/TRTR ratio per replicate; interval = 2.5-97.5 percentiles across replicates.",
+      "n_boot": 1000
     },
     "sample_counts": {
       "real_test": 14368,

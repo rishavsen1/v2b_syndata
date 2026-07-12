@@ -29,7 +29,17 @@ Runs, in order, with fixed seeds:
                      claims from committed primary sources (the planning-doc
                      0.148→0.073 number had no committed source; whatever this
                      step produces supersedes it).
-  7. v2b_dispatch  — tools/bench_v2b_dispatch.py: LP peak-shave dispatch
+  7. family_selection — across-family model selection on the SOURCE region
+                     cells (arrival hour / dwell hours / arrival SoC):
+                     candidate families per variable scored by one-sample KS
+                     on the training data plus AIC/BIC where a parametric
+                     likelihood is defined → docs/experiments/
+                     family_selection.csv (+ .md). Regenerates the paper's
+                     "why these families" appendix numbers. Deterministic
+                     (median-split EM; Scott-factor KDE on a fixed grid;
+                     SoC prior seed 20260613 = calibration/api.py's own;
+                     no free RNG).
+  8. v2b_dispatch  — tools/bench_v2b_dispatch.py: LP peak-shave dispatch
                      baseline (uncontrolled / V1G / V2B) on the released
                      campus10 unit b1/JUL2024/0, plus ACN-Sim V1G
                      cross-check rows via the repo bench machinery →
@@ -37,7 +47,7 @@ Runs, in order, with fixed seeds:
                      Deterministic (no RNG; unique LP optimum under the
                      price tie-break) except the solve_s wall-time column,
                      which collect does not cite.
-  8. collect       — consolidates every headline number the paper cites into
+  9. collect       — consolidates every headline number the paper cites into
                      docs/experiments/PAPER_NUMBERS.md with value, source
                      artifact, generating command, git SHA, and the compute
                      statement.
@@ -45,9 +55,10 @@ Runs, in order, with fixed seeds:
 Determinism contract (the WS-F gate):
   Two consecutive full runs must produce a bit-identical PAPER_NUMBERS.md.
   Everything numeric is seeded (generation: hash-keyed per-node streams;
-  bootstrap: seed 20260708 with per-cell hashed sub-streams; TSTR: seed 1234;
-  ablation: deterministic EM, no RNG). Wall-clock runtimes are the one
-  intrinsically non-deterministic output, so they are RECORDED ONCE into
+  bootstrap: seed 20260708 with per-cell hashed sub-streams; TSTR: seed 1234,
+  including its paired-bootstrap ratio CIs (B=1000, per-regime hashed
+  sub-streams); ablation: deterministic EM, no RNG). Wall-clock runtimes are
+  the one intrinsically non-deterministic output, so they are RECORDED ONCE into
   docs/experiments/repro_runtimes.json (only written when absent, or when
   --record-runtimes is passed) and PAPER_NUMBERS.md embeds that recorded
   measurement — re-runs then reproduce the file bit-for-bit while the compute
@@ -89,6 +100,10 @@ SOURCES_SUMMARY = DOCS_EXP / "sources_summary.csv"
 CAMPUS_DIR = REPO / "data" / "output" / "campus10"
 V2B_DISPATCH_CSV = DOCS_EXP / "v2b_dispatch.csv"
 V2B_DISPATCH_UNIT = CAMPUS_DIR / "b1" / "JUL2024" / "0"
+CONTENDED_CSV = DOCS_EXP / "contended_bench.csv"
+CONTENDED_CONFIG = DOCS_EXP / "contended_bench_config.json"
+CONTENDED_UNIT = (REPO / "data" / "output" / "contended" / "b1ch35"
+                  / "JUL2024" / "0")
 
 # Full calibrated-source list (WS-A caveat): the acn per-site cohorts must be
 # included or the regenerated CALIBRATION_RESULTS.md drops them. evwatts is
@@ -100,9 +115,17 @@ CAL_SOURCES = "acn,acn_caltech,acn_jpl,acn_office001,elaadnl,evwatts"
 # (port-as-proxy identity; 1.3M-session EM fits add ~20 min for a claim the
 # paper does not make about that cohort).
 ABLATION_SOURCES = ["acn", "acn_caltech", "acn_jpl", "acn_office001", "elaadnl"]
+# Family-selection scope: the driver-identity-grounded cohorts (same list as
+# the ablation) plus EV WATTS — the "why these families" claim is about the
+# whole calibrated corpus, and this step fits each cell once (no 50-seed
+# generation), so the 1.26M-session cohort is affordable here.
+FAMILY_SOURCES = [*ABLATION_SOURCES, "evwatts"]
+FAMILY_CSV = DOCS_EXP / "family_selection.csv"
+FAMILY_MD = DOCS_EXP / "family_selection.md"
 
 STEPS = ["calibration", "buildingload", "tstr_acn", "tstr_elaadnl",
-         "tstr_scale", "ablation", "v2b_dispatch", "collect"]
+         "tstr_scale", "ablation", "family_selection", "v2b_dispatch",
+         "contended_bench", "collect"]
 
 # TSTR scale study (review attack: "one synthetic month, 20-vehicle building
 # vs the 1,231-driver multi-year real aggregate"). Three arms on top of the
@@ -185,11 +208,32 @@ def step_tstr_scale(args) -> None:
 
 def step_v2b_dispatch(args) -> None:
     """LP peak-shave dispatch baseline (uncontrolled / V1G / V2B) on one
-    released corpus unit. Deterministic except the solve_s wall-time column
+    released corpus unit, plus ALL SEVEN stock ACN-Sim V1G cross-check rows.
+    Deterministic except the solve_s wall-time column
     (collect only cites the deterministic columns)."""
     _run([sys.executable, str(REPO / "tools" / "bench_v2b_dispatch.py"),
           "--data-dir", str(V2B_DISPATCH_UNIT), "--out-dir", str(DOCS_EXP)],
          "v2b_dispatch")
+
+
+def step_contended_bench(args) -> None:
+    """Contended dispatch benchmark: same building/fleet/month/seed as the
+    v2b_dispatch unit but charging_infra.charger_count 60 -> 35 (~60% of the
+    realized peak concurrency of 59), so plug contention binds, plus the
+    0.125 ACN-Caltech-like feeder cap under which the seven stock schedulers
+    genuinely separate. The unit is generated deterministically from the
+    committed config if absent (byte-identical regeneration; requires
+    EnergyPlus); the bench itself is fully deterministic (no RNG, no
+    wall-time columns — contended_bench.{csv,md} are byte-stable)."""
+    if not (CONTENDED_UNIT / "sessions.csv").exists():
+        _run([sys.executable, "-m", "v2b_syndata.cli", "generate-multi",
+              "--config", str(CONTENDED_CONFIG),
+              "--output-dir", str(CONTENDED_UNIT)],
+             "contended_bench/generate")
+    _run([sys.executable, str(REPO / "tools" / "bench_v2b_dispatch.py"),
+          "--contended", "--data-dir", str(CONTENDED_UNIT),
+          "--out-dir", str(DOCS_EXP)],
+         "contended_bench")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -384,7 +428,441 @@ def step_ablation(args) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Step 8 — collect: PAPER_NUMBERS.md
+# Step 7 — across-family model selection (deterministic; no free RNG)
+# ──────────────────────────────────────────────────────────────────────
+
+FAMILY_MIN_CELL = 60        # same per-cell floor as the ablation step
+_KDE_GRID_N = 4001          # fixed KDE evaluation grid (deterministic)
+_SOC_PRIOR_SEED = 20260613  # MUST equal calibration/api.py's arr_soc_rng seed
+
+FAMILY_VARIABLES = (("arrival_hour", "arrival"),
+                    ("dwell_hours", "dwell"),
+                    ("soc_arrival", "soc_arrival"))
+
+
+def _family_candidates(variable: str, vals) -> list[dict]:
+    """Fit every candidate family for one (source, region, variable) cell.
+
+    Returns [{family, k_params, loglik, ks, shippable, note}]; k_params is
+    None where no parametric likelihood is defined (KDE), in which case
+    AIC/BIC are not reported. Deterministic: the mixture EM is the fitter's
+    own median-split-initialized `_gmm_em`, the KDE uses scipy's Scott
+    factor on a fixed grid, and no candidate consumes an RNG.
+
+    Candidate sets:
+      arrival_hour: truncnorm[4,22] (shipped single), truncnorm 2-component
+        mixture (the shipped upgrade, fitted UNgated here), free 2-component
+        GMM (untruncated — its out-of-window tail mass is recorded), and a
+        Gaussian KDE (scored only; not shippable — see the MD memo).
+        A (shifted) lognormal is deliberately NOT fitted: arrival hour lives
+        on a bounded clock window, so the lognormal support origin would be
+        an artifact of the clock zero, not a property of behavior.
+      dwell_hours: weibull, weibull 2-component mixture (ungated), lognorm,
+        gamma, expon (all floc=0).
+      soc_arrival: beta[0,1] (shipped), truncnorm[0,1], uniform[0,1] (null).
+    """
+    import numpy as np
+    import scipy.stats as st
+    from scipy.optimize import minimize
+    from scipy.special import ndtr
+
+    from v2b_syndata.calibration.distribution_fitter import (
+        ARRIVAL_HI,
+        ARRIVAL_LO,
+        _gmm_em,
+        fit_truncnorm_arrival,
+    )
+
+    x = np.asarray(vals, dtype=float)
+    n = len(x)
+    rows: list[dict] = []
+
+    def _ks(cdf) -> float:
+        return float(st.kstest(x, cdf).statistic)
+
+    def _ll(logpdf_vals) -> float:
+        return float(np.clip(np.asarray(logpdf_vals, dtype=float),
+                             -700.0, None).sum())
+
+    def add(family, k, ll, ks, shippable, note=""):
+        rows.append({"family": family, "k_params": k, "loglik": ll,
+                     "ks": ks, "shippable": shippable, "note": note})
+
+    if variable == "arrival_hour":
+        a, b = ARRIVAL_LO, ARRIVAL_HI
+        fit = fit_truncnorm_arrival(x)
+        if fit is not None:
+            mu, sg = fit["mu"], fit["sigma"]
+            fz = st.truncnorm((a - mu) / sg, (b - mu) / sg, loc=mu, scale=sg)
+            add("truncnorm", 2, _ll(fz.logpdf(x)), _ks(fz.cdf), True)
+        # One deterministic EM feeds both mixture candidates (identical to
+        # the params fit_truncnorm_mixture_arrival would ship, minus the
+        # KS-margin acceptance gate).
+        mu2, sd2, w2, _ = _gmm_em(x, 2)
+        order = np.argsort(mu2)
+        mu2, sd2, w2 = mu2[order], sd2[order], w2[order]
+
+        def tmix_pdf(q):
+            q = np.asarray(q, dtype=float)
+            return sum(w2[j] * st.truncnorm.pdf(
+                q, (a - mu2[j]) / sd2[j], (b - mu2[j]) / sd2[j],
+                loc=mu2[j], scale=sd2[j]) for j in range(2))
+
+        def tmix_cdf(q):
+            q = np.asarray(q, dtype=float)
+            return sum(w2[j] * st.truncnorm.cdf(
+                q, (a - mu2[j]) / sd2[j], (b - mu2[j]) / sd2[j],
+                loc=mu2[j], scale=sd2[j]) for j in range(2))
+
+        add("truncnorm_mix2", 5,
+            _ll(np.log(np.clip(tmix_pdf(x), 1e-300, None))),
+            _ks(tmix_cdf), True,
+            "shipped form (fitter gates it at KS margin 0.02)")
+
+        def gmm_pdf(q):
+            q = np.asarray(q, dtype=float)
+            return sum(w2[j] * st.norm.pdf(q, mu2[j], sd2[j])
+                       for j in range(2))
+
+        def gmm_cdf(q):
+            q = np.asarray(q, dtype=float)
+            return sum(w2[j] * st.norm.cdf(q, mu2[j], sd2[j])
+                       for j in range(2))
+
+        tail = float(1.0 - (gmm_cdf(b) - gmm_cdf(a)))
+        add("gmm2_free", 5,
+            _ll(np.log(np.clip(gmm_pdf(x), 1e-300, None))),
+            _ks(gmm_cdf), False,
+            f"untruncated; mass outside [{a:g},{b:g}]h = {tail:.4f}")
+
+        kde = st.gaussian_kde(x)  # Scott factor — deterministic
+        bw = float(np.sqrt(kde.covariance[0, 0]))
+        grid = np.linspace(a, b, _KDE_GRID_N)
+        pdf_grid = kde.evaluate(grid)
+        cdf_grid = np.empty(_KDE_GRID_N)
+        for s0 in range(0, _KDE_GRID_N, 16):  # chunked exact Gaussian CDF
+            g = grid[s0:s0 + 16]
+            cdf_grid[s0:s0 + 16] = ndtr(
+                (g[:, None] - x[None, :]) / bw).mean(axis=1)
+        ll = _ll(np.log(np.clip(np.interp(x, grid, pdf_grid), 1e-300, None)))
+        add("kde", None, ll,
+            _ks(lambda q: np.interp(np.asarray(q, dtype=float),
+                                    grid, cdf_grid)),
+            False,
+            f"scored only ({_KDE_GRID_N}-pt grid); no closed-form PPF")
+        return rows
+
+    if variable == "dwell_hours":
+        for name, dist, k in (("weibull", st.weibull_min, 2),
+                              ("lognorm", st.lognorm, 2),
+                              ("gamma", st.gamma, 2),
+                              ("expon", st.expon, 1)):
+            try:
+                fz = dist(*dist.fit(x, floc=0))
+                ll = _ll(fz.logpdf(x))
+                if not np.isfinite(ll):
+                    raise ValueError("non-finite loglik")
+                add(name, k, ll, _ks(fz.cdf), True)
+            except Exception as e:  # noqa: BLE001
+                add(name, k, float("nan"), float("nan"), True,
+                    f"fit failed: {e}"[:60])
+        # Ungated 2-component Weibull mixture — the fitter's own
+        # construction (fit_weibull_mixture_dwell) minus the ship gate:
+        # deterministic Gaussian EM soft partition → hard assignment →
+        # per-cluster Weibull MLE, weights = cluster mass.
+        mu, sd, wg, _ = _gmm_em(x, 2)
+        resp = np.array([wg[j] * st.norm.pdf(x, mu[j], max(float(sd[j]), 1e-6))
+                         for j in range(2)])
+        assign = resp.argmax(0)
+        comps = []
+        for j in range(2):
+            cj = x[assign == j]
+            if len(cj) < 2:
+                comps = []
+                break
+            kj, _, lamj = st.weibull_min.fit(cj, floc=0)
+            comps.append((len(cj) / n, float(kj), float(lamj)))
+        if comps:
+            comps.sort(key=lambda c: c[2])
+            (w1, k1, l1), (_w2, k2, l2) = comps
+
+            def wmix_pdf(q):
+                q = np.asarray(q, dtype=float)
+                return (w1 * st.weibull_min.pdf(q, k1, scale=l1)
+                        + (1.0 - w1) * st.weibull_min.pdf(q, k2, scale=l2))
+
+            def wmix_cdf(q):
+                q = np.asarray(q, dtype=float)
+                return (w1 * st.weibull_min.cdf(q, k1, scale=l1)
+                        + (1.0 - w1) * st.weibull_min.cdf(q, k2, scale=l2))
+
+            add("weibull_mix2", 5,
+                _ll(np.log(np.clip(wmix_pdf(x), 1e-300, None))),
+                _ks(wmix_cdf), True,
+                "shipped form (fitter gates it at KS margin 0.02)")
+        else:
+            add("weibull_mix2", 5, float("nan"), float("nan"), True,
+                "degenerate EM partition")
+        return rows
+
+    if variable == "soc_arrival":
+        d = np.clip(x, 1e-6, 1 - 1e-6)
+
+        def _ks_d(cdf) -> float:
+            return float(st.kstest(d, cdf).statistic)
+
+        try:
+            al, be, _, _ = st.beta.fit(d, floc=0, fscale=1)
+            fz = st.beta(al, be)
+            add("beta", 2, _ll(fz.logpdf(d)), _ks_d(fz.cdf), True)
+        except Exception as e:  # noqa: BLE001
+            add("beta", 2, float("nan"), float("nan"), True,
+                f"fit failed: {e}"[:60])
+
+        def negll(p):
+            mu, sg = p
+            if sg <= 0.01:
+                return 1e12
+            lp = st.truncnorm.logpdf(d, (0.0 - mu) / sg, (1.0 - mu) / sg,
+                                     loc=mu, scale=sg)
+            return -float(lp.sum()) if np.all(np.isfinite(lp)) else 1e12
+
+        r = minimize(negll, [float(d.mean()), max(float(d.std()), 0.05)],
+                     method="Nelder-Mead")
+        mu, sg = float(r.x[0]), max(0.01, float(r.x[1]))
+        fz = st.truncnorm((0.0 - mu) / sg, (1.0 - mu) / sg, loc=mu, scale=sg)
+        add("truncnorm01", 2, _ll(fz.logpdf(d)), _ks_d(fz.cdf), True)
+
+        add("uniform01", 0, 0.0,
+            _ks_d(lambda q: np.clip(np.asarray(q, dtype=float), 0.0, 1.0)),
+            True, "null model")
+        return rows
+
+    raise ValueError(f"unknown variable {variable!r}")
+
+
+def _load_family_cells(source_key: str, pops_yaml: dict) -> dict:
+    """Per-region arrays for one source: arrival hours (within the [4,22]h
+    fitting window), dwell hours (>0) and reconstructed arrival SoC.
+
+    The SoC reconstruction replicates calibration/api.py exactly — a single
+    RNG seeded 20260613 consumed once per session in fetch order — so the
+    SoC cells are the very inputs the shipped Beta was fitted to (the SoC
+    contract: a modeled prior, not a measurement; see paper §4.4).
+    """
+    import numpy as np
+    from validate_calibration import SOURCE_SPECS  # tools/ on sys.path
+
+    from v2b_syndata.calibration.battery_inference import (
+        infer_capacity,
+        reconstruct_arrival_soc,
+    )
+    from v2b_syndata.calibration.distribution_fitter import (
+        ARRIVAL_HI,
+        ARRIVAL_LO,
+    )
+    from v2b_syndata.calibration.feature_extractor import (
+        aggregate_user_features,
+    )
+    from v2b_syndata.calibration.region_assignment import (
+        assign_user_to_region,
+    )
+    from v2b_syndata.calibration.sources import CALIBRATION_SOURCES
+
+    spec = SOURCE_SPECS[source_key]
+    src = CALIBRATION_SOURCES[spec["policy"]]()
+    sessions = src.fetch_sessions(dict(spec["source_args"]))
+    arr_times = [s.arrival_time for s in sessions]
+    users = aggregate_user_features(sessions, min(arr_times), max(arr_times))
+    axes = pops_yaml[spec["population"]]["axes_distribution"]
+    u2r = {u.user_id: (assign_user_to_region(u, axes) or "__unassigned__")
+           for u in users}
+
+    rng = np.random.default_rng(_SOC_PRIOR_SEED)
+    per: dict[str, dict[str, list[float]]] = {}
+    for s in sessions:
+        cap, _tag = infer_capacity(s)
+        # Draw for EVERY session in fetch order (api.py does), so the RNG
+        # stream — and therefore each region's SoC multiset — is identical
+        # to what calibration fitted.
+        soc = reconstruct_arrival_soc(s, cap, rng=rng)
+        region = u2r.get(s.user_id, "__unassigned__")
+        if region == "__unassigned__":
+            continue
+        c = per.setdefault(region, {"arrival_hour": [], "dwell_hours": [],
+                                    "soc_arrival": []})
+        if ARRIVAL_LO <= s.arrival_hour <= ARRIVAL_HI:
+            c["arrival_hour"].append(float(s.arrival_hour))
+        if s.dwell_hours > 0:
+            c["dwell_hours"].append(float(s.dwell_hours))
+        if soc is not None:
+            c["soc_arrival"].append(float(soc))
+    return {r: {k: np.asarray(v, dtype=float) for k, v in d.items()}
+            for r, d in sorted(per.items())}
+
+
+def step_family_selection(args) -> None:
+    """Across-family model selection on the SOURCE region cells: for every
+    fitted (source, region) cell, fit the candidate families per variable
+    and score one-sample KS on the training data plus AIC/BIC where a
+    parametric likelihood is defined (the fitter's own model-selection
+    question, asked across families rather than within one).
+
+    Deterministic: median-split EM init, Scott-factor KDE on a fixed grid,
+    SoC prior stream seeded 20260613 (identical to calibration/api.py);
+    no free RNG anywhere.
+    """
+    import numpy as np
+    import pandas as pd
+    import yaml as pyyaml
+    from validate_calibration import SOURCE_SPECS  # tools/ on sys.path
+
+    t0 = time.perf_counter()
+    pops_yaml = pyyaml.safe_load(
+        (REPO / "configs" / "populations.yaml").read_text()
+    )
+
+    rows: list[dict] = []
+    for source in FAMILY_SOURCES:
+        cells = _load_family_cells(source, pops_yaml)
+        shipped_dists = (
+            pops_yaml[SOURCE_SPECS[source]["population"]]
+            .get("region_distributions") or {}
+        )
+        for region, per_var in cells.items():
+            for variable, dist_key in FAMILY_VARIABLES:
+                vals = per_var[variable]
+                if len(vals) < FAMILY_MIN_CELL:
+                    continue
+                shipped = str(((shipped_dists.get(region) or {})
+                               .get(dist_key) or {}).get("dist", ""))
+                cand = _family_candidates(variable, vals)
+                finite = [c["ks"] for c in cand if np.isfinite(c["ks"])]
+                ks_best = min(finite) if finite else float("nan")
+                aics = {c["family"]: 2 * c["k_params"] - 2 * c["loglik"]
+                        for c in cand
+                        if c["k_params"] is not None
+                        and np.isfinite(c["loglik"])}
+                aic_order = sorted(aics, key=lambda f: aics[f])
+                for c in cand:
+                    k = c["k_params"]
+                    ll = c["loglik"]
+                    has_aic = c["family"] in aics
+                    rows.append({
+                        "source": source, "region": region,
+                        "variable": variable, "n": int(len(vals)),
+                        "family": c["family"],
+                        "k_params": k if k is not None else "",
+                        "loglik": ll,
+                        "aic": aics.get(c["family"], float("nan")),
+                        "bic": (k * np.log(len(vals)) - 2 * ll
+                                if has_aic else float("nan")),
+                        "ks": c["ks"],
+                        "aic_rank": (aic_order.index(c["family"]) + 1
+                                     if has_aic else ""),
+                        "ks_win": bool(np.isfinite(c["ks"])
+                                       and c["ks"] <= ks_best),
+                        "shippable": bool(c["shippable"]),
+                        "shipped_family": shipped,
+                        "note": c["note"],
+                    })
+                best = min((c for c in cand if np.isfinite(c["ks"])),
+                           key=lambda c: c["ks"], default=None)
+                tag = (f"best-KS={best['family']} ({best['ks']:.3f})"
+                       if best else "no finite fit")
+                print(f"  {source}/{region}/{variable}: n={len(vals)} {tag}",
+                      flush=True)
+
+    fam = pd.DataFrame(rows)
+    DOCS_EXP.mkdir(parents=True, exist_ok=True)
+    fam.to_csv(FAMILY_CSV, index=False)
+
+    # Companion MD: method + per-variable aggregates across all cells.
+    lines = [
+        "# Across-family model selection (behavioral marginals)",
+        "",
+        "_Auto-generated by `tools/repro_paper.py` (step `family_selection`). "
+        "Do not edit by hand. Deterministic: median-split EM init, "
+        "Scott-factor KDE on a fixed 4001-point grid, SoC prior seed "
+        "20260613 (= calibration/api.py); no free RNG._",
+        "",
+        f"Scope: every (source, region) cell with ≥ {FAMILY_MIN_CELL} "
+        f"sessions across {', '.join(FAMILY_SOURCES)} — the same normalized "
+        "session data calibration fits (arrival filtered to the [4,22] h "
+        "window; dwell > 0; arrival SoC = the calibration's seeded "
+        "prior-based reconstruction, per the SoC contract). Metrics: "
+        "one-sample KS of the fitted CDF against the cell's training data "
+        "(the fitter's own `ks_fit_quality` definition) and AIC/BIC where a "
+        "parametric likelihood is defined. Mixtures are fitted UNgated here "
+        "so the family comparison is unconditional; the shipped fitter "
+        "additionally gates the mixture at KS margin 0.02.",
+        "",
+        "Interpretation notes:",
+        "",
+        "- **KDE is scored only, and cannot ship.** Generation inverts each "
+        "marginal at a copula-driven uniform (one uniform per session, a "
+        "precondition for bitwise determinism); the shipped families have "
+        "closed-form or bisectable CDFs on a bounded window, whereas a KDE "
+        "CDF is a kernel sum with no closed-form PPF, requires shipping the "
+        "full training sample instead of a compact knob-parameterized "
+        "block, and its bandwidth is a data-dependent choice outside the "
+        "knob registry.",
+        "- **The free (untruncated) 2-component GMM cannot ship for "
+        "arrival**: it places probability mass outside the generator's "
+        "[4,22] h arrival window (per-cell tail mass in the `note` column), "
+        "which the truncated-component mixture eliminates at identical "
+        "parameter count.",
+        "- **A (shifted) lognormal is not fitted for arrival**: arrival "
+        "hour lives on a bounded clock window, so the lognormal support "
+        "origin would be an artifact of the clock zero rather than a "
+        "property of behavior.",
+        "- **Arrival SoC cells are prior-reconstructed** (no charger records "
+        "SoC): this table asks which family best represents the contracted "
+        "reconstruction, not a measured quantity.",
+        "",
+    ]
+
+    def _agg_table(variable: str) -> list[str]:
+        sub = fam[fam["variable"] == variable]
+        if sub.empty:
+            return []
+        out = [
+            f"## {variable}  ({sub['source'].nunique()} sources, "
+            f"{len(sub.groupby(['source', 'region']))} cells)",
+            "",
+            "| family | cells | mean KS | mean AIC rank | KS wins | "
+            "AIC wins | shippable |",
+            "|---|--:|--:|--:|--:|--:|:-:|",
+        ]
+        fams = sorted(sub["family"].unique(),
+                      key=lambda f: float(sub[sub["family"] == f]["ks"].mean()))
+        for f in fams:
+            g = sub[sub["family"] == f]
+            ranks = pd.to_numeric(g["aic_rank"], errors="coerce").dropna()
+            mean_rank = f"{ranks.mean():.2f}" if len(ranks) else "—"
+            aic_wins = int((ranks == 1).sum()) if len(ranks) else 0
+            out.append(
+                f"| {f} | {len(g)} | {g['ks'].mean():.4f} | {mean_rank} | "
+                f"{int(g['ks_win'].sum())} | {aic_wins} | "
+                f"{'yes' if bool(g['shippable'].iloc[0]) else 'no'} |"
+            )
+        out.append("")
+        return out
+
+    for variable, _key in FAMILY_VARIABLES:
+        lines += _agg_table(variable)
+    lines += [
+        "Per-cell scores: `family_selection.csv`. Regenerate: "
+        "`uv run python tools/repro_paper.py --steps family_selection`.",
+        "",
+    ]
+    FAMILY_MD.write_text("\n".join(lines))
+    print(f"family_selection done in {time.perf_counter() - t0:.1f}s -> "
+          f"{FAMILY_CSV}, {FAMILY_MD}", flush=True)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Step 9 — collect: PAPER_NUMBERS.md
 # ──────────────────────────────────────────────────────────────────────
 
 def _git_sha() -> str:
@@ -521,7 +999,9 @@ def step_collect(args) -> None:
          " to stamp the final SHA)" if _worktree_dirty() else ""))
     w("- **Determinism:** all steps seeded (generation: SHA-keyed node streams;"
       " S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000;"
-      " TSTR: seed 1234; ablation: deterministic EM). Two consecutive driver"
+      " TSTR: seed 1234, incl. the paired-bootstrap ratio CIs (B=1000,"
+      " per-regime hashed sub-streams); ablation: deterministic EM). Two"
+      " consecutive driver"
       " runs must reproduce this file bit-for-bit; wall-times below are the"
       " recorded measurement from `docs/experiments/repro_runtimes.json`"
       " (written once; see driver docstring).")
@@ -682,6 +1162,37 @@ def step_collect(args) -> None:
       "ablation`. Per-source aggregates: `docs/experiments/mixture_ablation.md`.")
     w("")
 
+    # ── 5b. Across-family model selection (§4.3, App. families) ───────
+    w("## 5b. Across-family model selection (§4.3, App. families)")
+    w("")
+    w("_One-sample KS on the cell's training data + AIC/BIC where a "
+      "parametric likelihood is defined, per (source, region) cell over "
+      f"{', '.join(FAMILY_SOURCES)}. Mixtures fitted ungated; KDE scored "
+      "only (cannot ship: no closed-form PPF on the copula uniform); free "
+      "GMM not shippable for arrival (mass outside the [4,22] h window). "
+      "Method + caveats: `family_selection.md`._")
+    w("")
+    famsel = pd.read_csv(FAMILY_CSV)
+    w("| variable | family | cells | mean KS | mean AIC rank | KS wins | "
+      "shippable |")
+    w("|---|---|--:|--:|--:|--:|:-:|")
+    for variable, _key in FAMILY_VARIABLES:
+        sub = famsel[famsel["variable"] == variable]
+        fams = sorted(sub["family"].unique(),
+                      key=lambda f: float(sub[sub["family"] == f]["ks"].mean()))
+        for f in fams:
+            g = sub[sub["family"] == f]
+            ranks = pd.to_numeric(g["aic_rank"], errors="coerce").dropna()
+            mean_rank = f"{ranks.mean():.2f}" if len(ranks) else "—"
+            w(f"| {variable} | {f} | {len(g)} | {g['ks'].mean():.4f} | "
+              f"{mean_rank} | {int(g['ks_win'].sum())} | "
+              f"{'yes' if bool(g['shippable'].iloc[0]) else 'no'} |")
+    w("")
+    w("Generating command: `uv run python tools/repro_paper.py --steps "
+      "family_selection`. Per-cell scores: "
+      "`docs/experiments/family_selection.csv`.")
+    w("")
+
     # ── 6. Building load (Tab 3, §5.1, §8) ─────────────────────────────
     w("## 6. Building-load fidelity vs ComStock (Tab 3, §5.1, §8)")
     w("")
@@ -737,12 +1248,22 @@ def step_collect(args) -> None:
     # ── 8. TSTR (Tab 4, §6, abstract) ──────────────────────────────────
     w("## 8. TSTR / TRTR utility (Tab 4, §6, abstract)")
     w("")
-    w("| corpus | regime | MAE ratio | RMSE ratio | source |")
+    w("| corpus | regime | MAE ratio [95% CI] | RMSE ratio [95% CI] | source |")
     w("|---|---|--:|--:|---|")
 
+    def _ci_txt(ci_block: dict | None, metric: str) -> str:
+        if not ci_block:
+            return ""
+        lo, hi = ci_block["TSTR_over_TRTR_ratio"][metric]
+        return f" [{_fmt(lo, 2)}, {_fmt(hi, 2)}]"
+
     def ratio_row(res: dict, corpus: str, regime: str, key: str, src: str):
-        r = res[key]["TSTR_over_TRTR_ratio"]
-        w(f"| {corpus} | {regime} | {_fmt(r['mae'], 2)} | {_fmt(r['rmse'], 2)} "
+        blk = res[key]
+        r = blk["TSTR_over_TRTR_ratio"]
+        ci = blk.get("ci")
+        w(f"| {corpus} | {regime} "
+          f"| {_fmt(r['mae'], 2)}{_ci_txt(ci, 'mae')} "
+          f"| {_fmt(r['rmse'], 2)}{_ci_txt(ci, 'rmse')} "
           f"| `{src}` |")
 
     ratio_row(tstr_acn, "ACN-Data", "lagged, raw", "results_lagged",
@@ -768,6 +1289,13 @@ def step_collect(args) -> None:
                          "results_calendar_only_normalized")]:
         ratio_row(arm_c, "ElaadNL (scale-matched, 12 synth months)", regime,
                   key, "data/tstr/results_elaadnl_scale.json")
+    w("")
+    w("CI method: seeded PAIRED percentile bootstrap over the held-out real"
+      " test bins (B=1000, base seed 1234, per-regime SHA-256 hash-keyed"
+      " sub-streams) — the same resampled bin indices are applied to both"
+      " models' per-bin errors before recomputing the TSTR/TRTR ratio per"
+      " replicate; interval = 2.5–97.5 percentiles (`ci` blocks in the"
+      " result JSONs).")
     w("")
     w("| context quantity | value | source |")
     w("|---|---|---|")
@@ -867,17 +1395,74 @@ def step_collect(args) -> None:
       f"{float(d['batt_throughput_kwh']):,.0f} kWh stationary-battery "
       "throughput.")
     if "acnsim_llf_crosscheck" in disp.index:
-        dpk = (float(disp.loc["acnsim_llf_crosscheck", "peak_net_kw"])
-               - float(disp.loc["uncontrolled", "peak_net_kw"]))
-        w(f"- ACN-Sim cross-check: LLF (stock V1G, building-load-unaware, "
-          f"uncontended charger pool = semantic twin of the uncontrolled "
-          f"arm) reproduces the uncontrolled peak to {dpk:+.1f} kW — the "
-          "demand model is independently validated by an established "
-          "simulator; see `v2b_dispatch.md` for why no stock ACN-Sim "
-          "algorithm is comparable to LP-V1G.")
+        cross = [a for a in disp.index
+                 if a.startswith("acnsim_") and a.endswith("_crosscheck")
+                 and a != "acnsim_uncontrolled_crosscheck"]
+        dpk = max((float(disp.loc[a, "peak_net_kw"])
+                   - float(disp.loc["uncontrolled", "peak_net_kw"])
+                   for a in cross), key=abs)
+        w(f"- ACN-Sim cross-check: all {len(cross)} controlled stock V1G "
+          f"schedulers (EDF/LLF/FCFS/LCFS/LRPT/RoundRobin — building-load-"
+          f"unaware; uncontended charger pool = semantic twins of the "
+          f"uncontrolled arm) reproduce the uncontrolled peak to within "
+          f"{dpk:+.1f} kW — queue algorithms cannot help without a queue, "
+          "and the demand model is independently validated by an "
+          "established simulator; see `v2b_dispatch.md` for why no stock "
+          "ACN-Sim algorithm is comparable to LP-V1G.")
     w("")
     w("Generating command: `uv run python tools/repro_paper.py --steps "
       "v2b_dispatch` (wraps `tools/bench_v2b_dispatch.py`).")
+    w("")
+
+    # ── 10b. Contended dispatch benchmark ──────────────────────────────
+    w("## 10b. Contended dispatch benchmark (plug-scarce unit + feeder cap)")
+    w("")
+    w("_Unit `data/output/contended/b1ch35/JUL2024/0`: byte-identical "
+      "demand to the section-10 unit (same building/fleet/month/weather/"
+      "seed; SHA-keyed node seeding) but `charging_infra.charger_count` "
+      "60 → 35 ≈ 60% of the realized peak concurrency (59), plus the "
+      "0.125 ACN-Caltech-like feeder service ratio (87.5 kW) from "
+      "`bench/adapter.py`. FCFS pool admission rejects 412/1,242 sessions "
+      "(33.2%) identically for every algorithm; the feeder cap is what the "
+      "schedulers contend over. Fully deterministic (no RNG, no wall-time "
+      "columns). Design and interpretation: "
+      "`docs/experiments/contended_bench.md`._")
+    w("")
+    cont = pd.read_csv(CONTENDED_CSV).set_index("arm")
+    w("| arm | peak net (kW) | kWh delivered / requested | "
+      "satisfied (of admitted) | satisfied (of offered) | source |")
+    w("|---|--:|--:|--:|--:|---|")
+    for arm in cont.index:
+        r = cont.loc[arm]
+        if pd.isna(r["peak_net_kw"]):
+            w(f"| {arm} | — (infeasible; see status in CSV) | — | — | — | "
+              "`contended_bench.csv` |")
+            continue
+        w(f"| {arm} | {float(r['peak_net_kw']):,.1f} | "
+          f"{float(r['kwh_delivered']):,.0f} / "
+          f"{float(r['kwh_requested']):,.0f} | "
+          f"{float(r['satisfied_pct_admitted']):.1f}% | "
+          f"{float(r['satisfied_pct_offered']):.1f}% | "
+          f"`contended_bench.csv` |")
+    w("")
+    sat = cont["satisfied_pct_admitted"]
+    algos = [a for a in cont.index
+             if a.startswith("acnsim_") and a != "acnsim_uncontrolled"]
+    w(f"- Under contention the stock schedulers separate: satisfied-of-"
+      f"admitted spans {min(float(sat[a]) for a in algos):.1f}%–"
+      f"{max(float(sat[a]) for a in algos):.1f}% across "
+      f"{len(algos)} algorithms (deadline-aware EDF/LLF at the top).")
+    w("- LP rows are labeled relaxations (aggregate EV-power cap; "
+      "fractional plug sharing; serve all sessions) — a faithful "
+      "plug-assignment LP needs integer machinery, deliberately not "
+      "attempted. The feeder-cap LP is infeasible when serving ALL "
+      "sessions, showing admission rejection is necessary at that service "
+      "ratio, not an artifact.")
+    w("")
+    w("Generating command: `uv run python tools/repro_paper.py --steps "
+      "contended_bench` (generates the unit from "
+      "`docs/experiments/contended_bench_config.json` if absent, then wraps "
+      "`tools/bench_v2b_dispatch.py --contended`).")
     w("")
 
     # ── 11. Compute statement for this driver ──────────────────────────
@@ -918,7 +1503,9 @@ STEP_FNS = {
     "tstr_elaadnl": step_tstr_elaadnl,
     "tstr_scale": step_tstr_scale,
     "ablation": step_ablation,
+    "family_selection": step_family_selection,
     "v2b_dispatch": step_v2b_dispatch,
+    "contended_bench": step_contended_bench,
     "collect": step_collect,
 }
 

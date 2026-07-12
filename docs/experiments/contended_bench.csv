@@ -1,0 +1,12 @@
+arm,peak_net_kw,peak_reduction_pct,kwh_requested,kwh_delivered,fulfillment_pct,n_admitted,n_rejected,n_satisfied,satisfied_pct_admitted,satisfied_pct_offered,ev_discharge_kwh,batt_throughput_kwh,status
+uncontrolled_nolimit,1871.542,0.0,20991.7,20991.7,100.0,1242,0,1242,100.0,100.0,0.0,0.0,simulated (no plug/feeder limit; serves all sessions)
+acnsim_edf,1577.729,15.699,14259.4,14259.4,100.0,830,412,830,100.0,66.83,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_llf,1577.953,15.687,14259.4,14259.4,100.0,830,412,830,100.0,66.83,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_fcfs,1539.39,17.748,14259.4,13097.8,91.85,830,412,741,89.28,59.66,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_lcfs,1543.74,17.515,14259.4,13389.8,93.9,830,412,767,92.41,61.76,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_lrpt,1562.396,16.518,14259.4,13232.2,92.8,830,412,636,76.63,51.21,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_round_robin,1570.244,16.099,14259.4,13237.9,92.84,830,412,733,88.31,59.02,0.0,0.0,simulated (acnsim; feeder-capped at 87.5 kW)
+acnsim_uncontrolled,1910.279,-2.07,14259.4,16340.0,114.59,830,412,830,100.0,66.83,0.0,0.0,simulated (acnsim; ignores the feeder cap by design — cap-violating upper bound)
+v1g_lp_plugcap,1521.759,18.69,20991.7,20991.7,100.0,1242,0,1242,100.0,100.0,0.0,0.0,LP relaxation (agg EV power <= plugs x rate = 700 kW; fractional plug sharing; serves all sessions)
+v2b_lp_plugcap,1321.87,29.37,20991.7,20991.7,100.0,1242,0,1242,100.0,100.0,561.2,5241.6,LP relaxation (agg EV power <= 700 kW; + discharge + battery; serves all sessions)
+v1g_lp_feedercap,,,20991.7,,,1242,0,0,0.0,0.0,,,infeasible under the 87.5 kW aggregate cap when serving ALL sessions — row omitted from comparisons (honest relaxation limit)

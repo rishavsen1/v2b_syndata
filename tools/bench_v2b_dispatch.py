@@ -71,24 +71,45 @@ the SAME unit — the optimus CSVs are adapted in-memory into the native-schema
 ``ScenarioInputs`` the adapter expects, using the same arrival-SoC
 reconstruction — at 15-min ticks with the unbinding feeder default, and its
 charging schedule is added to building_load - PV to compute the identical
-monthly-peak-of-net metric. Because ACN-Sim's stock sorted V1G heuristics
-(LLF/EDF) are building-load-unaware and the charger pool is uncontended here
-(60 chargers, non-overlapping per-car sessions), they charge each EV at max
-rate until its requested energy is met — i.e. they are the semantic twin of
-the *uncontrolled* arm, and a near-zero delta against it independently
-validates the demand model (windows, arrival-SoC chain, energy needs) through
-an established simulator. The delta against LP-V1G then measures the value of
-building-load-aware scheduling, not an inconsistency.
+monthly-peak-of-net metric. ALL SEVEN stock V1G schedulers are run
+(EDF/LLF/FCFS/LCFS/LRPT/RoundRobin/Uncontrolled). Because the stock
+algorithms are building-load-unaware and the charger pool is uncontended here
+(60 chargers, non-overlapping per-car sessions, unbinding feeder), every
+queue-ordering algorithm charges each EV at max rate until its requested
+energy is met — i.e. they all coincide with the *uncontrolled* arm, and a
+near-zero delta against it independently validates the demand model (windows,
+arrival-SoC chain, energy needs) through an established simulator. The point
+of the table is exactly that queue algorithms cannot help without a queue;
+the delta against LP-V1G measures the value of building-load-aware
+scheduling, not an inconsistency.
+
+Contended benchmark (``--contended``; separate outputs
+docs/experiments/contended_bench.{md,csv}): the same machinery on a unit
+whose charger pool is deliberately scarce (charging_infra.charger_count
+reduced below the fleet's realized peak concurrency) plus a binding feeder
+cap (``--feeder-ratio``, default 0.125 = the ACN-Caltech-like service ratio
+documented in bench/adapter.py). Plug scarcity is resolved by the adapter's
+FCFS admission (a pool policy — identical for every algorithm; rejected
+sessions never plug in, so there is no queueing delay to report); the feeder
+cap is what the scheduling algorithms actually contend over. LP arms on the
+contended unit are labeled RELAXATIONS: the LP's static session→charger
+assignment cannot express plug contention (a faithful model needs big-M /
+integer machinery, deliberately not attempted), so the LP instead serves ALL
+sessions under an aggregate EV-power cap — ``plugcap`` = charger_count × rate
+(the honest fractional-plug-sharing proxy) and ``feedercap`` = the same
+feeder cap the ACN-Sim arms see.
 
 Outputs: docs/experiments/v2b_dispatch.md (memo) and v2b_dispatch.csv
-(machine-readable; consumed by tools/repro_paper.py step ``collect``).
-Everything except the solve/wall-time columns is deterministic: no RNG, and
-the LP has a unique optimum under the tie-break.
+(machine-readable; consumed by tools/repro_paper.py step ``collect``), or
+contended_bench.{md,csv} with --contended. The CSVs and the contended memo
+are byte-deterministic (no RNG, no wall-time columns; the LP optimum is
+unique under the tie-break); only v2b_dispatch.md carries wall times.
 
 Usage:
     uv run python tools/bench_v2b_dispatch.py
     uv run python tools/bench_v2b_dispatch.py --data-dir <unit> --out-dir <dir>
     uv run python tools/bench_v2b_dispatch.py --skip-acnsim
+    uv run python tools/bench_v2b_dispatch.py --contended [--feeder-ratio 0.125]
 """
 from __future__ import annotations
 
@@ -107,11 +128,21 @@ from scipy.optimize import linprog
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 DEFAULT_DATA = REPO / "data" / "output" / "campus10" / "b1" / "JUL2024" / "0"
+DEFAULT_CONTENDED_DATA = (REPO / "data" / "output" / "contended" / "b1ch35"
+                          / "JUL2024" / "0")
 DEFAULT_OUT = REPO / "docs" / "experiments"
 
 TICK_S = 900
 DT_H = TICK_S / 3600.0  # 0.25 h
 TIE_BREAK = 1e-4
+ENERGY_TOL_KWH = 0.05   # session satisfied iff delivered >= requested - tol
+                        # (same tolerance as bench.runner._ENERGY_TOL_KWH)
+# Feeder-to-theoretical-max ratio for the contended benchmark. 0.125 is the
+# ACN-Caltech-like service ratio documented in bench/adapter.py — tight
+# enough that the schedulers must ration power (they separate), loose enough
+# that deadline-aware orderings (EDF/LLF) still satisfy every admitted
+# session (the problem stays feasible).
+CONTENDED_FEEDER_RATIO = 0.125
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -277,8 +308,17 @@ def simulate_uncontrolled(unit: Unit) -> np.ndarray:
     return ev
 
 
-def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool) -> dict:
-    """Peak-shaving LP. Returns dict with ev_kw, batt_kw (net), status, etc."""
+def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool,
+             ev_agg_cap_kw: float | None = None) -> dict:
+    """Peak-shaving LP. Returns dict with ev_kw, batt_kw (net), status, etc.
+
+    ``ev_agg_cap_kw`` adds, per step t, ``sum_s (c_{s,t} + d_{s,t}) <= cap``:
+    an aggregate cap on power flowing through the EV plugs (discharge counts —
+    a plug carries |power| regardless of direction; the stationary battery is
+    behind the meter and exempt). This is the honest LP proxy for charger
+    contention: it cannot say WHO plugs in (that needs integer machinery),
+    only how much total plug power exists. Raises RuntimeError if infeasible.
+    """
     T = len(unit.times)
     sess = unit.sessions
     load, pv, price = unit.load_kw, unit.pv_kw, unit.price
@@ -325,6 +365,9 @@ def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool) -> dict:
     EQ = (eq_rows, eq_cols, eq_vals)
 
     # Peak rows 0..T-1:  sum c - sum d + bc - bd - P <= pv - load
+    # Aggregate-cap rows T..2T-1 (only when ev_agg_cap_kw is set):
+    #   sum_s c_{s,t} + d_{s,t} <= ev_agg_cap_kw
+    n_ub_rows = T + (T if ev_agg_cap_kw is not None else 0)
     add(UB, np.arange(T), np.zeros(T, dtype=np.int64), -np.ones(T))
 
     for s, (c_off, d_off, e_off) in zip(sess, offs, strict=True):
@@ -339,9 +382,13 @@ def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool) -> dict:
         lb[e_off + L - 1] = s.required_kwh  # departure requirement
         # peak rows
         add(UB, t, c_off + k, np.ones(L))
+        if ev_agg_cap_kw is not None:
+            add(UB, T + t, c_off + k, np.ones(L))
         if d_off >= 0:
             ub[d_off:d_off + L] = s.p_discharge
             add(UB, t, d_off + k, -np.ones(L))
+            if ev_agg_cap_kw is not None:
+                add(UB, T + t, d_off + k, np.ones(L))
         # SoC dynamics: e_k - e_{k-1} - dt*c_k + dt*d_k = (k==0)*arrival_kwh
         r = n_eq + k
         add(EQ, r, e_off + k, np.ones(L))
@@ -383,8 +430,10 @@ def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool) -> dict:
     A_ub = sp.coo_matrix(
         (np.concatenate(ub_vals),
          (np.concatenate(ub_rows), np.concatenate(ub_cols))),
-        shape=(T, n_var)).tocsc()
+        shape=(n_ub_rows, n_var)).tocsc()
     b_ub = pv - load
+    if ev_agg_cap_kw is not None:
+        b_ub = np.concatenate([b_ub, np.full(T, float(ev_agg_cap_kw))])
     A_eq = sp.coo_matrix(
         (np.concatenate(eq_vals),
          (np.concatenate(eq_rows), np.concatenate(eq_cols))),
@@ -410,30 +459,22 @@ def solve_lp(unit: Unit, *, allow_discharge: bool, use_battery: bool) -> dict:
         batt_net = x[bc_off:bc_off + T] - x[bd_off:bd_off + T]
     return {"ev_kw": ev, "batt_kw": batt_net, "status": "optimal",
             "solve_s": solve_s, "n_var": n_var,
-            "n_constraints": T + n_eq, "lp_peak_kw": float(x[0])}
+            "n_constraints": n_ub_rows + n_eq, "lp_peak_kw": float(x[0])}
 
 
-ACNSIM_ALGOS = ("llf", "uncontrolled")
+# All seven stock ACN-Sim V1G schedulers shipped by the repo bench registry
+# (src/v2b_syndata/bench/algorithms.py). Order is the fixed report order.
+ACNSIM_ALGOS = ("edf", "llf", "fcfs", "lcfs", "lrpt", "round_robin",
+                "uncontrolled")
 
 
-def run_acnsim_crosscheck(unit: Unit) -> dict[str, dict]:
-    """Cross-check via the repo's established ACN-Sim bench machinery.
-
-    Adapts the reconstructed unit into the native-schema ``ScenarioInputs``
-    the bench adapter consumes (same arrival-SoC chain and relaxed
-    required_soc as the LP arms, for a like-for-like comparison), runs stock
-    V1G schedulers at 15-min ticks with the unbinding feeder default, and
-    computes the identical peak-of-net metric from the resulting charging
-    schedule. Deterministic (no RNG in these schedulers).
-    """
-    import pytz
-    from acnportal import acnsim
-
-    from v2b_syndata.bench.adapter import ScenarioInputs, build_acnsim_inputs
-    from v2b_syndata.bench.algorithms import ALGORITHMS
-
+def build_scenario_frames(
+    unit: Unit,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """(sessions, cars, building_load) DataFrames in the native schema the
+    bench adapter consumes — same arrival-SoC chain and relaxed required_soc
+    as the LP arms, for a like-for-like comparison. Pure pandas."""
     times = unit.times
-    T = len(times)
     step = pd.Timedelta(seconds=TICK_S)
     sess_df = pd.DataFrame({
         "session_id": [s.session_id for s in unit.sessions],
@@ -450,32 +491,88 @@ def run_acnsim_crosscheck(unit: Unit) -> dict[str, dict]:
         "capacity_kwh": [s.cap_kwh for s in unit.sessions],
     }).drop_duplicates("car_id").set_index("car_id"))
     bl_df = pd.DataFrame({"datetime": times, "power_kw": unit.load_kw})
+    return sess_df, cars_df, bl_df
+
+
+def satisfaction_stats(
+    requested: dict[str, float], delivered: dict[str, float],
+    tol: float = ENERGY_TOL_KWH,
+) -> tuple[int, float, float]:
+    """(n_satisfied, kwh_requested, kwh_delivered) over admitted sessions.
+
+    A session is satisfied iff delivered >= requested - tol — the same
+    definition as bench.runner's target-miss accounting.
+    """
+    n_sat = sum(1 for sid, req in requested.items()
+                if delivered.get(sid, 0.0) >= req - tol)
+    return n_sat, float(sum(requested.values())), float(sum(delivered.values()))
+
+
+def _simulate_acnsim(unit: Unit, algo_name: str, *,
+                     feeder_kw_ratio: float = 1.0) -> dict:
+    """One ACN-Sim run of a stock scheduler over the adapted unit at 15-min
+    ticks. Returns ev_kw (on the unit grid), per-session requested/delivered
+    kWh dicts, and the adapter's AdmissionStats. Deterministic (no RNG)."""
+    import warnings
+
+    import pytz
+    from acnportal import acnsim
+
+    from v2b_syndata.bench.adapter import ScenarioInputs, build_acnsim_inputs
+    from v2b_syndata.bench.algorithms import ALGORITHMS
+
+    times = unit.times
+    T = len(times)
+    sess_df, cars_df, bl_df = build_scenario_frames(unit)
     scenario = ScenarioInputs(
         sessions=sess_df, cars=cars_df, chargers=unit.chargers_native,
         building_load=bl_df, sim_start=times[0], sim_end=times[-1])
+    acn = build_acnsim_inputs(scenario, period_min=int(TICK_S // 60),
+                              feeder_kw_ratio=feeder_kw_ratio)
+    tz = pytz.timezone("America/Los_Angeles")
+    start = tz.localize(acn.sim_start.to_pydatetime().replace(tzinfo=None))
+    sim = acnsim.Simulator(acn.network, ALGORITHMS[algo_name](),
+                           acn.events, start,
+                           period=int(TICK_S // 60), verbose=False)
+    with warnings.catch_warnings():
+        # UncontrolledCharging ignores network constraints by design; under a
+        # binding feeder cap ACN-Sim warns "Invalid schedule provided" every
+        # recompute. Expected and documented — silence just that message.
+        warnings.filterwarnings("ignore", message="Invalid schedule provided")
+        sim.run()
+    agg = np.asarray(acnsim.aggregate_power(sim), dtype=float)
+    ev_kw = np.zeros(T)
+    n = min(T, len(agg))
+    ev_kw[:n] = agg[:n]
+    requested = {str(ev.session_id): float(ev.requested_energy)
+                 for ev in sim.ev_history.values()}
+    delivered = {str(ev.session_id): float(ev.energy_delivered)
+                 for ev in sim.ev_history.values()}
+    return {"ev_kw": ev_kw, "requested": requested, "delivered": delivered,
+            "admission": acn.admission, "feeder_kw": acn.feeder_kw}
 
+
+def run_acnsim_crosscheck(unit: Unit) -> dict[str, dict]:
+    """Cross-check via the repo's established ACN-Sim bench machinery.
+
+    Adapts the reconstructed unit into the native-schema ``ScenarioInputs``
+    the bench adapter consumes (same arrival-SoC chain and relaxed
+    required_soc as the LP arms, for a like-for-like comparison), runs ALL
+    SEVEN stock V1G schedulers at 15-min ticks with the unbinding feeder
+    default, and computes the identical peak-of-net metric from the resulting
+    charging schedule. Deterministic (no RNG in these schedulers).
+    """
     out: dict[str, dict] = {}
     for algo_name in ACNSIM_ALGOS:
         t0 = time.perf_counter()
-        acn = build_acnsim_inputs(scenario, period_min=int(TICK_S // 60))
-        tz = pytz.timezone("America/Los_Angeles")
-        start = tz.localize(acn.sim_start.to_pydatetime().replace(tzinfo=None))
-        sim = acnsim.Simulator(acn.network, ALGORITHMS[algo_name](),
-                               acn.events, start,
-                               period=int(TICK_S // 60), verbose=False)
-        sim.run()
-        agg = np.asarray(acnsim.aggregate_power(sim), dtype=float)
-        ev_kw = np.zeros(T)
-        n = min(T, len(agg))
-        ev_kw[:n] = agg[:n]
-        requested = sum(float(ev.requested_energy)
-                        for ev in sim.ev_history.values())
-        delivered = sum(float(ev.energy_delivered)
-                        for ev in sim.ev_history.values())
+        sim = _simulate_acnsim(unit, algo_name)
+        _, requested, delivered = satisfaction_stats(
+            sim["requested"], sim["delivered"])
+        adm = sim["admission"]
         out[f"acnsim_{algo_name}_crosscheck"] = {
-            **metrics(unit, ev_kw, np.zeros(T)),
-            "status": (f"simulated (acnsim; {acn.admission.n_admitted}"
-                       f"/{acn.admission.n_offered} admitted; "
+            **metrics(unit, sim["ev_kw"], np.zeros(len(unit.times))),
+            "status": (f"simulated (acnsim; {adm.n_admitted}"
+                       f"/{adm.n_offered} admitted; "
                        f"{delivered:,.0f}/{requested:,.0f} kWh delivered)"),
             "solve_s": time.perf_counter() - t0,
             "n_var": 0, "n_constraints": 0,
@@ -532,6 +629,120 @@ def run_benchmark(data_dir: Path, *, with_acnsim: bool = True) -> dict:
         row["peak_reduction_pct"] = 100.0 * (1.0 - row["peak_net_kw"] / p0)
         row["cost_reduction_pct"] = 100.0 * (1.0 - row["energy_cost_usd"] / c0)
     return {"unit": unit, "arms": arms}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Contended benchmark (plug-scarce unit + binding feeder cap)
+# ──────────────────────────────────────────────────────────────────────
+
+def run_contended_benchmark(
+    data_dir: Path, *, feeder_kw_ratio: float = CONTENDED_FEEDER_RATIO,
+) -> dict:
+    """All seven ACN-Sim V1G schedulers + labeled LP relaxations on a
+    contended unit (charger pool smaller than the fleet's realized peak
+    concurrency), scored on the same monthly-peak-of-net metric plus
+    energy-service accounting. Fully deterministic (no RNG, no wall times).
+
+    Contention channels (see module docstring):
+    - plugs: the adapter's FCFS admission rejects sessions that arrive with
+      no charger free — a pool POLICY, identical for every algorithm;
+    - power: the feeder cap (feeder_kw_ratio × chargers × rate) is the shared
+      resource the schedulers ration — this is where they separate.
+    Mean queueing delay is NOT reported: the machinery models
+    plug-on-arrival-or-reject admission, so no session waits.
+    """
+    unit = load_unit(data_dir)
+    T = len(unit.times)
+    n_offered = len(unit.sessions)
+    n_chargers = len(unit.chargers_native)
+    rate_kw = float(unit.chargers_native["max_rate_kw"].max())
+    plug_cap_kw = n_chargers * rate_kw
+    feeder_kw = feeder_kw_ratio * plug_cap_kw
+    req_all_kwh = float(sum(s.required_kwh - s.arrival_kwh
+                            for s in unit.sessions))
+
+    def full_service_row(m: dict, status: str) -> dict:
+        return {**m, "kwh_requested": req_all_kwh, "kwh_delivered": req_all_kwh,
+                "n_admitted": n_offered, "n_rejected": 0,
+                "n_satisfied": n_offered, "status": status}
+
+    arms: dict[str, dict] = {}
+    # Reference arm: charge-at-max with NO plug or feeder limit — the same
+    # semantics (and number) as the uncontended table's `uncontrolled` arm.
+    ev_unc = simulate_uncontrolled(unit)
+    arms["uncontrolled_nolimit"] = full_service_row(
+        metrics(unit, ev_unc, np.zeros(T)),
+        "simulated (no plug/feeder limit; serves all sessions)")
+
+    for algo_name in ACNSIM_ALGOS:
+        sim = _simulate_acnsim(unit, algo_name,
+                               feeder_kw_ratio=feeder_kw_ratio)
+        n_sat, kwh_req, kwh_del = satisfaction_stats(
+            sim["requested"], sim["delivered"])
+        adm = sim["admission"]
+        note = ("ignores the feeder cap by design — cap-violating upper bound"
+                if algo_name == "uncontrolled"
+                else f"feeder-capped at {feeder_kw:.1f} kW")
+        arms[f"acnsim_{algo_name}"] = {
+            **metrics(unit, sim["ev_kw"], np.zeros(T)),
+            "kwh_requested": kwh_req, "kwh_delivered": kwh_del,
+            "n_admitted": adm.n_admitted, "n_rejected": adm.n_rejected,
+            "n_satisfied": n_sat,
+            "status": f"simulated (acnsim; {note})",
+        }
+
+    # LP relaxations (labeled): static session→charger assignment cannot
+    # express plug contention, so the LP serves ALL sessions under an
+    # aggregate EV-power cap instead (fractional plug sharing; no admission).
+    lp_specs = [
+        ("v1g_lp_plugcap", {"allow_discharge": False, "use_battery": False},
+         plug_cap_kw,
+         f"LP relaxation (agg EV power <= plugs x rate = {plug_cap_kw:.0f} kW;"
+         " fractional plug sharing; serves all sessions)"),
+        ("v2b_lp_plugcap", {"allow_discharge": True, "use_battery": True},
+         plug_cap_kw,
+         f"LP relaxation (agg EV power <= {plug_cap_kw:.0f} kW; + discharge"
+         " + battery; serves all sessions)"),
+        ("v1g_lp_feedercap", {"allow_discharge": False, "use_battery": False},
+         feeder_kw,
+         f"LP relaxation (agg EV power <= feeder cap = {feeder_kw:.1f} kW;"
+         " same power envelope as the acnsim arms; serves all sessions)"),
+    ]
+    nan_metrics = {k: float("nan") for k in
+                   ("peak_net_kw", "energy_cost_usd", "ev_charge_kwh",
+                    "ev_discharge_kwh", "batt_throughput_kwh")}
+    for name, kw, cap, label in lp_specs:
+        try:
+            sol = solve_lp(unit, **kw, ev_agg_cap_kw=cap)
+            arms[name] = full_service_row(
+                metrics(unit, sol["ev_kw"], sol["batt_kw"]), label)
+        except RuntimeError:
+            arms[name] = {
+                **nan_metrics, "kwh_requested": req_all_kwh,
+                "kwh_delivered": float("nan"), "n_admitted": n_offered,
+                "n_rejected": 0, "n_satisfied": 0,
+                "status": (f"infeasible under the {cap:.1f} kW aggregate cap"
+                           " when serving ALL sessions — row omitted from"
+                           " comparisons (honest relaxation limit)"),
+            }
+
+    p0 = arms["uncontrolled_nolimit"]["peak_net_kw"]
+    for row in arms.values():
+        row["peak_reduction_pct"] = 100.0 * (1.0 - row["peak_net_kw"] / p0)
+        row["fulfillment_pct"] = (100.0 * row["kwh_delivered"]
+                                  / row["kwh_requested"]
+                                  if row["kwh_requested"] else 100.0)
+        row["satisfied_pct_admitted"] = (100.0 * row["n_satisfied"]
+                                         / row["n_admitted"]
+                                         if row["n_admitted"] else 100.0)
+        row["satisfied_pct_offered"] = 100.0 * row["n_satisfied"] / n_offered
+
+    return {"unit": unit, "arms": arms,
+            "params": {"n_offered": n_offered, "n_chargers": n_chargers,
+                       "rate_kw": rate_kw, "plug_cap_kw": plug_cap_kw,
+                       "feeder_kw_ratio": feeder_kw_ratio,
+                       "feeder_kw": feeder_kw,
+                       "req_all_kwh": req_all_kwh}}
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -661,33 +872,45 @@ def write_outputs(data_dir: Path, out_dir: Path, result: dict) -> None:
         "",
         "The `acnsim_*_crosscheck` rows run the repo's established ACN-Sim "
         "bench machinery (`src/v2b_syndata/bench/`, V1G-only by design) on "
-        "the same unit: the optimus CSVs are adapted in-memory into the "
-        "native-schema `ScenarioInputs` the adapter expects (same arrival-SoC "
+        "the same unit — ALL SEVEN stock schedulers in the registry "
+        "(EDF, LLF, FCFS, LCFS, LRPT, RoundRobin, Uncontrolled): the optimus "
+        "CSVs are adapted in-memory into the native-schema `ScenarioInputs` "
+        "the adapter expects (same arrival-SoC "
         "reconstruction and relaxed `required_soc` as the LP arms), simulated "
         "at 15-min ticks with the unbinding feeder default, and the resulting "
         "charging schedule is added to `building_load - PV` to compute the "
-        "identical peak-of-net metric. ACN-Sim's stock sorted V1G heuristics "
+        "identical peak-of-net metric. ACN-Sim's stock V1G schedulers "
         "are building-load-unaware, and the charger pool is uncontended here "
-        "(60 chargers, per-car sessions never overlap), so LLF charges each "
-        "EV at max rate until its requested energy is met — the semantic twin "
-        "of the **uncontrolled** arm. A near-zero LLF-vs-uncontrolled delta "
-        "therefore independently validates the demand model (session windows, "
+        "(60 chargers, per-car sessions never overlap, unbinding feeder), so "
+        "every queue-ordering algorithm charges each EV at max rate until its "
+        "requested energy is met — the semantic twin "
+        "of the **uncontrolled** arm. The table's point is exactly that "
+        "queue algorithms cannot help without a queue: their near-zero "
+        "deltas vs the uncontrolled arm independently validate the demand "
+        "model (session windows, "
         "arrival-SoC chain, energy needs) through an established simulator; "
         "the gap to LP-V1G measures the value of building-load-aware "
         "scheduling (no stock ACN-Sim algorithm observes building load). "
+        "For the contended companion (where the algorithms DO separate) see "
+        "`contended_bench.md`. "
         "ACN-Sim's `UncontrolledCharging` keeps charging past the requested "
         "energy (to battery capacity) by its own semantics, so it upper-"
         "bounds the uncontrolled arm.",
         "",
     ]
-    llf = arms.get("acnsim_llf_crosscheck")
-    if llf is not None:
-        d_unc = llf["peak_net_kw"] - arms["uncontrolled"]["peak_net_kw"]
-        d_v1g = llf["peak_net_kw"] - arms["v1g"]["peak_net_kw"]
+    ctrl = [a for a in ACNSIM_ALGOS if a != "uncontrolled"]
+    deltas = [arms[f"acnsim_{a}_crosscheck"]["peak_net_kw"]
+              - arms["uncontrolled"]["peak_net_kw"]
+              for a in ctrl if f"acnsim_{a}_crosscheck" in arms]
+    if deltas and "acnsim_llf_crosscheck" in arms:
+        d_max = max(deltas, key=abs)
+        d_v1g = (arms["acnsim_llf_crosscheck"]["peak_net_kw"]
+                 - arms["v1g"]["peak_net_kw"])
         L += [
-            f"Deltas: ACN-Sim LLF peak vs uncontrolled arm: "
-            f"{d_unc:+.1f} kW ({100 * d_unc / arms['uncontrolled']['peak_net_kw']:+.2f}%); "
-            f"vs LP-V1G: {d_v1g:+.1f} kW.",
+            f"Deltas: max |peak delta| of the {len(deltas)} controlled "
+            f"ACN-Sim schedulers vs the uncontrolled arm: {d_max:+.1f} kW "
+            f"({100 * d_max / arms['uncontrolled']['peak_net_kw']:+.2f}%); "
+            f"LLF vs LP-V1G: {d_v1g:+.1f} kW.",
             "",
         ]
     L += [
@@ -704,17 +927,210 @@ def write_outputs(data_dir: Path, out_dir: Path, result: dict) -> None:
     (out_dir / "v2b_dispatch.md").write_text("\n".join(L))
 
 
+CONTENDED_COLS = [
+    "arm", "peak_net_kw", "peak_reduction_pct", "kwh_requested",
+    "kwh_delivered", "fulfillment_pct", "n_admitted", "n_rejected",
+    "n_satisfied", "satisfied_pct_admitted", "satisfied_pct_offered",
+    "ev_discharge_kwh", "batt_throughput_kwh", "status",
+]
+
+
+def contended_rows(result: dict) -> list[dict]:
+    """CSV rows for the contended benchmark. Pure; deterministic rounding;
+    deliberately NO wall-time column (byte-identical across runs)."""
+    rows = []
+    for name, r in result["arms"].items():
+        rows.append({
+            "arm": name,
+            "peak_net_kw": round(r["peak_net_kw"], 3),
+            "peak_reduction_pct": round(r["peak_reduction_pct"], 3),
+            "kwh_requested": round(r["kwh_requested"], 1),
+            "kwh_delivered": round(r["kwh_delivered"], 1),
+            "fulfillment_pct": round(r["fulfillment_pct"], 2),
+            "n_admitted": r["n_admitted"],
+            "n_rejected": r["n_rejected"],
+            "n_satisfied": r["n_satisfied"],
+            "satisfied_pct_admitted": round(r["satisfied_pct_admitted"], 2),
+            "satisfied_pct_offered": round(r["satisfied_pct_offered"], 2),
+            "ev_discharge_kwh": round(r["ev_discharge_kwh"], 1),
+            "batt_throughput_kwh": round(r["batt_throughput_kwh"], 1),
+            "status": r["status"],
+        })
+    return rows
+
+
+def write_contended_outputs(data_dir: Path, out_dir: Path,
+                            result: dict) -> None:
+    """contended_bench.csv + contended_bench.md — both byte-deterministic
+    (no RNG anywhere in the pipeline; no wall-time fields)."""
+    unit: Unit = result["unit"]
+    p = result["params"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows = contended_rows(result)
+    pd.DataFrame(rows, columns=CONTENDED_COLS).to_csv(
+        out_dir / "contended_bench.csv", index=False)
+
+    rel_data = (data_dir.relative_to(REPO)
+                if data_dir.is_relative_to(REPO) else data_dir)
+    n_bidir = int((unit.chargers_native["min_rate_kw"] < 0).sum())
+    L = [
+        "# Contended dispatch benchmark — plug-scarce unit + binding feeder "
+        "cap",
+        "",
+        "_Auto-generated by `tools/bench_v2b_dispatch.py --contended`. Do not "
+        "edit by hand. Fully deterministic: no RNG, no wall-time columns — "
+        "two runs are byte-identical._",
+        "",
+        f"**Unit:** `{rel_data}` — same building, fleet, month, weather, "
+        f"noise (clean) and seed as the released uncontended unit "
+        f"`data/output/campus10/b1/JUL2024/0` (all demand-side CSVs are "
+        f"byte-identical; SHA-keyed node seeding makes `charger_count` "
+        f"changes invisible to every other node), but with "
+        f"**{p['n_chargers']} chargers** ({n_bidir} bidirectional) for 60 "
+        f"cars / {p['n_offered']} sessions.",
+        "",
+        "Generation command (deterministic; documented config committed at "
+        "`docs/experiments/contended_bench_config.json`):",
+        "",
+        "```",
+        "uv run python -m v2b_syndata.cli generate-multi \\",
+        "  --config docs/experiments/contended_bench_config.json \\",
+        "  --output-dir data/output/contended/b1ch35/JUL2024/0",
+        "```",
+        "",
+        "## Contention design",
+        "",
+        f"- The uncontended unit's realized peak concurrency is **59** "
+        f"(its manifest E5 block; mean work-hour concurrency ~42). "
+        f"`charging_infra.charger_count = {p['n_chargers']}` ≈ 60% of that "
+        f"observed peak, so plug contention binds hard on every workday "
+        f"while most sessions remain servable.",
+        "- The unit deliberately violates the generator's E5 physical-"
+        "realism invariant (18.1% of ticks have more active sessions than "
+        "chargers; the manifest records the validation error). That is the "
+        "point: offered demand exceeds the plugs, and the DISPATCH layer — "
+        "not the generator — must resolve it. The unit is a benchmark "
+        "stress input, not part of the released corpus.",
+        "- Plug scarcity is resolved by the bench adapter's FCFS admission "
+        "(`bench/adapter.py`): a session that arrives with no free charger "
+        "is rejected and never plugs in. Admission is a pool POLICY, "
+        "identical for every algorithm — every arm below sees the same "
+        "admitted set. **Mean queueing delay is not reported because the "
+        "machinery models plug-on-arrival-or-reject; no session waits.**",
+        f"- The scheduling algorithms contend over the FEEDER cap: "
+        f"{p['feeder_kw']:.1f} kW = {p['feeder_kw_ratio']} x "
+        f"{p['n_chargers']} chargers x {p['rate_kw']:.0f} kW. The 0.125 "
+        f"service ratio is the ACN-Caltech-like operating point documented "
+        f"in `bench/adapter.py`. At an unbinding feeder (ratio 1.0) all six "
+        f"controlled schedulers coincide exactly even on this plug-scarce "
+        f"unit — admitted sessions never share a constraint — so the feeder "
+        f"cap is what makes queue ORDER matter.",
+        "",
+        "## LP arms (labeled relaxations)",
+        "",
+        "The LP's static session→charger assignment cannot express plug "
+        "contention — a faithful assignment model needs big-M / integer "
+        "machinery, deliberately NOT attempted here. Instead the LP serves "
+        "ALL sessions (no admission) under an aggregate EV-power cap "
+        "`sum_s (c + d) <= cap` (discharge counts: a plug carries |power|; "
+        "the stationary battery is behind the meter and exempt):",
+        "",
+        f"- `*_lp_plugcap` — cap = chargers x rate = {p['plug_cap_kw']:.0f} "
+        "kW: the honest fractional-plug-sharing proxy for the plug pool.",
+        f"- `v1g_lp_feedercap` — cap = the acnsim arms' feeder cap "
+        f"({p['feeder_kw']:.1f} kW): same power envelope as the schedulers, "
+        "but load-aware and admission-free.",
+        "",
+        "These rows answer \"what could a building-load-aware optimizer do "
+        "with the same total plug power if plug-swapping were frictionless\" "
+        "— an upper bound on scheduling value, not a plug-level simulation.",
+        "",
+        "## Results",
+        "",
+        "| arm | peak net (kW) | peak red. | kWh delivered / requested | "
+        "fulfill. | admitted | rejected | satisfied (of admitted) | "
+        "satisfied (of offered) |",
+        "|---|--:|--:|--:|--:|--:|--:|--:|--:|",
+    ]
+
+    def f(x, nd=1):
+        return "—" if x != x else f"{x:,.{nd}f}"  # NaN-safe
+
+    for r in rows:
+        L.append(
+            f"| {r['arm']} | {f(r['peak_net_kw'])} | "
+            f"{f(r['peak_reduction_pct'])}% | "
+            f"{f(r['kwh_delivered'], 0)} / {f(r['kwh_requested'], 0)} | "
+            f"{f(r['fulfillment_pct'])}% | {r['n_admitted']} | "
+            f"{r['n_rejected']} | {r['n_satisfied']} "
+            f"({f(r['satisfied_pct_admitted'])}%) | "
+            f"{f(r['satisfied_pct_offered'])}% |")
+    L += [
+        "",
+        "Full rows (incl. discharge / battery throughput and per-arm status "
+        "labels): `contended_bench.csv`.",
+        "",
+        "## Reading the table",
+        "",
+        "- `uncontrolled_nolimit` reproduces the uncontended table's "
+        "uncontrolled arm (same demand; infrastructure limits ignored) — "
+        "the common baseline for peak reduction.",
+        "- `acnsim_uncontrolled` ignores the feeder cap by design "
+        "(cap-violating upper bound) and over-delivers past the requested "
+        "energy by ACN-Sim's own semantics.",
+        "- The six controlled schedulers all draw exactly the feeder cap "
+        "during the rush, so their PEAKS nearly coincide; they separate on "
+        "ENERGY SERVICE — deadline-aware orderings (EDF/LLF) satisfy every "
+        "admitted session, while deadline-blind orderings (FCFS/LCFS/LRPT/"
+        "RR) strand energy in sessions that depart unserved.",
+        "- The LP rows serve every session (no admission) AND shave the "
+        "building peak — locating the two distinct sources of dispatch "
+        "value: queue/admission management under contention (scheduler-"
+        "side) vs building-load-aware timing (optimizer-side).",
+        "",
+        "Repro: `uv run python tools/repro_paper.py --steps contended_bench` "
+        "(or run this script with `--contended`).",
+        "",
+    ]
+    (out_dir / "contended_bench.md").write_text("\n".join(L))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
+    ap.add_argument("--data-dir", type=Path, default=None,
+                    help=f"unit dir (default: {DEFAULT_DATA} or, with "
+                         f"--contended, {DEFAULT_CONTENDED_DATA})")
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--skip-acnsim", action="store_true",
                     help="skip the ACN-Sim cross-check rows")
+    ap.add_argument("--contended", action="store_true",
+                    help="run the contended-pool benchmark (writes "
+                         "contended_bench.{csv,md})")
+    ap.add_argument("--feeder-ratio", type=float,
+                    default=CONTENDED_FEEDER_RATIO,
+                    help="contended-mode feeder cap as a fraction of "
+                         "chargers x rate (default %(default)s)")
     args = ap.parse_args()
+    data_dir = args.data_dir or (DEFAULT_CONTENDED_DATA if args.contended
+                                 else DEFAULT_DATA)
 
     t0 = time.perf_counter()
-    result = run_benchmark(args.data_dir, with_acnsim=not args.skip_acnsim)
-    write_outputs(args.data_dir, args.out_dir, result)
+    if args.contended:
+        result = run_contended_benchmark(
+            data_dir, feeder_kw_ratio=args.feeder_ratio)
+        write_contended_outputs(data_dir, args.out_dir, result)
+        for name, r in result["arms"].items():
+            print(f"{name:>22}: peak {r['peak_net_kw']:8.1f} kW "
+                  f"({r['peak_reduction_pct']:+6.2f}%)  "
+                  f"{r['kwh_delivered']:8.0f}/{r['kwh_requested']:8.0f} kWh  "
+                  f"sat {r['n_satisfied']}/{r['n_admitted']} adm, "
+                  f"{r['n_rejected']} rej", flush=True)
+        print(f"total {time.perf_counter() - t0:.1f}s -> "
+              f"{args.out_dir / 'contended_bench.md'}", flush=True)
+        return 0
+
+    result = run_benchmark(data_dir, with_acnsim=not args.skip_acnsim)
+    write_outputs(data_dir, args.out_dir, result)
     for name, r in result["arms"].items():
         print(f"{name:>13}: peak {r['peak_net_kw']:8.1f} kW "
               f"({r['peak_reduction_pct']:+6.2f}%)  cost "

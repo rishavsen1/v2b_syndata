@@ -1,0 +1,38 @@
+{
+  "buildings": [
+    {
+      "base_scenario": "S01",
+      "building_id": 0,
+      "descriptors": {
+        "building": "large_office_v1",
+        "equipment": "bi_heavy",
+        "location": "san_jose_ca",
+        "population": "stable_commuter_heavy"
+      },
+      "noise_profile": "clean",
+      "overrides": {
+        "battery.battery_type": "nmc_4h",
+        "building_load.peak_kw_scaling": false,
+        "building_load.weather_dewpoint_offset_c": 0.7121,
+        "building_load.weather_solar_scale": 0.9772,
+        "building_load.weather_temp_offset_c": 3.3875,
+        "building_load.weather_wind_scale": 0.9393,
+        "charging_infra.charger_count": 35,
+        "ev_fleet.ev_count": 60,
+        "pv.pv_type": "rooftop_large",
+        "sim_window.mode": "month",
+        "sim_window.start": "2024-07-01"
+      },
+      "policy": null,
+      "seed": 1000,
+      "weather_profile": "moderate"
+    }
+  ],
+  "globals": {
+    "default_policy": "ILP-MPCFIXEDFSL",
+    "dr_incentive_per_kw": 13.6,
+    "dr_penalty_per_kwh": 6.0,
+    "dr_program": "CBP"
+  },
+  "output_mode": "shared"
+}

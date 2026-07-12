@@ -4,7 +4,7 @@
 > Regenerate (full paper source list): `uv run python tools/repro_paper.py --steps calibration`  
 > Rebuild only this doc from existing CSVs: add `--md-only`.
 
-_Generated 2026-07-08._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. INL is fixture-only and excluded; EV WATTS is the real public 2026 release (port-as-proxy user identity). See [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
+_Generated 2026-07-11._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. INL is fixture-only and excluded; EV WATTS is the real public 2026 release (port-as-proxy user identity). See [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
 
 **Reading the numbers.** With sample sizes in the thousands the two-sample KS *p*-value is ~0 everywhere and carries no signal — judge by effect size: mean error |Δμ|, the KS statistic, Wasserstein W₁, and the copula ρ-gap.
 

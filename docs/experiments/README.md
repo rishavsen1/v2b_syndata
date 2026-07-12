@@ -44,3 +44,21 @@ consistent runner-up. Arrival is bimodal (GaussMix-2 best) on every dataset.
 
 See [`../GENERATIVE_MODELS.md`](../GENERATIVE_MODELS.md#empirical-model-selection-2026-06)
 for the full discussion.
+
+## Per-region across-family comparison (2026-07, committed primary)
+
+The tables above are POOLED per-source fits from the 2026-06 study. The
+committed, regenerable primary for the paper's "why these families" claim is
+now the **per-region** across-family comparison:
+
+```bash
+uv run python tools/repro_paper.py --steps family_selection
+# → family_selection.csv (per-cell scores) + family_selection.md (aggregates)
+```
+
+It scores candidate families per variable (arrival hour, dwell hours,
+arrival SoC) on every fitted (source, region) cell — including the shipped
+2-component mixtures, which the pooled study predates — with one-sample KS +
+AIC/BIC, and records the deployment constraints (KDE: no closed-form PPF on
+the copula uniform; free GMM: mass outside the [4,22] h arrival window).
+See `family_selection.md`.

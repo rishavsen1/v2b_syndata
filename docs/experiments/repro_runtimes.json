@@ -3,7 +3,9 @@
   "buildingload": 28.3,
   "calibration": 455.1,
   "collect": 0.4,
+  "contended_bench": 35.8,
+  "family_selection": 479.4,
   "tstr_acn": 3.8,
   "tstr_elaadnl": 15.5,
-  "v2b_dispatch": 3.8
+  "v2b_dispatch": 41.8
 }

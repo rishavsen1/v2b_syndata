@@ -6,8 +6,8 @@
 > (full, ~overnight-safe) or `--steps collect` (rebuild this file from
 > existing artifacts).
 
-- **Git revision:** `71639063168898476b328bbd3593489747a231bc` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
-- **Determinism:** all steps seeded (generation: SHA-keyed node streams; S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000; TSTR: seed 1234; ablation: deterministic EM). Two consecutive driver runs must reproduce this file bit-for-bit; wall-times below are the recorded measurement from `docs/experiments/repro_runtimes.json` (written once; see driver docstring).
+- **Git revision:** `787f0f892c42c2639249c9285754386c46670a4a` (WS-F working tree; re-run `--steps collect` after the WS-F commit to stamp the final SHA)
+- **Determinism:** all steps seeded (generation: SHA-keyed node streams; S1 bootstrap: base seed 20260708, per-cell hashed sub-streams, B=1000; TSTR: seed 1234, incl. the paired-bootstrap ratio CIs (B=1000, per-regime hashed sub-streams); ablation: deterministic EM). Two consecutive driver runs must reproduce this file bit-for-bit; wall-times below are the recorded measurement from `docs/experiments/repro_runtimes.json` (written once; see driver docstring).
 - **No timestamps in this file by design** — the git SHA pins the revision; `docs/CALIBRATION_RESULTS.md` carries its own generation date.
 
 ## 1. Calibration corpora (Tab 1, §4.1)
@@ -78,6 +78,27 @@ _Metric: one-sample KS of the fitted CDF vs the region's source sessions (= the 
 
 Generating command: `uv run python tools/repro_paper.py --steps ablation`. Per-source aggregates: `docs/experiments/mixture_ablation.md`.
 
+## 5b. Across-family model selection (§4.3, App. families)
+
+_One-sample KS on the cell's training data + AIC/BIC where a parametric likelihood is defined, per (source, region) cell over acn, acn_caltech, acn_jpl, acn_office001, elaadnl, evwatts. Mixtures fitted ungated; KDE scored only (cannot ship: no closed-form PPF on the copula uniform); free GMM not shippable for arrival (mass outside the [4,22] h window). Method + caveats: `family_selection.md`._
+
+| variable | family | cells | mean KS | mean AIC rank | KS wins | shippable |
+|---|---|--:|--:|--:|--:|:-:|
+| arrival_hour | kde | 19 | 0.0339 | — | 11 | no |
+| arrival_hour | gmm2_free | 19 | 0.0350 | 2.00 | 5 | no |
+| arrival_hour | truncnorm_mix2 | 19 | 0.0396 | 1.00 | 3 | yes |
+| arrival_hour | truncnorm | 19 | 0.1269 | 3.00 | 0 | yes |
+| dwell_hours | weibull_mix2 | 21 | 0.0724 | 2.05 | 13 | yes |
+| dwell_hours | weibull | 21 | 0.1181 | 2.62 | 3 | yes |
+| dwell_hours | lognorm | 21 | 0.1225 | 2.67 | 3 | yes |
+| dwell_hours | gamma | 21 | 0.1273 | 2.81 | 2 | yes |
+| dwell_hours | expon | 21 | 0.1872 | 4.86 | 0 | yes |
+| soc_arrival | truncnorm01 | 21 | 0.0189 | 1.10 | 18 | yes |
+| soc_arrival | beta | 21 | 0.0385 | 1.90 | 3 | yes |
+| soc_arrival | uniform01 | 21 | 0.3108 | 3.00 | 0 | yes |
+
+Generating command: `uv run python tools/repro_paper.py --steps family_selection`. Per-cell scores: `docs/experiments/family_selection.csv`.
+
 ## 6. Building-load fidelity vs ComStock (Tab 3, §5.1, §8)
 
 | archetype/size | gen kW | ComStock kW | CV(RMSE) % | NMBE % | shape corr (wd) | shape corr (we) | peak-hr Δ | gen LF | ref LF |
@@ -107,18 +128,20 @@ Generating command: `uv run python tools/validate_pv.py` (requires PySAM; not re
 
 ## 8. TSTR / TRTR utility (Tab 4, §6, abstract)
 
-| corpus | regime | MAE ratio | RMSE ratio | source |
+| corpus | regime | MAE ratio [95% CI] | RMSE ratio [95% CI] | source |
 |---|---|--:|--:|---|
-| ACN-Data | lagged, raw | 0.99 | 0.92 | `data/tstr/results.json` |
-| ACN-Data | calendar-only, raw | 0.57 | 0.79 | `data/tstr/results.json` |
-| ElaadNL | lagged, raw | 7.38 | 6.16 | `data/tstr/results_elaadnl_matched.json` |
-| ElaadNL | lagged, normalized | 4.19 | 3.72 | `data/tstr/results_elaadnl_matched.json` |
-| ElaadNL | calendar-only, raw | 1.32 | 1.31 | `data/tstr/results_elaadnl_matched.json` |
-| ElaadNL | calendar-only, normalized | 1.02 | 1.03 | `data/tstr/results_elaadnl_matched.json` |
-| ElaadNL (scale-matched, 12 synth months) | lagged, raw | 4.31 | 4.30 | `data/tstr/results_elaadnl_scale.json` |
-| ElaadNL (scale-matched, 12 synth months) | lagged, normalized | 5.25 | 4.62 | `data/tstr/results_elaadnl_scale.json` |
-| ElaadNL (scale-matched, 12 synth months) | calendar-only, raw | 3.21 | 2.95 | `data/tstr/results_elaadnl_scale.json` |
-| ElaadNL (scale-matched, 12 synth months) | calendar-only, normalized | 1.01 | 1.02 | `data/tstr/results_elaadnl_scale.json` |
+| ACN-Data | lagged, raw | 0.99 [0.96, 1.01] | 0.92 [0.89, 0.95] | `data/tstr/results.json` |
+| ACN-Data | calendar-only, raw | 0.57 [0.56, 0.59] | 0.79 [0.77, 0.81] | `data/tstr/results.json` |
+| ElaadNL | lagged, raw | 7.38 [7.19, 7.57] | 6.16 [5.98, 6.36] | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL | lagged, normalized | 4.19 [4.09, 4.28] | 3.72 [3.62, 3.83] | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL | calendar-only, raw | 1.32 [1.32, 1.33] | 1.31 [1.30, 1.31] | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL | calendar-only, normalized | 1.02 [1.01, 1.02] | 1.03 [1.02, 1.03] | `data/tstr/results_elaadnl_matched.json` |
+| ElaadNL (scale-matched, 12 synth months) | lagged, raw | 4.31 [4.18, 4.45] | 4.30 [4.14, 4.49] | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | lagged, normalized | 5.25 [5.12, 5.38] | 4.62 [4.50, 4.77] | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | calendar-only, raw | 3.21 [3.14, 3.27] | 2.95 [2.89, 3.00] | `data/tstr/results_elaadnl_scale.json` |
+| ElaadNL (scale-matched, 12 synth months) | calendar-only, normalized | 1.01 [1.01, 1.01] | 1.02 [1.02, 1.02] | `data/tstr/results_elaadnl_scale.json` |
+
+CI method: seeded PAIRED percentile bootstrap over the held-out real test bins (B=1000, base seed 1234, per-regime SHA-256 hash-keyed sub-streams) — the same resampled bin indices are applied to both models' per-bin errors before recomputing the TSTR/TRTR ratio per replicate; interval = 2.5–97.5 percentiles (`ci` blocks in the result JSONs).
 
 | context quantity | value | source |
 |---|---|---|
@@ -153,14 +176,42 @@ _Unit `data/output/campus10/b1/JUL2024/0` (60 cars, 48/60 bidirectional chargers
 | uncontrolled | 1,871.5 | 0.0% | 113,732.18 | simulated | `v2b_dispatch.csv` |
 | v1g | 1,521.8 | 18.7% | 113,709.25 | optimal | `v2b_dispatch.csv` |
 | v2b | 1,321.0 | 29.4% | 113,640.91 | optimal | `v2b_dispatch.csv` |
+| acnsim_edf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
 | acnsim_llf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
+| acnsim_fcfs_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
+| acnsim_lcfs_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
+| acnsim_lrpt_crosscheck | 1,871.5 | 0.0% | 113,732.18 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | `v2b_dispatch.csv` |
+| acnsim_round_robin_crosscheck | 1,871.3 | 0.0% | 113,731.61 | simulated (acnsim; 1242/1242 admitted; 20,989/20,992 kWh delivered) | `v2b_dispatch.csv` |
 | acnsim_uncontrolled_crosscheck | 1,922.2 | -2.7% | 114,297.01 | simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered) | `v2b_dispatch.csv` |
 
 - Feasibility: 0 required-SoC relaxations, 0 horizon-clipped windows, 0 skipped sessions over 1242 sessions; 1002/1242 sessions bidirectional-assigned (deterministic round-robin).
 - V2B arm energy detail: 21,587 kWh EV charged, 595 kWh EV discharged, 5,298 kWh stationary-battery throughput.
-- ACN-Sim cross-check: LLF (stock V1G, building-load-unaware, uncontended charger pool = semantic twin of the uncontrolled arm) reproduces the uncontrolled peak to +0.0 kW — the demand model is independently validated by an established simulator; see `v2b_dispatch.md` for why no stock ACN-Sim algorithm is comparable to LP-V1G.
+- ACN-Sim cross-check: all 6 controlled stock V1G schedulers (EDF/LLF/FCFS/LCFS/LRPT/RoundRobin — building-load-unaware; uncontended charger pool = semantic twins of the uncontrolled arm) reproduce the uncontrolled peak to within -0.2 kW — queue algorithms cannot help without a queue, and the demand model is independently validated by an established simulator; see `v2b_dispatch.md` for why no stock ACN-Sim algorithm is comparable to LP-V1G.
 
 Generating command: `uv run python tools/repro_paper.py --steps v2b_dispatch` (wraps `tools/bench_v2b_dispatch.py`).
+
+## 10b. Contended dispatch benchmark (plug-scarce unit + feeder cap)
+
+_Unit `data/output/contended/b1ch35/JUL2024/0`: byte-identical demand to the section-10 unit (same building/fleet/month/weather/seed; SHA-keyed node seeding) but `charging_infra.charger_count` 60 → 35 ≈ 60% of the realized peak concurrency (59), plus the 0.125 ACN-Caltech-like feeder service ratio (87.5 kW) from `bench/adapter.py`. FCFS pool admission rejects 412/1,242 sessions (33.2%) identically for every algorithm; the feeder cap is what the schedulers contend over. Fully deterministic (no RNG, no wall-time columns). Design and interpretation: `docs/experiments/contended_bench.md`._
+
+| arm | peak net (kW) | kWh delivered / requested | satisfied (of admitted) | satisfied (of offered) | source |
+|---|--:|--:|--:|--:|---|
+| uncontrolled_nolimit | 1,871.5 | 20,992 / 20,992 | 100.0% | 100.0% | `contended_bench.csv` |
+| acnsim_edf | 1,577.7 | 14,259 / 14,259 | 100.0% | 66.8% | `contended_bench.csv` |
+| acnsim_llf | 1,578.0 | 14,259 / 14,259 | 100.0% | 66.8% | `contended_bench.csv` |
+| acnsim_fcfs | 1,539.4 | 13,098 / 14,259 | 89.3% | 59.7% | `contended_bench.csv` |
+| acnsim_lcfs | 1,543.7 | 13,390 / 14,259 | 92.4% | 61.8% | `contended_bench.csv` |
+| acnsim_lrpt | 1,562.4 | 13,232 / 14,259 | 76.6% | 51.2% | `contended_bench.csv` |
+| acnsim_round_robin | 1,570.2 | 13,238 / 14,259 | 88.3% | 59.0% | `contended_bench.csv` |
+| acnsim_uncontrolled | 1,910.3 | 16,340 / 14,259 | 100.0% | 66.8% | `contended_bench.csv` |
+| v1g_lp_plugcap | 1,521.8 | 20,992 / 20,992 | 100.0% | 100.0% | `contended_bench.csv` |
+| v2b_lp_plugcap | 1,321.9 | 20,992 / 20,992 | 100.0% | 100.0% | `contended_bench.csv` |
+| v1g_lp_feedercap | — (infeasible; see status in CSV) | — | — | — | `contended_bench.csv` |
+
+- Under contention the stock schedulers separate: satisfied-of-admitted spans 76.6%–100.0% across 6 algorithms (deadline-aware EDF/LLF at the top).
+- LP rows are labeled relaxations (aggregate EV-power cap; fractional plug sharing; serve all sessions) — a faithful plug-assignment LP needs integer machinery, deliberately not attempted. The feeder-cap LP is infeasible when serving ALL sessions, showing admission rejection is necessary at that service ratio, not an artifact.
+
+Generating command: `uv run python tools/repro_paper.py --steps contended_bench` (generates the unit from `docs/experiments/contended_bench_config.json` if absent, then wraps `tools/bench_v2b_dispatch.py --contended`).
 
 ## 11. Reproduction compute (this driver, recorded measurement)
 
@@ -171,9 +222,11 @@ Generating command: `uv run python tools/repro_paper.py --steps v2b_dispatch` (w
 | tstr_acn | 0.1 min |
 | tstr_elaadnl | 0.3 min |
 | ablation | 0.4 min |
-| v2b_dispatch | 0.1 min |
+| family_selection | 8.0 min |
+| v2b_dispatch | 0.7 min |
+| contended_bench | 0.6 min |
 | collect | 0.0 min |
-| **total** | **8.9 min** |
+| **total** | **18.1 min** |
 
 _Measured once on a 32-core workstation (EnergyPlus 24.1, load caches warm) and recorded in `docs/experiments/repro_runtimes.json`; re-runs embed the recorded values so this file stays bit-reproducible. Delete that JSON or pass `--record-runtimes` to re-measure._
 

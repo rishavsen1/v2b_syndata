@@ -26,16 +26,21 @@ minimize `P + 1e-4 * dt * sum price*(c + bc)` subject to, per step t, `load + su
 | arm | peak net (kW) | peak reduction | energy cost (USD) | cost reduction | EV charged (kWh) | EV discharged (kWh) | battery throughput (kWh) | status | LP size (var / constr) | solve (s) |
 |---|--:|--:|--:|--:|--:|--:|--:|---|---|--:|
 | uncontrolled | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated | — | 0.00 |
-| v1g | 1,521.8 | 18.7% | 113,709.25 | 0.0% | 20,991.7 | 0.0 | 0.0 | optimal | 77,173 / 41,562 | 0.32 |
-| v2b | 1,321.0 | 29.4% | 113,640.91 | 0.1% | 21,586.7 | 594.9 | 5,298.2 | optimal | 117,324 / 44,538 | 1.68 |
-| acnsim_llf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 0.98 |
-| acnsim_uncontrolled_crosscheck | 1,922.2 | -2.7% | 114,297.01 | -0.5% | 24,165.0 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered) | — | 0.49 |
+| v1g | 1,521.8 | 18.7% | 113,709.25 | 0.0% | 20,991.7 | 0.0 | 0.0 | optimal | 77,173 / 41,562 | 0.53 |
+| v2b | 1,321.0 | 29.4% | 113,640.91 | 0.1% | 21,586.7 | 594.9 | 5,298.2 | optimal | 117,324 / 44,538 | 1.99 |
+| acnsim_edf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 1.43 |
+| acnsim_llf_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 1.08 |
+| acnsim_fcfs_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 1.05 |
+| acnsim_lcfs_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 0.99 |
+| acnsim_lrpt_crosscheck | 1,871.5 | 0.0% | 113,732.18 | 0.0% | 20,991.7 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,992/20,992 kWh delivered) | — | 1.09 |
+| acnsim_round_robin_crosscheck | 1,871.3 | 0.0% | 113,731.61 | 0.0% | 20,988.6 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 20,989/20,992 kWh delivered) | — | 33.23 |
+| acnsim_uncontrolled_crosscheck | 1,922.2 | -2.7% | 114,297.01 | -0.5% | 24,165.0 | 0.0 | 0.0 | simulated (acnsim; 1242/1242 admitted; 24,165/20,992 kWh delivered) | — | 0.48 |
 
 ## ACN-Sim cross-check
 
-The `acnsim_*_crosscheck` rows run the repo's established ACN-Sim bench machinery (`src/v2b_syndata/bench/`, V1G-only by design) on the same unit: the optimus CSVs are adapted in-memory into the native-schema `ScenarioInputs` the adapter expects (same arrival-SoC reconstruction and relaxed `required_soc` as the LP arms), simulated at 15-min ticks with the unbinding feeder default, and the resulting charging schedule is added to `building_load - PV` to compute the identical peak-of-net metric. ACN-Sim's stock sorted V1G heuristics are building-load-unaware, and the charger pool is uncontended here (60 chargers, per-car sessions never overlap), so LLF charges each EV at max rate until its requested energy is met — the semantic twin of the **uncontrolled** arm. A near-zero LLF-vs-uncontrolled delta therefore independently validates the demand model (session windows, arrival-SoC chain, energy needs) through an established simulator; the gap to LP-V1G measures the value of building-load-aware scheduling (no stock ACN-Sim algorithm observes building load). ACN-Sim's `UncontrolledCharging` keeps charging past the requested energy (to battery capacity) by its own semantics, so it upper-bounds the uncontrolled arm.
+The `acnsim_*_crosscheck` rows run the repo's established ACN-Sim bench machinery (`src/v2b_syndata/bench/`, V1G-only by design) on the same unit — ALL SEVEN stock schedulers in the registry (EDF, LLF, FCFS, LCFS, LRPT, RoundRobin, Uncontrolled): the optimus CSVs are adapted in-memory into the native-schema `ScenarioInputs` the adapter expects (same arrival-SoC reconstruction and relaxed `required_soc` as the LP arms), simulated at 15-min ticks with the unbinding feeder default, and the resulting charging schedule is added to `building_load - PV` to compute the identical peak-of-net metric. ACN-Sim's stock V1G schedulers are building-load-unaware, and the charger pool is uncontended here (60 chargers, per-car sessions never overlap, unbinding feeder), so every queue-ordering algorithm charges each EV at max rate until its requested energy is met — the semantic twin of the **uncontrolled** arm. The table's point is exactly that queue algorithms cannot help without a queue: their near-zero deltas vs the uncontrolled arm independently validate the demand model (session windows, arrival-SoC chain, energy needs) through an established simulator; the gap to LP-V1G measures the value of building-load-aware scheduling (no stock ACN-Sim algorithm observes building load). For the contended companion (where the algorithms DO separate) see `contended_bench.md`. ACN-Sim's `UncontrolledCharging` keeps charging past the requested energy (to battery capacity) by its own semantics, so it upper-bounds the uncontrolled arm.
 
-Deltas: ACN-Sim LLF peak vs uncontrolled arm: +0.0 kW (+0.00%); vs LP-V1G: +349.8 kW.
+Deltas: max |peak delta| of the 6 controlled ACN-Sim schedulers vs the uncontrolled arm: -0.2 kW (-0.01%); LLF vs LP-V1G: +349.8 kW.
 
 Feasibility: 0 required-SoC relaxations, 0 horizon-clipped windows, 0 sessions skipped (fully out of horizon); 1002/1242 sessions bidirectional-assigned.
 

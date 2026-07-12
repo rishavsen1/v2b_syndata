@@ -131,13 +131,149 @@ def test_acnsim_crosscheck_matches_uncontrolled(fixture_dir):
     pytest.importorskip("acnportal")
     res = bvd.run_benchmark(fixture_dir, with_acnsim=True)
     arms = res["arms"]
-    assert "acnsim_llf_crosscheck" in arms
-    # LLF (uncontended, unbinding feeder) == charge-at-max-until-required,
-    # i.e. the uncontrolled arm's semantics.
-    assert arms["acnsim_llf_crosscheck"]["peak_net_kw"] == pytest.approx(
-        arms["uncontrolled"]["peak_net_kw"], abs=1e-6)
-    assert arms["acnsim_llf_crosscheck"]["ev_charge_kwh"] == pytest.approx(
-        arms["uncontrolled"]["ev_charge_kwh"], abs=1e-3)
+    # ALL seven stock schedulers are cross-checked; on an uncontended pool
+    # with an unbinding feeder every queue-ordering algorithm ==
+    # charge-at-max-until-required, i.e. the uncontrolled arm's semantics.
+    for algo in ("edf", "llf", "fcfs", "lcfs", "lrpt"):
+        key = f"acnsim_{algo}_crosscheck"
+        assert key in arms
+        assert arms[key]["peak_net_kw"] == pytest.approx(
+            arms["uncontrolled"]["peak_net_kw"], abs=1e-6)
+        assert arms[key]["ev_charge_kwh"] == pytest.approx(
+            arms["uncontrolled"]["ev_charge_kwh"], abs=1e-3)
+    assert "acnsim_round_robin_crosscheck" in arms
+    assert "acnsim_uncontrolled_crosscheck" in arms
+
+
+# ── PART 4b: aggregate EV-power cap in the LP ─────────────────────────
+
+def test_solve_lp_agg_cap_binds_and_serves(fixture_dir):
+    # 20 kWh over 8 x 15-min steps under a 10 kW aggregate cap:
+    # exactly feasible (10 kW x 2 h), so the cap binds everywhere.
+    unit = bvd.load_unit(fixture_dir)
+    sol = bvd.solve_lp(unit, allow_discharge=False, use_battery=False,
+                       ev_agg_cap_kw=10.0)
+    assert sol["status"] == "optimal"
+    assert sol["ev_kw"].max() <= 10.0 + 1e-6
+    assert sol["ev_kw"].sum() * 0.25 == pytest.approx(20.0, abs=1e-6)
+
+
+def test_solve_lp_agg_cap_infeasible_raises(fixture_dir):
+    # 5 kW x 2 h = 10 kWh < the 20 kWh requirement -> infeasible LP.
+    unit = bvd.load_unit(fixture_dir)
+    with pytest.raises(RuntimeError):
+        bvd.solve_lp(unit, allow_discharge=False, use_battery=False,
+                     ev_agg_cap_kw=5.0)
+
+
+def test_solve_lp_agg_cap_none_matches_uncapped(fixture_dir):
+    unit = bvd.load_unit(fixture_dir)
+    a = bvd.solve_lp(unit, allow_discharge=False, use_battery=False)
+    b = bvd.solve_lp(unit, allow_discharge=False, use_battery=False,
+                     ev_agg_cap_kw=1e9)
+    assert a["lp_peak_kw"] == pytest.approx(b["lp_peak_kw"], abs=1e-6)
+
+
+# ── PART 4b: pure helpers ─────────────────────────────────────────────
+
+def test_satisfaction_stats():
+    requested = {"a": 10.0, "b": 5.0, "c": 0.0}
+    delivered = {"a": 9.96, "b": 4.0}  # a within the 0.05 kWh tolerance
+    n_sat, req, dlv = bvd.satisfaction_stats(requested, delivered)
+    assert n_sat == 2  # a (within tol) and c (0-need, delivered 0 >= -tol)
+    assert req == pytest.approx(15.0)
+    assert dlv == pytest.approx(13.96)
+
+
+def test_build_scenario_frames(fixture_dir):
+    unit = bvd.load_unit(fixture_dir)
+    sess, cars, bl = bvd.build_scenario_frames(unit)
+    assert list(sess["session_id"]) == [1]
+    assert sess.loc[0, "arrival"] == unit.times[0]
+    assert sess.loc[0, "departure"] == unit.times[0] + pd.Timedelta(hours=2)
+    assert sess.loc[0, "arrival_soc"] == pytest.approx(20.0)
+    assert sess.loc[0, "required_soc_at_depart"] == pytest.approx(60.0)
+    assert cars.loc[1, "capacity_kwh"] == pytest.approx(50.0)
+    assert len(bl) == T
+
+
+# ── PART 4b: contended benchmark ──────────────────────────────────────
+
+def _contended_fixture(tmp_path):
+    """Two overlapping sessions of the same car on a 1-charger pool:
+    FCFS admission must reject the second. Session 1 spans the horizon
+    (needs 20 kWh, laxity 1 h); session 2 arrives 15 min later (needs
+    10 kWh: arrival 60% - 15% external use = 45%, required 65%)."""
+    two = pd.DataFrame({
+        "car_id": [1, 1],
+        "arrival": [START.strftime("%Y-%m-%d %H:%M:%S"),
+                    (START + pd.Timedelta(minutes=15)).strftime(
+                        "%Y-%m-%d %H:%M:%S")],
+        "required_soc_at_depart": [60.0, 65.0],
+        "previous_day_external_use_soc": [0.0, 15.0],
+        "duration": [7200, 3600], "session_id": [1, 2], "building_id": [0, 0],
+    })
+    return _write_fixture(tmp_path, two)
+
+
+def test_contended_benchmark_smoke(tmp_path):
+    pytest.importorskip("acnportal")
+    d = _contended_fixture(tmp_path)
+    res = bvd.run_contended_benchmark(d, feeder_kw_ratio=0.5)
+    arms = res["arms"]
+    # 1 charger x 20 kW -> plug cap 20 kW, feeder cap 10 kW
+    assert res["params"]["plug_cap_kw"] == pytest.approx(20.0)
+    assert res["params"]["feeder_kw"] == pytest.approx(10.0)
+    # admission: second (overlapping) session rejected, for EVERY algorithm
+    for algo in bvd.ACNSIM_ALGOS:
+        r = arms[f"acnsim_{algo}"]
+        assert (r["n_admitted"], r["n_rejected"]) == (1, 1)
+    # LLF under the 10 kW feeder cap still serves the admitted 20 kWh
+    llf = arms["acnsim_llf"]
+    assert llf["kwh_delivered"] == pytest.approx(20.0, abs=0.1)
+    assert llf["n_satisfied"] == 1
+    assert llf["satisfied_pct_offered"] == pytest.approx(50.0)
+    # LP plug-cap relaxation serves ALL sessions (30 kWh, no admission)
+    lp = arms["v1g_lp_plugcap"]
+    assert (lp["n_admitted"], lp["n_rejected"]) == (2, 0)
+    assert lp["kwh_delivered"] == pytest.approx(30.0, abs=1e-6)
+    # feeder-cap LP (10 kW x 2 h = 20 kWh < 30 kWh) is honestly infeasible
+    assert arms["v1g_lp_feedercap"]["status"].startswith("infeasible")
+    # reference arm reproduces the unconstrained uncontrolled semantics
+    assert arms["uncontrolled_nolimit"]["kwh_requested"] == pytest.approx(30.0)
+
+
+def test_repro_paper_wires_contended_step():
+    import repro_paper as rp
+    assert "contended_bench" in rp.STEPS
+    assert rp.STEPS.index("contended_bench") < rp.STEPS.index("collect")
+    assert "contended_bench" in rp.STEP_FNS
+    # the committed generation config the step regenerates the unit from
+    assert rp.CONTENDED_CONFIG.exists()
+
+
+def test_contended_outputs_deterministic(tmp_path):
+    pytest.importorskip("acnportal")
+    d = _contended_fixture(tmp_path)
+    r1 = bvd.run_contended_benchmark(d, feeder_kw_ratio=0.5)
+    r2 = bvd.run_contended_benchmark(d, feeder_kw_ratio=0.5)
+    rows1, rows2 = bvd.contended_rows(r1), bvd.contended_rows(r2)
+
+    def _nan_safe(rows):
+        return [{k: (None if v != v else v) if isinstance(v, float) else v
+                 for k, v in r.items()} for r in rows]
+
+    assert _nan_safe(rows1) == _nan_safe(rows2)
+
+    out1, out2 = tmp_path / "o1", tmp_path / "o2"
+    bvd.write_contended_outputs(d, out1, r1)
+    bvd.write_contended_outputs(d, out2, r2)
+    for name in ("contended_bench.csv", "contended_bench.md"):
+        assert (out1 / name).read_bytes() == (out2 / name).read_bytes()
+    csv = pd.read_csv(out1 / "contended_bench.csv")
+    # determinism gate: no wall-time columns anywhere
+    assert not any("solve" in c or "time" in c for c in csv.columns)
+    assert list(csv.columns) == bvd.CONTENDED_COLS
 
 
 def test_outputs_written(fixture_dir, tmp_path):
