@@ -1,0 +1,290 @@
+# campus_10_office_moderate.yaml — 10-building US office campus, San Jose CA.
+# VARIANT: every building uses weather_profile 'moderate' (see
+# ../campus_10_office.yaml for the original mixed 5/5 version).
+#
+# Design (2026-07-20):
+#   LOAD TIERS (peak_kw_scaling: true, exact peaks):
+#     high     200-400 kW → b1 380, b2 320          (large offices, 25 chargers)
+#     moderate 100-200 kW → b3 190, b4 170, b5 150,  (medium offices + mixed-use,
+#                           b6 130, b7 110            15 chargers)
+#     low       50-100 kW → b8 90, b9 70, b10 60    (small offices, 10 chargers)
+#   CHARGERS: balanced_50pct everywhere → exactly 50% uni / 50% bi, all 20 kW L2.
+#   EVs: ev_count == charger_count (1:1, no port contention). Not every EV
+#     arrives daily — regularity is governed by the population tier below.
+#   USERS: ACN-Data-fitted arrival/dwell/SoC distributions (Caltech/JPL
+#     2019-2021), re-weighted toward regular office commuters
+#     (acn_*_office_{high,mid,low} in populations.yaml). Regularity tiers:
+#       high (b1,b2)      ≈ mean charge freq 0.51 (~2.5-3 days/wk)
+#       mid  (b3,b4,b5)   ≈ 0.44
+#       low  (b6..b10)    ≈ 0.37 (~2 days/wk)
+#     No raw-ACN rare-charger dominance (weights capped at 10% rare).
+#   PV (≤ 200 kW, sized by building): large 200 kW DC (rooftop_large preset
+#     250 overridden via pv.dc_capacity_kw), medium 100 kW (rooftop_medium),
+#     small NONE. BATTERY only where PV exists: large nmc_4h, medium
+#     lfp_2h/nmc_2h mix, small none.
+#   SoC CHAIN: user_behavior.soc_chain_enforce=true on every building — each
+#     car's non-first session arrives at prior_departure_soc − U[10%,50%]
+#     (arrival always strictly below the SoC it left with; the between-visit
+#     external use lands in the 10-50% band). sessions_soc.csv is emitted with
+#     explicit arrival_soc/departure_soc columns (emit_sessions_soc: true).
+#   WEATHER: per-sample realization, ALL buildings 'moderate'; noise 'clean'
+#     (output-side jitter breaks D5 — see campus_10.yaml notes).
+#   SEEDS: spaced 1000 ≥ samples-per-month (150).
+#
+# Smoke first (ALWAYS):
+#   uv run python -m v2b_syndata.cli generate-multi \
+#     --config configs/campus_10_office.yaml \
+#     --start-month 2024-01 --end-month 2024-01 --samples-per-month 2 \
+#     --noise-profile clean --workers 4 \
+#     --output-dir data/output/campus10_office_smoke/ --force
+#
+# Full run is building-major (bybuildings/): split this config per building
+# (configs/_campus10_office_split/) and run one batch per building — see
+# tools/run_campus10.sh pattern. Do NOT use --output-mode per-building for
+# that layout (it writes integer leaf dirs, not building-major).
+
+output_mode: shared
+# Emit sessions_soc.csv (explicit arrival_soc/departure_soc columns) next to
+# the optimizer-format sessions.csv.
+emit_sessions_soc: true
+dr_program: CBP
+dr_incentive_per_kw: 13.6
+dr_penalty_per_kwh: 6.0
+default_policy: ILP-MPCFIXEDFSL
+
+buildings:
+  # ── HIGH-LOAD TIER (200-400 kW, large, 25 chargers) ────────────────────
+  # 1. HQ office tower — JPL cohort (high regularity), PV 200 + NMC 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: large_office_v1,
+        location: san_jose_ca,
+        population: acn_jpl_office_high,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 25,
+        charging_infra.charger_count: 25,
+        pv.pv_type: rooftop_large,
+        pv.dc_capacity_kw: 200,
+        battery.battery_type: nmc_4h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 380,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 1000
+
+  # 2. R&D building — Caltech cohort (high regularity), PV 200 + NMC 4h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: large_office_v1,
+        location: san_jose_ca,
+        population: acn_caltech_office_high,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 25,
+        charging_infra.charger_count: 25,
+        pv.pv_type: rooftop_large,
+        pv.dc_capacity_kw: 200,
+        battery.battery_type: nmc_4h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 320,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 2000
+
+  # ── MODERATE-LOAD TIER (100-200 kW, medium, 15 chargers) ───────────────
+  # 3. Medium office A — JPL (mid regularity), PV 100 + LFP 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: acn_jpl_office_mid,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: lfp_2h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 190,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 3000
+
+  # 4. Medium office B — Caltech (mid regularity), PV 100 + NMC 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: acn_caltech_office_mid,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: nmc_2h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 170,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 4000
+
+  # 5. Medium office C — JPL (mid regularity), PV 100 + LFP 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: medium_office_v1,
+        location: san_jose_ca,
+        population: acn_jpl_office_mid,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: lfp_2h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 150,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 5000
+
+  # 6. Campus amenities (mixed office+retail) — Caltech (low regularity),
+  #    PV 100 + NMC 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: mixed_use_v1,
+        location: san_jose_ca,
+        population: acn_caltech_office_low,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: nmc_2h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 130,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 6000
+
+  # 7. Conference center (mixed) — JPL (low regularity), PV 100 + LFP 2h
+  - base_scenario: S01
+    descriptors:
+      {
+        building: mixed_use_v1,
+        location: san_jose_ca,
+        population: acn_jpl_office_low,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 15,
+        charging_infra.charger_count: 15,
+        pv.pv_type: rooftop_medium,
+        battery.battery_type: lfp_2h,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 110,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 7000
+
+  # ── LOW-LOAD TIER (50-100 kW, small, 10 chargers, no PV/battery) ───────
+  # 8. Small office A — Caltech (low regularity)
+  - base_scenario: S01
+    descriptors:
+      {
+        building: small_office_v1,
+        location: san_jose_ca,
+        population: acn_caltech_office_low,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 10,
+        charging_infra.charger_count: 10,
+        pv.pv_type: none,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 90,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 8000
+
+  # 9. Small office B — JPL (low regularity)
+  - base_scenario: S01
+    descriptors:
+      {
+        building: small_office_v1,
+        location: san_jose_ca,
+        population: acn_jpl_office_low,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 10,
+        charging_infra.charger_count: 10,
+        pv.pv_type: none,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 70,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 9000
+
+  # 10. Small office C — Caltech (low regularity)
+  - base_scenario: S01
+    descriptors:
+      {
+        building: small_office_v1,
+        location: san_jose_ca,
+        population: acn_caltech_office_low,
+        equipment: balanced_50pct,
+      }
+    overrides:
+      {
+        ev_fleet.ev_count: 10,
+        charging_infra.charger_count: 10,
+        pv.pv_type: none,
+        battery.battery_type: none,
+        building_load.peak_kw_scaling: true,
+        user_behavior.soc_chain_enforce: true,
+        building_load.peak_kw: 60,
+      }
+    noise_profile: clean
+    weather_profile: moderate
+    seed: 10000

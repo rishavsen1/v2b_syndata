@@ -4,10 +4,14 @@ single-building config per building, for a BUILDING-MAJOR generation
 (each run -> data/output/campus<TAG>/b{i}/<MONTH>/<sample>/), exactly the recipe
 used for campus10 (configs/_campus_split/ + tools/run_campus10.sh).
 
-TAG is any suffix: a number ("20", "50") or a name ("10_new").
+TAG is any suffix: a number ("20", "50") or a name ("10_new"). An argument
+containing "/" or ending in ".yaml" is instead treated as a PATH to a campus
+config; its split dir is written next to it as _<stem>_split/.
 
 Usage:  uv run python tools/split_campus_config.py 20 50 10_new
-Writes: configs/_campus<TAG>_split/b1.yaml .. b{N}.yaml
+        uv run python tools/split_campus_config.py configs/campus10_office_variants/campus_10_office_slight.yaml
+Writes: configs/_campus<TAG>_split/b1.yaml .. b{N}.yaml  (tag form)
+        <dir>/_<stem>_split/b1.yaml .. b{N}.yaml         (path form)
 """
 from __future__ import annotations
 
@@ -22,10 +26,15 @@ TOP_KEYS = ("output_mode", "emit_sessions_soc", "dr_program",
 
 
 def split(tag: str) -> int:
-    src = CONFIGS / f"campus_{tag}.yaml"
+    if "/" in tag or tag.endswith(".yaml"):
+        src = Path(tag)
+        outdir = src.parent / f"_{src.stem}_split"
+        tag = src.stem.removeprefix("campus_")
+    else:
+        src = CONFIGS / f"campus_{tag}.yaml"
+        outdir = CONFIGS / f"_campus{tag}_split"
     cfg = yaml.safe_load(src.read_text())
     buildings = cfg["buildings"]
-    outdir = CONFIGS / f"_campus{tag}_split"
     outdir.mkdir(exist_ok=True)
     # clear any stale split files
     for old in outdir.glob("b*.yaml"):
