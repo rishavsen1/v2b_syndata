@@ -73,6 +73,10 @@ class MultiConfig:
     dr_incentive_per_kw: float | None = None
     dr_penalty_per_kwh: float | None = None
     default_policy: str = _DEFAULT_POLICY
+    # Also write sessions_soc.csv (sessions with explicit arrival_soc /
+    # departure_soc columns) next to sessions.csv. Additive: default False
+    # keeps the emitted file set unchanged.
+    emit_sessions_soc: bool = False
 
 
 def _flat_knobs(manifest: dict) -> dict[str, Any]:
@@ -142,14 +146,20 @@ def _read_native(run_dir: Path) -> dict[str, pd.DataFrame]:
 
 
 def _build_building_tables(
-    native: dict[str, pd.DataFrame], knobs: dict[str, Any], building_id: int
+    native: dict[str, pd.DataFrame], knobs: dict[str, Any], building_id: int,
+    *, emit_sessions_soc: bool = False,
 ) -> dict[str, pd.DataFrame]:
     """All per-building optimus tables (not the global dso_commands/policies)."""
     bl = native["building_load.csv"]
     dt = pd.to_datetime(bl["datetime"])
     sim_start = dt.iloc[0]
     sim_end = dt.iloc[-1] + pd.Timedelta(seconds=exp._TICK_SECONDS)
+    extra: dict[str, pd.DataFrame] = {}
+    if emit_sessions_soc:
+        extra["sessions_soc.csv"] = exp.build_sessions_soc(
+            native["sessions.csv"], building_id)
     return {
+        **extra,
         "building_load.csv": exp.build_building_load(bl, building_id),
         "cars.csv": exp.build_cars(
             native["cars.csv"], native["users.csv"], native["sessions.csv"],
@@ -211,7 +221,8 @@ def generate_multi(
             )
             native = _read_native(run_dir)
         knobs = _flat_knobs(manifest)
-        per_building.append(_build_building_tables(native, knobs, bid))
+        per_building.append(_build_building_tables(
+            native, knobs, bid, emit_sessions_soc=cfg.emit_sessions_soc))
         policies.append((bid, spec.policy or cfg.default_policy))
         manifests.append(manifest)
 
@@ -227,8 +238,10 @@ def generate_multi(
     assert dso_commands is not None
     policies_df = exp.build_policies(policies)
 
+    file_names = _PER_BUILDING_FILES + (
+        ["sessions_soc.csv"] if cfg.emit_sessions_soc else [])
     if cfg.output_mode == "shared":
-        for name in _PER_BUILDING_FILES:
+        for name in file_names:
             merged = pd.concat(
                 [tbl[name] for tbl in per_building], ignore_index=True
             )
@@ -241,7 +254,7 @@ def generate_multi(
         for bid, tables in enumerate(per_building):
             sub = output_dir / str(bid)
             sub.mkdir(parents=True, exist_ok=True)
-            for name in _PER_BUILDING_FILES:
+            for name in file_names:
                 df = tables[name]
                 # weather/occupancy match the reference exactly (no building_id).
                 if name in exp.WEATHER_OCCUPANCY and "building_id" in df.columns:
@@ -272,6 +285,7 @@ def _config_dict(cfg: MultiConfig) -> dict[str, Any]:
         "generator_version": __version__,
         "generator_git_sha": _git_sha(),
         "output_mode": cfg.output_mode,
+        "emit_sessions_soc": cfg.emit_sessions_soc,
         "globals": {
             "dr_program": cfg.dr_program,
             "dr_incentive_per_kw": cfg.dr_incentive_per_kw,
@@ -358,6 +372,8 @@ def config_from_dict(data: dict[str, Any]) -> MultiConfig:
     return MultiConfig(
         buildings=specs,
         output_mode=data.get("output_mode", g.get("output_mode", "shared")),
+        emit_sessions_soc=bool(
+            data.get("emit_sessions_soc", g.get("emit_sessions_soc", False))),
         dr_program=g.get("dr_program"),
         dr_incentive_per_kw=g.get("dr_incentive_per_kw"),
         dr_penalty_per_kwh=g.get("dr_penalty_per_kwh"),

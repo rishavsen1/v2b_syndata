@@ -17,8 +17,8 @@ from pathlib import Path
 import yaml
 
 CONFIGS = Path(__file__).resolve().parents[1] / "configs"
-TOP_KEYS = ("output_mode", "dr_program", "dr_incentive_per_kw",
-            "dr_penalty_per_kwh", "default_policy")
+TOP_KEYS = ("output_mode", "emit_sessions_soc", "dr_program",
+            "dr_incentive_per_kw", "dr_penalty_per_kwh", "default_policy")
 
 
 def split(tag: str) -> int:

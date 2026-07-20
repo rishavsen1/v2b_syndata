@@ -24,10 +24,13 @@ import pandas as pd
 
 from .load_pipeline import weather
 
-# Optimizer loaders read these four with read_csv(index_col=0): they MUST be
-# written with a leading (unnamed) index column.
+# Optimizer loaders read the first four with read_csv(index_col=0): they MUST
+# be written with a leading (unnamed) index column. sessions_soc.csv is not
+# optimizer-read but mirrors sessions.csv's on-disk format so both parse the
+# same way.
 INDEX_COL_FILES = frozenset({
     "cars.csv", "chargers.csv", "sessions.csv", "grid_prices.csv",
+    "sessions_soc.csv",
 })
 # These two match the reference exactly (no building_id) in per-building mode;
 # in shared mode they gain a building_id column like every other file.
@@ -174,6 +177,32 @@ def build_sessions(native_sessions: pd.DataFrame, building_id: int) -> pd.DataFr
         "car_id": native_sessions["car_id"].values,
         "arrival": native_sessions["arrival"].values,
         "required_soc_at_depart": native_sessions["required_soc_at_depart"].values,
+        "previous_day_external_use_soc":
+            native_sessions["previous_day_external_use_soc"].values,
+        "duration": native_sessions["duration_sec"].values,
+        "session_id": native_sessions["session_id"].values,
+        "building_id": building_id,
+    })
+
+
+def build_sessions_soc(native_sessions: pd.DataFrame, building_id: int) -> pd.DataFrame:
+    """Companion to `build_sessions` with the SoC endpoints as explicit columns:
+    `arrival_soc` and `departure_soc` (= required_soc_at_depart — the dataset's
+    departure-side SoC; see renderers/sessions.py docstring) plus the departure
+    timestamp. Written as `sessions_soc.csv` when the multi-building config sets
+    `emit_sessions_soc: true`; the optimizer does not read it."""
+    if native_sessions.empty:
+        return pd.DataFrame(columns=[
+            "car_id", "arrival", "departure", "arrival_soc", "departure_soc",
+            "previous_day_external_use_soc", "duration", "session_id",
+            "building_id",
+        ])
+    return pd.DataFrame({
+        "car_id": native_sessions["car_id"].values,
+        "arrival": native_sessions["arrival"].values,
+        "departure": native_sessions["departure"].values,
+        "arrival_soc": native_sessions["arrival_soc"].values,
+        "departure_soc": native_sessions["required_soc_at_depart"].values,
         "previous_day_external_use_soc":
             native_sessions["previous_day_external_use_soc"].values,
         "duration": native_sessions["duration_sec"].values,

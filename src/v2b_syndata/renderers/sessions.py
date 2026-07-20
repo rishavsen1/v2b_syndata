@@ -155,6 +155,21 @@ def render(ctx: ScenarioContext) -> None:
     depart_soc_mu = float(ctx.knobs.get("user_behavior.depart_soc_mu"))
     depart_soc_sigma = float(ctx.knobs.get("user_behavior.depart_soc_sigma"))
 
+    # Opt-in SoC chain (default off → byte-identical to pre-knob behavior).
+    # When on, non-first sessions tie arrival SoC to the SoC the car departed
+    # with: arrival = prior_departure − U[draw_min, draw_max] (the between-visit
+    # external use), clamped to the car's allowed band. prior_required_soc is
+    # strictly above car.min_allowed_soc (D6 floor > arrival >= min_allowed), so
+    # the clamp preserves arrival < prior departure strictly.
+    soc_chain = bool(ctx.knobs.get("user_behavior.soc_chain_enforce"))
+    chain_lo_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_min")) * 100.0
+    chain_hi_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_max")) * 100.0
+    if soc_chain and chain_lo_pct > chain_hi_pct:
+        raise ValueError(
+            "user_behavior.soc_chain_draw_min "
+            f"({chain_lo_pct / 100.0}) > soc_chain_draw_max ({chain_hi_pct / 100.0})"
+        )
+
     # Footgun guard: required_soc is drawn in [floor, ceiling] with
     # floor >= min_depart_soc% and ceiling = car.max_allowed_soc. If the
     # departure floor meets or exceeds the SoC cap, every session-day is dropped
@@ -292,9 +307,17 @@ def render(ctx: ScenarioContext) -> None:
                     continue
 
                 # 3. Sample arrival_soc; clamp to car's allowed band.
-                beta = float(rng.beta(soc_p["alpha"], soc_p["beta"]))
-                a_soc_pct = (max(soc_p["clip_lo"], min(soc_p["clip_hi"], beta + soc_p["shift"]))) * 100.0
-                a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
+                #    SoC chain (opt-in): non-first sessions derive arrival from
+                #    the prior departure minus a uniform external-use draw
+                #    (exactly ONE rng draw, mirroring the Beta path's draw count).
+                if soc_chain and prior_required_soc is not None:
+                    draw_pct = float(rng.uniform(chain_lo_pct, chain_hi_pct))
+                    a_soc_pct = prior_required_soc - draw_pct
+                    a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
+                else:
+                    beta = float(rng.beta(soc_p["alpha"], soc_p["beta"]))
+                    a_soc_pct = (max(soc_p["clip_lo"], min(soc_p["clip_hi"], beta + soc_p["shift"]))) * 100.0
+                    a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
 
                 # 4. Determine valid required-SoC band.
                 #    floor = max(min_depart_soc, arrival + epsilon) → enforces D6 + D7.

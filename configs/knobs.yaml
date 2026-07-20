@@ -144,6 +144,26 @@ user_behavior:
     description: "Std (%) of the fallback TruncNorm for required_soc_at_depart (paired with depart_soc_mu). Uncalibrated/synthetic populations only. Default 5 reproduces the prior hardcoded value. Must be > 0."
     affects_csv: [sessions.csv]
 
+  soc_chain_enforce:
+    type: bool
+    default: false
+    description: "When true, each car's NON-FIRST session draws arrival_soc as prior_departure_soc − U[soc_chain_draw_min, soc_chain_draw_max] (in SoC fraction), clamped to the car's [min_allowed_soc, max_allowed_soc] band — so arrival SoC is strictly below the SoC the car departed with, and previous_day_external_use_soc lands in the draw band. First sessions (and default false) keep the calibrated per-region Beta arrival draw. Default false → existing scenarios byte-identical."
+    affects_csv: [sessions.csv]
+
+  soc_chain_draw_min:
+    type: float
+    range: [0.0, 1.0]
+    default: 0.10
+    description: "Lower bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true. Must be <= soc_chain_draw_max."
+    affects_csv: [sessions.csv]
+
+  soc_chain_draw_max:
+    type: float
+    range: [0.0, 1.0]
+    default: 0.50
+    description: "Upper bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true."
+    affects_csv: [sessions.csv]
+
   weekend_activity_factor:
     type: float
     range: [0.0, 5.0]
