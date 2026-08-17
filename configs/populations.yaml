@@ -1454,14 +1454,35 @@ elaadnl_public_eu:
 # blocks). ONLY the axes_distribution weights differ: shifted toward
 # regular_charger so fleets behave like office commuters. Raw ACN weights put
 # ~36-53% of users in rare_consistent (<10% of days) — too irregular for an
-# office-campus scenario. Three regularity tiers
+# office-campus scenario. Four regularity tiers
 # (regular_charger / occasional_consistent / rare_consistent):
-#   high 0.70 / 0.28 / 0.02   → mean charge freq ≈ 0.51
-#   mid  0.55 / 0.40 / 0.05   → mean charge freq ≈ 0.44
-#   low  0.40 / 0.50 / 0.10   → mean charge freq ≈ 0.37
+#   veryhigh 0.80 / 0.18 / 0.02   → mean charge freq ≈ 0.56
+#   high     0.70 / 0.28 / 0.02   → mean charge freq ≈ 0.51
+#   mid      0.55 / 0.40 / 0.05   → mean charge freq ≈ 0.44
+#   low      0.40 / 0.50 / 0.10   → mean charge freq ≈ 0.37
 # Do NOT run `calibrate` against these entries: the weights are a scenario
 # design choice, not a data fit (calibrate would also expand the aliases).
 # ──────────────────────────────────────────────────────────────────────────
+acn_jpl_office_veryhigh:
+  description: "ACN JPL fits, office-regular mix (veryhigh tier: 80% regular chargers)"
+  calibration_policy: acn_data
+  axes_distribution:
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.02}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0],
+        dist_km: [5, 60], weight: 0.18}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.80}
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+  region_distributions: *acn_jpl_region_dists
+  calibration_metadata: *acn_jpl_calmeta
+
 acn_jpl_office_high:
   description: "ACN JPL fits, office-regular mix (high tier: 70% regular chargers)"
   calibration_policy: acn_data
@@ -1522,9 +1543,31 @@ acn_jpl_office_low:
   region_distributions: *acn_jpl_region_dists
   calibration_metadata: *acn_jpl_calmeta
 
+acn_caltech_office_veryhigh:
+  description: "ACN Caltech fits, office-regular mix (veryhigh tier: 80% regular chargers)"
+  calibration_policy: acn_data
+  axes_distribution:
+    - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
+        50], weight: 0.02}
+    - {name: rare_inconsistent, freq: [0.0, 0.1], consist: [0.0, 0.5], dist_km: [
+        3, 80], weight: 0.0}
+    - {name: occasional_consistent, freq: [0.1, 0.3], consist: [0.5, 1.0],
+        dist_km: [5, 60], weight: 0.18}
+    - {name: regular_charger, freq: [0.3, 1.0], consist: [0.4, 1.0], dist_km: [
+            10, 80], weight: 0.80}
+  negotiation:
+    cluster_mix: [0.107, 0.536, 0.321, 0.036]
+    w_multiplier: [1.0, 1.0]
+  fleet:
+    ev_count: 20
+    battery_mix: [0.20, 0.30, 0.40, 0.10]
+    battery_heterogeneity: mixed
+  region_distributions: *acn_caltech_region_dists
+  calibration_metadata: *acn_caltech_calmeta
+
 acn_caltech_office_high:
   description: "ACN Caltech fits, office-regular mix (high tier: 70% regular chargers)"
-  calibration_policy: acn_data
+  calibration_policy: acn_data  
   axes_distribution:
     - {name: rare_consistent, freq: [0.0, 0.1], consist: [0.5, 1.0], dist_km: [3,
         50], weight: 0.02}
