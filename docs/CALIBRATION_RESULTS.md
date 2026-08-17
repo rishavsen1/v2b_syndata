@@ -4,9 +4,24 @@
 > Regenerate (full paper source list): `uv run python tools/repro_paper.py --steps calibration`  
 > Rebuild only this doc from existing CSVs: add `--md-only`.
 
-_Generated 2026-07-11._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. INL is fixture-only and excluded; EV WATTS is the real public 2026 release (port-as-proxy user identity). See [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
+_Generated 2026-07-12._ Generated sessions are pooled across seeds and compared, region by region, against the real source each population was fit to. INL is fixture-only and excluded; EV WATTS is the real public 2026 release (port-as-proxy user identity). See [`CALIBRATION_NOTES.md`](CALIBRATION_NOTES.md) for method and [`GENERATIVE_MODELS.md`](GENERATIVE_MODELS.md) for family rationale.
 
 **Reading the numbers.** With sample sizes in the thousands the two-sample KS *p*-value is ~0 everywhere and carries no signal — judge by effect size: mean error |Δμ|, the KS statistic, Wasserstein W₁, and the copula ρ-gap.
+
+**Units.** Every table states its units in the column headers and in a `Units —` line beneath it. The convention throughout:
+
+| Kind of metric | Unit | Range |
+|---|---|---|
+| counts (`n …`, `drivers`) | sessions, or drivers where named | integer ≥ 0 |
+| moments and distances on a variable (`μ/σ`, `\|Δμ\|`, `W₁`) | **inherit the variable's unit — hours** for both `arrival hour` and `dwell hours` | ≥ 0 for `\|Δμ\|`, `W₁` |
+| KS statistic | dimensionless (a CDF probability distance) | [0, 1] |
+| Spearman ρ, Pearson r | dimensionless | [−1, 1] |
+| ratios (`pk/off`, `wd/we`, weekly rhythm) | dimensionless | > 0 |
+| power | kW | ≥ 0 |
+| `CV(RMSE)`, `NMBE`, `share` | percent | — |
+| log-space gaps | dex (log₁₀ units) | ≥ 0 |
+
+Two notes on the hours. `arrival hour` is a **decimal local wall-clock hour since midnight** (so 10.32 ≈ 10:19), while `dwell hours` is an **elapsed duration** — the same column mixes both senses across rows. And W₁ (Wasserstein-1) integrates a CDF difference over the variable's axis, so it carries the variable's unit; a dwell W₁ of 2.97 means ~3 hours of mass transport, not a probability.
 
 ## At a glance
 
@@ -21,7 +36,9 @@ _Generated 2026-07-11._ Generated sessions are pooled across seeds and compared,
 
 Each driver is summarised by (φ frequency, κ consistency) and dropped into the **first** region box that contains it; `assignment/<source>.png` shows the scatter with the box overlays. Per-region driver counts:
 
-| source | region | drivers | share |
+_Units — `drivers`: count of unique drivers (not sessions). `share`: percent of that source's drivers. The underlying axes φ (visit frequency) and κ (arrival consistency) are both dimensionless on [0, 1]._
+
+| source | region | drivers (count) | share (%) |
 |---|---|--:|--:|
 | acn | rare consistent | 229 | 36.1% |
 | acn | rare inconsistent | 4 | 0.6% |
@@ -63,7 +80,9 @@ Each driver is summarised by (φ frequency, κ consistency) and dropped into the
 
 _95% CIs: seeded percentile bootstrap over the SOURCE sessions (B=1000, seed 20260708, per-cell hashed sub-streams; generated pool held fixed). Machine-readable: `docs/experiments/s1_fidelity_cis.csv`._
 
-| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \|Δμ\| | KS | KS 95% CI | W₁ | W₁ 95% CI |
+_Units — `n src`/`n gen`: sessions. `src μ/σ`, `gen μ/σ`, `|Δμ|` and `W₁`: **hours**, inherited from the variable (`arrival hour` = decimal local wall-clock hour since midnight; `dwell hours` = elapsed duration). `KS`: dimensionless CDF distance on [0, 1]. Each CI carries the unit of the estimate it brackets._
+
+| source | region | variable | n src (sessions) | n gen (sessions) | src μ/σ (h) | gen μ/σ (h) | \|Δμ\| (h) | KS (0–1) | KS 95% CI | W₁ (h) | W₁ 95% CI (h) |
 |---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
 | acn | occasional consistent | arrival hour | 17,313 | 1,981 | 10.32/3.75 | 10.01/3.17 | 0.30 | 0.067 | [0.063, 0.073] | 0.42 | [0.39, 0.46] |
 | acn | occasional consistent | dwell hours | 17,313 | 1,981 | 6.49/3.93 | 6.51/3.50 | 0.02 | 0.099 | [0.092, 0.106] | 0.73 | [0.70, 0.76] |
@@ -104,7 +123,9 @@ _95% CIs: seeded percentile bootstrap over the SOURCE sessions (B=1000, seed 202
 
 ## S2 — Joint structure (arrival × dwell)
 
-| source | region | n | ρ source | ρ generated | ρ-gap |
+_Units — `n`: sessions. `ρ source`/`ρ generated`: Spearman rank correlation between arrival hour and dwell, dimensionless on [−1, 1]. `ρ-gap`: |ρ source − ρ generated|, dimensionless on [0, 2]._
+
+| source | region | n (sessions) | ρ source (−1–1) | ρ generated (−1–1) | ρ-gap |
 |---|---|--:|--:|--:|--:|
 | acn | occasional consistent | 17,313 | -0.627 | -0.624 | 0.002 |
 | acn | rare consistent | 4,723 | -0.544 | -0.515 | 0.029 |
@@ -129,7 +150,9 @@ _95% CIs: seeded percentile bootstrap over the SOURCE sessions (B=1000, seed 202
 
 _Δ = holdout − train KS. The train-split refit applies the same family-selection protocol calibration ships (2-component mixture where it beats the single family by the KS margin, else single); `refit family` is the family selected on the train split, `shipped` the family in the calibrated block. Judge per-cell Δ, not only the median._
 
-| source | region | variable | n train | n test | refit family | shipped | KS train | KS holdout | Δ |
+_Units — `n train`/`n test`: sessions. `KS train`/`KS holdout`: dimensionless on [0, 1]. `Δ`: a difference of two KS statistics, so dimensionless on [−1, 1]; negative means the holdout fold fit better than the train fold._
+
+| source | region | variable | n train (sessions) | n test (sessions) | refit family | shipped | KS train (0–1) | KS holdout (0–1) | Δ |
 |---|---|---|--:|--:|---|---|--:|--:|--:|
 | acn | occasional consistent | arrival hour | 16,052 | 1,261 | truncnorm mixture | truncnorm mixture | 0.042 | 0.093 | +0.051 |
 | acn | occasional consistent | dwell hours | 16,052 | 1,261 | weibull | weibull | 0.107 | 0.116 | +0.008 |
@@ -172,7 +195,9 @@ _Δ = holdout − train KS. The train-split refit applies the same family-select
 
 _Coarse real-data smoke test. The weekday/weekend band is derived from NREL ComStock/EULP across climate zones 5B/3B/4A/6A (`data/buildingload_reference/reference_bands.json`); peak/off-peak is an informational sanity bound only. The rigorous ASHRAE Guideline-14 fidelity comparison (CV(RMSE)/NMBE vs ComStock, `peak_kw_scaling` off) lives in `tools/validate_buildingload.py` — see `data/buildingload_reference/validation_metrics.json`._
 
-| scenario | archetype/size | peak kW | off-pk kW | pk/off | wd/we | ComStock wd/we band | ✓ | band src |
+_Units — `peak kW`/`off-pk kW`: kW. `pk/off` (peak ÷ off-peak), `wd/we` (weekday ÷ weekend mean load) and the ComStock band: dimensionless ratios._
+
+| scenario | archetype/size | peak (kW) | off-pk (kW) | pk/off (ratio) | wd/we (ratio) | ComStock wd/we band (ratio) | ✓ | band src |
 |---|---|--:|--:|--:|--:|--:|:-:|:-:|
 | S_size_small | office/small | 100 | 24.4 | 4.10 | 3.25 | [1.134, 1.935] | ✗ | comstock |
 | S01 | office/medium | 500 | 59.3 | 8.43 | 2.95 | [1.012, 1.984] | ✗ | comstock |
@@ -183,7 +208,9 @@ _Coarse real-data smoke test. The weekday/weekend band is derived from NREL ComS
 
 _Generator's raw single-prototype EnergyPlus load vs the ComStock stock-average for each (archetype,size), from `tools/validate_buildingload.py` (`data/buildingload_reference/validation_metrics.json`). G14 thresholds: CV(RMSE) ≤ 30 %, |NMBE| ≤ 10 %._
 
-| archetype/size | gen kW (mean) | ComStock kW (mean) | CV(RMSE) % | NMBE % | shape corr (wd) | peak-hr Δ | pass |
+_Units — `gen`/`ComStock`: mean load in kW. `CV(RMSE)`, `NMBE`: percent, where a positive NMBE means the generator **under**-predicts. `shape corr (wd)`: Pearson r on the weekday diurnal profile, dimensionless on [−1, 1]. `peak-hr Δ`: whole hours of peak-timing error._
+
+| archetype/size | gen mean (kW) | ComStock mean (kW) | CV(RMSE) (%) | NMBE (%) | shape corr (wd) (−1–1) | peak-hr Δ (h) | pass |
 |---|--:|--:|--:|--:|--:|--:|:-:|
 | office/small | 4.1 | 8.0 | 56.7 | +49.1 | 0.708 | 1 | ✗ |
 | office/med | 43.3 | 68.7 | 47.2 | +37.0 | 0.908 | 2 | ✗ |
@@ -195,7 +222,9 @@ _Generator's raw single-prototype EnergyPlus load vs the ComStock stock-average 
 
 ## S6 — Weekly weekday/weekend rhythm
 
-| source | source ratio | generated ratio | gap (log₁₀) |
+_Units — both ratios are dimensionless (sessions per weekday ÷ sessions per weekend day), printed with `×`. `gap`: dex, i.e. |log₁₀(source ratio) − log₁₀(generated ratio)|, so ≥ 0 and 0.06 dex ≈ a 15% multiplicative discrepancy._
+
+| source | source ratio (×) | generated ratio (×) | gap (dex, log₁₀) |
 |---|--:|--:|--:|
 | acn | 5.95× | 5.73× | 0.017 |
 | acn_caltech | 2.86× | 2.83× | 0.005 |

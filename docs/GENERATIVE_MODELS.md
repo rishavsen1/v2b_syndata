@@ -5,15 +5,15 @@ distribution family** is used, **why that family** was chosen, and **which
 ground-truth features** fit its parameters. This is the reference for "why is
 arrival time a truncated normal and not a beta?" type questions.
 
-> **On "why this family".** The family choices below were made on *principled*
+> **On "why this family".** The family choices below were made on _principled_
 > grounds — correct support, composability with the copula, interpretable
 > parameters — **not** by an empirical contest between candidate families. The
 > calibration code records only a single self-KS per quantity, never an AIC/BIC
 > comparison. A retrospective model-selection study (see
 > [Empirical model selection](#empirical-model-selection-2026-06) and
 > `docs/experiments/`) shows where the principled choice matches the data
-> (dwell→Weibull) and where the study *motivated a model the generator now
-> ships* (arrival→a per-region truncated-Gaussian **mixture**). Read the "why"
+> (dwell→Weibull) and where the study _motivated a model the generator now
+> ships_ (arrival→a per-region truncated-Gaussian **mixture**). Read the "why"
 > columns as design rationale, and that section for the empirical verdict.
 
 ## Two layers
@@ -21,7 +21,7 @@ arrival time a truncated normal and not a beta?" type questions.
 The pipeline separates **calibration** from **generation**:
 
 1. **Calibration** (`v2b-syndata calibrate`, `src/v2b_syndata/calibration/`) —
-   fits per-region distribution *parameters* from real charging-session
+   fits per-region distribution _parameters_ from real charging-session
    datasets (ACN-Data, ElaadNL/4TU, EV WATTS, INL) and writes them into
    `configs/populations.yaml` under `region_distributions.<region>.<dist>`.
    This is an offline, occasional step.
@@ -39,29 +39,29 @@ Every fitted parameter has one of three provenances, recorded per-knob in
 
 A calibrated fit is **post-clamped** to the validity window in
 `knob_loader.DIST_PARAM_RANGES`; if any required parameter lands out of range
-(or the MLE fails to converge), the whole distribution is *dropped* and
+(or the MLE fails to converge), the whole distribution is _dropped_ and
 generation falls back to the hand-authored default — a degenerate fit can never
 break generation (`distribution_fitter._drop_if_oor`).
 
 ## Summary
 
-| quantity | family | why this family | fit features (source) | parameters · provenance |
-|---|---|---|---|---|
-| arrival hour | per-region 2-component truncated-normal (Gaussian) mixture on [4, 22]; single TruncNorm(μ, σ) fallback | arrivals are **bimodal** (morning commute peak + midday shoulder), which a 2-component truncated-Gaussian captures, with a hard daytime support (no 3 AM arrivals) | `arrival_hour` (local clock hour of connect) | per-component w/μ/σ · **calibrated** (single μ,σ for synthetic pops); trunc [4,22] **fixed** |
-| dwell | Weibull(k, λ), optional 2-component Weibull mixture | non-negative, right-skewed duration; a 2-component mixture is used where it beats single-Weibull by a KS margin | `dwell_hours` (disconnect − connect) | k, λ (per component) · **calibrated** |
-| arrival × dwell coupling | Gaussian copula ρ | couples the two marginals (early arrivers stay longer) *without* distorting either marginal — applied on the shared uniform draw | Spearman ρ of (`arrival_hour`, `dwell_hours`) | ρ · **calibrated** |
-| arrival SoC | Beta(α, β) on [0, 1] | natural law for a bounded fraction; α/β set mean and skew independently | *none — SoC is unobserved* (see below) | α, β · **fixed prior** (default Beta(4,6) ≈ 0.40) |
-| departure-SoC requirement | Beta(α, β), else TruncNorm(μ, σ) | same bounded-fraction argument as arrival SoC; the TruncNorm fallback is a simple high-SoC prior when no source data exists | `arrival_prior + kWhDelivered/capacity` | α, β · **calibrated**; fallback μ/σ · **knobs** (`depart_soc_mu`/`sigma`, default 50/5) |
-| region frequency | categorical weights | a car belongs to exactly one behavioral region; weights are just the empirical population mix | per-region **user share** | `axes_distribution[*].weight` · **calibrated** |
-| weekend appearance | Bernoulli rate scaling | weekend turnout is a fraction of the weekday rate; one scalar captures the weekday:weekend ratio | weekend vs weekday sessions-per-day ratio | `weekend_activity_factor` · **calibrated** (else knob) |
-| DR events | inhomogeneous Poisson(λ(t)) + Uniform magnitude | event arrivals are rare, memoryless, and rate-modulated by season/heat/hour — the textbook point-process model | *not data-fit* — program specs from PG&E/CAISO tariff docs | λ_base, magnitude range · **knobs**; modulation factors **fixed** |
-| battery capacity | deterministic inference | physics (range × efficiency), not a distribution | `milesRequested × WhPerMile × 1.5` (ACN only) | per-session inferred, else 60 kWh **fixed** |
-| battery mix | Dirichlet(p·α) | the conjugate distribution over a simplex (class shares sum to 1); α tunes per-sample dispersion | *not data-fit* — declared mix | `battery_mix`, `battery_mix_dirichlet_alpha` · **knobs** |
-| building load | EnergyPlus simulation | a calibrated building-physics engine, not a statistical model | TMYx weather + ASHRAE occupancy schedule | physical; `peak_kw` scaling · **knob** |
-| rooftop PV | PVWatts physics (not fit) | deterministic engineering model from the SAME (perturbed) EPW irradiance/temp EnergyPlus used → weather-consistent with the load | EPW GHI/DNI/DHI + dry-bulb | `pv.*` knobs / `der_catalog` presets · **knobs** |
-| stationary battery | specs (knobs) + deterministic dispatch heuristic | capacity/power/efficiency are equipment attributes; dispatch is a rule (peak-shave + TOU arbitrage), not a sampled process | *not fit* | `battery.*` knobs / `der_catalog` presets · **knobs** |
-| grid prices | rule-based TOU tape | tariffs are deterministic schedules, not random | *not fit* | peak/off-peak prices, window · **knobs** |
-| negotiation mix | categorical | survey-derived behavioral type shares | CONSENT survey (n=28) | `negotiation_mix` · **fixed prior / knob** |
+| quantity                  | family                                                                                                 | why this family                                                                                                                                                    | fit features (source)                                      | parameters · provenance                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| arrival hour              | per-region 2-component truncated-normal (Gaussian) mixture on [4, 22]; single TruncNorm(μ, σ) fallback | arrivals are **bimodal** (morning commute peak + midday shoulder), which a 2-component truncated-Gaussian captures, with a hard daytime support (no 3 AM arrivals) | `arrival_hour` (local clock hour of connect)               | per-component w/μ/σ · **calibrated** (single μ,σ for synthetic pops); trunc [4,22] **fixed** |
+| dwell                     | Weibull(k, λ), optional 2-component Weibull mixture                                                    | non-negative, right-skewed duration; a 2-component mixture is used where it beats single-Weibull by a KS margin                                                    | `dwell_hours` (disconnect − connect)                       | k, λ (per component) · **calibrated**                                                        |
+| arrival × dwell coupling  | Gaussian copula ρ                                                                                      | couples the two marginals (early arrivers stay longer) _without_ distorting either marginal — applied on the shared uniform draw                                   | Spearman ρ of (`arrival_hour`, `dwell_hours`)              | ρ · **calibrated**                                                                           |
+| arrival SoC               | Beta(α, β) on [0, 1]                                                                                   | natural law for a bounded fraction; α/β set mean and skew independently                                                                                            | _none — SoC is unobserved_ (see below)                     | α, β · **fixed prior** (default Beta(4,6) ≈ 0.40)                                            |
+| departure-SoC requirement | Beta(α, β), else TruncNorm(μ, σ)                                                                       | same bounded-fraction argument as arrival SoC; the TruncNorm fallback is a simple high-SoC prior when no source data exists                                        | `arrival_prior + kWhDelivered/capacity`                    | α, β · **calibrated**; fallback μ/σ · **knobs** (`depart_soc_mu`/`sigma`, default 50/5)      |
+| region frequency          | categorical weights                                                                                    | a car belongs to exactly one behavioral region; weights are just the empirical population mix                                                                      | per-region **user share**                                  | `axes_distribution[*].weight` · **calibrated**                                               |
+| weekend appearance        | Bernoulli rate scaling                                                                                 | weekend turnout is a fraction of the weekday rate; one scalar captures the weekday:weekend ratio                                                                   | weekend vs weekday sessions-per-day ratio                  | `weekend_activity_factor` · **calibrated** (else knob)                                       |
+| DR events                 | inhomogeneous Poisson(λ(t)) + Uniform magnitude                                                        | event arrivals are rare, memoryless, and rate-modulated by season/heat/hour — the textbook point-process model                                                     | _not data-fit_ — program specs from PG&E/CAISO tariff docs | λ_base, magnitude range · **knobs**; modulation factors **fixed**                            |
+| battery capacity          | deterministic inference                                                                                | physics (range × efficiency), not a distribution                                                                                                                   | `milesRequested × WhPerMile × 1.5` (ACN only)              | per-session inferred, else 60 kWh **fixed**                                                  |
+| battery mix               | Dirichlet(p·α)                                                                                         | the conjugate distribution over a simplex (class shares sum to 1); α tunes per-sample dispersion                                                                   | _not data-fit_ — declared mix                              | `battery_mix`, `battery_mix_dirichlet_alpha` · **knobs**                                     |
+| building load             | EnergyPlus simulation                                                                                  | a calibrated building-physics engine, not a statistical model                                                                                                      | TMYx weather + ASHRAE occupancy schedule                   | physical; `peak_kw` scaling · **knob**                                                       |
+| rooftop PV                | PVWatts physics (not fit)                                                                              | deterministic engineering model from the SAME (perturbed) EPW irradiance/temp EnergyPlus used → weather-consistent with the load                                   | EPW GHI/DNI/DHI + dry-bulb                                 | `pv.*` knobs / `der_catalog` presets · **knobs**                                             |
+| stationary battery        | specs (knobs) + deterministic dispatch heuristic                                                       | capacity/power/efficiency are equipment attributes; dispatch is a rule (peak-shave + TOU arbitrage), not a sampled process                                         | _not fit_                                                  | `battery.`\* knobs / `der_catalog` presets · **knobs**                                       |
+| grid prices               | rule-based TOU tape                                                                                    | tariffs are deterministic schedules, not random                                                                                                                    | _not fit_                                                  | peak/off-peak prices, window · **knobs**                                                     |
+| negotiation mix           | categorical                                                                                            | survey-derived behavioral type shares                                                                                                                              | CONSENT survey (n=28)                                      | `negotiation_mix` · **fixed prior / knob**                                                   |
 
 The rest of this document expands each row.
 
@@ -75,7 +75,7 @@ The rest of this document expands each row.
 morning-commute peak plus a midday/afternoon shoulder — which a single normal
 underfits (the empirical study cut KS 0.11→0.03 by moving to a 2-component
 mixture). Each component is a normal; their sum captures both modes. Arrival hour
-also has a *hard physical support*: a Gaussian with realistic spread leaks mass
+also has a _hard physical support_: a Gaussian with realistic spread leaks mass
 before dawn / after midnight, which is unphysical and breaks the no-overnight
 constraint (C12). The window is `[4, 22]` — wide enough to capture nearly all
 real arrivals (the old `[6, 20]` structurally discarded ~8% of ACN arrivals)
@@ -91,10 +91,10 @@ ACN is converted UTC→`America/Los_Angeles` before reading the hour).
 (`api._fit_region_arrivals`): each data-rich region gets a 2-component truncated
 mixture (`fit_truncnorm_mixture_arrival`), kept **only if** it beats the single
 TruncNorm by a KS margin; thin regions fall back to the pooled mixture, and
-populations without data to a single TruncNorm. *(This replaced an earlier
+populations without data to a single TruncNorm. _(This replaced an earlier
 pooled-and-broadcast approach that assumed arrival ⟂ the φ/κ/δ axes and
-mis-served regions whose arrivals genuinely differ — e.g. `rare_consistent`,
-which arrives ~2 h later than the pool.)* Mixture parameters are stored as
+mis-served regions whose arrivals genuinely differ — e.g._ `rare_consistent`_,
+which arrives ~2 h later than the pool.)_ Mixture parameters are stored as
 numeric leaves `arrival.w1/mu1/sigma1/mu2/sigma2`; generation inverts the mixture
 CDF on the copula's shared uniform by bisection (`_mixture_ppf_u`), preserving
 determinism + the copula. All calibrated ACN + ElaadNL regions ship a mixture
@@ -115,7 +115,7 @@ quantile of the copula's shared uniform (`renderers/sessions.py`).
 
 **Models** how long a car stays plugged in (hours).
 
-**Why Weibull.** Dwell is a non-negative, right-skewed *duration*. Weibull is
+**Why Weibull.** Dwell is a non-negative, right-skewed _duration_. Weibull is
 the canonical duration/survival family: its shape `k` flexes from
 exponential-like (k≈1, many short stays) to bell-like (k>2, a dominant
 work-shift length), and it has a closed-form CDF/quantile for the copula. A
@@ -125,6 +125,7 @@ unplugging in the next minute given still plugged in."
 
 **Fit features.** `dwell_hours` = disconnect − connect, with sub-30-min stays
 dropped (metering noise / failed connects, `MIN_DWELL_HOURS = 0.5`) and
+
 > 1-week stays dropped as bogus.
 
 **Parameters.** k, λ via `scipy.stats.weibull_min.fit(arr, floc=0)` (location
@@ -145,7 +146,7 @@ pinned at 0 so it stays a true two-parameter Weibull, `fit_weibull_dwell`).
 **Models** the dependence between arrival hour and dwell (early arrivers tend to
 stay longer).
 
-**Why a copula.** We want to preserve each *marginal* exactly (the TruncNorm
+**Why a copula.** We want to preserve each _marginal_ exactly (the TruncNorm
 arrival and Weibull dwell above) while still correlating them. A copula does
 precisely that: draw one correlated pair of uniforms, then push each through its
 own marginal quantile. Modeling the joint directly (e.g. a bivariate normal on
@@ -192,17 +193,16 @@ the car's `[min_allowed_soc, max_allowed_soc]` (`samplers/sessions_dist.sample_f
 ## Departure-SoC requirement — `Beta(α, β)`, else `TruncNorm(μ, σ)`
 
 **Models** `required_soc_at_depart` — the SoC the car needs by the time it
-leaves (which, in this dataset, *is* the departure SoC).
+leaves (which, in this dataset, _is_ the departure SoC).
 
 **Why Beta (calibrated path).** Same bounded-fraction argument as arrival SoC.
-Here there *is* a real per-session signal to fit.
+Here there _is_ a real per-session signal to fit.
 
 **Fit features.** `arrival_prior + kWhDelivered/capacity` — the SoC the car
 actually left at, using **delivered energy** (the one quantity every source
 records). Delivered, not requested: arrival is already a prior, so using
 requested would make departure ≈ 1.0 by construction (circular). Departures that
-don't exceed arrival are dropped; the rest are fit with `fit_beta_soc(...,
-leaf_prefix="soc_depart")` (`calibration/api.py`).
+don't exceed arrival are dropped; the rest are fit with `fit_beta_soc(..., leaf_prefix="soc_depart")` (`calibration/api.py`).
 
 **Why TruncNorm fallback.** For hand-authored populations and sources without
 the data, there is no `soc_depart` block. The fallback is
@@ -228,7 +228,7 @@ A car's behavior is summarized by three axes, sampled from a region's range and
 then driving the session marginals:
 
 - **φ (frequency)** — daily appearance probability. Fit per user as
-  unique-weekdays-observed ÷ weekdays-in-active-window (a *per-user* window, so
+  unique-weekdays-observed ÷ weekdays-in-active-window (a _per-user_ window, so
   a sparse-but-regular commuter isn't crushed by a multi-year global
   denominator) (`aggregate_user_features`).
 - **κ (consistency)** — `1 − CV(arrival_hour)`, the regularity of arrival time.
@@ -254,11 +254,10 @@ per-day appearance probability is φ on weekdays and `φ · weekend_activity_fac
 on Sat/Sun (`renderers/sessions.py`).
 
 **Why one scalar.** Workplace charging is overwhelmingly a weekday phenomenon;
-the only thing worth calibrating is the *relative* weekend turnout, so a single
+the only thing worth calibrating is the _relative_ weekend turnout, so a single
 multiplier on the existing φ suffices rather than a separate weekend model.
 
-**Fit features.** `(weekend sessions / unique weekend dates) ÷ (weekday
-sessions / unique weekday dates)` — the same sessions-per-day ratio the S6
+**Fit features.** `(weekend sessions / unique weekend dates) ÷ (weekday sessions / unique weekday dates)` — the same sessions-per-day ratio the S6
 validator checks, so a generated population reproduces the source's
 weekday:weekend ratio (`population_weekend_factor`). 0.0 when the source has no
 weekend sessions. Has no effect unless `sim_window.weekdays_only` is false.
@@ -283,7 +282,7 @@ published per event.
 PG&E tariff docs + CAISO DR reports, hardcoded in `PROGRAM_SPECS` (CBP / BIP /
 ELRP). The modulation factor shapes (e.g. heat ramp, afternoon-clustered hour
 profile) are fixed model choices. Tunable knobs: `dr_program`,
-`dr_lambda_base`, `dr_magnitude_kw_range`. The temperature factor *does* read
+`dr_lambda_base`, `dr_magnitude_kw_range`. The temperature factor _does_ read
 real weather — daily max temp from the EnergyPlus EPW — so dispatch correlates
 with heat.
 
@@ -317,7 +316,7 @@ below.
 
 **Why Dirichlet.** The class shares (`leaf_24, bolt_40, m3_75, rivian_100`) live
 on a simplex (sum to 1). Dirichlet is the conjugate, natural distribution over a
-simplex; parameterizing it as `p · α` keeps the *mean* at the declared mix `p`
+simplex; parameterizing it as `p · α` keeps the _mean_ at the declared mix `p`
 while `α` (concentration) tunes dispersion — high α ⇒ effectively deterministic
 (default 1e6, preserves reproducibility), batch mode uses α ≈ 30 for ~8% jitter.
 
@@ -336,26 +335,25 @@ These are part of the generator but are not fit to data:
   schedule. The output is rescaled so `max(power_kw) == peak_kw` when
   `peak_kw_scaling` is on. This is building physics, not a sampled distribution.
   There are **two independent perturbation layers**:
-  - **Noise layer** (`noise_profiles.yaml`, the `noise.*` knobs) — perturbs the
-    *produced* CSVs **after** generation (load/sessions/prices/DR); it never
+  - **Noise layer** (`noise_profiles.yaml`, the `noise.`* knobs) — perturbs the
+    *produced\* CSVs **after** generation (load/sessions/prices/DR); it never
     touches the weather. The post-sim ±5%/±3% load realism noise is part of it
     and now profile-gated (`noise.load_flex_jitter_pct` /
     `noise.load_inflex_jitter_pct`): the `clean` profile sets them to 0, so
-    `clean` output is a **deterministic `load = f(weather, building, occupancy)`**
+    `clean` output is a **deterministic** `load = f(weather, building, occupancy)`
     — the faithful target for learning `load ← weather`. Other profiles keep
     0.05/0.03 (unchanged).
-  - **Weather layer** (`weather_profiles.yaml`, `building_load.weather_*` knobs) —
+  - **Weather layer** (`weather_profiles.yaml`, `building_load.weather_`* knobs) —
     the INPUT side. Four channels: `weather_temp_offset_c` (additive °C dry-bulb),
     `weather_dewpoint_offset_c` (additive °C dew-point — the moisture driver;
     relative-humidity is recomputed via Magnus to stay consistent),
     `weather_solar_scale` (×GHI/DNI/DHI) and `weather_wind_scale` (×wind speed,
-    drives infiltration). These perturb the EPW EnergyPlus *simulates*
+    drives infiltration). These perturb the EPW EnergyPlus *simulates\*
     **and** the exported `weather_data.csv` via one shared transform
     (`weather.perturb_weather_frame` / `perturb_epw_file`), so the exported
     weather always matches the load it produced. It's **per-building** like the
     noise layer: each building picks its own `weather_profile`
-    (`slight|moderate|strong`, batch default via `generate-multi
-    --weather-profile`, web dropdown in the card's Perturbations panel), and each
+    (`slight|moderate|strong`, batch default via `generate-multi --weather-profile`, web dropdown in the card's Perturbations panel), and each
     sample draws `temp_offset ~ N(0, σ_T)` and `solar_scale ~ N(1, σ_s)` from its
     seed, logged as explicit overrides (`--weather-sigma-c` still sets σ_T
     directly). Pair with the `clean` noise layer for a pure weather→load signal —
@@ -365,7 +363,7 @@ These are part of the generator but are not fit to data:
   plane-of-array transposition of the EPW GHI/DNI/DHI via a closed-form
   NOAA/Spencer solar position, then a NOCT cell-temperature + temperature-
   coefficient + DC/AC-clip conversion. It is **weather-consistent by
-  construction** — it consumes the *same* perturbed EPW (via the shared
+  construction** — it consumes the _same_ perturbed EPW (via the shared
   `weather.parsed_perturbed_weather` helper) that EnergyPlus simulated and that
   `weather_data.csv` exports, so PV and building load see identical
   irradiance/temperature (including any `weather_solar_scale` perturbation).
@@ -395,7 +393,7 @@ Regions below `MIN_SAMPLES = 30` are not fit (the distribution is `None` →
 generation uses the hand-authored default). Out-of-range or non-convergent fits
 are dropped with a `RuntimeWarning` so calibration runs surface the issue rather
 than silently shipping a degenerate parameter. The forward generator validates
-the *output* separately (`validate.py`, the S/D/E/F invariant checks).
+the _output_ separately (`validate.py`, the S/D/E/F invariant checks).
 
 > Note this is **goodness-of-fit of the chosen family only** — it does not
 > compare against alternative families. That comparison is the next section.
@@ -408,13 +406,13 @@ study (reproducible via `docs/experiments/model_selection.py` and
 **ACN-Data** (41,774 sessions, Caltech+JPL+Office001) and **ElaadNL** (55,201,
 Utrecht), through the same feature pipeline — and ranks them by AIC / BIC / KS.
 
-| quantity | chosen | input feature(s) | best by AIC | best by KS | verdict |
-|---|---|---|---|---|---|
-| **arrival hour** | per-region truncated-Gaussian mixture on [4,22] | local connect clock-hour | GaussMix-2 | GaussMix-2 (KS 0.029 vs 0.108 for a single TruncNorm) | **adopted.** The study motivated it and the generator now **ships** a 2-component truncated-Gaussian mixture per calibrated region (single TruncNorm only for synthetic pops); the window was widened [6,20]→[4,22], recovering the ~8% of arrivals the old bounds discarded. Validated arrival KS ≈ 0.07–0.08 vs source. |
-| **dwell** | Weibull(k,λ) + optional 2-component Weibull mixture | disconnect − connect | **Weibull** | **Weibull** (KS 0.102) | **empirically vindicated** — best of the standard duration families on the pooled data, JPL, and ElaadNL; Gamma a close 2nd (per-site winner at Caltech). A 2-component Weibull mixture is used where it beats single by a KS margin. |
-| **arrival × dwell** | Gaussian copula ρ | Spearman ρ of the two | Frank | n/a | strong **negative** dependence (Kendall τ=−0.44, ρ=−0.60; later arrival → shorter stay), reproduced on ElaadNL. Gaussian ≫ independence but **Frank fits better**; Gaussian kept because it composes with the marginal inverse-CDFs via shared normal scores. |
-| **arrival SoC** | Beta(α,β) prior | **none — unobserved** | n/a | n/a | **no model comparison is possible** (no charger records SoC). Honest prior, correctly *not* derived from kWhRequested. |
-| **departure SoC** | Beta(α,β) | arrival_prior + delivered/capacity | Kumaraswamy (≈Beta, ΔAIC 114) | TruncNorm | Beta ≈ Kumaraswamy → defensible. **Caveat:** partly synthetic — the real signal is delivered/capacity (mean 0.30); the fit inherits the arrival prior's shape. |
+| quantity            | chosen                                              | input feature(s)                   | best by AIC                   | best by KS                                            | verdict                                                                                                                                                                                                                                                                                                                   |
+| ------------------- | --------------------------------------------------- | ---------------------------------- | ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **arrival hour**    | per-region truncated-Gaussian mixture on [4,22]     | local connect clock-hour           | GaussMix-2                    | GaussMix-2 (KS 0.029 vs 0.108 for a single TruncNorm) | **adopted.** The study motivated it and the generator now **ships** a 2-component truncated-Gaussian mixture per calibrated region (single TruncNorm only for synthetic pops); the window was widened [6,20]→[4,22], recovering the ~8% of arrivals the old bounds discarded. Validated arrival KS ≈ 0.07–0.08 vs source. |
+| **dwell**           | Weibull(k,λ) + optional 2-component Weibull mixture | disconnect − connect               | **Weibull**                   | **Weibull** (KS 0.102)                                | **empirically vindicated** — best of the standard duration families on the pooled data, JPL, and ElaadNL; Gamma a close 2nd (per-site winner at Caltech). A 2-component Weibull mixture is used where it beats single by a KS margin.                                                                                     |
+| **arrival × dwell** | Gaussian copula ρ                                   | Spearman ρ of the two              | Frank                         | n/a                                                   | strong **negative** dependence (Kendall τ=−0.44, ρ=−0.60; later arrival → shorter stay), reproduced on ElaadNL. Gaussian ≫ independence but **Frank fits better**; Gaussian kept because it composes with the marginal inverse-CDFs via shared normal scores.                                                             |
+| **arrival SoC**     | Beta(α,β) prior                                     | **none — unobserved**              | n/a                           | n/a                                                   | **no model comparison is possible** (no charger records SoC). Honest prior, correctly _not_ derived from kWhRequested.                                                                                                                                                                                                    |
+| **departure SoC**   | Beta(α,β)                                           | arrival_prior + delivered/capacity | Kumaraswamy (≈Beta, ΔAIC 114) | TruncNorm                                             | Beta ≈ Kumaraswamy → defensible. **Caveat:** partly synthetic — the real signal is delivered/capacity (mean 0.30); the fit inherits the arrival prior's shape.                                                                                                                                                            |
 
 Robustness (dwell AIC-winner per site): Caltech `Gamma`, JPL `Weibull`,
 Office001 `Lognormal (n=580)`, ElaadNL `Weibull`. (The earlier per-site

@@ -938,6 +938,21 @@ def s6_weekly(
 # Markdown summary (committed; CSVs/PNGs stay git-ignored)
 # ──────────────────────────────────────────────────────────────────────
 
+_S3_UNITS_NOTE = (
+    "_Units — `n train`/`n test`: sessions. `KS train`/`KS holdout`: dimensionless "
+    "on [0, 1]. `Δ`: a difference of two KS statistics, so dimensionless on "
+    "[−1, 1]; negative means the holdout fold fit better than the train fold._"
+)
+
+_S1_UNITS_NOTE = (
+    "_Units — `n src`/`n gen`: sessions. `src μ/σ`, `gen μ/σ`, `|Δμ|` and `W₁`: "
+    "**hours**, inherited from the variable (`arrival hour` = decimal local "
+    "wall-clock hour since midnight; `dwell hours` = elapsed duration). `KS`: "
+    "dimensionless CDF distance on [0, 1]. Each CI carries the unit of the "
+    "estimate it brackets._"
+)
+
+
 def write_results_md(output_root: Path) -> None:
     """Emit docs/CALIBRATION_RESULTS.md from the S1–S6 summary CSVs.
 
@@ -954,12 +969,20 @@ def write_results_md(output_root: Path) -> None:
         except (FileNotFoundError, pd.errors.EmptyDataError):
             return pd.DataFrame()
 
+    names = ("S0_assignment.csv", "S1_marginals.csv", "S2_joint.csv",
+             "S3_holdout.csv", "S5_buildingload.csv", "S6_weekly.csv")
     s1 = _read("S1_marginals.csv")
     s2 = _read("S2_joint.csv")
     s3 = _read("S3_holdout.csv")
     s5 = _read("S5_buildingload.csv")
     s6 = _read("S6_weekly.csv")
     s0 = _read("S0_assignment.csv")
+
+    # Date the EVIDENCE, not the render. On a full run the CSVs were just
+    # written, so this is today; on a `--md-only` rebuild it keeps the original
+    # measurement date instead of silently claiming the numbers are fresh.
+    mtimes = [p.stat().st_mtime for p in (output_root / n for n in names) if p.exists()]
+    generated_on = (date.fromtimestamp(max(mtimes)) if mtimes else date.today()).isoformat()
 
     def f(x, nd: int = 2) -> str:
         try:
@@ -979,7 +1002,7 @@ def write_results_md(output_root: Path) -> None:
       "--steps calibration`  ")
     w("> Rebuild only this doc from existing CSVs: add `--md-only`.")
     w("")
-    w(f"_Generated {date.today().isoformat()}._ Generated sessions are pooled across "
+    w(f"_Generated {generated_on}._ Generated sessions are pooled across "
       "seeds and compared, region by region, against the real source each population "
       "was fit to. INL is fixture-only and excluded; EV WATTS is the real public "
       "2026 release (port-as-proxy user identity). See "
@@ -989,6 +1012,29 @@ def write_results_md(output_root: Path) -> None:
     w("**Reading the numbers.** With sample sizes in the thousands the two-sample KS "
       "*p*-value is ~0 everywhere and carries no signal — judge by effect size: mean "
       "error |Δμ|, the KS statistic, Wasserstein W₁, and the copula ρ-gap.")
+    w("")
+    w("**Units.** Every table states its units in the column headers and in a "
+      "`Units —` line beneath it. The convention throughout:")
+    w("")
+    w("| Kind of metric | Unit | Range |")
+    w("|---|---|---|")
+    w("| counts (`n …`, `drivers`) | sessions, or drivers where named | integer ≥ 0 |")
+    w("| moments and distances on a variable (`μ/σ`, `\\|Δμ\\|`, `W₁`) | **inherit the "
+      "variable's unit — hours** for both `arrival hour` and `dwell hours` | ≥ 0 for "
+      "`\\|Δμ\\|`, `W₁` |")
+    w("| KS statistic | dimensionless (a CDF probability distance) | [0, 1] |")
+    w("| Spearman ρ, Pearson r | dimensionless | [−1, 1] |")
+    w("| ratios (`pk/off`, `wd/we`, weekly rhythm) | dimensionless | > 0 |")
+    w("| power | kW | ≥ 0 |")
+    w("| `CV(RMSE)`, `NMBE`, `share` | percent | — |")
+    w("| log-space gaps | dex (log₁₀ units) | ≥ 0 |")
+    w("")
+    w("Two notes on the hours. `arrival hour` is a **decimal local wall-clock hour "
+      "since midnight** (so 10.32 ≈ 10:19), while `dwell hours` is an **elapsed "
+      "duration** — the same column mixes both senses across rows. And W₁ "
+      "(Wasserstein-1) integrates a CDF difference over the variable's axis, so it "
+      "carries the variable's unit; a dwell W₁ of 2.97 means ~3 hours of mass "
+      "transport, not a probability.")
     w("")
 
     w("## At a glance")
@@ -1038,7 +1084,11 @@ def write_results_md(output_root: Path) -> None:
           "the **first** region box that contains it; `assignment/<source>.png` shows "
           "the scatter with the box overlays. Per-region driver counts:")
         w("")
-        w("| source | region | drivers | share |")
+        w("_Units — `drivers`: count of unique drivers (not sessions). `share`: "
+          "percent of that source's drivers. The underlying axes φ (visit frequency) "
+          "and κ (arrival consistency) are both dimensionless on [0, 1]._")
+        w("")
+        w("| source | region | drivers (count) | share (%) |")
         w("|---|---|--:|--:|")
         for _, r in s0.iterrows():
             w(f"| {r['source']} | {reg(r['region'])} | {int(r['n_users']):,} | "
@@ -1054,10 +1104,14 @@ def write_results_md(output_root: Path) -> None:
               "per-cell hashed sub-streams; generated pool held fixed). "
               "Machine-readable: `docs/experiments/s1_fidelity_cis.csv`._")
             w("")
-            w("| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \\|Δμ\\| | KS | KS 95% CI | W₁ | W₁ 95% CI |")
+            w(_S1_UNITS_NOTE)
+            w("")
+            w("| source | region | variable | n src (sessions) | n gen (sessions) | src μ/σ (h) | gen μ/σ (h) | \\|Δμ\\| (h) | KS (0–1) | KS 95% CI | W₁ (h) | W₁ 95% CI (h) |")
             w("|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|")
         else:
-            w("| source | region | variable | n src | n gen | src μ/σ | gen μ/σ | \\|Δμ\\| | KS | W₁ |")
+            w(_S1_UNITS_NOTE)
+            w("")
+            w("| source | region | variable | n src (sessions) | n gen (sessions) | src μ/σ (h) | gen μ/σ (h) | \\|Δμ\\| (h) | KS (0–1) | W₁ (h) |")
             w("|---|---|---|--:|--:|--:|--:|--:|--:|--:|")
         for _, r in s1.iterrows():
             dmu = abs(float(r["source_mean"]) - float(r["generated_mean"]))
@@ -1080,7 +1134,11 @@ def write_results_md(output_root: Path) -> None:
     if not s2.empty:
         w("## S2 — Joint structure (arrival × dwell)")
         w("")
-        w("| source | region | n | ρ source | ρ generated | ρ-gap |")
+        w("_Units — `n`: sessions. `ρ source`/`ρ generated`: Spearman rank "
+          "correlation between arrival hour and dwell, dimensionless on [−1, 1]. "
+          "`ρ-gap`: |ρ source − ρ generated|, dimensionless on [0, 2]._")
+        w("")
+        w("| source | region | n (sessions) | ρ source (−1–1) | ρ generated (−1–1) | ρ-gap |")
         w("|---|---|--:|--:|--:|--:|")
         for _, r in s2.iterrows():
             w(f"| {r['source']} | {reg(r['region'])} | {int(r['n_source']):,} | "
@@ -1100,13 +1158,17 @@ def write_results_md(output_root: Path) -> None:
               "`shipped` the family in the calibrated block. Judge per-cell Δ, "
               "not only the median._")
             w("")
-            w("| source | region | variable | n train | n test | refit family | shipped | KS train | KS holdout | Δ |")
+            w(_S3_UNITS_NOTE)
+            w("")
+            w("| source | region | variable | n train (sessions) | n test (sessions) | refit family | shipped | KS train (0–1) | KS holdout (0–1) | Δ |")
             w("|---|---|---|--:|--:|---|---|--:|--:|--:|")
         else:
             w("_Δ = holdout − train KS. Fits a single TruncNorm for arrival, so arrival "
               "rows are pessimistic vs the shipped 2-component mixture._")
             w("")
-            w("| source | region | variable | n train | n test | KS train | KS holdout | Δ |")
+            w(_S3_UNITS_NOTE)
+            w("")
+            w("| source | region | variable | n train (sessions) | n test (sessions) | KS train (0–1) | KS holdout (0–1) | Δ |")
             w("|---|---|---|--:|--:|--:|--:|--:|")
         for _, r in s3.iterrows():
             d = float(r["delta"])
@@ -1129,7 +1191,11 @@ def write_results_md(output_root: Path) -> None:
           "`peak_kw_scaling` off) lives in `tools/validate_buildingload.py` — "
           "see `data/buildingload_reference/validation_metrics.json`._")
         w("")
-        w("| scenario | archetype/size | peak kW | off-pk kW | pk/off | wd/we | ComStock wd/we band | ✓ | band src |")
+        w("_Units — `peak kW`/`off-pk kW`: kW. `pk/off` (peak ÷ off-peak), `wd/we` "
+          "(weekday ÷ weekend mean load) and the ComStock band: dimensionless "
+          "ratios._")
+        w("")
+        w("| scenario | archetype/size | peak (kW) | off-pk (kW) | pk/off (ratio) | wd/we (ratio) | ComStock wd/we band (ratio) | ✓ | band src |")
         w("|---|---|--:|--:|--:|--:|--:|:-:|:-:|")
         for _, r in s5.iterrows():
             ww_ok = str(r["ww_in_range"]).strip().lower() == "true"
@@ -1161,7 +1227,13 @@ def write_results_md(output_root: Path) -> None:
               "(`data/buildingload_reference/validation_metrics.json`). "
               "G14 thresholds: CV(RMSE) ≤ 30 %, |NMBE| ≤ 10 %._")
             w("")
-            w("| archetype/size | gen kW (mean) | ComStock kW (mean) | CV(RMSE) % | NMBE % | shape corr (wd) | peak-hr Δ | pass |")
+            w("_Units — `gen`/`ComStock`: mean load in kW. `CV(RMSE)`, `NMBE`: "
+              "percent, where a positive NMBE means the generator **under**-predicts. "
+              "`shape corr (wd)`: Pearson r on the weekday diurnal profile, "
+              "dimensionless on [−1, 1]. `peak-hr Δ`: whole hours of peak-timing "
+              "error._")
+            w("")
+            w("| archetype/size | gen mean (kW) | ComStock mean (kW) | CV(RMSE) (%) | NMBE (%) | shape corr (wd) (−1–1) | peak-hr Δ (h) | pass |")
             w("|---|--:|--:|--:|--:|--:|--:|:-:|")
             n_pass = 0
             for e in g14:
@@ -1191,7 +1263,12 @@ def write_results_md(output_root: Path) -> None:
     if not s6.empty:
         w("## S6 — Weekly weekday/weekend rhythm")
         w("")
-        w("| source | source ratio | generated ratio | gap (log₁₀) |")
+        w("_Units — both ratios are dimensionless (sessions per weekday ÷ sessions "
+          "per weekend day), printed with `×`. `gap`: dex, i.e. "
+          "|log₁₀(source ratio) − log₁₀(generated ratio)|, so ≥ 0 and 0.06 dex ≈ a "
+          "15% multiplicative discrepancy._")
+        w("")
+        w("| source | source ratio (×) | generated ratio (×) | gap (dex, log₁₀) |")
         w("|---|--:|--:|--:|")
         for _, r in s6.iterrows():
             w(f"| {r['source']} | {f(r['source_weekly_ratio'], 2)}× | "
