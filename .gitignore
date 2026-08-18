@@ -61,3 +61,7 @@ showcase/decks/
 paper/
 main.*
 pdflatex*
+
+# Run logs from batch/campus generation (e.g. campus_base_run.log). In-tree logs
+# under data/output/ are already covered; this catches root-level run logs too.
+*.log
