@@ -68,3 +68,4 @@ showcase/decks/
 # Run logs from batch/campus generation (e.g. campus_base_run.log). In-tree logs
 # under data/output/ are already covered; this catches root-level run logs too.
 *.log
+configs/_campus_base_phi15_split/
