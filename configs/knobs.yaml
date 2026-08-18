@@ -150,18 +150,25 @@ user_behavior:
     description: "When true, each car's NON-FIRST session draws arrival_soc as prior_departure_soc − U[soc_chain_draw_min, soc_chain_draw_max] (in SoC fraction), clamped to the car's [min_allowed_soc, max_allowed_soc] band — so arrival SoC is strictly below the SoC the car departed with, and previous_day_external_use_soc lands in the draw band. First sessions (and default false) keep the calibrated per-region Beta arrival draw. Default false → existing scenarios byte-identical."
     affects_csv: [sessions.csv]
 
+  soc_chain_mode:
+    type: categorical
+    choices: [absolute, proportional]
+    default: absolute
+    description: "How the between-visit draw is applied when soc_chain_enforce is true. 'absolute' (legacy, bit-identical): next arrival = prev required − U(draw_min, draw_max) SoC FRACTION of the pack. 'proportional' (2026-08): next arrival = prev required − g × (SoC charged last visit), g ~ U(draw_min, draw_max) — usage scales with the energy the user requested, avoiding the min-SoC pile-up the absolute margin causes on small refills; arrival < prev departure whenever g > 0. Both modes hard-clamp into [min_allowed_soc, max_allowed_soc]."
+    affects_csv: [sessions.csv]
+
   soc_chain_draw_min:
     type: float
-    range: [0.0, 1.0]
+    range: [0.0, 3.0]
     default: 0.10
-    description: "Lower bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true. Must be <= soc_chain_draw_max."
+    description: "Lower bound of the between-visit chain draw (soc_chain_enforce true). Mode 'absolute': SoC fraction of the pack consumed. Mode 'proportional': usage factor g on the SoC charged last visit (E[g]≈1 keeps per-car SoC stationary; g>1 = drove more than the refill). Must be <= soc_chain_draw_max."
     affects_csv: [sessions.csv]
 
   soc_chain_draw_max:
     type: float
-    range: [0.0, 1.0]
+    range: [0.0, 3.0]
     default: 0.50
-    description: "Upper bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true."
+    description: "Upper bound of the between-visit chain draw (pairs with soc_chain_draw_min; same mode-dependent meaning)."
     affects_csv: [sessions.csv]
 
   dwell_clip_lo:

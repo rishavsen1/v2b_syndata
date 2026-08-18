@@ -13,13 +13,20 @@ tracked record of what they contain and how to regenerate them.
      source-faithful ceiling. ACN JPL "regular" chargers plug in ~53% of
      weekdays, so an unscaled 30-EV veryhigh building tops out at ~14 distinct
      users/day; 1.5 gives ~20. The scale is recorded in every unit's manifest.
-  2. `user_behavior.soc_chain_enforce: false` — arrival SoC is one i.i.d.
-     truncated Beta(2,3) prior per session (knobs
-     `user_behavior.arrival_soc_alpha/beta`) instead of the chained
-     prev-departure − U(10,50) draw. Design decision 2026-08-18: the chain
-     drew from a prior on unobservable between-visit consumption; workplace
-     drivers also charge at home, so day-to-day independence is defensible
-     and one model is simpler.
+  2. `user_behavior.soc_chain_enforce: true` + `soc_chain_mode: proportional`
+     + `soc_chain_draw_min/max: 0.75/1.35` — next arrival = prev departure −
+     g × (SoC charged last visit), g ~ U(0.75, 1.35). Design decision
+     2026-08-18 (superseding the earlier i.i.d. variant): usage scales with
+     the energy the user requested, so continuity arrival < prev departure
+     always holds, small refills are not over-drained onto the min-SoC floor
+     (the legacy absolute U(10,50) margin piles ~33% of arrivals there), and
+     E[g] slightly above 1 cancels the ceiling-truncation drift. First
+     sessions draw the truncated Beta(2,3) prior
+     (`user_behavior.arrival_soc_alpha/beta`). This makes the synthetic fleet
+     building-dependent BY CONSTRUCTION (energy in ≈ energy out at this
+     site) — a scenario choice, not a fidelity claim: the real JPL cohort
+     demonstrably charges elsewhere (98% of users receive less building
+     energy than their own stated driving consumes).
 - **Regenerate**:
   ```bash
   mkdir -p configs/_campus_base_phi15_split
@@ -31,7 +38,10 @@ tracked record of what they contain and how to regenerate them.
       for b in c["buildings"]:
           o = b.setdefault("overrides", {})
           o["user_behavior.phi_scale"] = 1.5
-          o["user_behavior.soc_chain_enforce"] = False
+          o["user_behavior.soc_chain_enforce"] = True
+          o["user_behavior.soc_chain_mode"] = "proportional"
+          o["user_behavior.soc_chain_draw_min"] = 0.75
+          o["user_behavior.soc_chain_draw_max"] = 1.35
       yaml.safe_dump(c, open(Path("configs/_campus_base_phi15_split") / Path(f).name, "w"),
                      sort_keys=False)
   PY
@@ -42,4 +52,5 @@ tracked record of what they contain and how to regenerate them.
   START=2024-01 END=2024-12 SAMPLES=200 NOISE=clean tools/campus/run_campus.sh 28
   ```
 - **Smoke evidence**: `docs/experiments/campus_base_smoke_overview.{png,csv}`
-  (energy KS 0.085, dwell 0.071, required-SoC 0.243, 20/20 units validated).
+  (energy KS 0.081, dwell 0.071, required-SoC 0.264, 0% of repeat arrivals
+  above the prior departure, 20/20 units validated).

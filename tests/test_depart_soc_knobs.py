@@ -87,3 +87,30 @@ def test_phi_scale_densifies_appearance(fast_generate):
     assert d > b * 1.3, f"phi_scale had insufficient effect: {b:.1f} -> {d:.1f}"
     u = pd.read_csv(dense / "users.csv")
     assert (u["phi"] <= 0.95 + 1e-9).all()
+
+
+def test_proportional_chain_continuity_and_band(fast_generate):
+    """soc_chain_mode=proportional: every non-first arrival sits strictly below
+    the prior departure requirement (g > 0), usage scales with the prior
+    charge, and the [min_allowed_soc, max_allowed_soc] band is never violated."""
+    import pandas as pd
+
+    out, _ = fast_generate(scenario="S_acn_jpl", seed=9,
+                           overrides={"ev_fleet.ev_count": 80,
+                                      "charging_infra.charger_count": 40,
+                                      "user_behavior.soc_chain_enforce": True,
+                                      "user_behavior.soc_chain_mode": "proportional",
+                                      "user_behavior.soc_chain_draw_min": 0.75,
+                                      "user_behavior.soc_chain_draw_max": 1.35})
+    s = pd.read_csv(out / "sessions.csv").sort_values(["car_id", "arrival"])
+    assert (s["arrival_soc"] >= 10.0 - 1e-9).all()
+    assert (s["arrival_soc"] <= 90.0 + 1e-9).all()
+    assert (s["required_soc_at_depart"] <= 90.0 + 1e-9).all()
+    prev_req = s.groupby("car_id")["required_soc_at_depart"].shift(1)
+    rep = s[prev_req.notna()]
+    # continuity: arrival strictly below prior departure requirement (or pinned
+    # at the min-SoC floor when g*charge would undershoot the band)
+    ok = (rep["arrival_soc"] < prev_req[prev_req.notna()] + 1e-9) | \
+         (rep["arrival_soc"] <= 10.0 + 1e-9)
+    assert ok.all(), f"{(~ok).sum()} arrivals above prior departure"
+    assert len(rep) > 50

@@ -162,6 +162,15 @@ def render(ctx: ScenarioContext) -> None:
     # strictly above car.min_allowed_soc (D6 floor > arrival >= min_allowed), so
     # the clamp preserves arrival < prior departure strictly.
     soc_chain = bool(ctx.knobs.get("user_behavior.soc_chain_enforce"))
+    # Chain mode (2026-08): "absolute" draws U(min,max) SoC POINTS below the
+    # prior departure (legacy, bit-identical default). "proportional" draws a
+    # usage factor g ~ U(min,max) and consumes g x the SoC actually CHARGED
+    # last session — usage scales with the energy the user requested, so small
+    # refills are not over-drained onto the min-SoC floor (the absolute mode
+    # piles ~33% of a month's arrivals there) and continuity
+    # arrival < prior departure holds whenever g > 0.
+    chain_mode = str(ctx.knobs.get("user_behavior.soc_chain_mode")) \
+        if ctx.knobs.has("user_behavior.soc_chain_mode") else "absolute"
     chain_lo_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_min")) * 100.0
     chain_hi_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_max")) * 100.0
     if soc_chain and chain_lo_pct > chain_hi_pct:
@@ -232,6 +241,7 @@ def render(ctx: ScenarioContext) -> None:
 
         prior_departure: pd.Timestamp | None = None
         prior_required_soc: float | None = None
+        prior_arrival_soc: float | None = None
 
         for day in days:
             rng = rng_for_car(ctx.seed, f"sessions:{day.date().isoformat()}", car_id)
@@ -311,8 +321,16 @@ def render(ctx: ScenarioContext) -> None:
                 #    the prior departure minus a uniform external-use draw
                 #    (exactly ONE rng draw, mirroring the Beta path's draw count).
                 if soc_chain and prior_required_soc is not None:
-                    draw_pct = float(rng.uniform(chain_lo_pct, chain_hi_pct))
-                    a_soc_pct = prior_required_soc - draw_pct
+                    if chain_mode == "proportional":
+                        # g x (SoC charged last visit); one uniform, like absolute.
+                        g = float(rng.uniform(chain_lo_pct, chain_hi_pct)) / 100.0
+                        charged_pts = max(0.0, prior_required_soc - (prior_arrival_soc or 0.0))
+                        a_soc_pct = prior_required_soc - g * charged_pts
+                    else:
+                        draw_pct = float(rng.uniform(chain_lo_pct, chain_hi_pct))
+                        a_soc_pct = prior_required_soc - draw_pct
+                    # Hard band: the car's [min_allowed_soc, max_allowed_soc]
+                    # is never violated in either mode.
                     a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
                 else:
                     # TRUNCATED Beta draw on the car's allowed band (2026-08).
@@ -411,6 +429,7 @@ def render(ctx: ScenarioContext) -> None:
             sid += 1
             prior_departure = departure_ts
             prior_required_soc = required_soc
+            prior_arrival_soc = arrival_soc
 
     df = pd.DataFrame(rows, columns=_COLUMNS) if rows else pd.DataFrame(columns=_COLUMNS)
     ctx.rendered["sessions.csv"] = df
