@@ -445,12 +445,12 @@ def _unit_config(
            "building_load.weather_temp_offset_c" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization")
             spec.overrides["building_load.weather_temp_offset_c"] = \
-                round(float(rng.normal(0.0, sigma_c)), 4)
+                round(float(np.clip(rng.normal(0.0, sigma_c), -15.0, 15.0)), 4)
         if dewpoint_sigma > 0.0 and \
            "building_load.weather_dewpoint_offset_c" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization_dewpoint")
             spec.overrides["building_load.weather_dewpoint_offset_c"] = \
-                round(float(rng.normal(0.0, dewpoint_sigma)), 4)
+                round(float(np.clip(rng.normal(0.0, dewpoint_sigma), -15.0, 15.0)), 4)
         if solar_sigma > 0.0 and \
            "building_load.weather_solar_scale" not in spec.overrides:
             rng = rng_for_node(spec.seed, "weather_realization_solar")
