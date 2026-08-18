@@ -8,7 +8,6 @@ absent.
 from __future__ import annotations
 
 import importlib.util
-import shutil
 import sys
 from pathlib import Path
 
@@ -283,7 +282,14 @@ def test_s5_reference_size_mapping():
 
 @pytest.mark.real_energyplus
 def test_generate_generator_load_real_ep():
-    if shutil.which("energyplus") is None and not Path("/usr/local/bin/energyplus").exists():
+    # Use the project's own discovery, not just PATH + /usr/local/bin: tools/setup.sh
+    # installs EnergyPlus user-locally (~/opt/EnergyPlus-*), so the narrower check
+    # skipped this test on the documented setup and `-m real_energyplus` looked green
+    # while never exercising a real EnergyPlus run.
+    from v2b_syndata.load_pipeline.ep_runner import EnergyPlusBinaryNotFound, discover_energyplus
+    try:
+        discover_energyplus()
+    except EnergyPlusBinaryNotFound:
         pytest.skip("EnergyPlus binary not available")
     # Short 8-day window to keep it cheap.
     s = vbl.generate_generator_load(
