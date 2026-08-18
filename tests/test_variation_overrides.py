@@ -8,12 +8,12 @@ from datetime import date, datetime
 import pandas as pd
 import pytest
 
-from v2b_syndata.knob_loader import (
+from v2b_syndata.config.knob_loader import (
     KnobValidationError,
     load_knob_registry,
     resolve_knobs,
 )
-from v2b_syndata.validate import validate
+from v2b_syndata.output.validate import validate
 
 
 @pytest.mark.parametrize("ev_count", [1, 200])

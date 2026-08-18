@@ -12,14 +12,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata import export_optimus as exp
-from v2b_syndata.multi_building import (
+from v2b_syndata.drivers.multi_building import (
     BuildingSpec,
     MultiConfig,
     generate_multi,
     generate_multi_batch,
     regenerate_from_config,
 )
+from v2b_syndata.output import export_optimus as exp
 
 _FAST = {
     "sim_window.mode": "custom",

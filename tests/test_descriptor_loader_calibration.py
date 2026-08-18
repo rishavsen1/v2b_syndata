@@ -10,8 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from v2b_syndata.descriptor_loader import expand_descriptors
-
+from v2b_syndata.config.descriptor_loader import expand_descriptors
 
 _BASE_LIBS = {
     "locations.yaml": """
@@ -155,7 +154,7 @@ def test_metadata_fields_filtered_from_expansion(tmp_path):
 
 def test_calibrated_leaves_only_in_dist_param_ranges(tmp_path):
     """Every emitted region_distributions key has trailing leaf in DIST_PARAM_RANGES."""
-    from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+    from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
     cfg = _write_libs(tmp_path, _POP_FULLY_CALIBRATED)
     out = expand_descriptors(_descriptors(), cfg)
     for k in out:

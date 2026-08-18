@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..seeding import rng_for_car, rng_for_node
-from ..types import FleetAttrs, ScenarioContext, UserAttrs
+from ..core.seeding import rng_for_car, rng_for_node
+from ..core.types import FleetAttrs, ScenarioContext, UserAttrs
 
 # Above this threshold the Dirichlet draw is skipped entirely (no RNG
 # consumption) so the default-alpha path preserves bitwise reproducibility

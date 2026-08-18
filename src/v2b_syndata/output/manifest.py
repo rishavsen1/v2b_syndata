@@ -8,8 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from . import __version__
-from .types import ResolvedKnobs
+from .. import __version__
+from ..core.types import ResolvedKnobs
 
 CSV_NAMES = [
     "building_load",

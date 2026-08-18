@@ -114,7 +114,7 @@ case-by-case (probe per knob at max; classify the exact invariant that fires).
 shift on arrival can land past the (unchanged) departure timestamp →
 `new_arrival > departure` → negative duration_sec.
 
-**Source code:** `src/v2b_syndata/noise.py:64-70` shifts only arrival,
+**Source code:** `src/v2b_syndata/output/noise.py:64-70` shifts only arrival,
 keeps departure fixed, recomputes `duration_sec = departure − new_arrival`.
 No bound on `shifts_sec` versus current `duration_sec`.
 
@@ -144,7 +144,7 @@ arrival_soc additively. When jittered up past required_soc, D6 fires
 required > arrival violated). When jittered down hard, the resulting
 energy need exceeds time × rate, D5 fires.
 
-**Source code:** `src/v2b_syndata/noise.py:71-78`. B3 fix clamps to per-car
+**Source code:** `src/v2b_syndata/output/noise.py:71-78`. B3 fix clamps to per-car
 `[min_allowed_soc, max_allowed_soc]` but does NOT re-clip against
 per-session `required_soc_at_depart`.
 

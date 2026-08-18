@@ -75,7 +75,7 @@ def test_docs_gen_subcommand_emits_full_reference(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     # Must contain every DIST_PARAM_RANGES leaf
-    from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+    from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
     for leaf in DIST_PARAM_RANGES:
         assert leaf in out, f"missing leaf {leaf}"
     # Source-category section
@@ -88,7 +88,7 @@ def test_docs_gen_includes_all_registry_knobs(tmp_path, capsys):
     src_cfg = Path(__file__).resolve().parent.parent / "configs"
     rc = main(["--config-dir", str(src_cfg), "docs-gen"])
     out = capsys.readouterr().out
-    from v2b_syndata.knob_loader import all_knob_paths, load_knob_registry
+    from v2b_syndata.config.knob_loader import all_knob_paths, load_knob_registry
     reg = load_knob_registry(src_cfg / "knobs.yaml")
     for path in all_knob_paths(reg):
         assert path in out, f"missing knob {path}"

@@ -197,7 +197,7 @@ def api_knobs():
 def api_der_catalog():
     """PV + battery preset catalog (ratings, specs, labels) for the UI info
     popovers + filling the advanced dials when a preset is chosen."""
-    from v2b_syndata.der_catalog import catalog_summary
+    from v2b_syndata.config.der_catalog import catalog_summary
     return jsonify(catalog_summary())
 
 
@@ -402,8 +402,8 @@ def api_resolve():
     uses this to display descriptor-resolved values instead of the
     knobs.yaml defaults.
     """
-    from v2b_syndata.descriptor_loader import expand_descriptors, load_scenario
-    from v2b_syndata.knob_loader import load_knob_registry, resolve_knobs
+    from v2b_syndata.config.descriptor_loader import expand_descriptors, load_scenario
+    from v2b_syndata.config.knob_loader import load_knob_registry, resolve_knobs
 
     payload = request.get_json(force=True, silent=True) or {}
     base_scenario = payload.get("base_scenario", "S01")

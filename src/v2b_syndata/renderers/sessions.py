@@ -34,8 +34,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from ..seeding import rng_for_car
-from ..types import ScenarioContext
+from ..core.seeding import rng_for_car
+from ..core.types import ScenarioContext
 
 logger = logging.getLogger(__name__)
 

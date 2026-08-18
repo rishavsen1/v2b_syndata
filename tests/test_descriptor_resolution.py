@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from v2b_syndata.descriptor_loader import expand_descriptors
+from v2b_syndata.config.descriptor_loader import expand_descriptors
 
 
 def test_all_four_descriptors_resolve(config_dir):

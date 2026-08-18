@@ -50,7 +50,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
-from v2b_syndata.der_catalog import MODULE_PARAMS  # noqa: E402
+from v2b_syndata.config.der_catalog import MODULE_PARAMS  # noqa: E402
 from v2b_syndata.load_pipeline import weather as weather_mod  # noqa: E402
 from v2b_syndata.load_pipeline.pv_model import pv_ac_series  # noqa: E402
 

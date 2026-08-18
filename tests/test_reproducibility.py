@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
 
 
 def _sha(p: Path) -> str:

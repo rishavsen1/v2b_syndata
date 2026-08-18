@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from v2b_syndata.samplers.sessions_dist import sample_f_arr, sample_f_dwell, sample_f_soc
-from v2b_syndata.types import (
+from v2b_syndata.core.types import (
     FleetAttrs,
     KnobValue,
     ResolvedKnobs,
@@ -17,6 +16,7 @@ from v2b_syndata.types import (
     ScenarioContext,
     UserAttrs,
 )
+from v2b_syndata.samplers.sessions_dist import sample_f_arr, sample_f_dwell, sample_f_soc
 
 
 def _build_ctx(region_distributions: dict) -> ScenarioContext:
@@ -176,7 +176,7 @@ def test_override_on_calibrated_leaf_manifest_stamp(tmp_path: Path):
             "  noise: clean\n"
         )
         try:
-            from v2b_syndata.runner import generate
+            from v2b_syndata.core.runner import generate
             out_dir = tmp_path / "out"
             manifest = generate(
                 scenario_id="audit_acn", seed=42,

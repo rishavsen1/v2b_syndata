@@ -142,7 +142,7 @@ Same seed + same deep override → identical CSV SHA256s across all 7 files.
 ### A7. Out-of-range rejection
 
 ```
-v2b_syndata.knob_loader.KnobValidationError:
+v2b_syndata.config.knob_loader.KnobValidationError:
     user_behavior.region_distributions.stable_commuter.dwell.lambda:
     999.0 outside range [0.01, 24.0]
 OK: error names value

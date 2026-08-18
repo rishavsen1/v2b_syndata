@@ -160,7 +160,7 @@ Generating commands: `uv run python tools/paper/tstr_forecasting.py --real acn -
 |---|---|---|
 | benchmark scenario configurations | 60 | `ls configs/scenarios/*.yaml \| wc -l` |
 | typed knobs in the registry | 69 | `configs/knobs.yaml` (leaf specs with a `type`) |
-| validation invariants | 59 in 9 families (A–I) | distinct `<letter><n>:` codes in `src/v2b_syndata/validate.py` |
+| validation invariants | 59 in 9 families (A–I) | distinct `<letter><n>:` codes in `src/v2b_syndata/output/validate.py` |
 | reference corpus | 10 buildings × 12 months × 150 samples = 18,000 units | `data/output/campus10/*/batch_manifest.json` |
 | corpus generation outcome | 18,000 succeeded / 0 failed; 0 hard validation errors; 11,920 units carry soft advisories | batch manifests (validation summaries) |
 | corpus size on disk | 18.2 GiB | `du -sb data/output/campus10` |

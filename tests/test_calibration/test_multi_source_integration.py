@@ -23,7 +23,7 @@ from v2b_syndata.calibration.sources import (
     InlSource,
 )
 from v2b_syndata.cli import main
-from v2b_syndata.descriptor_loader import expand_descriptors
+from v2b_syndata.config.descriptor_loader import expand_descriptors
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO / "configs"

@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO_ROOT / "configs"
@@ -105,7 +105,7 @@ def test_dr_renderer_lambda_base_override_sensitivity(tmp_path: Path):
 @pytest.mark.real_energyplus
 def test_dr_renderer_invalid_program_rejected(tmp_path: Path):
     """Unsupported dr_program string must be rejected."""
-    from v2b_syndata.knob_loader import KnobValidationError
+    from v2b_syndata.config.knob_loader import KnobValidationError
     out = tmp_path / "bad"
     # dr_program is a categorical knob — knob_loader rejects unknown values before
     # reaching the renderer. Use the registry validation path.

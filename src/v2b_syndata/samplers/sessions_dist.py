@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..types import ScenarioContext
+from ..core.types import ScenarioContext
 
 
 def _region_dist(ctx: ScenarioContext, region: str, dist: str) -> dict[str, Any]:

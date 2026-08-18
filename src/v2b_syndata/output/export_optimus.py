@@ -22,7 +22,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from .load_pipeline import weather
+from ..load_pipeline import weather
 
 # Optimizer loaders read the first four with read_csv(index_col=0): they MUST
 # be written with a leading (unnamed) index column. sessions_soc.csv is not
@@ -272,7 +272,7 @@ def build_occupancy(
 ) -> pd.DataFrame:
     """Full-year hourly fractional occupancy via the same ASHRAE schedules the
     load pipeline uses (`samplers.load._build_occupancy_series`)."""
-    from .samplers.load import _build_occupancy_series
+    from ..samplers.load import _build_occupancy_series
 
     idx = pd.date_range(
         start=pd.Timestamp(year=year, month=1, day=1),

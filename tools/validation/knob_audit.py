@@ -160,7 +160,7 @@ def parse_deep_channel(populations_yaml: Path, region_source: str = "consent_def
     Deep params overlay session-distribution leaves per region; they affect
     sessions.csv only (NOT users.csv — user-level region label is fixed per car).
     """
-    from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+    from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
 
     with populations_yaml.open() as f:
         pops = yaml.safe_load(f)
@@ -905,7 +905,7 @@ def select_5_probes(spec: KnobSpec) -> list[tuple[str, Any]] | None:
     path = spec.path
 
     if spec.is_deep_channel:
-        from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+        from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
         leaf = ".".join(path.rsplit(".", 2)[-2:])
         lo, hi = DIST_PARAM_RANGES[leaf]
         # Weibull(k) collapses to a degenerate distribution near k=0 (most mass

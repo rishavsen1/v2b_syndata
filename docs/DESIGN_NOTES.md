@@ -3,7 +3,8 @@
 Implementation choices made where the spec was ambiguous. Each is reversible later.
 
 > The numbered sections below (1–31) are cited **by section number** from
-> source code (`validate.py`, `runner.py`, `prototypes.py`, `e5_metrics.py`)
+> source code (`output/validate.py`, `core/runner.py`,
+> `load_pipeline/prototypes.py`, `output/e5_metrics.py`)
 > — do not renumber. For the live backlog (open items, conventions, deferred
 > work) see [`PROJECT_TRACKER.md`](PROJECT_TRACKER.md).
 
@@ -31,7 +32,7 @@ that did not have a clean row-count derivation. Replaced with calendar-month
 windows so row counts are unambiguous and align with utility billing periods.
 
 To change the default month: edit `DEFAULT_SIM_START` in
-`src/v2b_syndata/runner.py`. To override at the CLI:
+`src/v2b_syndata/core/runner.py`. To override at the CLI:
 
 ```
 --override 'sim_window.mode=custom' \
@@ -428,7 +429,7 @@ post-noise and emits:
    `InfeasibilityError` (rc=2). CSVs + manifest are still written before
    the raise so the failed scenario stays inspectable.
 
-Implementation in `src/v2b_syndata/e5_metrics.py` (vectorized tick sweep
+Implementation in `src/v2b_syndata/output/e5_metrics.py` (vectorized tick sweep
 + `E5Report` dataclass + `InfeasibilityError`). Sampler architecture and
 D53 reproducibility unchanged — metrics derive from rendered output, not
 from the RNG path.
@@ -438,7 +439,7 @@ motivated this design.
 
 ## 31. noise.py C4 + D6 jitter bound fixes (V2-followup, applied)
 
-Both V2 bugs are now fixed in `src/v2b_syndata/noise.py`:
+Both V2 bugs are now fixed in `src/v2b_syndata/output/noise.py`:
 
 ### C4 — bidirectional arrival-jitter bound
 At top of `noise.py`:
@@ -588,7 +589,7 @@ couple per-car streams; the sampler stays per-car-independent.
 Per Step 7 V2-followup, generation now surfaces E5 infeasibility at
 generation time (before validation) via:
 
-- `src/v2b_syndata/e5_metrics.py::compute_concurrency()` — vectorized
+- `src/v2b_syndata/output/e5_metrics.py::compute_concurrency()` — vectorized
   15-min tick sweep over rendered sessions.
 - `runner.generate()` writes `manifest["e5"]` with fields
   `{realized_max_concurrent, n_chargers, infeasible, infeasible_tick_count,
@@ -773,4 +774,4 @@ Key decisions:
 - **Per-building** in single (`pv.*`/`battery.*` overrides), batch, and
   multi-building (`BuildingSpec.overrides`); the optimus export adds `building_id`
   + energy columns, mirroring `build_building_load`/`build_cars`. Presets
-  (ratings/sizes) live in `src/v2b_syndata/der_catalog.py`.
+  (ratings/sizes) live in `src/v2b_syndata/config/der_catalog.py`.

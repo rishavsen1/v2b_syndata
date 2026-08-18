@@ -449,7 +449,7 @@ noise:
 # zeros and pv.csv carries zero capacity (no EnergyPlus/EPW read), preserving
 # the clean-profile bitwise contract. The PV generation curve is a deterministic
 # PVWatts-style function of the SAME (perturbed) EPW weather EnergyPlus consumed
-# for the building load. Presets in src/v2b_syndata/der_catalog.py.
+# for the building load. Presets in src/v2b_syndata/config/der_catalog.py.
 # ──────────────────────────────────────────────────────────────────────────
 pv:
 

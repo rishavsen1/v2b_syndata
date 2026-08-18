@@ -267,7 +267,7 @@ def test_month_starts_tiling():
 
 
 def _fake_generate_factory(calls: list[dict]):
-    """A stand-in for v2b_syndata.runner.generate that records its call args
+    """A stand-in for v2b_syndata.core.runner.generate that records its call args
     and writes a minimal per-month sessions.csv/cars.csv (2 sessions)."""
     def fake_generate(*, scenario_id, seed, output_dir, config_dir,
                       cli_overrides=None, **kw):
@@ -301,7 +301,7 @@ def test_generate_cohort_single_month_default_path(tmp_path, monkeypatch):
     """months=1, no overrides => exactly one generate() call with
     cli_overrides=None and NO sim_window.start injection (the byte-identical
     historical path)."""
-    import v2b_syndata.runner as runner
+    import v2b_syndata.core.runner as runner
     calls: list[dict] = []
     monkeypatch.setattr(runner, "generate", _fake_generate_factory(calls))
     sessions, stamp = tstr.generate_synthetic_cohort(
@@ -320,7 +320,7 @@ def test_generate_cohort_multi_month_consecutive_and_overrides(tmp_path, monkeyp
     injected start), months 1..2 advance sim_window.start by one calendar
     month; the knob overrides are forwarded to EVERY call; sessions
     concatenate across months."""
-    import v2b_syndata.runner as runner
+    import v2b_syndata.core.runner as runner
     calls: list[dict] = []
     monkeypatch.setattr(runner, "generate", _fake_generate_factory(calls))
     sessions, stamp = tstr.generate_synthetic_cohort(

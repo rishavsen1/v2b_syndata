@@ -4,7 +4,7 @@
 Two-part check:
 
 1. **Data generation correctness** — for each generated scenario_dir:
-   - Hard validators (D5/D6/C4 etc.) via v2b_syndata.validate
+   - Hard validators (D5/D6/C4 etc.) via v2b_syndata.output.validate
    - Schema sanity: row counts match knob values (ev_count, charger_count)
    - Manifest e5 block matches realized concurrency
    - SoC distributions within [min_allowed, max_allowed]
@@ -32,7 +32,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
-from v2b_syndata.validate import validate  # noqa: E402
+from v2b_syndata.output.validate import validate  # noqa: E402
 
 
 # ──────────────────────────────────────────────────────────────────────

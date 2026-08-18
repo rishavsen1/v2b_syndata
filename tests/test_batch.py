@@ -21,7 +21,7 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def test_months_between():
-    from v2b_syndata.batch import _months_between
+    from v2b_syndata.drivers.batch import _months_between
     out = _months_between("2024-04", "2024-06")
     assert [lbl for lbl, _ in out] == ["APR2024", "MAY2024", "JUN2024"]
 

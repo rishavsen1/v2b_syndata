@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from v2b_syndata.knob_loader import (
+from v2b_syndata.config.knob_loader import (
     KnobValidationError,
     load_knob_registry,
     parse_overrides,
@@ -195,7 +195,7 @@ def test_check_type_and_range_rejects_malformed(config_dir, knob_path, bad_value
 
 def test_deep_channel_rejects_non_numeric():
     """Deep-override values must be numeric."""
-    from v2b_syndata.knob_loader import _check_deep_range
+    from v2b_syndata.config.knob_loader import _check_deep_range
     with pytest.raises(KnobValidationError, match="numeric"):
         _check_deep_range(
             "user_behavior.region_distributions.stable_commuter.dwell.lambda",
@@ -204,7 +204,7 @@ def test_deep_channel_rejects_non_numeric():
 
 
 def test_deep_channel_rejects_unknown_leaf():
-    from v2b_syndata.knob_loader import _check_deep_range
+    from v2b_syndata.config.knob_loader import _check_deep_range
     with pytest.raises(KnobValidationError, match="not in"):
         _check_deep_range(
             "user_behavior.region_distributions.stable_commuter.unknown.param",
@@ -213,7 +213,7 @@ def test_deep_channel_rejects_unknown_leaf():
 
 
 def test_deep_channel_rejects_out_of_range():
-    from v2b_syndata.knob_loader import _check_deep_range
+    from v2b_syndata.config.knob_loader import _check_deep_range
     with pytest.raises(KnobValidationError, match="outside range"):
         _check_deep_range(
             "user_behavior.region_distributions.stable_commuter.dwell.lambda",

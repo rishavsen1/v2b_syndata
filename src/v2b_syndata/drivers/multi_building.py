@@ -36,12 +36,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from . import __version__
-from . import export_optimus as exp
+from .. import __version__
+from ..core.runner import generate
+from ..core.seeding import rng_for_node
+from ..output import export_optimus as exp
+from ..output.manifest import CSV_NAMES, _git_sha
 from .batch import BatchResult, _months_between, _record_result, _write_manifest
-from .manifest import CSV_NAMES, _git_sha
-from .runner import generate
-from .seeding import rng_for_node
 
 # Optimus per-building files (order is the on-disk write order).
 _PER_BUILDING_FILES = [
@@ -519,7 +519,7 @@ def generate_multi_batch(
     # wind): each building's own weather_profile wins, else the batch-default
     # `weather_profile`. An explicit weather_sigma_c / weather_solar_sigma (> 0)
     # overrides the resolved temp/solar σ for every building (power-user knob).
-    from .descriptor_loader import load_weather_profile
+    from ..config.descriptor_loader import load_weather_profile
     per_building_sigma: list[tuple[float, float, float, float]] = []
     for spec in cfg.buildings:
         wx = load_weather_profile(Path(config_dir), spec.weather_profile or weather_profile)

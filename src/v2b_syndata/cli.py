@@ -8,10 +8,10 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-from .e5_metrics import InfeasibilityError
-from .knob_loader import all_knob_paths, load_knob_registry, parse_overrides
-from .runner import generate
-from .validate import validate
+from .config.knob_loader import all_knob_paths, load_knob_registry, parse_overrides
+from .core.runner import generate
+from .output.e5_metrics import InfeasibilityError
+from .output.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_CONFIG_DIR = REPO_ROOT / "configs"
@@ -229,7 +229,7 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
     """
     import json as _json
 
-    from .multi_building import (
+    from .drivers.multi_building import (
         config_from_dict,
         generate_multi,
         generate_multi_batch,
@@ -305,7 +305,7 @@ def cmd_generate_multi(args: argparse.Namespace) -> int:
 
 
 def cmd_batch(args: argparse.Namespace) -> int:
-    from .batch import run_batch
+    from .drivers.batch import run_batch
     extra: dict[str, object] = {}
     for s in (args.override or []):
         if "=" not in s:
@@ -378,7 +378,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
 
 def cmd_docs_gen(args: argparse.Namespace) -> int:
     """Emit the auto-generated section of docs/KNOB_REFERENCE.md to stdout."""
-    from .knob_loader import (
+    from .config.knob_loader import (
         DEEP_OVERRIDE_PREFIXES,
         DIST_PARAM_RANGES,
         all_knob_paths,

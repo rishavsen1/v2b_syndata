@@ -7,8 +7,7 @@ work.
 """
 from __future__ import annotations
 
-from ..types import ResolvedKnobs, RootBundle, ScenarioContext
-
+from ..core.types import ResolvedKnobs, RootBundle, ScenarioContext
 
 _REGION_DIST_PREFIX = "user_behavior.region_distributions."
 

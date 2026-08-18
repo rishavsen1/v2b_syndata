@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from v2b_syndata.validate import validate
+from v2b_syndata.output.validate import validate
 
 
 def test_validate_empty_dir_reports_missing_csvs(tmp_path: Path):

@@ -5,7 +5,7 @@ generation needed.
 """
 from __future__ import annotations
 
-from v2b_syndata.validate import (
+from v2b_syndata.output.validate import (
     ValidationReport,
     _check_g5_calibration_consistency,
     _check_i,

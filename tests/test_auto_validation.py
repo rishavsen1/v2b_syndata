@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from v2b_syndata.validate import ValidationError, ValidationReport, validate
+from v2b_syndata.output.validate import ValidationError, ValidationReport, validate
 
 # ── 1. manifest always carries a validation block ────────────────────────────
 
@@ -148,7 +148,7 @@ def test_d5_strict_passes_when_need_within_avail(tmp_path):
 def test_strict_validate_raises_on_error(monkeypatch, fast_generate, tmp_path):
     """strict_validate=True raises ValidationError when validate finds errors,
     but only AFTER writing the manifest (so the failure is still recorded)."""
-    from v2b_syndata import runner
+    from v2b_syndata.core import runner
 
     # Force validate() to report an error regardless of the real output.
     def _fake_validate(output_dir, strict=False):  # noqa: ARG001
@@ -158,7 +158,7 @@ def test_strict_validate_raises_on_error(monkeypatch, fast_generate, tmp_path):
 
     monkeypatch.setattr(runner, "validate", _fake_validate, raising=False)
     # Patch the lazily-imported symbol in the validate module namespace too.
-    import v2b_syndata.validate as vmod
+    import v2b_syndata.output.validate as vmod
     monkeypatch.setattr(vmod, "validate", _fake_validate)
 
     out = tmp_path / "strict_out"
@@ -186,7 +186,7 @@ def test_strict_validate_raises_on_error(monkeypatch, fast_generate, tmp_path):
 
 def test_validation_summary_helper_rolls_up():
     """Unit-test the aggregation helper directly (no generation needed)."""
-    from v2b_syndata.multi_building import _validation_summary
+    from v2b_syndata.drivers.multi_building import _validation_summary
 
     manifests: list[dict[str, Any]] = [
         {"validation": {"passed": True, "n_errors": 0, "errors": []}},

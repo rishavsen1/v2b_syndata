@@ -17,7 +17,7 @@ Headline = the TSTR-vs-TRTR gap on real held-out data.
 Pipeline
 --------
 1. Build an aggregate charging-load series (kW per hour, or 15-min) from:
-   (a) a GENERATED synthetic cohort (`v2b_syndata.runner.generate` on a
+   (a) a GENERATED synthetic cohort (`v2b_syndata.core.runner.generate` on a
        calibrated scenario, default S_acn_caltech), and
    (b) the REAL ACN / ElaadNL sessions (production source loaders).
 2. Sessions -> load by spreading each session's delivered energy uniformly
@@ -224,7 +224,7 @@ def _base_sim_start(scenario_id: str, overrides: dict[str, Any]) -> pd.Timestamp
     raw = (scn.get("overrides") or {}).get("sim_window.start")
     if raw is not None:
         return pd.Timestamp(raw)
-    from v2b_syndata.runner import DEFAULT_SIM_START
+    from v2b_syndata.core.runner import DEFAULT_SIM_START
 
     return pd.Timestamp(DEFAULT_SIM_START)
 
@@ -276,7 +276,7 @@ def generate_synthetic_cohort(
 
     Returns (sessions, generator_stamp).
     """
-    from v2b_syndata.runner import generate
+    from v2b_syndata.core.runner import generate
 
     overrides = dict(overrides or {})
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -639,7 +639,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     knob_overrides: dict[str, Any] = {}
     if args.override:
-        from v2b_syndata.knob_loader import parse_overrides
+        from v2b_syndata.config.knob_loader import parse_overrides
         knob_overrides = parse_overrides(args.override)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)

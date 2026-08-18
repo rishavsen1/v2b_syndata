@@ -138,9 +138,9 @@ The `--allow-local-files` flag is required because slides reference figures unde
 From the repo root:
 
 ```bash
-python -m v2b_syndata.runner --scenario configs/scenarios/S01_baseline.yaml --out showcase/data/example_scenarios/S01_baseline
-python -m v2b_syndata.runner --scenario configs/scenarios/S_clim_miami_summer.yaml --out showcase/data/example_scenarios/S_clim_miami_summer
-python -m v2b_syndata.runner --scenario configs/scenarios/S_eq_bi.yaml --out showcase/data/example_scenarios/S_eq_bi
+python -m v2b_syndata.cli generate --scenario S01 --seed 42 --output-dir showcase/data/example_scenarios/S01_baseline
+python -m v2b_syndata.cli generate --scenario S_clim_miami_summer --seed 42 --output-dir showcase/data/example_scenarios/S_clim_miami_summer
+python -m v2b_syndata.cli generate --scenario S_eq_bi --seed 42 --output-dir showcase/data/example_scenarios/S_eq_bi
 ```
 
 Each command emits the seven CSVs plus `manifest.json` into the target directory. Identical seeds reproduce identical outputs (verified by V4).

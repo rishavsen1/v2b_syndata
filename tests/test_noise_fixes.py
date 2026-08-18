@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
 
 REPO = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO / "configs"
@@ -66,7 +66,7 @@ def test_soc_jitter_preserves_d6(tmp_path: Path):
 
 def test_validate_passes_under_max_arrival_jitter(tmp_path: Path):
     """C4 fix must propagate through to validate() passing."""
-    from v2b_syndata.validate import validate
+    from v2b_syndata.output.validate import validate
     out = _gen(tmp_path, {"noise.arrival_time_jitter_min": 60.0})
     rep = validate(out, strict=False)
     # C4 and C6 must pass; D5 may still flag (arrival shift changes overlap/energy budget).
@@ -76,7 +76,7 @@ def test_validate_passes_under_max_arrival_jitter(tmp_path: Path):
 
 def test_validate_passes_under_max_soc_jitter(tmp_path: Path):
     """D6 fix must propagate through to validate() passing."""
-    from v2b_syndata.validate import validate
+    from v2b_syndata.output.validate import validate
     out = _gen(tmp_path, {"noise.soc_arrival_jitter_pct": 0.30})
     rep = validate(out, strict=False)
     d6 = [e for e in rep.errors if e.startswith("D6")]

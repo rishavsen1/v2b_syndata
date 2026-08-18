@@ -15,8 +15,8 @@ from typing import Any
 
 import pandas as pd
 
-from .renderers.dr_events import _NOTIF_LEAD_HOURS
-from .samplers.dr_sampler import PROGRAM_SPECS
+from ..renderers.dr_events import _NOTIF_LEAD_HOURS
+from ..samplers.dr_sampler import PROGRAM_SPECS
 
 # Schema reference — column name → expected dtype family.
 # Order is not enforced (per A2) but we validate columns are exactly these.
@@ -520,8 +520,9 @@ def _check_i(rep: ValidationReport, output_dir: Path) -> dict[str, Any]:
             rep.add(h.hexdigest() == expected, f"I3: {name}.csv sha256 mismatch")
     # I4 every knob present in resolution with valid source
     res = manifest.get("knob_resolution", {})
-    knob_path = Path(__file__).parent.parent.parent / "configs" / "knobs.yaml"
-    from .knob_loader import (
+    # output/validate.py -> v2b_syndata -> src -> repo root (cf. load_pipeline.cache)
+    knob_path = Path(__file__).resolve().parents[3] / "configs" / "knobs.yaml"
+    from ..config.knob_loader import (
         DIST_PARAM_RANGES,
         _match_deep_prefix,
         all_knob_paths,
@@ -584,7 +585,7 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
     if not res:
         return
     alpha_w1, alpha_w2 = res.get("user_behavior.w_multiplier", {"value": [1.0, 1.0]})["value"]
-    from .samplers.per_entity import CONSENT_CLUSTERS
+    from ..samplers.per_entity import CONSENT_CLUSTERS
     for ntype, params in CONSENT_CLUSTERS.items():
         sub = users[users["negotiation_type"] == ntype]
         if len(sub) == 0:
@@ -604,7 +605,7 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
     # F4: negotiation_type shares
     neg_mix = res.get("user_behavior.negotiation_mix", {}).get("value")
     if neg_mix:
-        from .samplers.per_entity import NEG_TYPES
+        from ..samplers.per_entity import NEG_TYPES
         n = len(users)
         for nt, expected in zip(NEG_TYPES, neg_mix, strict=True):
             actual = float((users["negotiation_type"] == nt).sum()) / n

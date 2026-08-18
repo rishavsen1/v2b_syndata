@@ -1345,7 +1345,7 @@ def step_collect(args) -> None:
       "`configs/knobs.yaml` (leaf specs with a `type`) |")
     w(f"| validation invariants | {inv['n_invariants']} in "
       f"{inv['n_invariant_families']} families (A–I) | distinct "
-      "`<letter><n>:` codes in `src/v2b_syndata/validate.py` |")
+      "`<letter><n>:` codes in `src/v2b_syndata/output/validate.py` |")
     w(f"| reference corpus | {campus['n_buildings']} buildings × "
       f"{campus['n_months']} months × {campus['samples_per_month']} samples = "
       f"{campus['n_total']:,} units | `data/output/campus10/*/batch_manifest.json` |")

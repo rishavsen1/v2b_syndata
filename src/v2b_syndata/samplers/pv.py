@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..der_catalog import resolve_pv
+from ..config.der_catalog import resolve_pv
+from ..core.types import ScenarioContext
 from ..load_pipeline import weather as weather_mod
 from ..load_pipeline.pv_model import pv_ac_series
-from ..types import ScenarioContext
 
 
 def pv_spec_from_ctx(ctx: ScenarioContext) -> dict:

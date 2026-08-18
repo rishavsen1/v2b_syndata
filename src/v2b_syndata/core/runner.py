@@ -15,24 +15,24 @@ from typing import Any
 
 import pandas as pd
 
-from . import noise as noise_mod
+from ..config.descriptor_loader import expand_descriptors, load_scenario
+from ..config.knob_loader import _normalize, load_knob_registry, resolve_knobs
+from ..output import noise as noise_mod
+from ..output.e5_metrics import InfeasibilityError, compute_concurrency
+from ..output.manifest import CSV_NAMES, write_manifest
+from ..renderers import battery as r_battery
+from ..renderers import building_load as r_building_load
+from ..renderers import cars as r_cars
+from ..renderers import chargers as r_chargers
+from ..renderers import dr_events as r_dr
+from ..renderers import grid_prices as r_grid
+from ..renderers import pv as r_pv
+from ..renderers import sessions as r_sessions
+from ..renderers import users as r_users
+from ..samplers import exogenous, per_entity, sessions_dist
+from ..samplers import load as load_sampler
+from ..samplers import pv as pv_sampler
 from .dag import SamplerRegistry, build_graph
-from .descriptor_loader import expand_descriptors, load_scenario
-from .e5_metrics import InfeasibilityError, compute_concurrency
-from .knob_loader import _normalize, load_knob_registry, resolve_knobs
-from .manifest import CSV_NAMES, write_manifest
-from .renderers import battery as r_battery
-from .renderers import building_load as r_building_load
-from .renderers import cars as r_cars
-from .renderers import chargers as r_chargers
-from .renderers import dr_events as r_dr
-from .renderers import grid_prices as r_grid
-from .renderers import pv as r_pv
-from .renderers import sessions as r_sessions
-from .renderers import users as r_users
-from .samplers import exogenous, per_entity, sessions_dist
-from .samplers import load as load_sampler
-from .samplers import pv as pv_sampler
 from .types import ResolvedKnobs, ScenarioContext
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ def generate(
     # callers/UI can surface failures. For NOISY runs some invariants (D5/H2)
     # can fail by the documented noise contract; `noise_applied` records whether
     # any jitter knob was non-zero so callers can note that nuance.
-    from .validate import ValidationError, validate  # lazy import — breaks the cycle
+    from ..output.validate import ValidationError, validate  # lazy import — breaks the cycle
 
     report = validate(output_dir, strict=False)
     noise_applied = any(v != 0 for v in ctx.noise.values())

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ..core.types import ScenarioContext
 from ..samplers.pv import pv_spec_from_ctx
-from ..types import ScenarioContext
 
 PV_SPEC_COLUMNS = [
     "pv_id", "pv_type", "dc_capacity_kw", "ac_capacity_kw", "dc_ac_ratio",

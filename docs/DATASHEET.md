@@ -51,7 +51,7 @@ See the paper's acknowledgements (not encoded in this repository).
 **What do the instances represent, and what files exist?**
 A generated *dataset instance* is one scenario-seed directory of CSVs plus a
 provenance manifest. There are several instance types, one per file
-(`README.md`, "Outputs"; schema enforced by `src/v2b_syndata/validate.py`
+(`README.md`, "Outputs"; schema enforced by `src/v2b_syndata/output/validate.py`
 `_SCHEMAS`):
 
 | file | instance = one… | columns |

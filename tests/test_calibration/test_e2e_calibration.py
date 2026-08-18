@@ -161,8 +161,9 @@ def test_e2e_calibration_writeback_preserves_region_bounds_and_other_blocks(
 
 
 def test_e2e_calibration_metadata_block_format(populated_cache, tmp_populations_yaml, tmp_path):
-    from v2b_syndata.calibration import calibrate_populations
     import re
+
+    from v2b_syndata.calibration import calibrate_populations
 
     calibrate_populations(
         populations_yaml_path=tmp_populations_yaml,

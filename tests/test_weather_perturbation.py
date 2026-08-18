@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from v2b_syndata.core.runner import generate
 from v2b_syndata.load_pipeline import weather
-from v2b_syndata.runner import generate
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "configs"
 
@@ -114,7 +114,7 @@ def test_epw_perturb_matches_frame_perturb(tmp_path):
 # ── weather perturbation profiles ─────────────────────────────────────────────
 
 def test_weather_profile_loader():
-    from v2b_syndata.descriptor_loader import load_weather_profile
+    from v2b_syndata.config.descriptor_loader import load_weather_profile
     assert load_weather_profile(CONFIG_DIR, "none") == {
         "temp_sigma_c": 0.0, "solar_sigma": 0.0, "dewpoint_sigma_c": 0.0, "wind_sigma": 0.0}
     mod = load_weather_profile(CONFIG_DIR, "moderate")

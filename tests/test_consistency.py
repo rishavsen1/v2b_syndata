@@ -10,8 +10,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata.runner import generate
-from v2b_syndata.validate import validate
+from v2b_syndata.core.runner import generate
+from v2b_syndata.output.validate import validate
 
 
 @pytest.fixture(scope="module")
@@ -236,7 +236,7 @@ def test_i3_sha256_mismatch(baseline_dir, tmp_path):
 def test_i4_all_knobs_in_manifest(baseline_dir):
     with (baseline_dir / "manifest.json").open() as f:
         manifest = json.load(f)
-    from v2b_syndata.knob_loader import all_knob_paths, load_knob_registry
+    from v2b_syndata.config.knob_loader import all_knob_paths, load_knob_registry
     reg = load_knob_registry(Path(__file__).resolve().parent.parent / "configs" / "knobs.yaml")
     res = manifest["knob_resolution"]
     for path in all_knob_paths(reg):

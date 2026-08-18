@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
 
 REPO = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO / "configs"

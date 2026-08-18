@@ -28,8 +28,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .e5_metrics import InfeasibilityError
-from .knob_loader import _normalize
+from ..config.knob_loader import _normalize
+from ..output.e5_metrics import InfeasibilityError
 
 
 @dataclass

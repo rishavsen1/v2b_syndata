@@ -21,7 +21,7 @@ from typing import Any
 
 import yaml
 
-from .types import KnobValue, ResolvedKnobs
+from ..core.types import KnobValue, ResolvedKnobs
 
 
 class KnobValidationError(ValueError):

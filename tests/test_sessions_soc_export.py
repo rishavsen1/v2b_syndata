@@ -8,13 +8,13 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from v2b_syndata import export_optimus as exp
-from v2b_syndata.multi_building import (
+from v2b_syndata.drivers.multi_building import (
     BuildingSpec,
     MultiConfig,
     config_from_dict,
     generate_multi,
 )
+from v2b_syndata.output import export_optimus as exp
 
 from .test_multi_building import _FAST, _write_epw
 

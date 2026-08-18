@@ -7,7 +7,6 @@ from v2b_syndata.calibration.region_assignment import (
     assign_users,
 )
 
-
 AXES = [
     {"name": "stable_commuter", "freq": [0.85, 1.00], "consist": [0.75, 1.00],
      "dist_km": [40, 80], "weight": 0.4},

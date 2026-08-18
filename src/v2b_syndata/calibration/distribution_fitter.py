@@ -22,7 +22,7 @@ import numpy as np
 import scipy.stats as st
 from scipy.optimize import minimize
 
-from ..knob_loader import DIST_PARAM_RANGES
+from ..config.knob_loader import DIST_PARAM_RANGES
 
 # Arrival-hour clip window. Widened from [6,20] → [4,22] (KDD task 6) to recover
 # the early-/late-shift tail mass the old window discarded (~8% of ACN arrivals),

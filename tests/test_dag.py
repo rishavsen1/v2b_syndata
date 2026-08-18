@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import networkx as nx
 
-from v2b_syndata.dag import build_graph, topological_order
-from v2b_syndata.runner import build_registry
+from v2b_syndata.core.dag import build_graph, topological_order
+from v2b_syndata.core.runner import build_registry
 
 
 def test_dag_is_acyclic():
@@ -39,7 +39,8 @@ def test_a_user_parents_include_u():
 
 def test_sampler_registry_rejects_duplicate_register():
     import pytest
-    from v2b_syndata.dag import SamplerRegistry
+
+    from v2b_syndata.core.dag import SamplerRegistry
     reg = SamplerRegistry()
     reg.register("node_x", lambda ctx: None)
     with pytest.raises(ValueError, match="already registered"):
@@ -48,7 +49,8 @@ def test_sampler_registry_rejects_duplicate_register():
 
 def test_sampler_registry_get_raises_on_missing():
     import pytest
-    from v2b_syndata.dag import SamplerRegistry
+
+    from v2b_syndata.core.dag import SamplerRegistry
     reg = SamplerRegistry()
     with pytest.raises(KeyError, match="no sampler"):
         reg.get("nonexistent")
@@ -56,7 +58,8 @@ def test_sampler_registry_get_raises_on_missing():
 
 def test_sampler_registry_validate_raises_on_missing_node():
     import pytest
-    from v2b_syndata.dag import SamplerRegistry, build_graph
+
+    from v2b_syndata.core.dag import SamplerRegistry, build_graph
     reg = SamplerRegistry()  # empty
     with pytest.raises(RuntimeError, match="without samplers"):
         reg.validate(build_graph())

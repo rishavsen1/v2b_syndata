@@ -212,7 +212,7 @@ each building card, with advanced dials in the card's DER panel). The PV
 generation curve is a deterministic
 PVWatts-style function of the *same* (optionally perturbed) TMYx weather fed to
 EnergyPlus for the building load — see `docs/GENERATIVE_MODELS.md`. Presets live
-in `src/v2b_syndata/der_catalog.py`.
+in `src/v2b_syndata/config/der_catalog.py`.
 
 `sessions.csv` SoC columns are *synthesized*: `arrival_soc` from the per-region
 calibrated Beta, and `required_soc_at_depart` from the calibrated departure-SoC

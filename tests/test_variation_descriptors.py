@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from v2b_syndata.validate import validate
+from v2b_syndata.output.validate import validate
 
 S01_DEFAULTS = {
     "location": "nashville_tn",

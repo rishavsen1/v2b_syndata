@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from v2b_syndata.e5_metrics import InfeasibilityError, compute_concurrency
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
+from v2b_syndata.output.e5_metrics import InfeasibilityError, compute_concurrency
 
 REPO = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO / "configs"
@@ -47,7 +47,7 @@ def test_e5_manifest_infeasible_on_undersize(tmp_path: Path):
 
 def test_e5_warning_on_undersize(tmp_path: Path, caplog: pytest.LogCaptureFixture):
     out = tmp_path / "warn"
-    with caplog.at_level(logging.WARNING, logger="v2b_syndata.runner"):
+    with caplog.at_level(logging.WARNING, logger="v2b_syndata.core.runner"):
         _gen(out, scenario="S_audit_baseline",
              overrides={"charging_infra.charger_count": 1})
     assert any("E5 infeasibility" in r.message for r in caplog.records)
@@ -73,8 +73,9 @@ def test_e5_strict_mode_passes_on_clean(tmp_path: Path):
 
 def test_compute_concurrency_empty_sessions():
     """Edge case: no sessions → max_concurrent=0, not infeasible."""
-    import pandas as pd
     from datetime import datetime
+
+    import pandas as pd
     rep = compute_concurrency(
         pd.DataFrame(columns=["arrival", "departure"]),
         sim_start=datetime(2020, 4, 1), sim_end=datetime(2020, 4, 8),

@@ -7,8 +7,8 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from v2b_syndata.output.validate import validate
 from v2b_syndata.renderers.dr_events import _NOTIF_LEAD_HOURS
-from v2b_syndata.validate import validate
 
 
 @pytest.mark.parametrize(

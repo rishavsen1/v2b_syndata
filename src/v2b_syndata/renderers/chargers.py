@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..types import ScenarioContext
+from ..core.types import ScenarioContext
 
 
 def render(ctx: ScenarioContext) -> None:

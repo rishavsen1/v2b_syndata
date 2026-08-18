@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..der_catalog import resolve_battery
-from ..types import ScenarioContext
+from ..config.der_catalog import resolve_battery
+from ..core.types import ScenarioContext
 
 BATTERY_SPEC_COLUMNS = [
     "battery_id", "battery_type", "capacity_kwh", "power_kw",

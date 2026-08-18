@@ -17,10 +17,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from v2b_syndata.der_catalog import resolve_battery, resolve_pv
+from v2b_syndata.config.der_catalog import resolve_battery, resolve_pv
+from v2b_syndata.core.runner import generate
 from v2b_syndata.load_pipeline import weather as weather_mod
 from v2b_syndata.load_pipeline.pv_model import pv_ac_series
-from v2b_syndata.runner import generate
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_DIR = REPO / "configs"
@@ -231,7 +231,7 @@ def test_pv_enabled_generates_curve(tmp_path, epw_cache):
 
 
 def test_validate_passes_with_pv(tmp_path, epw_cache):
-    from v2b_syndata.validate import validate
+    from v2b_syndata.output.validate import validate
     out = tmp_path / "on"
     _gen(out, overrides={"pv.pv_type": "carport", "battery.battery_type": "nmc_2h"})
     rep = validate(out)
@@ -241,7 +241,7 @@ def test_validate_passes_with_pv(tmp_path, epw_cache):
 # ── multi-building per-building ────────────────────────────────────────────
 
 def test_multibuilding_per_building_pv(tmp_path, epw_cache):
-    from v2b_syndata.multi_building import BuildingSpec, MultiConfig, generate_multi
+    from v2b_syndata.drivers.multi_building import BuildingSpec, MultiConfig, generate_multi
     out = tmp_path / "mb"
     cfg = MultiConfig(buildings=[
         BuildingSpec(base_scenario="S01", seed=1, overrides={

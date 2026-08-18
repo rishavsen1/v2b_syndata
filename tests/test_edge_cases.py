@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from v2b_syndata.runner import generate
-from v2b_syndata.validate import validate
+from v2b_syndata.core.runner import generate
+from v2b_syndata.output.validate import validate
 
 REPO = Path(__file__).resolve().parent.parent
 CONFIG_DIR = REPO / "configs"

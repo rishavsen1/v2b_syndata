@@ -80,6 +80,6 @@ def test_fitter_dwell_mixture_params_in_range():
     if fit is not None:
         for leaf, key in [("dwell.k", "k1"), ("dwell.k", "k2"),
                           ("dwell.lambda", "lambda1"), ("dwell.lambda", "lambda2")]:
-            from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+            from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
             lo, hi = DIST_PARAM_RANGES[leaf]
             assert lo <= fit[key] <= hi

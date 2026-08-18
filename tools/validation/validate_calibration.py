@@ -77,7 +77,7 @@ from v2b_syndata.calibration.distribution_fitter import (  # noqa: E402
     fit_weibull_dwell,
     fit_weibull_mixture_dwell,
 )
-from v2b_syndata.runner import generate as runner_generate  # noqa: E402
+from v2b_syndata.core.runner import generate as runner_generate  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("validate")
@@ -397,7 +397,7 @@ def load_generated(source_key: str, seed_dirs: list[Path]) -> pd.DataFrame:
 
 # Fixed base seed for the bootstrap; each (source, region, variable) cell
 # derives its own sub-stream from a SHA-256 hash of the cell key (same
-# hash-not-order seeding philosophy as src/v2b_syndata/seeding.py), so adding
+# hash-not-order seeding philosophy as src/v2b_syndata/core/seeding.py), so adding
 # or reordering cells never shifts another cell's resamples.
 BOOTSTRAP_SEED = 20260708
 BOOTSTRAP_DEFAULT_B = 1000

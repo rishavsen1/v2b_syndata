@@ -5,8 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from v2b_syndata.runner import generate
-from v2b_syndata.validate import validate
+from v2b_syndata.core.runner import generate
+from v2b_syndata.output.validate import validate
 
 
 def _sha(p: Path) -> str:

@@ -37,7 +37,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
 from v2b_syndata.bench import available_algorithms, run_scenario  # noqa: E402
-from v2b_syndata.runner import generate as runner_generate  # noqa: E402
+from v2b_syndata.core.runner import generate as runner_generate  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("sweep")

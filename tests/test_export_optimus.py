@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from v2b_syndata import export_optimus as exp
+from v2b_syndata.output import export_optimus as exp
 
 # ── synthetic native CSVs ────────────────────────────────────────────────────
 

@@ -309,7 +309,7 @@ is therefore the JPL or Caltech column of §4.2/§4.3, reweighted.
 | Dataset normalizers | `src/v2b_syndata/calibration/sources/{acn,elaadnl,evwatts,inl}.py` |
 | YAML → runtime parameters | `src/v2b_syndata/samplers/sessions_dist.py` |
 | Sampler (copula + inverse-CDF + rejection) | `src/v2b_syndata/renderers/sessions.py` |
-| Parameter validity ranges | `src/v2b_syndata/knob_loader.py::DIST_PARAM_RANGES` |
+| Parameter validity ranges | `src/v2b_syndata/config/knob_loader.py::DIST_PARAM_RANGES` |
 | Validation harness | `tools/validation/validate_calibration.py` |
 | Standalone sampler | `tools/data_prep/sample_behavior_standalone.py` |
 

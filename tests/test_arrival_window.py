@@ -15,7 +15,7 @@ from v2b_syndata.calibration.distribution_fitter import (
     ARRIVAL_LO,
     fit_truncnorm_arrival,
 )
-from v2b_syndata.knob_loader import DIST_PARAM_RANGES
+from v2b_syndata.config.knob_loader import DIST_PARAM_RANGES
 
 
 def test_fitter_window_widened():

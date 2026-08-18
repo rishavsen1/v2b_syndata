@@ -71,10 +71,23 @@ The generator is a **DAG of samplers and renderers** executed in topological
 order. The tier structure (Tier 0 descriptors → Tier 1 roots → Tier 1.5
 per-entity → Tier 2 latents → Tier 3 renderers) maps directly onto modules:
 
-- **`dag.py`** — `NODE_TOPOLOGY` declares every node and its parents. `SamplerRegistry`
+The package is grouped into subpackages by role. Only `cli.py` stays at the
+package root — `pyproject` declares `v2b_syndata.cli:main` and seven call sites
+shell out to `python -m v2b_syndata.cli`.
+
+- **`core/`** — the engine: `types.py` (dataclasses passed between stages),
+  `seeding.py`, `dag.py`, `runner.py`.
+- **`config/`** — the knob/descriptor system: `knob_loader.py` (registry +
+  resolution chain), `descriptor_loader.py` (Tier-0 → Tier-1 expansion),
+  `der_catalog.py` (PV/battery presets).
+- **`output/`** — everything applied to, or recorded about, the produced CSVs:
+  `noise.py`, `validate.py`, `manifest.py`, `export_optimus.py`, `e5_metrics.py`.
+- **`drivers/`** — multi-run orchestration: `batch.py`, `multi_building.py`.
+
+- **`core/dag.py`** — `NODE_TOPOLOGY` declares every node and its parents. `SamplerRegistry`
   maps node name → function. The graph is validated acyclic; nodes run in
   `lexicographical_topological_sort` order (stable across networkx versions).
-- **`runner.py`** — `generate()` is the entry point. It resolves knobs, builds a
+- **`core/runner.py`** — `generate()` is the entry point. It resolves knobs, builds a
   `ScenarioContext`, wires the registry (`build_registry()`), runs the DAG,
   applies noise, runs the E5 concurrency check, writes CSVs in deterministic
   order, and writes the manifest. Each sampler mutates the shared `ScenarioContext`
@@ -93,12 +106,12 @@ per-entity → Tier 2 latents → Tier 3 renderers) maps directly onto modules:
 ### Two invariants that constrain almost every change
 
 1. **Bitwise determinism.** A given (scenario, seed) must always produce
-   byte-identical CSVs. Seeding (`seeding.py`) keys each RNG sub-stream off a
+   byte-identical CSVs. Seeding (`core/seeding.py`) keys each RNG sub-stream off a
    **SHA-256 hash of the node name** (and car_id), *not* spawn order — so adding
    a new node MUST NOT shift the seeds of existing nodes. Never use Python's
    salted `hash()`. Tests: `test_reproducibility.py`, `test_determinism_stress.py`.
 
-2. **Knob resolution chain & provenance.** `knob_loader.resolve_knobs` resolves
+2. **Knob resolution chain & provenance.** `config.knob_loader.resolve_knobs` resolves
    every knob by priority: **CLI override > scenario YAML `overrides` >
    descriptor expansion > `knobs.yaml` default**. Each resolved value is a
    `KnobValue(value, source)` so the manifest records where it came from
@@ -111,7 +124,7 @@ per-entity → Tier 2 latents → Tier 3 renderers) maps directly onto modules:
 ### Config / descriptor system (`configs/`)
 
 A scenario YAML names five Tier-0 descriptors (`location`, `building`,
-`population`, `equipment`, `noise`). `descriptor_loader.expand_descriptors`
+`population`, `equipment`, `noise`). `config.descriptor_loader.expand_descriptors`
 looks each up in its library file (`locations.yaml`, `buildings.yaml`,
 `populations.yaml`, `equipment.yaml`, `noise_profiles.yaml`) and produces the
 Tier-1 knob values. `knobs.yaml` is the typed knob **registry** (type, range,
@@ -120,7 +133,7 @@ value by editing the relevant library file.
 
 ### Noise vs weather (kept deliberately distinct)
 
-- **Noise layer** (`noise.py`, `configs/noise_profiles.yaml`) — **output-side**:
+- **Noise layer** (`output/noise.py`, `configs/noise_profiles.yaml`) — **output-side**:
   perturbs the produced CSVs after generation. `clean` profile → 0 jitter →
   `building_load` is a deterministic `f(weather)`.
 - **Weather layer** (`configs/weather_profiles.yaml`) — **input-side**: perturbs
@@ -137,7 +150,7 @@ value by editing the relevant library file.
   (EnergyPlus re-runs each perturbed EPW; the per-sample seed varies sessions)
   and 100% pass validation. This is the proven overnight/campus recipe.
 - **Per-building `weather_profile:` / `noise_profile:` in the multi-building
-  config win over the batch-level CLI flags** (`multi_building.py::generate_multi_batch`).
+  config win over the batch-level CLI flags** (`drivers/multi_building.py::generate_multi_batch`).
   To mix slight/moderate across buildings in one run, set them per building and
   do NOT pass `--weather-profile` / `--weather-sigma-c` / `--weather-solar-sigma`.
 - **`building_load.peak_kw_scaling` defaults true** → every sample's peak is
@@ -163,7 +176,7 @@ value by editing the relevant library file.
   uncertainty-analysis HTML. Reference runs: `data/output/overnight/`,
   `data/output/campus10/` (18k units, 0 hard errors).
 
-### Validation (`validate.py`)
+### Validation (`output/validate.py`)
 
 Hard invariants (A–H + manifest checks I) raise `ValidationError`; soft checks
 (S) emit warnings. `cli generate` auto-validates only when no jitter was applied;
@@ -189,8 +202,9 @@ run `cli validate <dir>` explicitly for noisy outputs.
 ## Where to look for "why"
 
 - **`docs/DESIGN_NOTES.md`** — numbered decision log (sections 1–31). **These
-  section numbers are cited by number from source code (`validate.py`,
-  `runner.py`, `prototypes.py`, `e5_metrics.py`) — do not renumber them.**
+  section numbers are cited by number from source code (`output/validate.py`,
+  `core/runner.py`, `load_pipeline/prototypes.py`, `output/e5_metrics.py`) — do
+  not renumber them.**
 - **`docs/GENERATIVE_MODELS.md`** — why each random quantity uses its
   distribution family, with the empirical AIC/BIC/KS verdicts.
 - **`docs/PROJECT_TRACKER.md`** — live backlog: open items, conventions, deferred work.

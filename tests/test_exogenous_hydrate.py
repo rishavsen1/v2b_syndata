@@ -5,8 +5,8 @@ flatten/hydrate.
 """
 from __future__ import annotations
 
+from v2b_syndata.core.types import KnobValue, ResolvedKnobs
 from v2b_syndata.samplers.exogenous import _hydrate_region_distributions
-from v2b_syndata.types import KnobValue, ResolvedKnobs
 
 
 def _resolved(items: dict[str, float]) -> ResolvedKnobs:

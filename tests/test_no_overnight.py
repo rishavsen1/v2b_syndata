@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from v2b_syndata.runner import generate
-from v2b_syndata.validate import validate
+from v2b_syndata.core.runner import generate
+from v2b_syndata.output.validate import validate
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "configs"
 
@@ -94,8 +94,8 @@ def test_arrival_jitter_cannot_reintroduce_overnight():
     """
     from datetime import datetime
 
-    from v2b_syndata.noise import apply_noise
-    from v2b_syndata.types import ScenarioContext
+    from v2b_syndata.core.types import ScenarioContext
+    from v2b_syndata.output.noise import apply_noise
 
     class _Knobs:
         def get(self, _key):

@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from v2b_syndata.runner import generate
+from v2b_syndata.core.runner import generate
 
 
 def _stub_simulate_building_load(

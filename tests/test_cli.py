@@ -98,7 +98,7 @@ def test_cli_unknown_subcommand_errors():
 
 def test_cli_generate_rejects_unknown_override(tmp_path: Path):
     out = tmp_path / "gen"
-    from v2b_syndata.knob_loader import KnobValidationError
+    from v2b_syndata.config.knob_loader import KnobValidationError
     with pytest.raises(KnobValidationError):
         _run("--config-dir", str(CONFIG_DIR), "generate",
              "--scenario", "S01", "--seed", "42",
@@ -122,7 +122,8 @@ def test_cli_docs_gen_emits_reference(capsys: pytest.CaptureFixture):
 def _stub_weather(tmp_path, monkeypatch):
     """Synthetic EPW so generate-multi's weather export needs no real station."""
     import pandas as pd
-    from v2b_syndata import export_optimus as exp
+
+    from v2b_syndata.output import export_optimus as exp
     epw = tmp_path / "fixture.epw"
     idx = pd.date_range("2021-01-01", "2022-01-01", freq="h", inclusive="left")
     lines = ["LOCATION,Test"] + ["HEADER"] * 7
@@ -247,7 +248,7 @@ def test_noise_applied_flag_covers_flex_inflex(tmp_path):
     is non-zero (runner reads ctx.noise, which spans all 8 jitter knobs)."""
     from pathlib import Path
 
-    from v2b_syndata.runner import generate
+    from v2b_syndata.core.runner import generate
 
     config_dir = Path(__file__).resolve().parents[1] / "configs"
     fast = {

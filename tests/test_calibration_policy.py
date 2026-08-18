@@ -8,7 +8,7 @@ import pytest
 import yaml as pyyaml
 
 from v2b_syndata.cli import main
-from v2b_syndata.descriptor_loader import expand_descriptors
+from v2b_syndata.config.descriptor_loader import expand_descriptors
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "configs"
 
@@ -107,7 +107,9 @@ def test_default_calibration_targets_only_acn_data_populations(tmp_path, monkeyp
     cache = tmp_path / "cache"
     cache.mkdir()
     # Build minimal cache so fetch path doesn't crash.
-    import pandas as pd, json
+    import json
+
+    import pandas as pd
     rng_uid = 0
     for site in ("caltech", "jpl", "office001"):
         sessions = []
@@ -164,7 +166,7 @@ def test_g5c_warns_when_hand_specified_population_has_missing_regions():
     """G5c: synthetic population emitting hand_specified leaves for SOME
     regions but not all → warning per missing region.
     """
-    from v2b_syndata.validate import (
+    from v2b_syndata.output.validate import (
         ValidationReport,
         _check_g5_calibration_consistency,
     )
