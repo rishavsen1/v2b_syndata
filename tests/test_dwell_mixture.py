@@ -83,3 +83,30 @@ def test_fitter_dwell_mixture_params_in_range():
             from v2b_syndata.knob_loader import DIST_PARAM_RANGES
             lo, hi = DIST_PARAM_RANGES[leaf]
             assert lo <= fit[key] <= hi
+
+
+# --------------------------------------------------------------------------- #
+# Shape ceiling (2026-08): a sharply peaked workday component must survive
+# --------------------------------------------------------------------------- #
+def test_tight_workday_component_is_not_dropped_by_range_guard():
+    """A k≈8 long component is a tight peak, not a degenerate fit.
+
+    The old dwell.k ceiling of 5.0 rejected the whole mixture via _drop_if_oor,
+    silently demoting JPL's two largest cells to a single Weibull. Regression
+    guard for the raised ceiling.
+    """
+    rng = np.random.default_rng(11)
+    short = stats.weibull_min.rvs(1.4, scale=1.2, size=400, random_state=rng)
+    tight = stats.weibull_min.rvs(8.0, scale=9.5, size=1600, random_state=rng)
+    fit = fit_weibull_mixture_dwell(np.concatenate([short, tight]))
+    assert fit is not None, "mixture dropped — shape ceiling too low"
+    assert fit["dist"] == "weibull_mixture"
+    assert fit["k2"] > 5.0  # the component the old ceiling rejected
+
+
+def test_degenerate_shape_still_rejected():
+    """Raising the ceiling must not disable the guard: k → ∞ on near-constant
+    data is still dropped."""
+    from v2b_syndata.calibration.distribution_fitter import fit_weibull_dwell as _f
+    near_constant = np.full(500, 8.0) + np.random.default_rng(3).normal(0, 0.01, 500)
+    assert _f(near_constant) is None

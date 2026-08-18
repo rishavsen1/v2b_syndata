@@ -9,10 +9,17 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from .battery_inference import infer_capacity, reconstruct_arrival_soc
+from .battery_inference import (
+    ARRIVAL_SOC_PRIOR_MEAN,
+    ARRIVAL_SOC_PRIOR_STD,
+    infer_capacity,
+    reconstruct_arrival_soc,
+)
 from .distribution_fitter import (
+    FIT_SOC_ARRIVAL,
     MIN_SAMPLES,
     MIXTURE_MIN_SAMPLES,
+    fit_beta_soc,
     fit_region,
     fit_truncnorm_arrival,
     fit_truncnorm_mixture_arrival,
@@ -20,7 +27,6 @@ from .distribution_fitter import (
 from .feature_extractor import (
     SessionFeatures,
     aggregate_user_features,
-    extract_session,  # re-exported for backwards-compat callers
     population_weekend_factor,
 )
 from .region_assignment import assign_users
@@ -208,7 +214,7 @@ def calibrate_populations(
         # Write per-user artifact CSV (filename is per-source).
         user_df = pd.DataFrame([
             {"user_id": u.user_id, "n_sessions": u.n_sessions, "phi": u.phi,
-             "kappa": u.kappa, "delta_km": u.delta_km}
+             "delta_km": u.delta_km}
             for u in users
         ])
         user_df.to_csv(artifact_dir / source.per_user_csv_filename, index=False)
@@ -318,6 +324,17 @@ def _calibrate_one_population(
         for key in ("dwell", "soc_arrival", "soc_depart", "copula"):
             if fit.get(key) is not None:
                 clean[key] = fit[key]
+        # Per-bin φ Beta (2026-08): fitted to this region's real per-user φ so
+        # generation draws appearance rates from the data instead of
+        # Uniform(bin) — the uniform drew E[φ]=0.65 for regular_charger vs the
+        # real 0.44 (×1.29 session-volume overshoot at caltech). Unit is USERS
+        # (φ is a per-user quantity), so MIN_SAMPLES gates on the user count;
+        # thin regions (e.g. office001, 14 users) keep the uniform draw.
+        phi_vals = np.asarray([u.phi for u in region_users], dtype=float)
+        if len(phi_vals) >= MIN_SAMPLES:
+            phi_fit = fit_beta_soc(phi_vals, leaf_prefix="phi")
+            if phi_fit is not None:
+                clean["phi"] = phi_fit
         if clean or fit.get("arrival") is not None:
             region_fits[rname] = clean
 
@@ -359,6 +376,18 @@ def _calibrate_one_population(
         "n_users_with_userinputs": int(n_users_with_inputs),
         "capacity_inference_fallback_rate": float(fallback_rate),
         "unassigned_user_rate": float(unassigned_rate),
+        # Arrival SoC is a declared prior, never a fit — no dataset records SoC.
+        # Stamped so the manifest cannot imply data provenance for it.
+        # See distribution_fitter.FIT_SOC_ARRIVAL.
+        "arrival_soc_policy": (
+            f"prior:normal(mean={ARRIVAL_SOC_PRIOR_MEAN},std={ARRIVAL_SOC_PRIOR_STD})"
+            if not FIT_SOC_ARRIVAL else "fitted_beta"
+        ),
+        # δ_km is a differentiation prior, not a fit: the observed per-user
+        # milesRequested is a charge-request range (median ≈ 95 km, max > 1000),
+        # not distance-driven-since-last-plug-in, so it cannot parameterize the
+        # arrival-SoC shift. Generation draws δ ~ Uniform(region.dist_km).
+        "delta_km_policy": "prior:uniform(region.dist_km)",
     })
 
     # Population weekend:weekday session-rate ratio (drives weekend appearance

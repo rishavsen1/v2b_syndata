@@ -34,6 +34,17 @@ ARRIVAL_LO = 4.0
 ARRIVAL_HI = 22.0
 MIN_SAMPLES = 30
 
+# Arrival SoC is NOT fitted (2026-08). No charging dataset records SoC, and
+# `battery_inference.reconstruct_arrival_soc` ignores the session entirely — it
+# returns clip(N(ARRIVAL_SOC_PRIOR_MEAN, ARRIVAL_SOC_PRIOR_STD)). Fitting a Beta
+# to those draws and shipping it as `calibration:<provenance>` was circular: it
+# recovered the prior at every region of every site (ACN α ≈ 3.6–4.4, β ≈ 5.4–6.4
+# ⇒ E ≈ 0.40 = the prior mean) while claiming data provenance it does not have.
+# Generation now falls through to the declared Beta(4, 6) prior in
+# `sessions_dist.sample_f_soc` (same mean, honest provenance). `soc_depart` IS
+# still fitted — it carries real delivered-energy signal.
+FIT_SOC_ARRIVAL = False
+
 
 def _within(leaf: str, value: float) -> bool:
     lo, hi = DIST_PARAM_RANGES[leaf]
@@ -372,7 +383,7 @@ def fit_region(
         )
     else:
         out["dwell"] = None
-    if soc_arrivals is not None and len(soc_arrivals) >= MIN_SAMPLES:
+    if FIT_SOC_ARRIVAL and soc_arrivals is not None and len(soc_arrivals) >= MIN_SAMPLES:
         out["soc_arrival"] = fit_beta_soc(soc_arrivals)
     else:
         out["soc_arrival"] = None

@@ -47,16 +47,29 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "arrival.sigma1": (0.01, 6.0),
     "arrival.mu2": (4.0, 22.0),
     "arrival.sigma2": (0.01, 6.0),
-    "dwell.k": (0.01, 5.0),
+    # Weibull shape ceiling raised 5.0 → 15.0 (2026-08). A fixed-hours workforce
+    # produces a *sharply peaked* workday dwell — JPL's long component fits at
+    # k ≈ 7.4–7.7, the calibration bootstrap at k ≈ 9.1. The old 5.0 ceiling
+    # silently rejected those mixtures via _drop_if_oor, so the two largest JPL
+    # cells (24k of 27k sessions) fell back to a single Weibull at KS 0.14–0.16.
+    # k is a shape, not a rate: k = 8 is an ordinary tight peak, not a
+    # degenerate fit. 15.0 leaves the guard's real job (catching k → ∞ spikes
+    # on near-constant data, e.g. the k = 23.4 fixture) intact.
+    "dwell.k": (0.01, 15.0),
     "dwell.lambda": (0.01, 24.0),
     # Optional 2-component Weibull dwell mixture (short top-up + long workday).
     # Present only when calibration selects a mixture; w2 = 1 - w1. Single
     # Weibull (k/lambda above) remains the default.
     "dwell.w1": (0.0, 1.0),
-    "dwell.k1": (0.01, 5.0),
+    "dwell.k1": (0.01, 15.0),
     "dwell.lambda1": (0.01, 24.0),
-    "dwell.k2": (0.01, 5.0),
+    "dwell.k2": (0.01, 15.0),
     "dwell.lambda2": (0.01, 24.0),
+    # Per-bin φ (weekday appearance rate) Beta, fitted by the calibrator to the
+    # region's real per-user φ values (2026-08). Kills the uniform-in-rectangle
+    # volume overshoot. Drawn per car in per_entity.sample_a_user.
+    "phi.alpha": (0.01, 100.0),
+    "phi.beta": (0.01, 100.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
     "soc_depart.alpha": (0.01, 50.0),

@@ -163,7 +163,7 @@ class SourceData:
     sessions_df: pd.DataFrame    # session-level
     region_axes: list[dict]
     user_to_region: dict[str, str]
-    users: list                  # UserFeatures (per-driver phi / kappa / delta_km)
+    users: list                  # UserFeatures (per-driver phi / delta_km)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -273,7 +273,10 @@ def s0_assignment(
     for name in region_names + ["__unassigned__"]:
         us = by_region.get(name, [])
         if us:
-            ax.scatter([u.phi for u in us], [u.kappa for u in us],
+            # κ removed from UserFeatures (2026-08): φ is the only assignment
+            # axis; spread points on a stable per-region y-jitter for legibility.
+            ax.scatter([u.phi for u in us],
+                       [hash(u.user_id) % 1000 / 1000.0 for u in us],
                        s=16, alpha=0.5, color=color[name], edgecolors="none",
                        label=f"{name} (n={len(us)})", zorder=3)
         rows.append({
@@ -358,7 +361,7 @@ def load_generated(source_key: str, seed_dirs: list[Path]) -> pd.DataFrame:
         )
         users = pd.read_csv(sdir / "users.csv")
         # Map car_id → user attrs → region. users.csv has the per-user
-        # behavioral axes (phi, kappa, region directly).
+        # behavioral axes (phi, region directly).
         if "region" in users.columns:
             car_region = dict(zip(users["car_id"], users["region"]))
         else:
@@ -366,7 +369,7 @@ def load_generated(source_key: str, seed_dirs: list[Path]) -> pd.DataFrame:
             car_region = {}
             for _, row in users.iterrows():
                 fake_user = type("U", (), {
-                    "phi": row["phi"], "kappa": row["kappa"],
+                    "phi": row["phi"],
                     "delta_km": row.get("delta_km", 0.0),
                     "user_id": str(row["car_id"]),
                 })()

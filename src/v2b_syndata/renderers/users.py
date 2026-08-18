@@ -15,7 +15,6 @@ def render(ctx: ScenarioContext) -> None:
             "car_id": u.car_id,
             "region": u.region,
             "phi": u.phi,
-            "kappa": u.kappa,
             "delta_km": u.delta_km,
             "negotiation_type": u.negotiation_type,
             "w1": u.w1,

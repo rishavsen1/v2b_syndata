@@ -54,7 +54,9 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
             }
         else:
             mu = float(cal.get("mu", 8.5))
-            sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
+            # κ removed 2026-08; fixed placeholder spread for populations with
+            # no calibrated/hand-authored arrival sigma (G5c warns on those).
+            sigma_default = 0.5
             sigma = float(cal.get("sigma", sigma_default))
             params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": trunc_lo,
                               "trunc_hi": trunc_hi, "phi": u.phi}
@@ -65,6 +67,14 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
     """Per-user Weibull(k, λ) parameters + copula ρ. Calibrated leaf wins."""
     assert ctx.a_user is not None
     params = {}
+    # Dwell clip window. Knob-driven since 2026-08 (defaults 0.5 / 14.0 keep the
+    # previously hardcoded values, so existing scenarios stay bitwise-identical).
+    # The upper clip is a hard truncation and is visible in the output as a
+    # density spike at the clip point, so it belongs in the manifest.
+    clip_lo = float(ctx.knobs.get("user_behavior.dwell_clip_lo")) \
+        if ctx.knobs.has("user_behavior.dwell_clip_lo") else 0.5
+    clip_hi = float(ctx.knobs.get("user_behavior.dwell_clip_hi")) \
+        if ctx.knobs.has("user_behavior.dwell_clip_hi") else 14.0
     for car_id, u in ctx.a_user.items():
         dwell_cal = _region_dist(ctx, u.region, "dwell")
         copula_cal = _region_dist(ctx, u.region, "copula")
@@ -74,7 +84,7 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
         # YAML "lambda" → runtime "lam" rename.
         lam = float(dwell_cal.get("lambda", 8.0 * (0.5 + u.phi)))
         entry = {"k": k, "lam": lam,
-                 "clip_lo": 0.5, "clip_hi": 14.0,
+                 "clip_lo": clip_lo, "clip_hi": clip_hi,
                  "rho": rho}
         # A region whose calibrated `dwell` block carries the mixture leaves
         # (w1, k1, lambda1, k2, lambda2) gets a 2-component Weibull mixture;

@@ -20,6 +20,16 @@ ACN_TZ = "America/Los_Angeles"
 # are dominated by metering noise / failed connects and bias the dwell fit.
 MIN_DWELL_HOURS = 0.5
 
+# Drop sessions whose disconnect falls on a later *local* calendar day than the
+# connect. ACN's overnight/left-plugged-in rows (caltech 4.8%, jpl 1.5%,
+# office001 3.4%) carry dwells up to 150 h; that tail is what forces the
+# 2-component dwell mixture's EM to spend a component on the tail instead of on
+# the real short-top-up / full-workday bimodality, so the shipped
+# MIXTURE_KS_MARGIN gate then rejects the mixture in the largest cells.
+# Comparison is on naive Pacific wall-clock timestamps (extract_session already
+# converts), so DST transitions are handled by the tz conversion, not here.
+DROP_OVERNIGHT_SESSIONS = True
+
 
 @dataclass
 class SessionFeatures:
@@ -42,7 +52,6 @@ class UserFeatures:
     n_weekdays_observed: int
     n_weekdays_total: int
     phi: float
-    kappa: float
     delta_km: float | None
 
 
@@ -63,6 +72,8 @@ def extract_session(raw: dict[str, Any], site: str) -> SessionFeatures | None:
 
     dwell = (disconnect - connection).total_seconds() / 3600.0
     if dwell < MIN_DWELL_HOURS or dwell > 168.0:  # < 30 min noise; > 1 week bogus
+        return None
+    if DROP_OVERNIGHT_SESSIONS and disconnect.normalize() != connection.normalize():
         return None
 
     arr_hour = connection.hour + connection.minute / 60.0 + connection.second / 3600.0
@@ -125,7 +136,11 @@ def aggregate_user_features(
     window_start: pd.Timestamp,
     window_end: pd.Timestamp,
 ) -> list[UserFeatures]:
-    """Compute (φ, κ, δ_km) per user across sessions.
+    """Compute (φ, δ_km) per user across sessions.
+
+    κ (arrival-hour consistency) was removed 2026-08: independent of every
+    session quantity and unused downstream once region assignment became
+    φ-only.
 
     φ uses a **per-user active window** [first_session, last_session] rather
     than the global calibration window. A user with 22 sessions over 6 months
@@ -168,13 +183,6 @@ def aggregate_user_features(
         phi = (n_obs / n_weekdays_user) if n_weekdays_user > 0 else 0.0
         phi = float(min(1.0, max(0.0, phi)))
 
-        arr_hours = g["arrival_hour"].to_numpy()
-        if arr_hours.std() == 0 or arr_hours.mean() == 0:
-            kappa = 1.0
-        else:
-            cv = arr_hours.std() / arr_hours.mean()
-            kappa = float(max(0.0, min(1.0, 1.0 - cv)))
-
         miles = g["miles_requested"].dropna()
         if len(miles) > 0:
             delta_km = float(miles.mean() * 1.609344)
@@ -187,7 +195,6 @@ def aggregate_user_features(
             n_weekdays_observed=int(n_obs),
             n_weekdays_total=int(n_weekdays_user),  # per-user active window
             phi=phi,
-            kappa=kappa,
             delta_km=delta_km,
         ))
 

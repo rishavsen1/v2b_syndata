@@ -57,6 +57,8 @@ def sample_a_user(ctx: ScenarioContext) -> None:
     neg_mix = neg_mix / neg_mix.sum()
     alpha_w1, alpha_w2 = U["w_multiplier"]
 
+    region_dists = U.get("region_distributions") or {}
+
     out: dict[int, UserAttrs] = {}
     for car_id in range(1, ev_count + 1):
         rng = rng_for_car(ctx.seed, "A_user", car_id)
@@ -64,8 +66,21 @@ def sample_a_user(ctx: ScenarioContext) -> None:
         ridx = int(rng.choice(len(region_names), p=region_weights))
         region = axes[ridx]
         rname = region["name"]
-        phi = float(rng.uniform(region["freq"][0], region["freq"][1]))
-        kappa = float(rng.uniform(region["consist"][0], region["consist"][1]))
+        # φ: calibrated per-bin Beta when the region carries a fitted `phi`
+        # block (written by the calibrator from that bin's real user φ values;
+        # kills the uniform-in-rectangle overshoot, e.g. regular_charger drew
+        # E[φ]=0.65 vs the real 0.44). Clamped into the bin so region semantics
+        # hold. Hand-authored populations have no `phi` block → uniform draw,
+        # unchanged. κ is no longer drawn: it described nothing the generator
+        # produced (r = -0.06 against the car's own arrival scatter) and was
+        # read by nothing.
+        phi_lo, phi_hi = float(region["freq"][0]), float(region["freq"][1])
+        phi_cal = region_dists.get(rname, {}).get("phi", {})
+        if "alpha" in phi_cal and "beta" in phi_cal:
+            phi = float(rng.beta(float(phi_cal["alpha"]), float(phi_cal["beta"])))
+            phi = min(max(phi, phi_lo), phi_hi)
+        else:
+            phi = float(rng.uniform(phi_lo, phi_hi))
         delta = float(rng.uniform(region["dist_km"][0], region["dist_km"][1]))
         # Negotiation
         nidx = int(rng.choice(len(NEG_TYPES), p=neg_mix))
@@ -76,7 +91,7 @@ def sample_a_user(ctx: ScenarioContext) -> None:
         w1 = max(0.0, w1) * float(alpha_w1)
         w2 = max(0.0, w2) * float(alpha_w2)
         out[car_id] = UserAttrs(
-            car_id=car_id, region=rname, phi=phi, kappa=kappa,
+            car_id=car_id, region=rname, phi=phi,
             delta_km=delta, negotiation_type=ntype, w1=w1, w2=w2,
         )
     ctx.a_user = out

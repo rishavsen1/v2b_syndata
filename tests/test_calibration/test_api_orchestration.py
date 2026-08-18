@@ -120,7 +120,7 @@ def test_artifact_csv_written(tmp_pops, tmp_path, monkeypatch):
     )
     assert (art / "acn_per_user.csv").exists()
     df = pd.read_csv(art / "acn_per_user.csv")
-    expected = {"user_id", "n_sessions", "phi", "kappa", "delta_km"}
+    expected = {"user_id", "n_sessions", "phi", "delta_km"}
     assert expected.issubset(df.columns)
 
 

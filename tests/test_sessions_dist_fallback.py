@@ -47,7 +47,7 @@ def _build_ctx(region_distributions: dict) -> ScenarioContext:
     )
     ctx = ScenarioContext(scenario_id="S01", seed=42, knobs=knobs, roots=roots)
     ctx.a_user = {1: UserAttrs(
-        car_id=1, region="stable_commuter", phi=0.9, kappa=0.85,
+        car_id=1, region="stable_commuter", phi=0.9,
         delta_km=50.0, negotiation_type="type_ii", w1=0.01, w2=0.05,
     )}
     ctx.a_fleet = {1: FleetAttrs(
@@ -112,7 +112,7 @@ def test_no_calibration_all_placeholders():
     dw = ctx.latents["f_dwell"][1]
     so = ctx.latents["f_soc"][1]
     assert arr["mu"] == 8.5
-    assert abs(arr["sigma"] - 2.0 * (1.0 - 0.85)) < 1e-9  # 2*(1-κ)
+    assert arr["sigma"] == 0.5  # fixed placeholder (κ removed 2026-08)
     assert dw["k"] == 2.0
     assert abs(dw["lam"] - 8.0 * (0.5 + 0.9)) < 1e-9
     assert dw["rho"] == 0.0
@@ -126,7 +126,7 @@ def test_user_in_uncalibrated_region_falls_back():
     ctx = _build_ctx(rd)
     # Reassign user to uncalibrated region
     ctx.a_user[1] = UserAttrs(
-        car_id=1, region="flexible_local", phi=0.7, kappa=0.6,
+        car_id=1, region="flexible_local", phi=0.7,
         delta_km=10.0, negotiation_type="type_ii", w1=0.01, w2=0.05,
     )
     sample_f_dwell(ctx)

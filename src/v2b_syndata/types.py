@@ -50,7 +50,6 @@ class UserAttrs:
     car_id: int
     region: str
     phi: float
-    kappa: float
     delta_km: float
     negotiation_type: str
     w1: float

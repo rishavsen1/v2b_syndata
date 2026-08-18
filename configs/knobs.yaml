@@ -164,6 +164,20 @@ user_behavior:
     description: "Upper bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true."
     affects_csv: [sessions.csv]
 
+  dwell_clip_lo:
+    type: float
+    range: [0.0, 24.0]
+    default: 0.5
+    description: "Lower clip (hours) on every sampled session dwell, applied after the Weibull/mixture draw. Default 0.5 matches the calibration-side MIN_DWELL_HOURS filter, so the generator cannot emit a session shorter than the shortest session any fit was trained on. Must be < dwell_clip_hi."
+    affects_csv: [sessions.csv]
+
+  dwell_clip_hi:
+    type: float
+    range: [0.5, 24.0]
+    default: 14.0
+    description: "Upper clip (hours) on every sampled session dwell. Was hardcoded 14.0 in sessions_dist.py; promoted to a knob 2026-08 because it is a hard truncation that shows up in the output as a spike at the clip point (real ACN same-day dwells reach 20 h). Default 14.0 keeps existing scenarios bitwise-identical; raise it for cohorts whose calibrated dwell has mass above 14 h."
+    affects_csv: [sessions.csv]
+
   weekend_activity_factor:
     type: float
     range: [0.0, 5.0]

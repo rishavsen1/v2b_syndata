@@ -23,7 +23,7 @@ from .samplers.dr_sampler import PROGRAM_SPECS
 _SCHEMAS: dict[str, list[str]] = {
     "building_load": ["datetime", "power_flex_kw", "power_inflex_kw", "power_kw"],
     "cars": ["car_id", "capacity_kwh", "min_allowed_soc", "max_allowed_soc", "battery_class"],
-    "users": ["car_id", "region", "phi", "kappa", "delta_km",
+    "users": ["car_id", "region", "phi", "delta_km",
               "negotiation_type", "w1", "w2"],
     "chargers": ["charger_id", "directionality", "min_rate_kw", "max_rate_kw"],
     "grid_prices": ["datetime", "price_per_kwh", "type"],
@@ -174,7 +174,7 @@ def _check_a3_a4(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
     numeric_cols = {
         "building_load": ["power_flex_kw", "power_inflex_kw", "power_kw"],
         "cars": ["car_id", "capacity_kwh", "min_allowed_soc", "max_allowed_soc"],
-        "users": ["car_id", "phi", "kappa", "delta_km", "w1", "w2"],
+        "users": ["car_id", "phi", "delta_km", "w1", "w2"],
         "chargers": ["charger_id", "min_rate_kw", "max_rate_kw"],
         "grid_prices": ["price_per_kwh"],
         "dr_events": ["event_id", "magnitude_kw"],
@@ -433,7 +433,6 @@ def _check_e(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
 def _check_g(rep: ValidationReport, csvs: dict[str, pd.DataFrame]) -> None:
     users = csvs["users"]
     rep.add(((users["phi"] >= 0) & (users["phi"] <= 1)).all(), "G1: phi outside [0,1]")
-    rep.add(((users["kappa"] >= 0) & (users["kappa"] <= 1)).all(), "G2: kappa outside [0,1]")
     rep.add((users["delta_km"] >= 0).all(), "G3: delta_km negative")
 
 
@@ -631,7 +630,7 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                     f"F5: region {r['name']} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
-    # G4: (phi, kappa, delta) within declared region bounds
+    # G4: (phi, delta) within declared region bounds (kappa removed 2026-08)
     if axes:
         region_lookup = {r["name"]: r for r in axes}
         for _, row in users.iterrows():
@@ -639,14 +638,12 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             if region is None:
                 continue
             f_lo, f_hi = region["freq"]
-            k_lo, k_hi = region["consist"]
             d_lo, d_hi = region["dist_km"]
             ok = (f_lo <= row["phi"] <= f_hi and
-                  k_lo <= row["kappa"] <= k_hi and
                   d_lo <= row["delta_km"] <= d_hi)
             if not ok:
                 rep.errors.append(
-                    f"G4: car {row['car_id']} (phi={row['phi']:.3f}, kappa={row['kappa']:.3f}, "
+                    f"G4: car {row['car_id']} (phi={row['phi']:.3f}, "
                     f"delta={row['delta_km']:.1f}) outside region {row['region']} bounds"
                 )
                 break
