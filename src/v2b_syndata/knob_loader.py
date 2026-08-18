@@ -70,6 +70,13 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     # volume overshoot. Drawn per car in per_entity.sample_a_user.
     "phi.alpha": (0.01, 100.0),
     "phi.beta": (0.01, 100.0),
+    # Per-session delivered-energy lognormal (2026-08): kWh is the ONLY energy
+    # quantity any charging dataset measures, so generation draws it directly
+    # and DERIVES required_soc = arrival + kwh/capacity — decoupling session
+    # energy from the hand-authored battery_mix. sigma is the lognorm shape,
+    # scale = exp(mu) in kWh.
+    "energy.sigma": (0.01, 5.0),
+    "energy.scale": (0.1, 100.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
     "soc_depart.alpha": (0.01, 50.0),

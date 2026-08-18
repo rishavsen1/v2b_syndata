@@ -36,3 +36,54 @@ def test_override_shifts_required_soc(fast_generate):
     lo = pd.read_csv(out_lo / "sessions.csv")["required_soc_at_depart"]
     assert len(hi) and len(lo)
     assert lo.mean() < hi.mean(), (lo.mean(), hi.mean())
+
+
+# --------------------------------------------------------------------------- #
+# Energy-first departure requirement (2026-08)
+# --------------------------------------------------------------------------- #
+def test_energy_block_drives_required_soc(fast_generate):
+    """A calibrated `energy` lognormal must produce session energies whose
+    distribution tracks the fitted lognormal, independent of battery_mix."""
+    import numpy as np
+    import pandas as pd
+    import scipy.stats as st
+    import yaml
+
+    out, _ = fast_generate(scenario="S_acn_jpl", seed=11,
+                           overrides={"ev_fleet.ev_count": 120,
+                                      "charging_infra.charger_count": 60})
+    s = pd.read_csv(out / "sessions.csv")
+    cars = pd.read_csv(out / "cars.csv").set_index("car_id")["capacity_kwh"]
+    kwh = ((s["required_soc_at_depart"] - s["arrival_soc"]) / 100.0
+           * s["car_id"].map(cars))
+    pops = yaml.safe_load(open("configs/populations.yaml"))
+    e = pops["acn_jpl_baseline"]["region_distributions"]["regular_charger"]["energy"]
+    # Model medians per region are ~10.4-11.8 kWh; the generated median must be
+    # in that neighborhood, not the old gap*capacity regime (median ~22 kWh).
+    assert 6.0 < np.median(kwh) < 16.0, f"median {np.median(kwh):.1f}"
+    # And the marginal must be close to the fitted lognormal (headroom clamp
+    # trims the top, so allow a loose KS bound).
+    ref = st.lognorm.rvs(e["sigma"], scale=e["scale"], size=4000,
+                         random_state=np.random.default_rng(0))
+    assert st.ks_2samp(kwh, ref).statistic < 0.2
+
+
+def test_phi_scale_densifies_appearance(fast_generate):
+    """phi_scale multiplies the drawn φ (capped 0.95): more distinct cars/day."""
+    import pandas as pd
+
+    base, _ = fast_generate(scenario="S_acn_jpl", seed=3,
+                            overrides={"ev_fleet.ev_count": 60,
+                                       "charging_infra.charger_count": 30})
+    dense, _ = fast_generate(scenario="S_acn_jpl", seed=3,
+                             overrides={"ev_fleet.ev_count": 60,
+                                        "charging_infra.charger_count": 30,
+                                        "user_behavior.phi_scale": 1.7})
+    def daily(out):
+        s = pd.read_csv(out / "sessions.csv")
+        a = pd.to_datetime(s["arrival"])
+        return s.groupby(a.dt.date)["car_id"].nunique().mean()
+    b, d = daily(base), daily(dense)
+    assert d > b * 1.3, f"phi_scale had insufficient effect: {b:.1f} -> {d:.1f}"
+    u = pd.read_csv(dense / "users.csv")
+    assert (u["phi"] <= 0.95 + 1e-9).all()

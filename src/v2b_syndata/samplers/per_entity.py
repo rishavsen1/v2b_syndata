@@ -58,6 +58,11 @@ def sample_a_user(ctx: ScenarioContext) -> None:
     alpha_w1, alpha_w2 = U["w_multiplier"]
 
     region_dists = U.get("region_distributions") or {}
+    # Global φ multiplier (default 1.0 = source-faithful). Applied to the drawn
+    # φ and capped at 0.95 so appearance stays a proper Bernoulli rate; the
+    # scaled value is what lands in users.csv (the effective rate, honestly).
+    phi_scale = float(ctx.knobs.get("user_behavior.phi_scale")) \
+        if ctx.knobs.has("user_behavior.phi_scale") else 1.0
 
     out: dict[int, UserAttrs] = {}
     for car_id in range(1, ev_count + 1):
@@ -81,6 +86,7 @@ def sample_a_user(ctx: ScenarioContext) -> None:
             phi = min(max(phi, phi_lo), phi_hi)
         else:
             phi = float(rng.uniform(phi_lo, phi_hi))
+        phi = min(0.95, phi * phi_scale)
         delta = float(rng.uniform(region["dist_km"][0], region["dist_km"][1]))
         # Negotiation
         nidx = int(rng.choice(len(NEG_TYPES), p=neg_mix))

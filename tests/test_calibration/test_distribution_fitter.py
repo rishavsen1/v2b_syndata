@@ -86,3 +86,28 @@ def test_fit_region_does_not_fit_arrival_soc():
     assert FIT_SOC_ARRIVAL is False
     assert out["soc_arrival"] is None
     assert out["soc_depart"] is not None, "departure SoC carries real signal — keep it"
+
+
+# --------------------------------------------------------------------------- #
+# Per-session delivered-energy lognormal (2026-08)
+# --------------------------------------------------------------------------- #
+def test_fit_lognorm_energy_recovers_params():
+    import numpy as np
+
+    from v2b_syndata.calibration.distribution_fitter import fit_lognorm_energy
+
+    rng = np.random.default_rng(5)
+    kwh = rng.lognormal(mean=np.log(11.5), sigma=0.7, size=5000)
+    fit = fit_lognorm_energy(kwh)
+    assert fit is not None and fit["dist"] == "lognorm"
+    assert abs(fit["scale"] - 11.5) < 1.0
+    assert abs(fit["sigma"] - 0.7) < 0.05
+    assert fit["ks_fit_quality"] < 0.03
+
+
+def test_fit_lognorm_energy_below_min_samples_returns_none():
+    import numpy as np
+
+    from v2b_syndata.calibration.distribution_fitter import fit_lognorm_energy
+
+    assert fit_lognorm_energy(np.array([5.0] * 10)) is None

@@ -118,12 +118,22 @@ def sample_f_soc(ctx: ScenarioContext) -> None:
             "clip_lo": car.min_allowed_soc / 100.0,
             "clip_hi": car.max_allowed_soc / 100.0,
         }
-        # Departure-SoC requirement: None → renderer keeps the hardcoded
-        # N(85, 5) fallback (bit-identical for uncalibrated populations).
+        # Departure-SoC requirement, by priority (renderer branches the same way):
+        #   1. calibrated per-region ENERGY lognormal (2026-08): draw session kWh
+        #      directly (the metered quantity) and derive required_soc — this
+        #      decouples energy from battery_mix;
+        #   2. calibrated soc_depart Beta (legacy calibrated path);
+        #   3. None → renderer keeps the hardcoded N(85, 5) fallback
+        #      (bit-identical for uncalibrated populations).
         dep_cal = _region_dist(ctx, u.region, "soc_depart")
-        depart_params[car_id] = (
-            {"alpha": float(dep_cal["alpha"]), "beta": float(dep_cal["beta"])}
-            if "alpha" in dep_cal and "beta" in dep_cal else None
-        )
+        energy_cal = _region_dist(ctx, u.region, "energy")
+        dep_entry: dict[str, float] | None = None
+        if "alpha" in dep_cal and "beta" in dep_cal:
+            dep_entry = {"alpha": float(dep_cal["alpha"]), "beta": float(dep_cal["beta"])}
+        if "sigma" in energy_cal and "scale" in energy_cal:
+            dep_entry = dict(dep_entry or {})
+            dep_entry["energy_sigma"] = float(energy_cal["sigma"])
+            dep_entry["energy_scale"] = float(energy_cal["scale"])
+        depart_params[car_id] = dep_entry
     ctx.latents["f_soc"] = params
     ctx.latents["f_soc_depart"] = depart_params

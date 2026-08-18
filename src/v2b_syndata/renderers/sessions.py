@@ -328,11 +328,32 @@ def render(ctx: ScenarioContext) -> None:
                     # User arrived too charged for any valid target → drop session-day.
                     break
 
-                # Departure-SoC requirement: calibrated Beta per region when
-                # available (sample on [0,1], clamp into the D6/D7 band), else
-                # the hardcoded N(85, 5) — kept bit-identical for uncalibrated
-                # populations (same single RNG draw).
-                if soc_depart_p is not None:
+                # Departure-SoC requirement, by priority (one RNG draw each way):
+                #   1. calibrated per-region ENERGY lognormal — draw the session's
+                #      delivered kWh directly (the only energy quantity the source
+                #      datasets meter) and derive required_soc = arrival +
+                #      kwh/capacity, clamped to the car's headroom. Decouples
+                #      session energy from the hand-authored battery_mix.
+                #   2. calibrated soc_depart Beta (legacy calibrated path).
+                #   3. hardcoded N(85, 5) — bit-identical for uncalibrated
+                #      populations.
+                if soc_depart_p is not None and "energy_sigma" in soc_depart_p:
+                    kwh_draw = float(stats.lognorm.ppf(
+                        float(rng.random()),
+                        soc_depart_p["energy_sigma"],
+                        scale=soc_depart_p["energy_scale"],
+                    ))
+                    # The calibrated energy draw REPLACES the D7 behavioral
+                    # floor (min_depart_soc): D7 is a discretionary prior for
+                    # synthetic populations, and letting it bind here forces
+                    # small empirical sessions up to the floor (arrival 10% +
+                    # 5 kWh -> 40% floor = a fabricated 22 kWh session on a
+                    # 75 kWh pack). Only the structural D6 rule (required >
+                    # arrival) and the car's headroom still apply.
+                    floor_e = a_soc_pct + _FLOOR_EPSILON
+                    r_soc_pct = max(floor_e, min(
+                        ceiling, a_soc_pct + kwh_draw / car.capacity_kwh * 100.0))
+                elif soc_depart_p is not None:
                     beta_d = float(rng.beta(soc_depart_p["alpha"], soc_depart_p["beta"])) * 100.0
                     r_soc_pct = max(floor, min(ceiling, beta_d))
                 else:

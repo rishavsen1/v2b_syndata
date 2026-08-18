@@ -152,6 +152,12 @@ acn_workplace_baseline:
         beta: 27.055944317621655
         n_samples: 228
         ks_fit_quality: 0.14486792717446656
+      energy:
+        dist: lognorm
+        sigma: 0.8269355424301275
+        scale: 10.491279764944638
+        n_samples: 4814
+        ks_fit_quality: 0.03119558673602002
       arrival:
         dist: truncnorm_mixture
         w1: 0.43153687453682354
@@ -189,6 +195,12 @@ acn_workplace_baseline:
         beta: 36.31611219329569
         n_samples: 255
         ks_fit_quality: 0.08636471485015679
+      energy:
+        dist: lognorm
+        sigma: 0.7916857607425841
+        scale: 10.375335990737605
+        n_samples: 17318
+        ks_fit_quality: 0.02953786544300152
       arrival:
         dist: truncnorm_mixture
         w1: 0.4910296065050719
@@ -226,6 +238,12 @@ acn_workplace_baseline:
         beta: 2.6259283338674053
         n_samples: 142
         ks_fit_quality: 0.17805732860313034
+      energy:
+        dist: lognorm
+        sigma: 0.7873791336248382
+        scale: 9.744869011817904
+        n_samples: 17968
+        ks_fit_quality: 0.039684155651144526
       arrival:
         dist: truncnorm_mixture
         w1: 0.4826551420126444
@@ -311,6 +329,12 @@ acn_caltech_baseline:
         beta: 20.696567923022183
         n_samples: 139
         ks_fit_quality: 0.15776476235193004
+      energy:
+        dist: lognorm
+        sigma: 0.877573581012097
+        scale: 9.588438514456818
+        n_samples: 2832
+        ks_fit_quality: 0.034958233423846186
       arrival:
         dist: truncnorm_mixture
         w1: 0.46730193311337515
@@ -348,6 +372,12 @@ acn_caltech_baseline:
         beta: 40.533906644475465
         n_samples: 81
         ks_fit_quality: 0.10747991454484357
+      energy:
+        dist: lognorm
+        sigma: 0.8211894954808107
+        scale: 7.846052452020161
+        n_samples: 4380
+        ks_fit_quality: 0.029984173314710927
       arrival:
         dist: truncnorm_mixture
         w1: 0.5620825443953065
@@ -385,6 +415,12 @@ acn_caltech_baseline:
         beta: 4.5679637128747475
         n_samples: 38
         ks_fit_quality: 0.24741091730043369
+      energy:
+        dist: lognorm
+        sigma: 0.7803757537111534
+        scale: 5.811451795041921
+        n_samples: 5117
+        ks_fit_quality: 0.049005380738371934
       arrival:
         dist: truncnorm_mixture
         w1: 0.4304762523437962
@@ -467,6 +503,12 @@ acn_jpl_baseline:
         beta: 68.87863633831435
         n_samples: 109
         ks_fit_quality: 0.09407294964919777
+      energy:
+        dist: lognorm
+        sigma: 0.7955786600079097
+        scale: 10.375241371801044
+        n_samples: 2469
+        ks_fit_quality: 0.034993961925923245
       arrival:
         dist: truncnorm_mixture
         w1: 0.509455465826716
@@ -504,6 +546,12 @@ acn_jpl_baseline:
         beta: 36.651284941089635
         n_samples: 168
         ks_fit_quality: 0.08170714138005275
+      energy:
+        dist: lognorm
+        sigma: 0.744800685119903
+        scale: 11.756904531546333
+        n_samples: 12010
+        ks_fit_quality: 0.035649985495220735
       arrival:
         dist: truncnorm_mixture
         w1: 0.5553929917972694
@@ -541,6 +589,12 @@ acn_jpl_baseline:
         beta: 2.38458265238533
         n_samples: 101
         ks_fit_quality: 0.17660901444648935
+      energy:
+        dist: lognorm
+        sigma: 0.6844784130479606
+        scale: 11.799165609171878
+        n_samples: 12657
+        ks_fit_quality: 0.05542485779452855
       arrival:
         dist: truncnorm_mixture
         w1: 0.6923433713747946
@@ -613,6 +667,12 @@ acn_office001_baseline:
         rho_spearman: -0.6576655052264809
         rho_gaussian: -0.6751751851778541
         n_samples: 41
+      energy:
+        dist: lognorm
+        sigma: 0.9430261431213696
+        scale: 13.071977893311864
+        n_samples: 41
+        ks_fit_quality: 0.17460732654973316
       arrival:
         dist: truncnorm_mixture
         w1: 0.46264371091660317
@@ -641,6 +701,12 @@ acn_office001_baseline:
         rho_spearman: -0.5245295168434151
         rho_gaussian: -0.5424066923378253
         n_samples: 169
+      energy:
+        dist: lognorm
+        sigma: 0.8538025426426896
+        scale: 11.716621036313626
+        n_samples: 169
+        ks_fit_quality: 0.16028259444513482
       arrival:
         dist: truncnorm_mixture
         w1: 0.4696032319390456
@@ -669,6 +735,12 @@ acn_office001_baseline:
         rho_spearman: -0.6642131706418422
         rho_gaussian: -0.6816253752936312
         n_samples: 344
+      energy:
+        dist: lognorm
+        sigma: 0.6032741946372079
+        scale: 18.781972891549433
+        n_samples: 344
+        ks_fit_quality: 0.10182352091750912
       arrival:
         dist: truncnorm_mixture
         w1: 0.3521807021487939

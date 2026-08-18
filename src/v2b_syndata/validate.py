@@ -378,7 +378,17 @@ def _check_d(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
     d5_enforced = "d5_enforcement" in noise_block
     res = manifest.get("knob_resolution", {})
     mds_entry = res.get("user_behavior.min_depart_soc")
-    if mds_entry is not None and not d5_enforced:
+    # Skip when the population carries a calibrated per-region ENERGY block:
+    # the renderer's energy-first draw deliberately replaces the D7 behavioral
+    # floor with the empirical session-energy distribution (D7 is documented
+    # as a discretionary prior, not a hard constraint), so small real-world
+    # sessions below the floor are correct output, not a defect.
+    energy_calibrated = any(
+        path.startswith("user_behavior.region_distributions.")
+        and path.endswith(".energy.sigma")
+        for path in res
+    )
+    if mds_entry is not None and not d5_enforced and not energy_calibrated:
         mds_pct = float(mds_entry["value"]) * 100.0
         bad_d7 = sess[sess["required_soc_at_depart"] < mds_pct]
         if len(bad_d7) > 0:
@@ -630,7 +640,10 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
                     f"F5: region {r['name']} share {actual:.3f} vs {expected:.3f} (tol {tol:.3f}, n={n})"
                 )
 
-    # G4: (phi, delta) within declared region bounds (kappa removed 2026-08)
+    # G4: (phi, delta) within declared region bounds (kappa removed 2026-08).
+    # users.csv records the EFFECTIVE φ — post phi_scale, capped at 0.95 — so
+    # the acceptance band is the region's bin scaled the same way.
+    phi_scale = float(res.get("user_behavior.phi_scale", {}).get("value", 1.0))
     if axes:
         region_lookup = {r["name"]: r for r in axes}
         for _, row in users.iterrows():
@@ -638,8 +651,10 @@ def _check_f(rep: ValidationReport, csvs: dict[str, pd.DataFrame],
             if region is None:
                 continue
             f_lo, f_hi = region["freq"]
+            f_lo = min(0.95, f_lo * phi_scale)
+            f_hi = min(0.95, f_hi * phi_scale)
             d_lo, d_hi = region["dist_km"]
-            ok = (f_lo <= row["phi"] <= f_hi and
+            ok = (f_lo - 1e-9 <= row["phi"] <= f_hi + 1e-9 and
                   d_lo <= row["delta_km"] <= d_hi)
             if not ok:
                 rep.errors.append(

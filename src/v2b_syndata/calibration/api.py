@@ -20,6 +20,7 @@ from .distribution_fitter import (
     MIN_SAMPLES,
     MIXTURE_MIN_SAMPLES,
     fit_beta_soc,
+    fit_lognorm_energy,
     fit_region,
     fit_truncnorm_arrival,
     fit_truncnorm_mixture_arrival,
@@ -302,11 +303,14 @@ def _calibrate_one_population(
         dwell_list: list[float] = []
         soc_list: list[float] = []
         depart_list: list[float] = []
+        kwh_list: list[float] = []
         for u in region_users:
             sess = sessions_by_uid.get(u.user_id, [])
             for s in sess:
                 arr_list.append(s.arrival_hour)
                 dwell_list.append(s.dwell_hours)
+                if s.kwh_delivered and s.kwh_delivered > 0:
+                    kwh_list.append(float(s.kwh_delivered))
             socs = arr_soc_by_uid.get(u.user_id, [])
             soc_list.extend(socs)
             depart_list.extend(depart_soc_by_uid.get(u.user_id, []))
@@ -335,6 +339,12 @@ def _calibrate_one_population(
             phi_fit = fit_beta_soc(phi_vals, leaf_prefix="phi")
             if phi_fit is not None:
                 clean["phi"] = phi_fit
+        # Per-session delivered-energy lognormal (2026-08): the metered kWh is
+        # the primal energy signal; generation draws it directly and derives
+        # required_soc, decoupling energy from the hand-authored battery_mix.
+        energy_fit = fit_lognorm_energy(np.asarray(kwh_list, dtype=float))
+        if energy_fit is not None:
+            clean["energy"] = energy_fit
         if clean or fit.get("arrival") is not None:
             region_fits[rname] = clean
 

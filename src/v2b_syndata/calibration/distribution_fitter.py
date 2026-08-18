@@ -339,6 +339,33 @@ def fit_beta_soc(soc_fractions: np.ndarray, leaf_prefix: str = "soc_arrival") ->
                         {"alpha": f"{leaf_prefix}.alpha", "beta": f"{leaf_prefix}.beta"})
 
 
+def fit_lognorm_energy(kwh_delivered: np.ndarray) -> dict[str, Any] | None:
+    """Fit LogNormal(sigma, scale) to per-session delivered energy (kWh).
+
+    Delivered kWh is the only energy quantity the source datasets actually
+    meter (SoC is never recorded), so it is fitted directly; generation draws a
+    session's energy from this and derives the departure-SoC requirement.
+    Across-family check on ACN JPL: lognorm KS 0.035-0.055 per region vs
+    gamma 0.084 / weibull 0.099 pooled. Returns None below MIN_SAMPLES or if
+    any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """
+    arr = np.asarray(kwh_delivered, dtype=float)
+    arr = arr[arr > 0.05]
+    n = int(len(arr))
+    if n < MIN_SAMPLES:
+        return None
+    shape, _, scale = st.lognorm.fit(arr, floc=0)
+    shape = float(shape)
+    scale = float(scale)
+    if shape <= 0 or scale <= 0:
+        return None
+    ks = float(st.kstest(arr, "lognorm", args=(shape, 0, scale)).statistic)
+    fit = {"dist": "lognorm", "sigma": shape, "scale": scale,
+           "n_samples": n, "ks_fit_quality": ks}
+    return _drop_if_oor("energy", fit,
+                        {"sigma": "energy.sigma", "scale": "energy.scale"})
+
+
 def fit_copula_rho(arrivals: np.ndarray, dwells: np.ndarray) -> dict[str, Any]:
     """Compute Spearman ρ + Gaussian-copula correlation."""
     n = int(min(len(arrivals), len(dwells)))
