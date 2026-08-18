@@ -98,6 +98,12 @@ def _load_generated(root: Path, max_units: int | None):
             a = pd.to_datetime(g["arrival"]); d = pd.to_datetime(g["departure"])
             kwh = (g["departure_soc"] - g["arrival_soc"]) / 100.0 * cap
             gg = pd.read_csv(f, usecols=["previous_day_external_use_soc"])
+            # signed external SoC change: prev departure_soc − this arrival_soc
+            # per car in arrival order (positive = consumed away from the
+            # building, negative = net external charging, e.g. at home).
+            gs = g.sort_values(["car_id", "arrival"])
+            signed = (gs.groupby("car_id")["departure_soc"].shift(1)
+                      - gs["arrival_soc"])
             rows.append(pd.DataFrame({
                 "b": bdir.name,
                 "arr_h": a.dt.hour + a.dt.minute / 60.0,
@@ -106,6 +112,7 @@ def _load_generated(root: Path, max_units: int | None):
                 "kwh": kwh,
                 "req_soc": g["departure_soc"],
                 "prev_ext": gg["previous_day_external_use_soc"],
+                "ext_signed": signed.reindex(g.index),
                 "car": g["car_id"],
                 "month": a.dt.to_period("M").astype(str),
                 "unit": ckey,
@@ -187,15 +194,20 @@ def main(argv=None) -> int:
     overlay(ax[2, 1], sdep_soc, g["req_soc"].to_numpy(), 40, (0, 100),
             "8  Required SoC at departure (%)", "% SoC")
 
-    # 9: previous-day external use (chain draw) — generated only; no dataset
-    # observes between-visit consumption.
+    # 9: SIGNED external SoC change between visits (prev departure − arrival),
+    # generated only — no dataset observes between-visit behavior. Positive =
+    # consumed away from the building; negative = net external charging (home).
+    # The shipped previous_day_external_use_soc column is this, floored at 0.
     a9 = ax[2, 2]
-    pe = g["prev_ext"].to_numpy()
-    a9.hist(pe[pe > 0], bins=40, color=GEN_C, alpha=0.8)
-    a9.set_title(f"9  previous_day_external_use_soc  "
-                 f"(zero share {np.mean(pe <= 0):.2f}; no source analogue)",
-                 fontsize=10, loc="left")
-    a9.set_xlabel("SoC points consumed between visits"); a9.set_ylabel("sessions")
+    es = g["ext_signed"].dropna().to_numpy()
+    a9.hist(es, bins=np.linspace(-80, 80, 49), color=GEN_C, alpha=0.8)
+    a9.axvline(0, color="k", lw=1.0, ls="--")
+    neg = float(np.mean(es < 0))
+    a9.set_title(f"9  prev departure − next arrival (signed external use)\n"
+                 f"negative = charged elsewhere: {neg:.0%} of repeat sessions; "
+                 f"shipped column floors these to 0", fontsize=10, loc="left")
+    a9.set_xlabel("SoC points (+ = used externally, − = gained externally)")
+    a9.set_ylabel("sessions")
 
     lines = [f"{b}: {v['units']} units  {v['sessions']:,} sessions  {v['mwh']:.1f} MWh EV"
              for b, v in per_b.items()]
