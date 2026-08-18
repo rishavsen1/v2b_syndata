@@ -107,11 +107,18 @@ def sample_f_soc(ctx: ScenarioContext) -> None:
     assert ctx.a_fleet is not None
     params = {}
     depart_params: dict[Any, dict[str, float] | None] = {}
+    # Arrival-SoC Beta prior defaults (knobs; Beta(2,3) since 2026-08 — same
+    # 0.40 mean as the old hardcoded Beta(4,6), wider spread). A population's
+    # calibrated/hand-authored soc_arrival block still wins per region.
+    alpha_default = float(ctx.knobs.get("user_behavior.arrival_soc_alpha")) \
+        if ctx.knobs.has("user_behavior.arrival_soc_alpha") else 2.0
+    beta_default = float(ctx.knobs.get("user_behavior.arrival_soc_beta")) \
+        if ctx.knobs.has("user_behavior.arrival_soc_beta") else 3.0
     for car_id, u in ctx.a_user.items():
         car = ctx.a_fleet[car_id]
         soc_cal = _region_dist(ctx, u.region, "soc_arrival")
-        alpha = float(soc_cal.get("alpha", 4.0))
-        beta = float(soc_cal.get("beta", 6.0))
+        alpha = float(soc_cal.get("alpha", alpha_default))
+        beta = float(soc_cal.get("beta", beta_default))
         params[car_id] = {
             "alpha": alpha, "beta": beta,
             "shift": -u.delta_km * 0.003,

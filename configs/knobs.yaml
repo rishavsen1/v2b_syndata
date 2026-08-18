@@ -178,6 +178,20 @@ user_behavior:
     description: "Upper clip (hours) on every sampled session dwell. Was hardcoded 14.0 in sessions_dist.py; promoted to a knob 2026-08 because it is a hard truncation that shows up in the output as a spike at the clip point (real ACN same-day dwells reach 20 h). Default 14.0 keeps existing scenarios bitwise-identical; raise it for cohorts whose calibrated dwell has mass above 14 h."
     affects_csv: [sessions.csv]
 
+  arrival_soc_alpha:
+    type: float
+    range: [0.1, 50.0]
+    default: 2.0
+    description: "Alpha of the arrival-SoC Beta prior (used when the population carries no calibrated soc_arrival block — the ACN populations, since SoC is never metered). Default Beta(2,3): mean 0.40, sd 0.20. Pre-2026-08 the fallback was a hardcoded Beta(4,6) (same mean, sd 0.148); widened per dataset-design decision to spread arrival states. The per-user −δ_km·0.003 commute shift and the [min_allowed_soc, max_allowed_soc] clamp still apply."
+    affects_csv: [sessions.csv]
+
+  arrival_soc_beta:
+    type: float
+    range: [0.1, 50.0]
+    default: 3.0
+    description: "Beta of the arrival-SoC Beta prior (pairs with arrival_soc_alpha; mean = α/(α+β))."
+    affects_csv: [sessions.csv]
+
   phi_scale:
     type: float
     range: [0.1, 3.0]

@@ -116,8 +116,8 @@ def test_no_calibration_all_placeholders():
     assert dw["k"] == 2.0
     assert abs(dw["lam"] - 8.0 * (0.5 + 0.9)) < 1e-9
     assert dw["rho"] == 0.0
-    assert so["alpha"] == 4.0
-    assert so["beta"] == 6.0
+    assert so["alpha"] == 2.0  # arrival_soc_alpha knob default (Beta(2,3), 2026-08)
+    assert so["beta"] == 3.0
 
 
 def test_user_in_uncalibrated_region_falls_back():
