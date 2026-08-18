@@ -40,6 +40,10 @@ SRC_C, GEN_C = "#555555", "#d8853b"
 
 
 def _source_arrays(site: str):
+    from v2b_syndata.calibration.battery_inference import (
+        infer_capacity,
+        reconstruct_arrival_soc,
+    )
     from v2b_syndata.calibration.sources import CALIBRATION_SOURCES
     src = CALIBRATION_SOURCES["acn_data"]()
     sess = src.fetch_sessions({
@@ -50,12 +54,32 @@ def _source_arrays(site: str):
     dw = np.array([s.dwell_hours for s in sess])
     kwh = np.array([s.kwh_delivered for s in sess])
     dep = (arr + dw) % 24.0
-    return arr, dep, dw, kwh
+    # depart-SoC target: the same prior-based reconstruction calibration used
+    rng = np.random.default_rng(20260613)
+    dep_soc = []
+    for s in sess:
+        cap, _ = infer_capacity(s)
+        soc = reconstruct_arrival_soc(s, cap, rng=rng)
+        if soc is None or cap <= 0 or not s.kwh_delivered:
+            continue
+        d_ = min(1 - 1e-6, soc + float(s.kwh_delivered) / float(cap))
+        if d_ > soc:
+            dep_soc.append(d_ * 100)
+    # per-weekday-date: mean dwell per active user
+    df = pd.DataFrame({
+        "date": pd.to_datetime([s.arrival_time for s in sess]).date,
+        "uid": [s.user_id for s in sess],
+        "dw": dw,
+    })
+    byd = df.groupby("date").agg(n=("uid", "nunique"), dwsum=("dw", "sum"))
+    dwell_per_active = (byd["dwsum"] / byd["n"]).to_numpy()
+    return arr, dep, dw, kwh, np.array(dep_soc), dwell_per_active
 
 
 def _load_generated(root: Path, max_units: int | None):
     rows = []
     per_building = {}
+    per_day = []
     for bdir in sorted(root.glob("b*"), key=lambda p: int(p.name[1:])):
         cars_cache: dict[str, pd.Series] = {}
         files = sorted(glob.glob(str(bdir / "*" / "*" / "sessions_soc.csv")))
@@ -73,21 +97,33 @@ def _load_generated(root: Path, max_units: int | None):
             cap = g["car_id"].map(cars_cache[ckey])
             a = pd.to_datetime(g["arrival"]); d = pd.to_datetime(g["departure"])
             kwh = (g["departure_soc"] - g["arrival_soc"]) / 100.0 * cap
+            gg = pd.read_csv(f, usecols=["previous_day_external_use_soc"])
             rows.append(pd.DataFrame({
                 "b": bdir.name,
                 "arr_h": a.dt.hour + a.dt.minute / 60.0,
                 "dep_h": d.dt.hour + d.dt.minute / 60.0,
                 "dwell": (d - a).dt.total_seconds() / 3600.0,
                 "kwh": kwh,
+                "req_soc": g["departure_soc"],
+                "prev_ext": gg["previous_day_external_use_soc"],
                 "car": g["car_id"],
                 "month": a.dt.to_period("M").astype(str),
                 "unit": ckey,
             }))
+            fleet = int(cars_cache[ckey].shape[0])
+            daily = g.assign(date=a.dt.date).groupby("date")["car_id"].nunique()
+            dw_day = (pd.DataFrame({"date": a.dt.date,
+                                    "dw": (d - a).dt.total_seconds() / 3600.0})
+                      .groupby("date")["dw"].sum())
+            for date, cnt in daily.items():
+                per_day.append({"unit": ckey, "date": date, "n_evs": cnt,
+                                "fleet": fleet, "share": cnt / fleet,
+                                "dwell_per_active": float(dw_day.loc[date]) / cnt})
             n_sess += len(g)
             energy += float(kwh.sum())
         per_building[bdir.name] = {"units": len(files), "sessions": n_sess,
                                    "mwh": energy / 1000.0}
-    return pd.concat(rows, ignore_index=True), per_building
+    return pd.concat(rows, ignore_index=True), per_building, pd.DataFrame(per_day)
 
 
 def main(argv=None) -> int:
@@ -98,11 +134,11 @@ def main(argv=None) -> int:
     p.add_argument("--max-units-per-building", type=int, default=None)
     args = p.parse_args(argv)
 
-    sa, sdep, sdw, skwh = _source_arrays(args.site)
-    g, per_b = _load_generated(args.root, args.max_units_per_building)
+    sa, sdep, sdw, skwh, sdep_soc, sdw_day = _source_arrays(args.site)
+    g, per_b, per_day = _load_generated(args.root, args.max_units_per_building)
     n_units = sum(v["units"] for v in per_b.values())
 
-    fig, ax = plt.subplots(2, 3, figsize=(16.5, 8.6))
+    fig, ax = plt.subplots(3, 3, figsize=(16.5, 12.9))
 
     def overlay(a, sx, gx, bins, rng_, title, xlabel):
         ks = st.ks_2samp(sx, gx).statistic
@@ -128,14 +164,44 @@ def main(argv=None) -> int:
                        fontsize=10, loc="left")
     ax[1, 1].set_xlabel("sessions in month"); ax[1, 1].set_ylabel("car-months")
 
-    a6 = ax[1, 2]; a6.axis("off")
+    # 6: distinct EVs active per day, as a share of the building fleet.
+    # No direct source analogue at building scale (the ACN site pools hundreds
+    # of drivers over 50+ chargers), so the reference lines are the model's own
+    # source-anchored expectation E[phi] and the realized mean.
+    a6 = ax[1, 2]
+    a6.hist(per_day["share"], bins=np.linspace(0, 1, 31), color=GEN_C, alpha=0.8)
+    mu = per_day["share"].mean()
+    a6.axvline(mu, color="k", lw=1.2, ls="--", label=f"realized mean {mu:.2f}")
+    a6.set_title(f"6  Active EVs per day / fleet size  "
+                 f"(mean {per_day['n_evs'].mean():.1f} EVs)", fontsize=10, loc="left")
+    a6.set_xlabel("share of fleet active"); a6.set_ylabel("building-days")
+    a6.legend(fontsize=8)
+
+    # 7: dwell hours per active EV per day — source comparable.
+    overlay(ax[2, 0], sdw_day, per_day["dwell_per_active"].to_numpy(), 40, (0, 14),
+            "7  Dwell hours per active EV per day", "h / active EV / day")
+
+    # 8: departure-SoC requirement. Source side is the calibration's
+    # prior-based reconstruction (SoC is never metered), so this compares two
+    # MODELED quantities; generated is now DERIVED from the energy draw.
+    overlay(ax[2, 1], sdep_soc, g["req_soc"].to_numpy(), 40, (0, 100),
+            "8  Required SoC at departure (%)", "% SoC")
+
+    # 9: previous-day external use (chain draw) — generated only; no dataset
+    # observes between-visit consumption.
+    a9 = ax[2, 2]
+    pe = g["prev_ext"].to_numpy()
+    a9.hist(pe[pe > 0], bins=40, color=GEN_C, alpha=0.8)
+    a9.set_title(f"9  previous_day_external_use_soc  "
+                 f"(zero share {np.mean(pe <= 0):.2f}; no source analogue)",
+                 fontsize=10, loc="left")
+    a9.set_xlabel("SoC points consumed between visits"); a9.set_ylabel("sessions")
+
     lines = [f"{b}: {v['units']} units  {v['sessions']:,} sessions  {v['mwh']:.1f} MWh EV"
              for b, v in per_b.items()]
     tot = (f"TOTAL: {n_units:,} units  {len(g):,} sessions  "
            f"{sum(v['mwh'] for v in per_b.values()):.1f} MWh EV")
-    a6.text(0.02, 0.98, "\n".join(lines + ["", tot]), va="top", family="monospace",
-            fontsize=9, transform=a6.transAxes)
-    a6.set_title("6  Per-building totals", fontsize=10, loc="left")
+    print("\n".join(lines + [tot]))
 
     fig.suptitle(
         f"campus_base generated tree vs ACN {args.site} calibration cohort "
@@ -148,7 +214,9 @@ def main(argv=None) -> int:
     stats = args.out.with_suffix(".csv")
     rows = []
     for name, sx, gx in (("kwh", skwh, g["kwh"]), ("arrival_hour", sa, g["arr_h"]),
-                         ("departure_hour", sdep, g["dep_h"]), ("dwell_hours", sdw, g["dwell"])):
+                         ("departure_hour", sdep, g["dep_h"]), ("dwell_hours", sdw, g["dwell"]),
+                         ("required_soc_at_depart", sdep_soc, g["req_soc"]),
+                         ("dwell_per_active_day", sdw_day, per_day["dwell_per_active"])):
         gx = np.asarray(gx)
         rows.append({"quantity": name, "n_source": len(sx), "n_generated": len(gx),
                      "source_mean": float(np.mean(sx)), "generated_mean": float(np.mean(gx)),
