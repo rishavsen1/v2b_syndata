@@ -14,7 +14,7 @@ Output:
     data/sensitivity/heatmap_target_miss.png
 
 Usage:
-    uv run python tools/sensitivity_sweep.py \\
+    uv run python tools/paper/sensitivity_sweep.py \\
         --output data/sensitivity \\
         --seed 42 \\
         [--workers 16]
@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pandas as pd
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
 from v2b_syndata.bench import available_algorithms, run_scenario  # noqa: E402

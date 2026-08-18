@@ -35,7 +35,7 @@ import pandas as pd
 
 log = logging.getLogger("validate_buildingload")
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 REFERENCE_DIR = REPO / "data" / "buildingload_reference"
 
 # ASHRAE Guideline-14 hourly thresholds.
@@ -277,7 +277,7 @@ def load_reference_hourly(
     if not pq.exists():
         raise FileNotFoundError(
             f"reference parquet missing: {pq}. Run "
-            "tools/fetch_buildingload_reference.py first."
+            "tools/data_prep/fetch_buildingload_reference.py first."
         )
     df = pd.read_parquet(pq)
     sel = df[
@@ -438,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     if not results:
         print(
             "No results — is the reference parquet present? Run "
-            "tools/fetch_buildingload_reference.py first."
+            "tools/data_prep/fetch_buildingload_reference.py first."
         )
         return 1
     print(format_table(results))

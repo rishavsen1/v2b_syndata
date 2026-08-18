@@ -4,9 +4,9 @@ Stage 1 verifies each knob/deep-param actually affects the declared output CSVs.
 Stage 2 sweeps and tests directional response.
 
 Run:
-    python tools/knob_audit.py --stage 1
-    python tools/knob_audit.py --stage 2          # only after S1 triage
-    python tools/knob_audit.py --stage 1 --jobs 4 # parallel probes
+    python tools/validation/knob_audit.py --stage 1
+    python tools/validation/knob_audit.py --stage 2          # only after S1 triage
+    python tools/validation/knob_audit.py --stage 1 --jobs 4 # parallel probes
 
 Outputs:
     /tmp/knob_audit/audit_metadata.json
@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
 CSV_FILES = [

@@ -1,5 +1,5 @@
 """Tests for the seeded bootstrap CIs + S3 family-matched holdout refit in
-tools/validate_calibration.py (KDD_READINESS #11 / tracker F3).
+tools/validation/validate_calibration.py (KDD_READINESS #11 / tracker F3).
 
 Pure-math tests: the vectorized KS/W1 kernel must agree with scipy exactly,
 and the bootstrap must be bit-deterministic given the fixed seed.
@@ -17,7 +17,7 @@ import scipy.stats as st
 
 REPO = Path(__file__).resolve().parent.parent
 _SPEC = importlib.util.spec_from_file_location(
-    "validate_calibration", REPO / "tools" / "validate_calibration.py"
+    "validate_calibration", REPO / "tools" / "validation" / "validate_calibration.py"
 )
 vc = importlib.util.module_from_spec(_SPEC)
 assert _SPEC and _SPEC.loader

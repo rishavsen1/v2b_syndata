@@ -18,7 +18,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
-    "tstr_forecasting", REPO / "tools" / "tstr_forecasting.py")
+    "tstr_forecasting", REPO / "tools" / "paper" / "tstr_forecasting.py")
 tstr = importlib.util.module_from_spec(_spec)
 # Register before exec so @dataclass can resolve the module by name.
 sys.modules["tstr_forecasting"] = tstr

@@ -6,7 +6,7 @@ summary metrics across all streams (building load, PV, net load, EV sessions,
 grid prices, DR, weather), then quantifies the cross-sample UNCERTAINTY and
 renders a single self-contained HTML report.
 
-Run:  uv run python tools/analyze_overnight.py
+Run:  uv run python tools/campus/analyze_overnight.py
 Out:  data/output/overnight/analysis.html  (+ analysis_summary.csv)
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / "data" / "output" / "overnight"
 OUT_HTML = BASE / "analysis.html"
 OUT_CSV = BASE / "analysis_summary.csv"

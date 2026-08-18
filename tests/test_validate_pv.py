@@ -1,4 +1,4 @@
-"""Tests for tools/validate_pv.py (WS-B PV validation harness).
+"""Tests for tools/validation/validate_pv.py (WS-B PV validation harness).
 
 Metric-math tests use synthetic series (no PySAM, no EPW). The end-to-end
 comparison against PySAM Pvwattsv8 skips when PySAM or the cached San Jose
@@ -16,7 +16,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 _SPEC = importlib.util.spec_from_file_location(
-    "validate_pv", REPO / "tools" / "validate_pv.py"
+    "validate_pv", REPO / "tools" / "validation" / "validate_pv.py"
 )
 vpv = importlib.util.module_from_spec(_SPEC)
 assert _SPEC and _SPEC.loader

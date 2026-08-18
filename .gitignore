@@ -58,9 +58,12 @@ data/calibration/evwatts_cache
 
 # Local-only generated slide decks (kept in-repo on disk, deliberately untracked).
 showcase/decks/
-paper/
-main.*
-pdflatex*
+# Root-anchored: the LaTeX source tree + its build artifacts live at the repo
+# root only. Leading slashes matter — an unanchored `paper/` also swallowed
+# `tools/paper/` (the paper-tooling scripts), hiding new files there from git.
+/paper/
+/main.*
+/pdflatex*
 
 # Run logs from batch/campus generation (e.g. campus_base_run.log). In-tree logs
 # under data/output/ are already covered; this catches root-level run logs too.

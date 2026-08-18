@@ -38,7 +38,7 @@ import requests
 # ---------------------------------------------------------------------------
 
 HERE = Path(__file__).resolve().parent
-REPO_ROOT = HERE.parent
+REPO_ROOT = HERE.parents[1]
 OUT_DIR = REPO_ROOT / "data" / "buildingload_reference"
 RAW_DIR = OUT_DIR / "_raw"
 

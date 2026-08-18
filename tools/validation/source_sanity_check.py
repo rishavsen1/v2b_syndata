@@ -11,7 +11,7 @@ Reuses the harness's load_source() so timezone handling is identical to
 calibration (ACN → Pacific; ElaadNL → native UTC-labelled local, by design).
 
 Usage:
-    uv run python tools/source_sanity_check.py \
+    uv run python tools/validation/source_sanity_check.py \
         --output data/calibration_validation/source_sanity \
         --sources acn,acn_caltech,acn_jpl,acn_office001,elaadnl
 """
@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
@@ -37,7 +37,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(REPO / ".env", override=False)
 
 # Reuse the harness loader so tz handling matches calibration exactly.
-from tools.validate_calibration import load_source  # noqa: E402
+from tools.validation.validate_calibration import load_source  # noqa: E402
 
 # Normal workplace-charging windows (local clock hour).
 ARRIVAL_OK = (5.0, 12.0)     # arrivals should center in the morning commute

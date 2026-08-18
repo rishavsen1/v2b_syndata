@@ -7,11 +7,11 @@ metrics across all streams (building load, PV, net load, EV sessions, grid
 prices, DR, weather), quantifies cross-sample UNCERTAINTY per building and rolls
 up to a campus view, then renders a single self-contained HTML report.
 
-Adapted from tools/analyze_overnight.py. Unlike that (single building, fixed
+Adapted from tools/campus/analyze_overnight.py. Unlike that (single building, fixed
 N_CHARGERS/PV), charger count and PV rating are read PER BUILDING from each
 sample's chargers.csv / pv.csv.
 
-Run:  uv run python tools/analyze_campus.py
+Run:  uv run python tools/campus/analyze_campus.py
 Out:  data/output/campus10/analysis.html  (+ analysis_summary.csv)
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / "data" / "output" / "campus10"
 OUT_HTML = BASE / "analysis.html"
 OUT_CSV = BASE / "analysis_summary.csv"

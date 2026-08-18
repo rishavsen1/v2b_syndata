@@ -108,7 +108,7 @@ curl -s -H "Authorization: Bearer $ZENODO_TOKEN" "$BUCKET" | jq '.contents[] | {
 - **Quota:** default Zenodo record quota is 50 GB — the ~19 GB corpus fits
   without a quota request (staging tars are smaller still).
 - **Bitwise recoverability:** the corpus regenerates from the repo alone (the
-  generic `tools/run_campus.sh` over the committed split configs, seeds in the
+  generic `tools/campus/run_campus.sh` over the committed split configs, seeds in the
   batch manifests), so the deposit is a convenience artifact; state this in the
   description.
 - **Sandbox first:** repeat §4 against `https://sandbox.zenodo.org/api`

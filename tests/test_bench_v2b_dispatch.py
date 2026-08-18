@@ -1,4 +1,4 @@
-"""Smoke tests for tools/bench_v2b_dispatch.py (LP peak-shave baseline).
+"""Smoke tests for tools/paper/bench_v2b_dispatch.py (LP peak-shave baseline).
 
 Tiny synthetic optimus-schema fixture: 8 x 15-min steps, one 50-kWh car
 (arrival SoC 20%, required 60% -> 20 kWh), one bidirectional +-20 kW charger,
@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "paper"))
 
 import bench_v2b_dispatch as bvd  # noqa: E402
 

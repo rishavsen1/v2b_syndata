@@ -4,8 +4,8 @@
 # spanning large→medium office, peaks 600→50 kW, each with 1:1 kWh PV and a
 # 2-hour battery (power = capacity/2). Strong per-building weather realization,
 # clean output noise. Building-major generation: split with
-#   uv run python tools/split_campus_config.py configs/campus_base.yaml
-# then run tools/run_campus.sh (SPLIT=configs/_campus_base_split).
+#   uv run python tools/campus/split_campus_config.py configs/campus_base.yaml
+# then run tools/campus/run_campus.sh (SPLIT=configs/_campus_base_split).
 output_mode: shared
 emit_sessions_soc: true
 dr_program: CBP

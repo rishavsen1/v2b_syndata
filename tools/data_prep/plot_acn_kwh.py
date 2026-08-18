@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot a per-session energy column from an ACN-Data CSV (tools/acn_json_to_csv.py).
+"""Plot a per-session energy column from an ACN-Data CSV (tools/data_prep/acn_json_to_csv.py).
 
 One standalone 4-panel figure per column, with identical panel layout across
 columns so two figures can be read side by side:
@@ -13,8 +13,8 @@ columns so two figures can be read side by side:
 
 Usage
 -----
-  uv run python tools/plot_acn_kwh.py data/calibration/acn_csv/caltech_2019_2021.csv
-  uv run python tools/plot_acn_kwh.py <csv> --columns kWhDelivered
+  uv run python tools/data_prep/plot_acn_kwh.py data/calibration/acn_csv/caltech_2019_2021.csv
+  uv run python tools/data_prep/plot_acn_kwh.py <csv> --columns kWhDelivered
 """
 from __future__ import annotations
 

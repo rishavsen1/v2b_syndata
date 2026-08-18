@@ -11,10 +11,10 @@
 #  a `partial` building is correctly re-run.)
 #
 # Prepare a split dir first:
-#   uv run python tools/split_campus_config.py configs/campus_base.yaml
+#   uv run python tools/campus/split_campus_config.py configs/campus_base.yaml
 #
 # Usage:
-#   tools/run_campus.sh [WORKERS]
+#   tools/campus/run_campus.sh [WORKERS]
 # Config via environment (defaults shown):
 #   SPLIT=configs/_campus_base_split   dir of per-building b*.yaml split configs
 #   OUT=data/output/campus_base        output root (building-major)
@@ -26,9 +26,10 @@
 #
 # Example — 12 months, 150 samples, a different split/out:
 #   SPLIT=configs/_campus_base_split OUT=data/output/campus_base \
-#   START=2024-01 END=2024-12 SAMPLES=150 tools/run_campus.sh 30
+#   START=2024-01 END=2024-12 SAMPLES=150 tools/campus/run_campus.sh 30
 set -uo pipefail
-cd /home/rishav/programs/v2b_syndata
+# Repo root, resolved from this script's location (tools/campus/ -> ../../).
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 SPLIT="${SPLIT:-configs/_campus_base_split}"
 OUT="${OUT:-data/output/campus_base}"
@@ -41,7 +42,7 @@ mkdir -p "$OUT"
 
 mapfile -t CFGS < <(ls "$SPLIT"/b*.yaml 2>/dev/null | sort -V)
 N=${#CFGS[@]}
-[ "$N" -gt 0 ] || { echo "no split configs in $SPLIT — run tools/split_campus_config.py first"; exit 2; }
+[ "$N" -gt 0 ] || { echo "no split configs in $SPLIT — run tools/campus/split_campus_config.py first"; exit 2; }
 
 echo "=== campus runner: ${N} buildings, ${WORKERS} workers, ${START}..${END} x${SAMPLES}/mo, noise=${NOISE}"
 echo "===   split=${SPLIT}  out=${OUT}"

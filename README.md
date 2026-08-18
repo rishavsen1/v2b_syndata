@@ -173,7 +173,7 @@ Raw per-session fields, by source:
 
 - **ACN-Data:** `sessionID, userID, siteID, stationID, connectionTime, disconnectTime, kWhDelivered, userInputs{milesRequested, WhPerMile, kWhRequested, minutesAvailable}`
 - **ElaadNL / 4TU:** `EV_id_x, start_datetime, end_datetime, total_energy, capacity_kwh, commute_km_range_min/max, EV_brand/model_selfreported, ownership`
-- **EV WATTS:** real public release is OCPI-relational (`session ⋈ evse` on `evse_id`); `tools/ingest_evwatts.py` joins + filters it to the internal schema `evse_id, venue_type, start_time_utc, end_time_utc, energy_kwh` (port-proxy user)
+- **EV WATTS:** real public release is OCPI-relational (`session ⋈ evse` on `evse_id`); `tools/data_prep/ingest_evwatts.py` joins + filters it to the internal schema `evse_id, venue_type, start_time_utc, end_time_utc, energy_kwh` (port-proxy user)
 - **INL:** `vehicle_id, evse_id, venue, evse_power_kw, start_time, end_time, energy_kwh`
 
 ACN-Data, ElaadNL, and **EV WATTS** are calibrated on real public releases.

@@ -30,15 +30,15 @@ guarantee.
 Examples
 --------
   # what is available, and which populations are data-calibrated
-  uv run python tools/sample_behavior_standalone.py --list
+  uv run python tools/data_prep/sample_behavior_standalone.py --list
 
   # 5000 draws from one region, with a round-trip fit report
-  uv run python tools/sample_behavior_standalone.py \
+  uv run python tools/data_prep/sample_behavior_standalone.py \
       --population acn_workplace_baseline --region regular_charger \
       -n 5000 --seed 42 --report
 
   # draw across all regions using the calibrated user-share weights
-  uv run python tools/sample_behavior_standalone.py \
+  uv run python tools/data_prep/sample_behavior_standalone.py \
       --population elaadnl_public_eu -n 20000 --out sessions.csv
 """
 from __future__ import annotations

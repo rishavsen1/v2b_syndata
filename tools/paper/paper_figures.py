@@ -13,7 +13,7 @@ All content is read from the repo (configs/populations.yaml, data/tstr/*.json,
 data/buildingload_reference/, the load-pipeline cache) — nothing is hardcoded
 from memory. Deterministic: no random draws; matplotlib only.
 
-Run:  uv run python tools/paper_figures.py [--skip-fig4]
+Run:  uv run python tools/paper/paper_figures.py [--skip-fig4]
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import yaml
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from scipy import stats
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "paper" / "figures"
 POPULATIONS = REPO / "configs" / "populations.yaml"
 TSTR_ACN = REPO / "data" / "tstr" / "results.json"
@@ -335,7 +335,7 @@ def fig4_load(skip: bool = False) -> None:
     try:
         if skip:
             raise RuntimeError("--skip-fig4 requested")
-        sys.path.insert(0, str(REPO / "tools"))
+        sys.path.insert(0, str(REPO / "tools" / "validation"))
         from validate_buildingload import (  # noqa: E402
             generate_generator_load, load_reference_hourly, to_hourly,
         )

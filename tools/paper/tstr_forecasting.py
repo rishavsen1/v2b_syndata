@@ -50,12 +50,12 @@ reconstructed by the *identical* rule and the TSTR comparison is apples-to-apple
 
 Usage
 -----
-  uv run python tools/tstr_forecasting.py                  # full baseline run
-  uv run python tools/tstr_forecasting.py --freq 15min
-  uv run python tools/tstr_forecasting.py --real elaadnl
-  uv run python tools/tstr_forecasting.py --quick          # tiny month, fast
+  uv run python tools/paper/tstr_forecasting.py                  # full baseline run
+  uv run python tools/paper/tstr_forecasting.py --freq 15min
+  uv run python tools/paper/tstr_forecasting.py --real elaadnl
+  uv run python tools/paper/tstr_forecasting.py --quick          # tiny month, fast
   # scale study: 12 consecutive synthetic months, scale-matched fleet
-  uv run python tools/tstr_forecasting.py --real elaadnl --normalize \
+  uv run python tools/paper/tstr_forecasting.py --real elaadnl --normalize \
       --months 12 --override 'ev_fleet.ev_count=1000' \
       --override 'charging_infra.charger_count=500'
 """
@@ -73,7 +73,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 CAL = REPO / "data" / "calibration"
 OUT_DIR = REPO / "data" / "tstr"
 
@@ -405,7 +405,7 @@ def fit_eval(
 def _ci_rng(label: str, base_seed: int = SEED) -> np.random.Generator:
     """Deterministic per-regime RNG, independent of evaluation order.
 
-    Same pattern as tools/validate_calibration.py `_cell_rng`: the sub-stream
+    Same pattern as tools/validation/validate_calibration.py `_cell_rng`: the sub-stream
     is keyed off a SHA-256 hash of the regime label (never Python's salted
     `hash()`), so adding a regime never shifts the draws of existing ones.
     """

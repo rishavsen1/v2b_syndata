@@ -10,7 +10,7 @@ flat internal schema that ``calibration.sources.evwatts`` expects:
 
 Then calibrate against it, e.g. for the workplace cohort:
 
-    uv run python tools/ingest_evwatts.py \\
+    uv run python tools/data_prep/ingest_evwatts.py \\
         --raw-dir <dir with evwatts.public.session.csv + evwatts.public.evse.csv> \\
         --release-tag public_<YYYY> --venue "Business Office" \\
         --cache-dir data/calibration/evwatts_cache

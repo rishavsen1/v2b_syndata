@@ -5,8 +5,8 @@
 #   high_power_dcfc (8 chargers). charger_count is set well above the largest
 #   expected active-session peak so descriptor swaps don't trip E5 invariant.
 #
-# Used by tools/knob_audit.py for descriptor-swap probes that would otherwise
-# fail with "active_sessions > chargers" under S01's default 20 chargers.
+# Used by tools/validation/knob_audit.py for descriptor-swap probes that would
+# otherwise fail with "active_sessions > chargers" under S01's default 20 chargers.
 
 scenario_id: S_audit_baseline
 description: "High-capacity audit baseline: large office, 50 EVs, 60 chargers"

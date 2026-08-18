@@ -23,7 +23,7 @@ that section's prefix. Keep `Source/Ref` pointing at the authoritative doc or
 **auto-generated** — do not edit by hand and do not track their internal numbers
 here; rerun their generators (see DESIGN_NOTES / tool headers) and treat them as
 source-of-truth for their own metrics. (`CALIBRATION_RESULTS.md` is emitted by
-`tools/validate_calibration.py`; rebuild it cheaply from existing CSVs with
+`tools/validation/validate_calibration.py`; rebuild it cheaply from existing CSVs with
 `--md-only`.) Items below *mirror* their open conclusions for visibility only.
 
 _Last updated: 2026-07-08._
@@ -101,7 +101,7 @@ Consciously postponed, with the gating condition.
 
 | ID | Item | Area | Source/Ref |
 |---|---|---|---|
-| ~~K1~~ | **DONE (2026-06-28):** EV WATTS now calibrated on the real public release (13.9M sessions → 1.36M workplace / 3,652 ports via `tools/ingest_evwatts.py`). See ✔6. | evwatts | CALIBRATION_NOTES |
+| ~~K1~~ | **DONE (2026-06-28):** EV WATTS now calibrated on the real public release (13.9M sessions → 1.36M workplace / 3,652 ports via `tools/data_prep/ingest_evwatts.py`). See ✔6. | evwatts | CALIBRATION_NOTES |
 | K2 | INL is fixture-only (~65 synthetic sessions) — confirm columns vs avt.inl.gov Phase 1 & bump `SCHEMA_VERSION`; session CSV not public (`INL_BULK_URL` hook, needs direct INL contact). | inl | CALIBRATION_NOTES |
 | K3 | Arrival SoC is unobservable — no charger records SoC, so no model comparison is possible (honest Beta(4,6) prior, not a fit). | soc | GENERATIVE_MODELS |
 | K4 | DR per-event reduction magnitudes use a flat Uniform prior — no published per-event reduction targets available. | dr | GENERATIVE_MODELS |
@@ -119,7 +119,7 @@ New, dated decisions go here; the **historical numbered decision log lives in
 | Date | Decision | Ref |
 |---|---|---|
 | 2026-06-26 | Consolidated docs to 5 hand-written files (README + DESIGN_NOTES + CALIBRATION_NOTES + GENERATIVE_MODELS + this tracker); auto-generated docs kept in place; point-in-time reports moved to `docs/archive/`. | this file |
-| 2026-06-26 | `tools/validate_calibration.py` now emits `docs/CALIBRATION_RESULTS.md` (faithfulness S1–S6 summary) as a committed auto-generated doc; bulky CSVs/PNGs stay git-ignored. | validate_calibration.py |
+| 2026-06-26 | `tools/validation/validate_calibration.py` now emits `docs/CALIBRATION_RESULTS.md` (faithfulness S1–S6 summary) as a committed auto-generated doc; bulky CSVs/PNGs stay git-ignored. | validate_calibration.py |
 | 2026-06-27 | Added the S0 region-assignment diagnostic, then re-anchored the ElaadNL grid on its own (φ,κ) cloud (judge-panel of 4 candidate grids). Confirms the datasets are modeled independently — ElaadNL's grid no longer borrows ACN's assumptions. | populations.yaml · S0 |
 | 2026-06-27 | Added per-building PV + battery (DER). PV is a separate weather-consistent PVWatts curve (not netted into power_kw); battery is specs-only (no dispatch); both default-off to keep the bitwise contract. Future work: battery dispatch model; optional per-sample PV/battery sizing jitter (node names reserved). | DESIGN_NOTES #32 |
 | 2026-06-29 | **Reverted** a briefly-merged `battery_dispatch.csv` generator output. Rationale: battery dispatch is a downstream control *decision* (endogenous to the V2B optimization), not exogenous data the platform should emit — PV generation belongs (weather→output, exogenous), battery dispatch does not. `battery.csv` ships specs only (cf. `cars.csv`). W11 stands but is reframed: a dispatch, if offered, belongs in `bench/` as a baseline, not a dataset CSV. | KDD_READINESS #7 |
@@ -136,6 +136,6 @@ Closed items kept for provenance.
 | ✔2 | E5 hybrid enforcement (warning + manifest + `--strict-e5`, `e5_metrics.py`) landed. | EDGE_CASE_REPORT, DESIGN_NOTES #30 |
 | ✔3 | Arrival/dwell/departure-SoC fit issues from the README known-issues list addressed (mixture-aware fits, clamp-artifact and over-pile-at-100% corrections). | README (FIXED items) |
 | ✔4 | ElaadNL region grid re-anchored on its own (φ,κ) cloud (4-box tiling: occasional_consistent / weekly_consistent / regular_commuter + erratic catch-all). Unassigned 76%→0%, 293→1231 drivers fit, near-even thirds; S1 KS 0.11–0.17, S2 ρ-gap ≤0.03. | S0, validate_calibration |
-| ✔6 | EV WATTS upgraded from fixture-only to **real-data calibrated**: ingested the public release (session⋈evse, venue=Business Office) via `tools/ingest_evwatts.py` → 1.36M workplace sessions / 3,356 users; `evwatts_workplace_public` fits 5/5 regions, unassigned 0.4% (no re-anchor needed). Registered in the validation harness. INL remains fixture-only. | tools/ingest_evwatts.py, populations.yaml |
+| ✔6 | EV WATTS upgraded from fixture-only to **real-data calibrated**: ingested the public release (session⋈evse, venue=Business Office) via `tools/data_prep/ingest_evwatts.py` → 1.36M workplace sessions / 3,356 users; `evwatts_workplace_public` fits 5/5 regions, unassigned 0.4% (no re-anchor needed). Registered in the validation harness. INL remains fixture-only. | tools/data_prep/ingest_evwatts.py, populations.yaml |
 | ✔5 | Per-building rooftop/carport PV + stationary battery (DER). PVWatts curve from the same perturbed EPW as building load (`pv_generation.csv`), PV + battery specs (`pv.csv`/`battery.csv`), `pv.*`/`battery.*` knobs (default off), CLI + web + multi-building, `der_catalog` presets. 15 new tests; 534 pass. | der_catalog, pv_model, DESIGN_NOTES #32, GENERATIVE_MODELS |
 | ✔7 | **O4:** `GENERATIVE_MODELS.md` `depart_soc_mu` default inconsistency (summary table 85 vs prose 50) — already reconciled in the doc (both the L54 summary table and the L209 prose say **50**); tracker entry was stale, closed 2026-07-08. | GENERATIVE_MODELS L54/L209 |

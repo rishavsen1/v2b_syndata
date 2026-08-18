@@ -1,5 +1,5 @@
 """Unit tests for the across-family model-selection harness
-(tools/repro_paper.py step `family_selection`).
+(tools/paper/repro_paper.py step `family_selection`).
 
 Pure-computation tests on synthetic data — no calibration caches, no
 EnergyPlus, no network. The harness itself must be deterministic (fixed EM
@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "paper"))
 
 import repro_paper as rp  # noqa: E402
 

@@ -64,7 +64,7 @@ submission — artifact links must appear in the submitted PDF.
 ### WS-A ∥ — Bootstrap CIs + held-out protocol repair
 *(KDD_READINESS #11; held-out KS already ships as S3, median Δ = 0.012.)*
 - D1–3: add seeded bootstrap (B ≥ 1000 over source sessions) to
-  `tools/validate_calibration.py` for KS and W₁ per region×variable; CI
+  `tools/validation/validate_calibration.py` for KS and W₁ per region×variable; CI
   columns into `CALIBRATION_RESULTS.md` + machine-readable CSV for Tab 2.
 - **Protocol repair (verifier G1 / tracker F3):** current S3 holdout refits a
   *single TruncNorm*, not the shipped GMM-k mixture — a protocol/model
@@ -77,7 +77,7 @@ submission — artifact links must appear in the submitted PDF.
 
 ### WS-B ∥ — PV validation vs NREL reference
 *(KDD_READINESS #8.)*
-- D1–4: `tools/validate_pv.py`: identical inputs (tilt 10°, azimuth 180°,
+- D1–4: `tools/validation/validate_pv.py`: identical inputs (tilt 10°, azimuth 180°,
   dc 100 kW, derate 0.86) into `pv_model.pv_ac_series` and the NREL reference —
   **prefer local pysam/SAM fed with our exact TMYx EPW** (apples-to-apples);
   PVWatts v8 API (DEMO_KEY) as cross-check with the NSRDB-weather delta
@@ -130,7 +130,7 @@ dependency on WS-A — `tstr_forecasting.py` already supports `--real elaadnl`.)
 ### WS-F — Reproducibility pass + release-metadata refresh (D8–10)
 *(KDD_READINESS #13 + verifier G4/G5. Runs after WS-E's commit-clean so SHAs
 are stable.)*
-- One driver (`tools/repro_paper.py`): calibrate → validate_calibration (CIs)
+- One driver (`tools/paper/repro_paper.py`): calibrate → validate_calibration (CIs)
   → validate_buildingload → tstr_forecasting → model_eval →
   `docs/experiments/PAPER_NUMBERS.md` (with git SHA + compute statement).
 - **Must regenerate with committed primary sources:** the GMM-k ablation

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-site overview figure for an ACN-Data session CSV (tools/acn_json_to_csv.py).
+"""Per-site overview figure for an ACN-Data session CSV (tools/data_prep/acn_json_to_csv.py).
 
 Six panels on one sheet, identical across sites so figures can be compared:
 
@@ -16,9 +16,9 @@ retained rows, so read values off the annotations rather than comparing axes.
 
 Usage
 -----
-  uv run python tools/plot_acn_overview.py data/calibration/acn_csv/jpl_2019_2021.csv
-  uv run python tools/plot_acn_overview.py data/calibration/acn_csv/*.csv
-  uv run python tools/plot_acn_overview.py --identified-only data/calibration/acn_csv/*.csv
+  uv run python tools/data_prep/plot_acn_overview.py data/calibration/acn_csv/jpl_2019_2021.csv
+  uv run python tools/data_prep/plot_acn_overview.py data/calibration/acn_csv/*.csv
+  uv run python tools/data_prep/plot_acn_overview.py --identified-only data/calibration/acn_csv/*.csv
 """
 from __future__ import annotations
 

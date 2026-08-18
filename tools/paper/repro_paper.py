@@ -3,17 +3,17 @@
 
 Runs, in order, with fixed seeds:
 
-  1. calibration   — tools/validate_calibration.py over the FULL source list
+  1. calibration   — tools/validation/validate_calibration.py over the FULL source list
                      (acn, acn_caltech, acn_jpl, acn_office001, elaadnl, evwatts)
                      with --seeds 50 --workers 16 --bootstrap 1000.
                      Regenerates docs/CALIBRATION_RESULTS.md +
                      docs/experiments/s1_fidelity_cis.csv + the S0–S6 CSVs.
-  2. buildingload  — tools/validate_buildingload.py (ASHRAE G14 vs NREL
+  2. buildingload  — tools/validation/validate_buildingload.py (ASHRAE G14 vs NREL
                      ComStock, CZ-5B, peak_kw_scaling off). Regenerates
                      data/buildingload_reference/validation_metrics.json.
-  3. tstr_acn      — tools/tstr_forecasting.py --real acn (matched scenario
+  3. tstr_acn      — tools/paper/tstr_forecasting.py --real acn (matched scenario
                      S_acn_caltech, seed 1234) → data/tstr/results.json.
-  4. tstr_elaadnl  — tools/tstr_forecasting.py --real elaadnl --normalize
+  4. tstr_elaadnl  — tools/paper/tstr_forecasting.py --real elaadnl --normalize
                      (matched scenario S_elaadnl_public_eu, seed 1234)
                      → data/tstr/results_elaadnl_matched.json. One run emits
                      BOTH raw and unit-mean-normalized regimes.
@@ -39,7 +39,7 @@ Runs, in order, with fixed seeds:
                      (median-split EM; Scott-factor KDE on a fixed grid;
                      SoC prior seed 20260613 = calibration/api.py's own;
                      no free RNG).
-  8. v2b_dispatch  — tools/bench_v2b_dispatch.py: LP peak-shave dispatch
+  8. v2b_dispatch  — tools/paper/bench_v2b_dispatch.py: LP peak-shave dispatch
                      baseline (uncontrolled / V1G / V2B) on the released
                      campus10 unit b1/JUL2024/0, plus ACN-Sim V1G
                      cross-check rows via the repo bench machinery →
@@ -66,9 +66,9 @@ Determinism contract (the WS-F gate):
   timestamps for the same reason (the git SHA pins the revision).
 
 Usage:
-    uv run python tools/repro_paper.py                 # full run
-    uv run python tools/repro_paper.py --steps collect # rebuild the MD only
-    uv run python tools/repro_paper.py --record-runtimes  # re-measure compute
+    uv run python tools/paper/repro_paper.py                 # full run
+    uv run python tools/paper/repro_paper.py --steps collect # rebuild the MD only
+    uv run python tools/paper/repro_paper.py --record-runtimes  # re-measure compute
 
 After the WS-F changes are committed, re-run `--steps collect` once so the
 embedded git SHA is the final one (artifacts are unchanged; only the SHA line
@@ -84,9 +84,9 @@ import sys
 import time
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
-sys.path.insert(0, str(REPO / "tools"))
+sys.path.insert(0, str(REPO / "tools" / "validation"))
 
 DOCS_EXP = REPO / "docs" / "experiments"
 VAL_DIR = REPO / "data" / "calibration_validation"
@@ -155,25 +155,25 @@ def _run(cmd: list[str], name: str) -> None:
 
 
 def step_calibration(args) -> None:
-    _run([sys.executable, str(REPO / "tools" / "validate_calibration.py"),
+    _run([sys.executable, str(REPO / "tools" / "validation" / "validate_calibration.py"),
           "--seeds", str(args.seeds), "--workers", str(args.workers),
           "--sources", CAL_SOURCES, "--bootstrap", str(args.bootstrap)],
          "calibration")
 
 
 def step_buildingload(args) -> None:
-    _run([sys.executable, str(REPO / "tools" / "validate_buildingload.py"),
+    _run([sys.executable, str(REPO / "tools" / "validation" / "validate_buildingload.py"),
           "-v"], "buildingload")
 
 
 def step_tstr_acn(args) -> None:
-    _run([sys.executable, str(REPO / "tools" / "tstr_forecasting.py"),
+    _run([sys.executable, str(REPO / "tools" / "paper" / "tstr_forecasting.py"),
           "--real", "acn", "--out", str(TSTR_DIR / "results.json")],
          "tstr_acn")
 
 
 def step_tstr_elaadnl(args) -> None:
-    _run([sys.executable, str(REPO / "tools" / "tstr_forecasting.py"),
+    _run([sys.executable, str(REPO / "tools" / "paper" / "tstr_forecasting.py"),
           "--real", "elaadnl", "--normalize",
           "--out", str(TSTR_DIR / "results_elaadnl_matched.json")],
          "tstr_elaadnl")
@@ -184,7 +184,7 @@ def step_tstr_scale(args) -> None:
     1-month/20-EV baseline, then a combined keyed JSON. Deterministic given
     the fixed seeds (generation: SHA-keyed node streams; TSTR: seed 1234)."""
     for arm, (extra, out) in TSTR_SCALE_ARMS.items():
-        _run([sys.executable, str(REPO / "tools" / "tstr_forecasting.py"),
+        _run([sys.executable, str(REPO / "tools" / "paper" / "tstr_forecasting.py"),
               "--real", "elaadnl", "--normalize", *extra, "--out", str(out)],
              f"tstr_scale/{arm}")
     combined = {
@@ -211,7 +211,7 @@ def step_v2b_dispatch(args) -> None:
     released corpus unit, plus ALL SEVEN stock ACN-Sim V1G cross-check rows.
     Deterministic except the solve_s wall-time column
     (collect only cites the deterministic columns)."""
-    _run([sys.executable, str(REPO / "tools" / "bench_v2b_dispatch.py"),
+    _run([sys.executable, str(REPO / "tools" / "paper" / "bench_v2b_dispatch.py"),
           "--data-dir", str(V2B_DISPATCH_UNIT), "--out-dir", str(DOCS_EXP)],
          "v2b_dispatch")
 
@@ -230,7 +230,7 @@ def step_contended_bench(args) -> None:
               "--config", str(CONTENDED_CONFIG),
               "--output-dir", str(CONTENDED_UNIT)],
              "contended_bench/generate")
-    _run([sys.executable, str(REPO / "tools" / "bench_v2b_dispatch.py"),
+    _run([sys.executable, str(REPO / "tools" / "paper" / "bench_v2b_dispatch.py"),
           "--contended", "--data-dir", str(CONTENDED_UNIT),
           "--out-dir", str(DOCS_EXP)],
          "contended_bench")
@@ -290,7 +290,7 @@ def step_ablation(args) -> None:
     import numpy as np
     import pandas as pd
     import scipy.stats as stats
-    from validate_calibration import load_source  # tools/ on sys.path
+    from validate_calibration import load_source  # tools/validation on sys.path
 
     from v2b_syndata.calibration.distribution_fitter import (
         ARRIVAL_HI,
@@ -386,7 +386,7 @@ def step_ablation(args) -> None:
     lines = [
         "# Mixture / per-region fit ablation",
         "",
-        "_Auto-generated by `tools/repro_paper.py` (step `ablation`). Do not "
+        "_Auto-generated by `tools/paper/repro_paper.py` (step `ablation`). Do not "
         "edit by hand. Deterministic: median-split EM init, no RNG._",
         "",
         "Metric: one-sample KS of the fitted model CDF vs the region's real "
@@ -651,7 +651,7 @@ def _load_family_cells(source_key: str, pops_yaml: dict) -> dict:
     contract: a modeled prior, not a measurement; see paper §4.4).
     """
     import numpy as np
-    from validate_calibration import SOURCE_SPECS  # tools/ on sys.path
+    from validate_calibration import SOURCE_SPECS  # tools/validation on sys.path
 
     from v2b_syndata.calibration.battery_inference import (
         infer_capacity,
@@ -715,7 +715,7 @@ def step_family_selection(args) -> None:
     import numpy as np
     import pandas as pd
     import yaml as pyyaml
-    from validate_calibration import SOURCE_SPECS  # tools/ on sys.path
+    from validate_calibration import SOURCE_SPECS  # tools/validation on sys.path
 
     t0 = time.perf_counter()
     pops_yaml = pyyaml.safe_load(
@@ -781,7 +781,7 @@ def step_family_selection(args) -> None:
     lines = [
         "# Across-family model selection (behavioral marginals)",
         "",
-        "_Auto-generated by `tools/repro_paper.py` (step `family_selection`). "
+        "_Auto-generated by `tools/paper/repro_paper.py` (step `family_selection`). "
         "Do not edit by hand. Deterministic: median-split EM init, "
         "Scott-factor KDE on a fixed 4001-point grid, SoC prior seed "
         "20260613 (= calibration/api.py); no free RNG._",
@@ -853,7 +853,7 @@ def step_family_selection(args) -> None:
         lines += _agg_table(variable)
     lines += [
         "Per-cell scores: `family_selection.csv`. Regenerate: "
-        "`uv run python tools/repro_paper.py --steps family_selection`.",
+        "`uv run python tools/paper/repro_paper.py --steps family_selection`.",
         "",
     ]
     FAMILY_MD.write_text("\n".join(lines))
@@ -879,7 +879,7 @@ def _fmt(x, nd: int = 3) -> str:
 
 
 def _pv_numbers() -> dict[str, str]:
-    """Parse the committed PV validation memo (tools/validate_pv.py output)."""
+    """Parse the committed PV validation memo (tools/validation/validate_pv.py output)."""
     txt = (DOCS_EXP / "pv_validation.md").read_text()
 
     def grab(pattern: str) -> str:
@@ -988,9 +988,9 @@ def step_collect(args) -> None:
     w = L.append
     w("# PAPER_NUMBERS — consolidated evidence for the KDD paper")
     w("")
-    w("> **Auto-generated by `tools/repro_paper.py`. Do not edit by hand.**")
+    w("> **Auto-generated by `tools/paper/repro_paper.py`. Do not edit by hand.**")
     w("> Every number the paper cites must appear here; the paper cites only")
-    w("> numbers present here. Regenerate: `uv run python tools/repro_paper.py`")
+    w("> numbers present here. Regenerate: `uv run python tools/paper/repro_paper.py`")
     w("> (full, ~overnight-safe) or `--steps collect` (rebuild this file from")
     w("> existing artifacts).")
     w("")
@@ -1034,7 +1034,7 @@ def step_collect(args) -> None:
       f"| {int(inl['n_sessions_total'])} | {int(inl['n_users_total'])} "
       f"| `configs/populations.yaml` calibration_metadata |")
     w("")
-    w("Generating command: `uv run python tools/repro_paper.py --steps ablation`"
+    w("Generating command: `uv run python tools/paper/repro_paper.py --steps ablation`"
       " (sources_summary) — EV WATTS/INL rows from committed calibration"
       " metadata.")
     w("")
@@ -1059,7 +1059,7 @@ def step_collect(args) -> None:
       "76% | `docs/PROJECT_TRACKER.md` W8/✔4 (the 0% 'after' is the "
       "regenerated S0 row above) |")
     w("")
-    w("Generating command: `uv run python tools/validate_calibration.py "
+    w("Generating command: `uv run python tools/validation/validate_calibration.py "
       f"--seeds {args.seeds} --workers {args.workers} --sources {CAL_SOURCES} "
       f"--bootstrap {args.bootstrap}`.")
     w("")
@@ -1158,7 +1158,7 @@ def step_collect(args) -> None:
       f"(mixture selected in {int(dwl['mixture_selected'].sum())}/{len(dwl)}) | "
       f"`mixture_ablation.csv` |")
     w("")
-    w("Generating command: `uv run python tools/repro_paper.py --steps "
+    w("Generating command: `uv run python tools/paper/repro_paper.py --steps "
       "ablation`. Per-source aggregates: `docs/experiments/mixture_ablation.md`.")
     w("")
 
@@ -1188,7 +1188,7 @@ def step_collect(args) -> None:
               f"{mean_rank} | {int(g['ks_win'].sum())} | "
               f"{'yes' if bool(g['shippable'].iloc[0]) else 'no'} |")
     w("")
-    w("Generating command: `uv run python tools/repro_paper.py --steps "
+    w("Generating command: `uv run python tools/paper/repro_paper.py --steps "
       "family_selection`. Per-cell scores: "
       "`docs/experiments/family_selection.csv`.")
     w("")
@@ -1220,10 +1220,10 @@ def step_collect(args) -> None:
       f"{', '.join(_fmt(abs(x), 1) for x in above)}%.")
     w("- BDG2 context: 19 real meters (14 office + 5 retail) in "
       "`data/buildingload_reference/bdg2_timeseries.parquet` "
-      "(fetched by `tools/fetch_buildingload_reference.py`).")
+      "(fetched by `tools/data_prep/fetch_buildingload_reference.py`).")
     w("")
     w("Source: `data/buildingload_reference/validation_metrics.json`. "
-      "Generating command: `uv run python tools/validate_buildingload.py -v`.")
+      "Generating command: `uv run python tools/validation/validate_buildingload.py -v`.")
     w("")
 
     # ── 7. PV validation (§5.3) ────────────────────────────────────────
@@ -1241,7 +1241,7 @@ def step_collect(args) -> None:
     w(f"| derate-equalized (pure physics) annual error | "
       f"{pv['derate_equalized_pct']}% | `pv_validation.md` |")
     w("")
-    w("Generating command: `uv run python tools/validate_pv.py` (requires "
+    w("Generating command: `uv run python tools/validation/validate_pv.py` (requires "
       "PySAM; not re-run by this driver — the committed memo is the primary).")
     w("")
 
@@ -1328,9 +1328,9 @@ def step_collect(args) -> None:
       "evidence per §6 footnote) | `data/tstr/results_elaadnl.json` "
       "(scenario S_acn_caltech) | repo |")
     w("")
-    w("Generating commands: `uv run python tools/tstr_forecasting.py --real "
+    w("Generating commands: `uv run python tools/paper/tstr_forecasting.py --real "
       "acn --out data/tstr/results.json` and `uv run python "
-      "tools/tstr_forecasting.py --real elaadnl --normalize --out "
+      "tools/paper/tstr_forecasting.py --real elaadnl --normalize --out "
       "data/tstr/results_elaadnl_matched.json`.")
     w("")
 
@@ -1410,8 +1410,8 @@ def step_collect(args) -> None:
           "established simulator; see `v2b_dispatch.md` for why no stock "
           "ACN-Sim algorithm is comparable to LP-V1G.")
     w("")
-    w("Generating command: `uv run python tools/repro_paper.py --steps "
-      "v2b_dispatch` (wraps `tools/bench_v2b_dispatch.py`).")
+    w("Generating command: `uv run python tools/paper/repro_paper.py --steps "
+      "v2b_dispatch` (wraps `tools/paper/bench_v2b_dispatch.py`).")
     w("")
 
     # ── 10b. Contended dispatch benchmark ──────────────────────────────
@@ -1459,10 +1459,10 @@ def step_collect(args) -> None:
       "sessions, showing admission rejection is necessary at that service "
       "ratio, not an artifact.")
     w("")
-    w("Generating command: `uv run python tools/repro_paper.py --steps "
+    w("Generating command: `uv run python tools/paper/repro_paper.py --steps "
       "contended_bench` (generates the unit from "
       "`docs/experiments/contended_bench_config.json` if absent, then wraps "
-      "`tools/bench_v2b_dispatch.py --contended`).")
+      "`tools/paper/bench_v2b_dispatch.py --contended`).")
     w("")
 
     # ── 11. Compute statement for this driver ──────────────────────────

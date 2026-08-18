@@ -160,7 +160,7 @@ Regenerate this table: `uv run python -m v2b_syndata.cli calibrate --population 
 
 ### 4.3 Test error (held-out KS)
 
-`tools/validate_calibration.py::s3_holdout` implements the only held-out protocol:
+`tools/validation/validate_calibration.py::s3_holdout` implements the only held-out protocol:
 **80/20 split by sorted `user_id`** (deterministic, not random), refit on train with
 the same family-selection gate production uses, one-sample KS on the test fold.
 Cells need n ≥ 200, test fold ≥ 30, train fold ≥ 50.
@@ -310,8 +310,8 @@ is therefore the JPL or Caltech column of §4.2/§4.3, reweighted.
 | YAML → runtime parameters | `src/v2b_syndata/samplers/sessions_dist.py` |
 | Sampler (copula + inverse-CDF + rejection) | `src/v2b_syndata/renderers/sessions.py` |
 | Parameter validity ranges | `src/v2b_syndata/knob_loader.py::DIST_PARAM_RANGES` |
-| Validation harness | `tools/validate_calibration.py` |
-| Standalone sampler | `tools/sample_behavior_standalone.py` |
+| Validation harness | `tools/validation/validate_calibration.py` |
+| Standalone sampler | `tools/data_prep/sample_behavior_standalone.py` |
 
 There is **no pickle, checkpoint, or binary model file.** The entire fitted model is
 the human-readable YAML block, which is what makes it auditable and diffable.
@@ -322,20 +322,20 @@ the human-readable YAML block, which is what makes it auditable and diffable.
 
 ### 8.1 Option A — the standalone script (no generator, no EnergyPlus)
 
-`tools/sample_behavior_standalone.py` reads the fitted blocks and samples from them
+`tools/data_prep/sample_behavior_standalone.py` reads the fitted blocks and samples from them
 with only numpy/scipy/pyyaml. It is self-contained and can be copied out of the repo.
 
 ```bash
 # what is available, and which populations are actually calibrated
-uv run python tools/sample_behavior_standalone.py --list
+uv run python tools/data_prep/sample_behavior_standalone.py --list
 
 # 5000 draws from one region, with families + train KS + a sampler self-check
-uv run python tools/sample_behavior_standalone.py \
+uv run python tools/data_prep/sample_behavior_standalone.py \
     --population acn_workplace_baseline --region regular_charger \
     -n 5000 --seed 42 --report
 
 # draw across all regions using the calibrated user-share weights, write CSV
-uv run python tools/sample_behavior_standalone.py \
+uv run python tools/data_prep/sample_behavior_standalone.py \
     --population elaadnl_public_eu -n 20000 --out sessions.csv
 ```
 
@@ -344,10 +344,10 @@ round-trip KS of the script's own draws against the fitted CDF. That last number
 should sit inside the Monte-Carlo band (`1.36/√n`); it validates the sampler, not
 the model.
 
-As a library (the script lives in `tools/`, which is not an installed package):
+As a library (the script lives in `tools/data_prep/`, which is not an installed package):
 
 ```python
-import sys; sys.path.insert(0, "tools")
+import sys; sys.path.insert(0, "tools/data_prep")
 from pathlib import Path
 import numpy as np
 from sample_behavior_standalone import build_models
@@ -414,13 +414,13 @@ dataset. Or call `fit_region(arrivals, dwells, soc_arrivals, soc_departs)` from
 
 ```bash
 # S1 fidelity + S2 copula + S3 held-out KS -> docs/CALIBRATION_RESULTS.md
-uv run python tools/validate_calibration.py --seeds 50 --workers 16 \
+uv run python tools/validation/validate_calibration.py --seeds 50 --workers 16 \
     --sources acn,acn_caltech,acn_jpl,acn_office001,elaadnl,evwatts --bootstrap 1000
 
 # everything the paper cites, into docs/experiments/PAPER_NUMBERS.md
-uv run python tools/repro_paper.py                      # ~18 min on 32 cores
-uv run python tools/repro_paper.py --steps ablation     # mixture ablation only
+uv run python tools/paper/repro_paper.py                      # ~18 min on 32 cores
+uv run python tools/paper/repro_paper.py --steps ablation     # mixture ablation only
 
 # held-out 70/30 family comparison (NLL + KS) -> docs/MODEL_SELECTION.md
-uv run python tools/model_eval.py --seed 0
+uv run python tools/validation/model_eval.py --seed 0
 ```

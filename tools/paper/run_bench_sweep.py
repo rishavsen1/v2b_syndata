@@ -2,7 +2,7 @@
 """Multi-scenario × multi-algorithm benchmark sweep.
 
 Usage:
-    uv run python tools/run_bench_sweep.py \
+    uv run python tools/paper/run_bench_sweep.py \
         --output data/sweep \
         --seed 42 \
         [--gen-workers 8] [--bench-workers 20]
@@ -33,7 +33,7 @@ from pathlib import Path
 import pandas as pd
 
 # Make src/ importable when run as a script.
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
 from v2b_syndata.bench import available_algorithms, run_scenario  # noqa: E402

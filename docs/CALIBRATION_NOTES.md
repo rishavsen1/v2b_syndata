@@ -9,7 +9,7 @@ parameters in `configs/populations.yaml`.
 > live here moved to [`DESIGN_NOTES.md`](DESIGN_NOTES.md); open items live in
 > [`PROJECT_TRACKER.md`](PROJECT_TRACKER.md). The faithfulness **results** — how
 > closely generated data matches each source — are auto-generated in
-> [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md) by `tools/validate_calibration.py`.
+> [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md) by `tools/validation/validate_calibration.py`.
 
 ## 1. Filter chain
 
@@ -197,14 +197,14 @@ evwattsdata@energetics.com under a non-disclosure agreement").
 
 **Real-data calibration (2026-06-28).** The public release was obtained and
 calibrated. It is OCPI-relational (a `session` table joined to `evse` on
-`evse_id`, plus connector/vehicles tables); `tools/ingest_evwatts.py` joins
+`evse_id`, plus connector/vehicles tables); `tools/data_prep/ingest_evwatts.py` joins
 `session ⋈ evse`, filters to the workplace cohort (`venue = "Business Office"`)
 and drops error-flagged sessions, writing the internal flat schema
 (`start_time_utc, end_time_utc, energy_kwh, evse_id, venue_type, rated_power_kw`)
 to `data/calibration/evwatts_cache/evwatts_<tag>.csv` (git-ignored; regenerate
 from the raw download). Reproduce with:
 ```
-uv run python tools/ingest_evwatts.py --raw-dir <raw> --release-tag public_2026 \
+uv run python tools/data_prep/ingest_evwatts.py --raw-dir <raw> --release-tag public_2026 \
     --venue "Business Office" --cache-dir data/calibration/evwatts_cache
 uv run v2b-syndata calibrate --population evwatts_workplace_public \
     --cache-dir data/calibration/evwatts_cache \
@@ -219,7 +219,7 @@ re-anchor needed, unlike ElaadNL). `capacity_inference_fallback_rate = 1.0`
 timestamps are naive local clock time (per-region, US-wide; DST varies — the
 dataset even flags non-DST EVSEs), so arrival_hour mixes time zones; arrival is
 fit pooled per population (W3). `evwatts` is now a first-class source in
-`tools/validate_calibration.py` (`--sources …,evwatts`).
+`tools/validation/validate_calibration.py` (`--sources …,evwatts`).
 
 Implemented: `inl_ev_project` policy adds INL EV Project Phase 1 (Idaho
 National Lab, avt.inl.gov, 2011–2013 ChargePoint+Blink fleet on ~24 kWh Leaf

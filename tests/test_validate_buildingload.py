@@ -1,4 +1,4 @@
-"""Tests for tools/validate_buildingload.py.
+"""Tests for tools/validation/validate_buildingload.py.
 
 Most tests use synthetic reference fixtures (no live downloads, no EnergyPlus).
 The single end-to-end test that needs a real EnergyPlus run is marked
@@ -18,7 +18,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 _SPEC = importlib.util.spec_from_file_location(
-    "validate_buildingload", REPO / "tools" / "validate_buildingload.py"
+    "validate_buildingload", REPO / "tools" / "validation" / "validate_buildingload.py"
 )
 vbl = importlib.util.module_from_spec(_SPEC)
 assert _SPEC and _SPEC.loader
@@ -232,7 +232,7 @@ def test_validate_all_skips_missing_reference(tmp_path, monkeypatch):
 
 def _load_vc():
     spec = importlib.util.spec_from_file_location(
-        "validate_calibration", REPO / "tools" / "validate_calibration.py"
+        "validate_calibration", REPO / "tools" / "validation" / "validate_calibration.py"
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules["validate_calibration"] = mod

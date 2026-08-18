@@ -693,7 +693,7 @@ the 1e6 threshold).
 prior spec claim of "~±5%" was optimistic by ~1.7× at α=30; the
 description in `knobs.yaml` documents the actual relationship.
 
-**Audit re-verification.** `tools/knob_audit.py` has no `--knobs` filter
+**Audit re-verification.** `tools/validation/knob_audit.py` has no `--knobs` filter
 flag, and a full Stage 2 re-run is ~30 minutes for two knobs. Skipped
 in favour of the test suite, which exercises:
 - `tests/test_dirichlet.py` — variance bounds, default-off determinism, same-seed bitwise

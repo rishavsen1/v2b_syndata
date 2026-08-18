@@ -25,11 +25,11 @@ site-local arrival hour and dwell hours the fitter actually consumes.
 
 Examples
 --------
-  uv run python tools/acn_json_to_csv.py \
+  uv run python tools/data_prep/acn_json_to_csv.py \
       data/calibration/acn_cache/caltech_2019_2021.json
 
   # all three sites, with the derived modeling columns
-  uv run python tools/acn_json_to_csv.py \
+  uv run python tools/data_prep/acn_json_to_csv.py \
       data/calibration/acn_cache/*.json --derived --out-dir data/calibration/acn_csv/
 """
 from __future__ import annotations

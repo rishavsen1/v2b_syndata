@@ -4,7 +4,7 @@ Sample 50 random pairs from Stage 2 admitted MONOTONIC knobs. For each pair:
 generate baseline, only-A, only-B, both. Per affected CSV, measure metric
 deltas and classify the joint effect as LINEAR vs NONLINEAR vs SIGN_FLIP.
 
-Reuses Stage 2's probe selectors + metric registry from tools/knob_audit.py.
+Reuses Stage 2's probe selectors + metric registry from tools/validation/knob_audit.py.
 """
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from typing import Any
 
 import numpy as np
 
-REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO / "tools"))
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools" / "validation"))
 sys.path.insert(0, str(REPO / "src"))
 
 import knob_audit  # noqa: E402  (sibling tool)
@@ -46,7 +46,7 @@ def _load_admitted_paths() -> list[str]:
     """Read Stage 2 metadata, return paths with MONOTONIC verdict."""
     meta_path = Path("/tmp/knob_audit/audit_s2_metadata.json")
     if not meta_path.exists():
-        raise SystemExit(f"missing {meta_path} — run tools/knob_audit.py --stage 2 first")
+        raise SystemExit(f"missing {meta_path} — run tools/validation/knob_audit.py --stage 2 first")
     with meta_path.open() as f:
         meta = json.load(f)
     return [v["knob_path"] for v in meta["verdicts"] if v["overall_verdict"] == "MONOTONIC"]

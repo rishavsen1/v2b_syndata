@@ -1,4 +1,4 @@
-"""Tests for tools/convert_shared_to_perbuilding.py.
+"""Tests for tools/campus/convert_shared_to_perbuilding.py.
 
 The strong test is a *round-trip*: split a real shared slice into per-building
 folders, then reconstruct the original shared CSVs from the pieces and assert
@@ -20,10 +20,10 @@ REPO = Path(__file__).resolve().parents[1]
 SRC_SHARED = REPO / "data/output/campus10_slight"
 REF_PERBUILDING = REPO / "data/output/campus10_new"
 
-# Import the converter module by path (it lives in tools/, not the package).
+# Import the converter module by path (it lives in tools/campus/, not the package).
 _spec = importlib.util.spec_from_file_location(
     "convert_shared_to_perbuilding",
-    REPO / "tools/convert_shared_to_perbuilding.py",
+    REPO / "tools/campus/convert_shared_to_perbuilding.py",
 )
 conv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(conv)

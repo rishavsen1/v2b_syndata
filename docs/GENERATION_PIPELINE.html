@@ -665,8 +665,8 @@ date-keyed stream = rng_for_car(seed, f"sessions:{day.isoformat()}", car_id)   #
   single-shot generation with CSV previews, batch submission with live progress, ZIP download, distribution plots per building_id.</p>
 
   <h3>Post-run analysis (repo tooling)</h3>
-  <p><code>tools/analyze_overnight.py</code> (single building, slight-vs-moderate trees) and
-  <code>tools/analyze_campus.py</code> (building-major <code>b1..bN</code>) stream every sample → per-sample metrics CSV +
+  <p><code>tools/campus/analyze_overnight.py</code> (single building, slight-vs-moderate trees) and
+  <code>tools/campus/analyze_campus.py</code> (building-major <code>b1..bN</code>) stream every sample → per-sample metrics CSV +
   self-contained uncertainty-analysis HTML (CV rankings, P5–P95 bands, per-building box plots).</p>
 </section>
 

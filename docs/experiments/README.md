@@ -52,7 +52,7 @@ committed, regenerable primary for the paper's "why these families" claim is
 now the **per-region** across-family comparison:
 
 ```bash
-uv run python tools/repro_paper.py --steps family_selection
+uv run python tools/paper/repro_paper.py --steps family_selection
 # → family_selection.csv (per-cell scores) + family_selection.md (aggregates)
 ```
 
