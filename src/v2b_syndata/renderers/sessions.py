@@ -315,8 +315,21 @@ def render(ctx: ScenarioContext) -> None:
                     a_soc_pct = prior_required_soc - draw_pct
                     a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
                 else:
-                    beta = float(rng.beta(soc_p["alpha"], soc_p["beta"]))
-                    a_soc_pct = (max(soc_p["clip_lo"], min(soc_p["clip_hi"], beta + soc_p["shift"]))) * 100.0
+                    # TRUNCATED Beta draw on the car's allowed band (2026-08).
+                    # The previous clip-after-draw CENSORED the Beta: every
+                    # low-tail draw piled onto exactly min_allowed_soc (10-25%
+                    # of draws once the -delta shift is applied), which showed
+                    # up downstream as a fake mode at prev_ext_use = 80
+                    # (depart-at-90 x arrive-at-10). Truncation via inverse-CDF
+                    # keeps the shape inside the band with no atom; still one
+                    # uniform per draw.
+                    b_lo = min(max(soc_p["clip_lo"] - soc_p["shift"], 0.0), 1.0 - 1e-9)
+                    b_hi = min(max(soc_p["clip_hi"] - soc_p["shift"], b_lo + 1e-9), 1.0)
+                    f_lo = float(stats.beta.cdf(b_lo, soc_p["alpha"], soc_p["beta"]))
+                    f_hi = float(stats.beta.cdf(b_hi, soc_p["alpha"], soc_p["beta"]))
+                    u_soc = f_lo + float(rng.random()) * (f_hi - f_lo)
+                    beta = float(stats.beta.ppf(u_soc, soc_p["alpha"], soc_p["beta"]))
+                    a_soc_pct = (beta + soc_p["shift"]) * 100.0
                     a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
 
                 # 4. Determine valid required-SoC band.
