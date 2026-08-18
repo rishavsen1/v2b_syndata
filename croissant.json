@@ -79,7 +79,7 @@
       "@type": "cr:FileObject",
       "@id": "users.csv",
       "name": "users.csv",
-      "description": "One row per EV driver: behavioral profile (region, phi frequency, kappa consistency, delta_km commute, negotiation type, scheduler weights).",
+      "description": "One row per EV driver: behavioral profile (region, phi frequency, delta_km commute, negotiation type, scheduler weights).",
       "contentUrl": "users.csv",
       "encodingFormat": "text/csv"
     },
@@ -216,21 +216,6 @@
             },
             "extract": {
               "column": "phi"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "users/kappa",
-          "name": "kappa",
-          "description": "Behavioral consistency axis (1 - coefficient of variation of arrival).",
-          "dataType": "sc:Float",
-          "source": {
-            "fileObject": {
-              "@id": "users.csv"
-            },
-            "extract": {
-              "column": "kappa"
             }
           }
         },

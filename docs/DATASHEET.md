@@ -56,7 +56,7 @@ provenance manifest. There are several instance types, one per file
 
 | file | instance = one… | columns |
 |---|---|---|
-| `users.csv` | EV driver (behavioral profile) | `car_id, region, phi, kappa, delta_km, negotiation_type, w1, w2` |
+| `users.csv` | EV driver (behavioral profile) | `car_id, region, phi, delta_km, negotiation_type, w1, w2` |
 | `cars.csv` | vehicle (battery spec) | `car_id, capacity_kwh, min_allowed_soc, max_allowed_soc, battery_class` |
 | `chargers.csv` | charging port | `charger_id, directionality, min_rate_kw, max_rate_kw` |
 | `sessions.csv` | charging session | `session_id, car_id, building_id, arrival, departure, duration_sec, arrival_soc, required_soc_at_depart, previous_day_external_use_soc` |
