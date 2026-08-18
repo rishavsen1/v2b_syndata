@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-EP_VERSION="23.2.0"
-EP_TAG="7636e6b3e9"
-EP_DIR_NAME="EnergyPlus-23-2-0"
+EP_VERSION="24.1.0"
+EP_TAG="9d7789a3ac"
+EP_DIR_NAME="EnergyPlus-24-1-0"
 EP_DIR="${HOME}/opt/${EP_DIR_NAME}"
 EP_BIN="${EP_DIR}/energyplus"
 CACHE="${HOME}/.cache/v2b-syndata"
@@ -60,7 +60,7 @@ ep_probe() {
 }
 
 ep_version() {
-  # Print version string like "23.2.0" from a binary path, or empty on failure.
+  # Print version string like "24.1.0" from a binary path, or empty on failure.
   local bin="$1"
   [[ -x "${bin}" ]] || { echo ""; return; }
   "${bin}" --version 2>/dev/null \
@@ -69,7 +69,7 @@ ep_version() {
     | awk '{print $2}'
 }
 
-REQUIRED_EP_MAJOR_MINOR="23.2"
+REQUIRED_EP_MAJOR_MINOR="24.1"
 PINNED_OK=0
 
 if EP_PATH="$(ep_probe)" && [[ -n "${EP_PATH}" ]]; then

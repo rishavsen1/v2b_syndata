@@ -18,7 +18,7 @@ datasets** (ACN-Data, ElaadNL, EV WATTS, INL).
 ## Commands
 
 ```bash
-# One-shot setup (uv + deps + user-local EnergyPlus 23.2 + smoke gen). Idempotent.
+# One-shot setup (uv + deps + user-local EnergyPlus 24.1 + smoke gen). Idempotent.
 ./tools/setup.sh
 
 # Install/sync deps only

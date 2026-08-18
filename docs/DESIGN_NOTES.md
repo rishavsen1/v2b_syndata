@@ -210,16 +210,17 @@ load shifting; unoccupied-hour V2B is grid-only."
 Spec named the bundled IDFs `ASHRAE901_*_STD2019_USA.idf`; PNNL releases
 prototypes per climate-zone (Atlanta, Baltimore, Denver, Miami, …), not a
 generic "USA" file. We bundle the **Denver (climate zone 5B) variants** that
-ship with EnergyPlus 23.2 (`ExampleFiles/`). HVAC sizing follows the Denver
+ship with EnergyPlus 24.1 (`ExampleFiles/`). HVAC sizing follows the Denver
 prototype but climate signal flows from the chosen TMYx EPW; re-runs against
 warmer/colder weather still produce reasonable shapes. Switching to other
 climate-zone variants is a one-line change in
 `load_pipeline/prototypes.py::PROTOTYPE_MAP`.
 
-## 14. EnergyPlus 23.2.0 baseline (not 26.x as installed)
+## 14. EnergyPlus 24.1.0 baseline (not 26.x as installed)
 
 Ubuntu 22.04 (glibc 2.35) cannot run the system-installed EnergyPlus 26.1.0
-(needs glibc 2.38). The pipeline is tested against EnergyPlus 23.2.0
+(needs glibc 2.38). The pipeline is pinned to EnergyPlus 24.1.0 (release tag
+`9d7789a3ac`, the newest release with an Ubuntu 22.04 / glibc 2.35 build)
 installed under `~/opt/`. `ep_runner.discover_energyplus` searches `~/opt/`,
 `/usr/local/EnergyPlus-*`, `/opt/EnergyPlus-*`, `$ENERGYPLUS_PATH`,
 `$ENERGYPLUS_BIN`, and `which energyplus`; it validates each candidate by
@@ -244,8 +245,8 @@ Day` are set explicitly because EP's "derive day-of-week from year" path
 silently defaults to Sunday in the PNNL configuration — leaving Day of Week
 blank shifted weekday/weekend schedules by several days.
 
-Even with the explicit Wednesday spec for Jan 1 2020, EP 23.2 + the PNNL
-lighting schedule applies "For: Weekdays" to a calendar-Saturday and rolls
+Even with the explicit Wednesday spec for Jan 1 2020, EP 24.1 + the PNNL
+lighting schedule still applies "For: Weekdays" to a calendar-Saturday and rolls
 calendar-Monday into the "Sunday Holidays AllOtherDays" branch. The result
 is a per-day shape where Tue–Sat run as full weekdays and Sun–Mon run as
 weekend. Acceptance criteria (peak/off-peak ratio 2–4×, weekend ≠ weekday)

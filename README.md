@@ -6,7 +6,7 @@ Forward-sampling generative model: scenario YAML + seed → bitwise-identical CS
 
 ## Quickstart — one command, any agent (or none)
 
-`tools/setup.sh` installs the entire toolchain end-to-end: `uv`, Python deps, a user-local EnergyPlus 23.2.0 under `~/opt/`, and runs a smoke generation. Idempotent; safe to re-run.
+`tools/setup.sh` installs the entire toolchain end-to-end: `uv`, Python deps, a user-local EnergyPlus 24.1.0 under `~/opt/`, and runs a smoke generation. Idempotent; safe to re-run.
 
 ```bash
 cd v2b_syndata
@@ -37,7 +37,7 @@ Building load is simulated through EnergyPlus (23.x or newer). Install once per 
 ### Linux
 
 1. Download from <https://energyplus.net/downloads> (use the build matching
-   your distro — e.g. EnergyPlus 23.2 for Ubuntu 22.04, glibc 2.35).
+   your distro — e.g. EnergyPlus 24.1 for Ubuntu 22.04, glibc 2.35).
 2. Install or extract to `/usr/local/EnergyPlus-<ver>/` (system) or
    `~/opt/EnergyPlus-<ver>/` (user-space).
 3. Either ensure `energyplus` is on `$PATH`, or set

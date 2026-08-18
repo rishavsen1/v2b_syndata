@@ -63,27 +63,27 @@ Goal: a working `energyplus` binary that `discover_energyplus()` finds.
    uv run python -c "from v2b_syndata.load_pipeline.ep_runner import discover_energyplus; print(discover_energyplus())"
    ```
    If it prints a path and exits 0, skip the rest of Phase 3.
-2. Otherwise install to `~/opt/EnergyPlus-23-2-0/` (user-space, no sudo).
-   Default version: **23.2.0**. NREL release assets are on GitHub; pick the
-   tarball/zip matching the detected platform:
+2. Otherwise install to `~/opt/EnergyPlus-24-1-0/` (user-space, no sudo).
+   Default version: **24.1.0** (release tag `9d7789a3ac`). NREL release assets
+   are on GitHub; pick the tarball/zip matching the detected platform:
 
-   | Platform | Asset name (under `v23.2.0`) |
+   | Platform | Asset name (under `v24.1.0`) |
    |---|---|
-   | Linux x86_64 (Ubuntu 22.04 / glibc ≥ 2.35) | `EnergyPlus-23.2.0-7636e6b3e9-Linux-Ubuntu22.04-x86_64.tar.gz` |
-   | Linux x86_64 (Ubuntu 20.04) | `EnergyPlus-23.2.0-7636e6b3e9-Linux-Ubuntu20.04-x86_64.tar.gz` |
-   | macOS arm64 | `EnergyPlus-23.2.0-7636e6b3e9-Darwin-macOS12.1-arm64.tar.gz` |
-   | macOS x86_64 | `EnergyPlus-23.2.0-7636e6b3e9-Darwin-macOS12.1-x86_64.tar.gz` |
-   | Windows x86_64 | `EnergyPlus-23.2.0-7636e6b3e9-Windows-x86_64.zip` |
+   | Linux x86_64 (Ubuntu 22.04 / glibc ≥ 2.35) | `EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu22.04-x86_64.tar.gz` |
+   | Linux x86_64 (Ubuntu 20.04) | `EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.tar.gz` |
+   | macOS arm64 | `EnergyPlus-24.1.0-9d7789a3ac-Darwin-macOS12.1-arm64.tar.gz` |
+   | macOS x86_64 | `EnergyPlus-24.1.0-9d7789a3ac-Darwin-macOS12.1-x86_64.tar.gz` |
+   | Windows x86_64 | `EnergyPlus-24.1.0-9d7789a3ac-Windows-x86_64.zip` |
 
    Download from
-   `https://github.com/NREL/EnergyPlus/releases/download/v23.2.0/<asset>`
+   `https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/<asset>`
    into `~/.cache/v2b-syndata/` (create if missing), then extract:
-   - **Linux/macOS:** `tar -xzf <asset> -C ~/opt/ && mv ~/opt/EnergyPlus-23.2.0-* ~/opt/EnergyPlus-23-2-0`
-   - **Windows:** unzip to `C:\EnergyPlusV23-2-0\`
+   - **Linux/macOS:** `tar -xzf <asset> -C ~/opt/ && mv ~/opt/EnergyPlus-24.1.0-* ~/opt/EnergyPlus-24-1-0`
+   - **Windows:** unzip to `C:\EnergyPlusV24-1-0\`
 
    On Linux, if the GitHub release URL 404s or the asset name has drifted,
    list assets via
-   `curl -fsSL https://api.github.com/repos/NREL/EnergyPlus/releases/tags/v23.2.0`
+   `curl -fsSL https://api.github.com/repos/NREL/EnergyPlus/releases/tags/v24.1.0`
    and pick the Linux x86_64 `.tar.gz` whose name best matches the detected
    glibc/distro (`ldd --version`, `/etc/os-release`). Do **not** silently
    substitute a different EnergyPlus major version.
@@ -110,7 +110,7 @@ Print a final summary table:
 component       status   detail
 uv              OK       0.x.y
 python deps     OK       uv sync clean
-EnergyPlus      OK       ~/opt/EnergyPlus-23-2-0/energyplus  (23.2.0)
+EnergyPlus      OK       ~/opt/EnergyPlus-24-1-0/energyplus  (24.1.0)
 smoke gen       OK       S01 seed=42 → 7 CSVs + manifest
 ```
 
