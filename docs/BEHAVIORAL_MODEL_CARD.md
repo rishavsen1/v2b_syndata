@@ -222,15 +222,16 @@ There are two 10-building campus configs, and they differ in a way that matters:
 
 | Config | Populations used | Fitted? |
 |---|---|---|
-| `configs/campus_10.yaml` | `stable_commuter_heavy`, `consent_default`, `flexible_workforce`, `occasional_commuter`, `visitor_heavy` | **No — all hand-authored** |
-| `configs/campus_10_office.yaml` | `acn_jpl_office_{high,mid,low}`, `acn_caltech_office_{high,mid,low}` | **Yes — ACN-Data** |
+| `configs/campus_base.yaml` (current) | `acn_jpl_office_{high,veryhigh,mid}` | **Yes — ACN-Data** |
 
-> **The 18,000-unit reference corpus in `data/output/campus10/` was generated from
-> `campus_10.yaml`, i.e. from hand-authored round-number parameters** (`arrival: {mu: 8.5,
-> sigma: 0.6}`, `dwell: {k: 2.5, lambda: 9.5}`, …) with `calibration_policy: synthetic`,
-> no `calibration_metadata`, and no `ks_fit_quality`. There is **no training or test
-> error for those buildings, because nothing was trained.** Use
-> `campus_10_office.yaml` when you need the calibrated behavioral model.
+> **Historical note.** The 18,000-unit reference corpus in `data/output/campus10/`
+> was generated from the former `campus_10.yaml` (now removed), i.e. from
+> hand-authored round-number parameters (`arrival: {mu: 8.5, sigma: 0.6}`,
+> `dwell: {k: 2.5, lambda: 9.5}`, …) with `calibration_policy: synthetic`, no
+> `calibration_metadata`, and no `ks_fit_quality`. There is **no training or test
+> error for those buildings, because nothing was trained.** The current
+> `campus_base.yaml` replaces it and uses the ACN-Data-calibrated
+> `acn_jpl_office_*` populations.
 >
 > Verify for any released unit — the population is recorded per unit:
 > `jq '.buildings[0].descriptors.population' data/output/campus10/b1/JUL2024/0/multi_building_config.json`

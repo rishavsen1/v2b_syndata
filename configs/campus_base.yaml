@@ -1,0 +1,165 @@
+# campus_base.yaml — canonical 10-building base campus config.
+#
+# Replaces the earlier ad-hoc campus variations. Ten ACN-JPL office buildings
+# spanning large→medium office, peaks 600→50 kW, each with 1:1 kWh PV and a
+# 2-hour battery (power = capacity/2). Strong per-building weather realization,
+# clean output noise. Building-major generation: split with
+#   uv run python tools/split_campus_config.py configs/campus_base.yaml
+# then run tools/run_campus.sh (SPLIT=configs/_campus_base_split).
+output_mode: shared
+emit_sessions_soc: true
+dr_program: CBP
+dr_incentive_per_kw: 13.6
+dr_penalty_per_kwh: 6.0
+default_policy: ILP-MPCFIXEDFSL
+buildings:
+# b1 (600-30): large office, peak 600 kW, JPL high-regularity
+- base_scenario: S01
+  descriptors: {building: large_office_v1, location: san_jose_ca, population: acn_jpl_office_high, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 30
+    charging_infra.charger_count: 30
+    pv.dc_capacity_kw: 600
+    battery.capacity_kwh: 600
+    battery.power_kw: 300
+    building_load.peak_kw: 600
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 0
+# b2 (500-30): large office, peak 500 kW, JPL very-high-regularity
+- base_scenario: S01
+  descriptors: {building: large_office_v1, location: san_jose_ca, population: acn_jpl_office_veryhigh, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 30
+    charging_infra.charger_count: 30
+    pv.dc_capacity_kw: 500
+    battery.capacity_kwh: 500
+    battery.power_kw: 250
+    building_load.peak_kw: 500
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 1000
+# b3 (400-25): large office, peak 400 kW, JPL high-regularity
+- base_scenario: S01
+  descriptors: {building: large_office_v1, location: san_jose_ca, population: acn_jpl_office_high, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 25
+    charging_infra.charger_count: 25
+    pv.dc_capacity_kw: 400
+    battery.capacity_kwh: 400
+    battery.power_kw: 200
+    building_load.peak_kw: 400
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 2000
+# b4 (350-25): large office, peak 350 kW, JPL very-high-regularity
+- base_scenario: S01
+  descriptors: {building: large_office_v1, location: san_jose_ca, population: acn_jpl_office_veryhigh, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 25
+    charging_infra.charger_count: 25
+    pv.dc_capacity_kw: 350
+    battery.capacity_kwh: 350
+    battery.power_kw: 175
+    building_load.peak_kw: 350
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 3000
+# b5 (300-25): large office, peak 300 kW, JPL high-regularity
+- base_scenario: S01
+  descriptors: {building: large_office_v1, location: san_jose_ca, population: acn_jpl_office_high, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 25
+    charging_infra.charger_count: 25
+    pv.dc_capacity_kw: 300
+    battery.capacity_kwh: 300
+    battery.power_kw: 150
+    building_load.peak_kw: 300
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 4000
+# b6 (250-20): medium office, peak 250 kW, JPL very-high-regularity
+- base_scenario: S01
+  descriptors: {building: medium_office_v1, location: san_jose_ca, population: acn_jpl_office_veryhigh, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 20
+    charging_infra.charger_count: 20
+    pv.dc_capacity_kw: 250
+    battery.capacity_kwh: 250
+    battery.power_kw: 125
+    building_load.peak_kw: 250
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 5000
+# b7 (200-20): medium office, peak 200 kW, JPL high-regularity
+- base_scenario: S01
+  descriptors: {building: medium_office_v1, location: san_jose_ca, population: acn_jpl_office_high, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 20
+    charging_infra.charger_count: 20
+    pv.dc_capacity_kw: 200
+    battery.capacity_kwh: 200
+    battery.power_kw: 100
+    building_load.peak_kw: 200
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 6000
+# b8 (150-15): medium office, peak 150 kW, JPL very-high-regularity
+- base_scenario: S01
+  descriptors: {building: medium_office_v1, location: san_jose_ca, population: acn_jpl_office_veryhigh, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 15
+    charging_infra.charger_count: 15
+    pv.dc_capacity_kw: 150
+    battery.capacity_kwh: 150
+    battery.power_kw: 75
+    building_load.peak_kw: 150
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 7000
+# b9 (100-15): medium office, peak 100 kW, JPL mid-regularity
+- base_scenario: S01
+  descriptors: {building: medium_office_v1, location: san_jose_ca, population: acn_jpl_office_mid, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 15
+    charging_infra.charger_count: 15
+    pv.dc_capacity_kw: 100
+    battery.capacity_kwh: 100
+    battery.power_kw: 50
+    building_load.peak_kw: 100
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 8000
+# b10 (50-15): medium office, peak 50 kW, JPL mid-regularity
+- base_scenario: S01
+  descriptors: {building: medium_office_v1, location: san_jose_ca, population: acn_jpl_office_mid, equipment: balanced_50pct}
+  overrides:
+    ev_fleet.ev_count: 10
+    charging_infra.charger_count: 10
+    pv.dc_capacity_kw: 50
+    battery.capacity_kwh: 50
+    battery.power_kw: 25
+    building_load.peak_kw: 50
+    building_load.peak_kw_scaling: true
+    user_behavior.soc_chain_enforce: true
+  noise_profile: clean
+  weather_profile: strong
+  seed: 9000

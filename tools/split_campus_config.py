@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Split a multi-building campus config (configs/campus_<TAG>.yaml) into one
 single-building config per building, for a BUILDING-MAJOR generation
-(each run -> data/output/campus<TAG>/b{i}/<MONTH>/<sample>/), exactly the recipe
-used for campus10 (configs/_campus_split/ + tools/run_campus10.sh).
+(each run -> data/output/campus<TAG>/b{i}/<MONTH>/<sample>/), the recipe used by
+the generic runner (configs/_campus_base_split/ + tools/run_campus.sh).
 
 TAG is any suffix: a number ("20", "50") or a name ("10_new"). An argument
 containing "/" or ending in ".yaml" is instead treated as a PATH to a campus
 config; its split dir is written next to it as _<stem>_split/.
 
 Usage:  uv run python tools/split_campus_config.py 20 50 10_new
-        uv run python tools/split_campus_config.py configs/campus10_office_variants/campus_10_office_slight.yaml
+        uv run python tools/split_campus_config.py configs/campus_base.yaml
 Writes: configs/_campus<TAG>_split/b1.yaml .. b{N}.yaml  (tag form)
         <dir>/_<stem>_split/b1.yaml .. b{N}.yaml         (path form)
 """

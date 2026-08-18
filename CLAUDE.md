@@ -42,9 +42,9 @@ uv run python -m v2b_syndata.cli validate data/output/dev/S01/seed42/
 
 # Multi-building batch (months × samples, optimus CSVs). ALWAYS smoke-test a
 # 1-month × 2-sample slice first; see "Multi-building / batch generation gotchas".
-uv run python -m v2b_syndata.cli generate-multi --config configs/campus_10.yaml \
-    --start-month 2024-01 --end-month 2024-12 --samples-per-month 150 \
-    --noise-profile clean --workers 30 --output-dir data/output/campus10/ --force
+uv run python -m v2b_syndata.cli generate-multi --config configs/campus_base.yaml \
+    --start-month 2024-01 --end-month 2024-06 --samples-per-month 100 \
+    --noise-profile clean --workers 30 --output-dir data/output/campus_base/ --force
 
 # Discoverability
 uv run python -m v2b_syndata.cli list-scenarios
@@ -147,8 +147,8 @@ value by editing the relevant library file.
 - **`--output-mode per-building` ≠ building-major layout.** It writes integer
   `0..N-1` subfolders at the *leaf* (`<out>/<MONTH>/<sample>/<bid>/`). For a
   building-major tree (`parent/b1/<MONTH>/<sample>/`), run one single-building
-  batch per building (split the config; see `configs/_campus_split/`,
-  `tools/run_campus10.sh`).
+  batch per building (split the config with `tools/split_campus_config.py`; see
+  `configs/_campus_base_split/`, driven by the generic `tools/run_campus.sh`).
 - **Seed spacing:** batch adds the per-sample offset (`0..samples_per_month-1`)
   to each building's base seed — space base seeds by ≥ samples_per_month (and
   ≥ `multiplier` when used) or (building, sample) seeds collide across entries.

@@ -7,8 +7,8 @@ from committed artifacts so the numbers cannot drift from the evidence:
   appendix_fits.tex    docs/experiments/s1_fidelity_cis.csv (KS/W1 + 95% CIs)
                        + S1 moments, S2 copula, S3 held-out tables parsed from
                        docs/CALIBRATION_RESULTS.md (auto-generated doc)
-  appendix_corpus.tex  configs/campus_10.yaml + the ten
-                       data/output/campus10/b*/batch_manifest.json files
+  appendix_corpus.tex  configs/campus_base.yaml + the ten
+                       data/output/campus_base/b*/batch_manifest.json files
   appendix_tstr.tex    data/tstr/results.json + results_elaadnl_matched.json
                        (harness details from tools/tstr_forecasting.py)
   appendix_axes.tex    configs/populations.yaml region-box geometries
@@ -30,8 +30,8 @@ REPO = Path(__file__).resolve().parent.parent
 SECTIONS = REPO / "paper" / "sections"
 CAL_MD = REPO / "docs" / "CALIBRATION_RESULTS.md"
 CIS_CSV = REPO / "docs" / "experiments" / "s1_fidelity_cis.csv"
-CAMPUS_YAML = REPO / "configs" / "campus_10.yaml"
-CAMPUS_DIR = REPO / "data" / "output" / "campus10"
+CAMPUS_YAML = REPO / "configs" / "campus_base.yaml"
+CAMPUS_DIR = REPO / "data" / "output" / "campus_base"
 TSTR_DIR = REPO / "data" / "tstr"
 POPS_YAML = REPO / "configs" / "populations.yaml"
 
