@@ -54,3 +54,18 @@ tracked record of what they contain and how to regenerate them.
 - **Smoke evidence**: `docs/experiments/campus_base_smoke_overview.{png,csv}`
   (energy KS 0.081, dwell 0.071, required-SoC 0.264, 0% of repeat arrivals
   above the prior departure, 20/20 units validated).
+
+## `campus_base_phi15_moderate` — configs/_campus_base_phi15_moderate_split/
+
+- **Source**: exact copies of `configs/_campus_base_phi15_split/` (the variant
+  above) with ONE additional diff: per-building `weather_profile: strong` →
+  `moderate` (±2.5 °C dry-bulb, ±5 % solar, ±1.5 °C dew-point, ±10 % wind —
+  half the strong sigmas). Behavioral model identical.
+- **Campaign** (launched 2026-08-18 23:05 CDT, same size: 10 × 12 × 200):
+  ```bash
+  SPLIT=configs/_campus_base_phi15_moderate_split OUT=data/output/campus_base_moderate \
+  START=2024-01 END=2024-12 SAMPLES=200 NOISE=clean tools/campus/run_campus.sh 28
+  ```
+- Seeds identical to campus_base_phi15 → same behavioral draws per (building,
+  sample); only the weather realization (and load) differs. The two corpora are
+  a matched pair for weather-sensitivity studies.
