@@ -196,6 +196,32 @@ def main(argv=None) -> int:
     df = collect(a.root, a.workers, a.max_units_per_building)
     a.out_dir.mkdir(parents=True, exist_ok=True)
     cols = [c for c in METRICS if c in df.columns]
+    # Raw per-unit metrics: the reusable artifact for any downstream slice
+    # (per-building, per-month, episode-to-episode). Kept out of docs/ (large).
+    raw = REPO / "data" / "output" / f"campus_metrics_{a.tag}.csv"
+    df.to_csv(raw, index=False)
+    print(f"saved raw per-unit metrics: {raw}  ({len(df):,} rows)")
+
+    # Per-(building, month) episode spread — how much one episode differs from
+    # another with the SAME building and month (weather realization + seed only).
+    ep = []
+    for (b, mo), g in df.groupby(["building", "month"]):
+        for c in cols:
+            v = g[c].dropna()
+            if len(v) < 5 or v.nunique() < 2:
+                continue
+            q = v.quantile([0.05, 0.5, 0.95])
+            ep.append({"building": b, "month": mo, "metric": c,
+                       "label": METRICS.get(c, c), "n_episodes": len(v),
+                       "mean": v.mean(), "sd": v.std(),
+                       "cv": v.std() / abs(v.mean()) if v.mean() else np.nan,
+                       "p5": q[0.05], "p50": q[0.5], "p95": q[0.95],
+                       "range_p5_p95": q[0.95] - q[0.05],
+                       "rel_range": (q[0.95] - q[0.05]) / abs(v.mean()) if v.mean() else np.nan})
+    ep_df = pd.DataFrame(ep)
+    ep_df.to_csv(a.out_dir / f"campus_episode_spread_{a.tag}.csv", index=False)
+    print(f"saved per-(building,month) episode spread: "
+          f"campus_episode_spread_{a.tag}.csv ({len(ep_df):,} rows)")
 
     unc = pd.DataFrame([variance_decomposition(df, c) for c in cols]).dropna(subset=["metric"])
     unc.to_csv(a.out_dir / f"campus_uncertainty_{a.tag}.csv", index=False)
