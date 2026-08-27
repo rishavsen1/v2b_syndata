@@ -69,3 +69,23 @@ tracked record of what they contain and how to regenerate them.
 - Seeds identical to campus_base_phi15 → same behavioral draws per (building,
   sample); only the weather realization (and load) differs. The two corpora are
   a matched pair for weather-sensitivity studies.
+
+## `campus_base_phi15_moderate2` — configs/_campus_base_phi15_moderate2_split/
+
+Copies of the `_moderate` split plus ONE diff:
+`ev_fleet.battery_capacity_kwh_overrides: {leaf_24: 60.0}`.
+
+Generated with two model changes landed 2026-08-27 (energy-first arrival SoC +
+the dwell<->energy copula edge), so this corpus is NOT comparable session-wise
+to the earlier `campus_base`/`campus_base_moderate` pair.
+
+```bash
+SPLIT=configs/_campus_base_phi15_moderate2_split OUT=data/output/campus_base_moderate_2 \
+START=2024-01 END=2024-12 SAMPLES=200 NOISE=clean tools/campus/run_campus.sh 28
+```
+
+Caveat on the capacity swap: the ACN source evidence points the OTHER way (no
+JPL driver ever delivered >=75 kWh in one session; best-case per-driver capacity
+estimator median 44.7 kWh vs our fleet's 75). The swap is a scenario choice to
+keep the max-SoC ceiling non-binding, not a fidelity claim. Most of the energy
+gain comes from the energy-first fix, which needs no fleet change.

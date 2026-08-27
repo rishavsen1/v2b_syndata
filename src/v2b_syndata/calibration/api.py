@@ -20,6 +20,7 @@ from .distribution_fitter import (
     MIN_SAMPLES,
     MIXTURE_MIN_SAMPLES,
     fit_beta_soc,
+    fit_dwell_energy_rho,
     fit_lognorm_energy,
     fit_region,
     fit_truncnorm_arrival,
@@ -345,6 +346,18 @@ def _calibrate_one_population(
         energy_fit = fit_lognorm_energy(np.asarray(kwh_list, dtype=float))
         if energy_fit is not None:
             clean["energy"] = energy_fit
+        # Third copula edge: dwell <-> energy. Fitted on the SAME sessions in
+        # the same order, so the pairs line up with the dwell array above.
+        de_pairs = [(s_.dwell_hours, float(s_.kwh_delivered))
+                    for u in region_users
+                    for s_ in sessions_by_uid.get(u.user_id, [])
+                    if s_.kwh_delivered and s_.kwh_delivered > 0]
+        if de_pairs and "copula" in clean:
+            de = fit_dwell_energy_rho(np.array([x[0] for x in de_pairs]),
+                                      np.array([x[1] for x in de_pairs]))
+            if de is not None:
+                clean["copula"]["rho_dwell_energy"] = de["rho_gaussian"]
+                clean["copula"]["rho_dwell_energy_spearman"] = de["rho_spearman"]
         if clean or fit.get("arrival") is not None:
             region_fits[rname] = clean
 

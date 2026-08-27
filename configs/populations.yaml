@@ -146,6 +146,8 @@ acn_workplace_baseline:
         rho_spearman: -0.6091728496107992
         rho_gaussian: -0.627162470341074
         n_samples: 4814
+        rho_dwell_energy: 0.23379566439251664
+        rho_dwell_energy_spearman: 0.2237700412806913
       phi:
         dist: beta
         alpha: 1.4107703606186819
@@ -189,6 +191,8 @@ acn_workplace_baseline:
         rho_spearman: -0.6896988164981172
         rho_gaussian: -0.7066546410074654
         n_samples: 17318
+        rho_dwell_energy: 0.27898441016307396
+        rho_dwell_energy_spearman: 0.2672821139482141
       phi:
         dist: beta
         alpha: 8.137123019123838
@@ -232,6 +236,8 @@ acn_workplace_baseline:
         rho_spearman: -0.5951795586909139
         rho_gaussian: -0.6132311354037752
         n_samples: 17968
+        rho_dwell_energy: 0.2990277203486107
+        rho_dwell_energy_spearman: 0.28662517014071615
       phi:
         dist: beta
         alpha: 2.7194492399733377
@@ -256,7 +262,7 @@ acn_workplace_baseline:
         n_samples: 17848
         ks_fit_quality: 0.04328410127200599
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260818
+    source: calibration:acn_data_2019_2021_20260827
     dataset: ACN-Data
     sites:
       - caltech
@@ -265,7 +271,7 @@ acn_workplace_baseline:
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-08-18'
+    calibration_date: '2026-08-27'
     n_users_total: 625
     n_sessions_total: 40694
     n_users_assigned_in_population: 625
@@ -323,6 +329,8 @@ acn_caltech_baseline:
         rho_spearman: -0.46644417645978503
         rho_gaussian: -0.4836177175512331
         n_samples: 2832
+        rho_dwell_energy: 0.2244095705359583
+        rho_dwell_energy_spearman: 0.21474758136348304
       phi:
         dist: beta
         alpha: 1.0054873468399885
@@ -366,6 +374,8 @@ acn_caltech_baseline:
         rho_spearman: -0.6018747459355048
         rho_gaussian: -0.6199008327603123
         n_samples: 4380
+        rho_dwell_energy: 0.06770840593515749
+        rho_dwell_energy_spearman: 0.0646691219306481
       phi:
         dist: beta
         alpha: 8.578773470917989
@@ -409,6 +419,8 @@ acn_caltech_baseline:
         rho_spearman: -0.4340383531037598
         rho_gaussian: -0.45062145054204406
         n_samples: 5117
+        rho_dwell_energy: 0.32973993252899597
+        rho_dwell_energy_spearman: 0.31632268767462124
       phi:
         dist: beta
         alpha: 3.845966570383028
@@ -433,14 +445,14 @@ acn_caltech_baseline:
         n_samples: 5117
         ks_fit_quality: 0.022203675948065382
   calibration_metadata: &id004
-    source: calibration:acn_data_2019_2021_20260818
+    source: calibration:acn_data_2019_2021_20260827
     dataset: ACN-Data
     sites:
       - caltech
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-08-18'
+    calibration_date: '2026-08-27'
     n_users_total: 258
     n_sessions_total: 12757
     n_users_assigned_in_population: 258
@@ -497,6 +509,8 @@ acn_jpl_baseline:
         rho_spearman: -0.6379194593110751
         rho_gaussian: -0.6556753557622733
         n_samples: 2469
+        rho_dwell_energy: 0.3057974868142087
+        rho_dwell_energy_spearman: 0.2931650179811949
       phi:
         dist: beta
         alpha: 3.9688747307373786
@@ -540,6 +554,8 @@ acn_jpl_baseline:
         rho_spearman: -0.676090631680392
         rho_gaussian: -0.6933055159551663
         n_samples: 12010
+        rho_dwell_energy: 0.28262279486245884
+        rho_dwell_energy_spearman: 0.27079127554378535
       phi:
         dist: beta
         alpha: 8.239893253871468
@@ -583,6 +599,8 @@ acn_jpl_baseline:
         rho_spearman: -0.567188918467206
         rho_gaussian: -0.5852663914192484
         n_samples: 12657
+        rho_dwell_energy: 0.2145126712390156
+        rho_dwell_energy_spearman: 0.20523931165279466
       phi:
         dist: beta
         alpha: 2.551003730943366
@@ -607,14 +625,14 @@ acn_jpl_baseline:
         n_samples: 12537
         ks_fit_quality: 0.019714103410603867
   calibration_metadata: &id002
-    source: calibration:acn_data_2019_2021_20260818
+    source: calibration:acn_data_2019_2021_20260827
     dataset: ACN-Data
     sites:
       - jpl
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-08-18'
+    calibration_date: '2026-08-27'
     n_users_total: 378
     n_sessions_total: 27377
     n_users_assigned_in_population: 378
@@ -667,6 +685,8 @@ acn_office001_baseline:
         rho_spearman: -0.6576655052264809
         rho_gaussian: -0.6751751851778541
         n_samples: 41
+        rho_dwell_energy: 0.61161063236952
+        rho_dwell_energy_spearman: 0.5935540069686414
       energy:
         dist: lognorm
         sigma: 0.9430261431213696
@@ -701,6 +721,8 @@ acn_office001_baseline:
         rho_spearman: -0.5245295168434151
         rho_gaussian: -0.5424066923378253
         n_samples: 169
+        rho_dwell_energy: 0.012819787794176286
+        rho_dwell_energy_spearman: 0.012242079413158248
       energy:
         dist: lognorm
         sigma: 0.8538025426426896
@@ -735,6 +757,8 @@ acn_office001_baseline:
         rho_spearman: -0.6642131706418422
         rho_gaussian: -0.6816253752936312
         n_samples: 344
+        rho_dwell_energy: 0.4180539423104128
+        rho_dwell_energy_spearman: 0.40217787906368924
       energy:
         dist: lognorm
         sigma: 0.6032741946372079
@@ -753,14 +777,14 @@ acn_office001_baseline:
         n_samples: 344
         ks_fit_quality: 0.03645292511645137
   calibration_metadata:
-    source: calibration:acn_data_2019_2021_20260818
+    source: calibration:acn_data_2019_2021_20260827
     dataset: ACN-Data
     sites:
       - office001
     year_range:
       - 2019
       - 2021
-    calibration_date: '2026-08-18'
+    calibration_date: '2026-08-27'
     n_users_total: 14
     n_sessions_total: 560
     n_users_assigned_in_population: 14

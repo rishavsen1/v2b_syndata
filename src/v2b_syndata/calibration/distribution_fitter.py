@@ -366,6 +366,32 @@ def fit_lognorm_energy(kwh_delivered: np.ndarray) -> dict[str, Any] | None:
                         {"sigma": "energy.sigma", "scale": "energy.scale"})
 
 
+def fit_dwell_energy_rho(dwells: np.ndarray, kwh: np.ndarray) -> dict[str, Any] | None:
+    """Spearman + Gaussian-copula ρ between dwell and delivered energy.
+
+    The third edge of the session copula. Measured on ACN JPL, the dependence
+    structure is a MARKOV CHAIN arrival -> dwell -> energy: per region,
+    ρ(arrival, energy) ≈ ρ(arrival, dwell) · ρ(dwell, energy) to within ±0.04
+    (rare −0.145 vs −0.187, occasional −0.194 vs −0.183, regular −0.079 vs
+    −0.116). So arrival ⊥ energy | dwell holds, and this ONE extra parameter
+    per region reproduces the arrival→energy dependence for free — the 3x3
+    Gaussian correlation matrix is built as an AR(1)-style chain, which is
+    positive-definite by construction.
+    """
+    a = np.asarray(dwells, float)
+    b = np.asarray(kwh, float)
+    m = np.isfinite(a) & np.isfinite(b) & (b > 0)
+    a, b = a[m], b[m]
+    n = int(len(a))
+    if n < MIN_SAMPLES:
+        return None
+    rho_s = float(st.spearmanr(a, b).statistic)
+    if not np.isfinite(rho_s):
+        return None
+    rho_g = float(2.0 * np.sin(np.pi * rho_s / 6.0))
+    return {"rho_spearman": rho_s, "rho_gaussian": rho_g, "n_samples": n}
+
+
 def fit_copula_rho(arrivals: np.ndarray, dwells: np.ndarray) -> dict[str, Any]:
     """Compute Spearman ρ + Gaussian-copula correlation."""
     n = int(min(len(arrivals), len(dwells)))

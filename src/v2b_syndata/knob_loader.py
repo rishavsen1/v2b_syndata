@@ -75,6 +75,9 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     # and DERIVES required_soc = arrival + kwh/capacity — decoupling session
     # energy from the hand-authored battery_mix. sigma is the lognorm shape,
     # scale = exp(mu) in kWh.
+    # Third copula edge: dwell <-> delivered energy (see fit_dwell_energy_rho).
+    # arrival<->energy is implied by the chain, not stored.
+    "copula.rho_dwell_energy": (-0.99, 0.99),
     "energy.sigma": (0.01, 5.0),
     "energy.scale": (0.1, 100.0),
     "soc_arrival.alpha": (0.01, 50.0),
@@ -208,6 +211,16 @@ def _check_type_and_range(path: str, value: Any, spec: dict[str, Any]) -> None:
             total += float(entry["weight"])
         if abs(total - 1.0) > 1e-6:
             raise KnobValidationError(f"{path}: region weights must sum to 1.0, got {total}")
+    elif typ == "map[str,float]":
+        if not isinstance(value, dict):
+            raise KnobValidationError(f"{path}: expected mapping, got {type(value).__name__}")
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise KnobValidationError(f"{path}: key {k!r} must be a string")
+            if not isinstance(v, (int, float)) or isinstance(v, bool):
+                raise KnobValidationError(f"{path}: value for {k!r} must be numeric, got {v!r}")
+            if float(v) <= 0:
+                raise KnobValidationError(f"{path}: value for {k!r} must be > 0, got {v}")
     elif typ == "timestamp":
         # null, ISO string, or date/datetime (YAML parses 'YYYY-MM-DD' to date).
         import datetime as _dt

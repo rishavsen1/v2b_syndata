@@ -85,7 +85,10 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
         lam = float(dwell_cal.get("lambda", 8.0 * (0.5 + u.phi)))
         entry = {"k": k, "lam": lam,
                  "clip_lo": clip_lo, "clip_hi": clip_hi,
-                 "rho": rho}
+                 "rho": rho,
+                 # Third copula edge (dwell <-> energy). 0.0 => the legacy
+                 # 2-way path, bit-identical for populations without the leaf.
+                 "rho_de": float(copula_cal.get("rho_dwell_energy", 0.0))}
         # A region whose calibrated `dwell` block carries the mixture leaves
         # (w1, k1, lambda1, k2, lambda2) gets a 2-component Weibull mixture;
         # otherwise the single Weibull above (default / hand-authored path,

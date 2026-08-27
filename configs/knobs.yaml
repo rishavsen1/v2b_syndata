@@ -40,6 +40,12 @@ ev_fleet:
     description: "Per-car capacity variance mode. Couples to sessions via D5 rejection sampling (see battery_mix)."
     affects_csv: [cars.csv, sessions.csv]
 
+  battery_capacity_kwh_overrides:
+    type: map[str,float]
+    default: {}
+    description: "Per-battery-class capacity override in kWh, e.g. {leaf_24: 60.0}. Empty default = the built-in BATTERY_SPECS capacities (24/40/75/100), so existing scenarios are bitwise-identical. Use when a scenario's fleet should not contain a class as specced — e.g. swapping the 24 kWh entry to 60 kWh because a 24 kWh pack cannot physically absorb the calibrated session-energy draws (it hits the max-SoC ceiling on 43% of sessions). Keys must be existing class names; the class LABEL is unchanged in cars.csv, only its capacity."
+    affects_csv: [cars.csv, sessions.csv]
+
   battery_mix_dirichlet_alpha:
     type: float
     range: [1.0, 1000000.0]

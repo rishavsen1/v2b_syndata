@@ -129,6 +129,19 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
     min_soc = float(ctx.knobs.get("ev_fleet.min_allowed_soc"))
     max_soc = float(ctx.knobs.get("ev_fleet.max_allowed_soc"))
 
+    # Per-class capacity overrides (knob; empty default = built-in specs, so the
+    # default path is bitwise-identical). Lets a scenario retire a class whose
+    # pack is too small to absorb the calibrated energy draws without the
+    # max-SoC ceiling binding, without changing the class vocabulary.
+    cap_over = (ctx.knobs.get("ev_fleet.battery_capacity_kwh_overrides")
+                if ctx.knobs.has("ev_fleet.battery_capacity_kwh_overrides") else None) or {}
+    unknown = set(cap_over) - set(BATTERY_SPECS)
+    if unknown:
+        raise ValueError(
+            f"ev_fleet.battery_capacity_kwh_overrides has unknown class(es): {sorted(unknown)}; "
+            f"valid: {sorted(BATTERY_SPECS)}"
+        )
+
     out: dict[int, FleetAttrs] = {}
     for car_id in range(1, ev_count + 1):
         if homog:
@@ -139,7 +152,7 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
         spec = BATTERY_SPECS[cls]
         out[car_id] = FleetAttrs(
             car_id=car_id, battery_class=cls,
-            capacity_kwh=spec["capacity_kwh"],
+            capacity_kwh=float(cap_over.get(cls, spec["capacity_kwh"])),
             min_allowed_soc=min_soc,
             max_allowed_soc=max_soc,
         )

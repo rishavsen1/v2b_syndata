@@ -114,3 +114,49 @@ def test_proportional_chain_continuity_and_band(fast_generate):
          (rep["arrival_soc"] <= 10.0 + 1e-9)
     assert ok.all(), f"{(~ok).sum()} arrivals above prior departure"
     assert len(rep) > 50
+
+
+def test_energy_first_and_triple_copula(fast_generate):
+    """Energy-first arrival SoC + the dwell<->energy copula edge.
+
+    Guards three properties at once: the SoC band is never violated, the
+    max-SoC ceiling stops dominating (clamp rate collapses), and delivered
+    energy correlates with dwell instead of being independent of it.
+    """
+    import numpy as np
+    import pandas as pd
+    import scipy.stats as st
+
+    out, _ = fast_generate(scenario="S_acn_jpl", seed=21,
+                           overrides={"ev_fleet.ev_count": 150,
+                                      "charging_infra.charger_count": 75})
+    s = pd.read_csv(out / "sessions.csv")
+    cars = pd.read_csv(out / "cars.csv").set_index("car_id")["capacity_kwh"]
+    cap = s["car_id"].map(cars)
+    kwh = (s["required_soc_at_depart"] - s["arrival_soc"]) / 100.0 * cap
+    dwell = s["duration_sec"] / 3600.0
+
+    assert (s["arrival_soc"] >= 10.0 - 1e-9).all()
+    assert (s["required_soc_at_depart"] <= 90.0 + 1e-9).all()
+    clamp = float((s["required_soc_at_depart"] >= 89.999).mean())
+    assert clamp < 0.12, f"ceiling still binding on {clamp:.1%} of sessions"
+    rho = st.spearmanr(dwell, kwh).statistic
+    assert rho > 0.12, f"dwell<->energy coupling absent (rho={rho:.3f})"
+    assert np.median(kwh) > 9.0
+
+
+def test_capacity_override_knob(fast_generate):
+    """ev_fleet.battery_capacity_kwh_overrides retires a class's capacity."""
+    import pandas as pd
+
+    base, _ = fast_generate(scenario="S_acn_jpl", seed=4,
+                            overrides={"ev_fleet.ev_count": 60})
+    over, _ = fast_generate(
+        scenario="S_acn_jpl", seed=4,
+        overrides={"ev_fleet.ev_count": 60,
+                   "ev_fleet.battery_capacity_kwh_overrides": {"leaf_24": 60.0}})
+    b = pd.read_csv(base / "cars.csv")["capacity_kwh"]
+    o = pd.read_csv(over / "cars.csv")["capacity_kwh"]
+    assert (b == 24.0).any(), "fixture needs at least one 24 kWh car"
+    assert not (o == 24.0).any()
+    assert (o == 60.0).sum() >= (b == 24.0).sum()
