@@ -112,7 +112,7 @@ def synth_frame(root: Path, units: int, phi_scale: float) -> pd.DataFrame:
 
 def _render_unified(src, gen, a, cmap, gen_h):
     """One pooled distribution per feature — no region split anywhere."""
-    fig, ax = plt.subplots(2, 3, figsize=(19, 11))
+    fig, ax = plt.subplots(2, 4, figsize=(25, 11))
     rows = []
     for i, (key, label, bins, rng_) in enumerate(PARAMS):
         axx = ax[0, i]
@@ -140,7 +140,38 @@ def _render_unified(src, gen, a, cmap, gen_h):
                   f"(no source analogue: SoC is never metered)", fontsize=11, loc="left")
     axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=8)
 
+    # arrival SoC, hour by hour
     axx = ax[1, 1]
+    for i2, hlab in enumerate(HOUR_LABELS):
+        v = gen_h[gen_h.hb == hlab]["arr_soc"].to_numpy()
+        if len(v) < 30:
+            continue
+        axx.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=2.0,
+                 color=cmap(i2 / max(1, len(HOUR_LABELS) - 1)),
+                 label=f"{hlab}  mean {v.mean():.0f}%, floor {np.mean(v <= 10.001):.0%}")
+    axx.set_title("arrival SoC BY ARRIVAL HOUR — generated only\n"
+                  "(curves nearly coincide: the spread is capacity-driven, not hour-driven)",
+                  fontsize=11, loc="left")
+    axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=8)
+
+    # arrival SoC mean + spread per hour bin
+    axx = ax[1, 2]
+    m = gen_h.groupby("hb")["arr_soc"].mean()
+    q1 = gen_h.groupby("hb")["arr_soc"].quantile(0.25)
+    q3 = gen_h.groupby("hb")["arr_soc"].quantile(0.75)
+    se = gen_h.groupby("hb")["arr_soc"].sem()
+    x = range(len(HOUR_LABELS))
+    axx.fill_between(x, q1.values, q3.values, color=GEN_C, alpha=0.22, label="IQR")
+    axx.errorbar(x, m.values, yerr=1.96 * se.values, marker="o", color=GEN_C,
+                 lw=2, capsize=3, label="mean ± 95% CI")
+    axx.set_xticks(list(x)); axx.set_xticklabels(HOUR_LABELS)
+    axx.set_xlabel("arrival-hour bin"); axx.set_ylabel("% SoC at arrival")
+    rg = st.spearmanr(gen.arr_h, gen.arr_soc, nan_policy="omit").statistic
+    axx.set_title(f"arrival SoC level by hour — generated only\nspearman {rg:+.3f} (flat)",
+                  fontsize=11, loc="left")
+    axx.legend(fontsize=8); axx.grid(alpha=.25)
+
+    axx = ax[1, 3]
     for key, c, ls in (("dwell", "#1f4e79", "-"), ("kwh", "#d8853b", "-")):
         for df, lab, mk in ((src, "source", "o"), (gen, "campus", "s")):
             d = df.dropna(subset=[key, "arr_h"]).copy()
@@ -156,7 +187,7 @@ def _render_unified(src, gen, a, cmap, gen_h):
                   "(all regions pooled)", fontsize=11, loc="left")
     axx.legend(fontsize=8); axx.grid(alpha=.25)
 
-    axx = ax[1, 2]; axx.axis("off")
+    axx = ax[0, 3]; axx.axis("off")
     t = f"{'feature':22s}{'source':>10s}{'campus':>10s}{'KS':>8s}\n" + "-" * 50 + "\n"
     for r in rows:
         t += f"{r['feature'][:22]:22s}{r['source_mean']:10.2f}{r['generated_mean']:10.2f}{r['ks']:8.3f}\n"
