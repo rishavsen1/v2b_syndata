@@ -110,6 +110,74 @@ def synth_frame(root: Path, units: int, phi_scale: float) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _render_unified(src, gen, a, cmap, gen_h):
+    """One pooled distribution per feature — no region split anywhere."""
+    fig, ax = plt.subplots(2, 3, figsize=(19, 11))
+    rows = []
+    for i, (key, label, bins, rng_) in enumerate(PARAMS):
+        axx = ax[0, i]
+        sv = src[key].dropna().to_numpy()
+        gv = gen[key].dropna().to_numpy()
+        ks = st.ks_2samp(sv, gv).statistic
+        rows.append({"feature": label, "n_source": len(sv), "n_generated": len(gv),
+                     "source_mean": sv.mean(), "generated_mean": gv.mean(),
+                     "source_median": float(np.median(sv)),
+                     "generated_median": float(np.median(gv)), "ks": ks})
+        axx.hist(sv, bins=bins, range=rng_, density=True, color=SRC_C, alpha=0.55,
+                 label=f"ACN {a.site} source  (n={len(sv):,})")
+        axx.hist(gv, bins=bins, range=rng_, density=True, histtype="step",
+                 color=GEN_C, lw=2.4, label=f"campus generated  (n={len(gv):,})")
+        axx.set_title(f"{label}\nKS = {ks:.3f}   mean {sv.mean():.2f} vs {gv.mean():.2f}",
+                      fontsize=11, loc="left")
+        axx.set_xlabel(label); axx.set_ylabel("density"); axx.legend(fontsize=8)
+
+    axx = ax[1, 0]
+    gv = gen["arr_soc"].dropna().to_numpy()
+    axx.hist(gv, bins=40, range=(0, 100), density=True, color=GEN_C, alpha=0.8,
+             label=f"campus generated (n={len(gv):,})")
+    axx.set_title(f"arrival SoC (%)  —  GENERATED ONLY\n"
+                  f"mean {gv.mean():.1f}%, {np.mean(gv <= 10.001):.0%} pinned at the {10}% floor\n"
+                  f"(no source analogue: SoC is never metered)", fontsize=11, loc="left")
+    axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=8)
+
+    axx = ax[1, 1]
+    for key, c, ls in (("dwell", "#1f4e79", "-"), ("kwh", "#d8853b", "-")):
+        for df, lab, mk in ((src, "source", "o"), (gen, "campus", "s")):
+            d = df.dropna(subset=[key, "arr_h"]).copy()
+            d["hb"] = pd.cut(d.arr_h, HOUR_BINS, labels=HOUR_LABELS)
+            m = d.groupby("hb")[key].mean()
+            norm = m / m.iloc[0]
+            axx.plot(range(len(HOUR_LABELS)), norm.values, marker=mk,
+                     ls="-" if lab == "source" else "--", color=c,
+                     label=f"{key} — {lab}")
+    axx.set_xticks(range(len(HOUR_LABELS))); axx.set_xticklabels(HOUR_LABELS)
+    axx.set_xlabel("arrival-hour bin"); axx.set_ylabel("mean, normalised to first bin")
+    axx.set_title("CONDITIONAL shape: how dwell and energy fall\nwith later arrival "
+                  "(all regions pooled)", fontsize=11, loc="left")
+    axx.legend(fontsize=8); axx.grid(alpha=.25)
+
+    axx = ax[1, 2]; axx.axis("off")
+    t = f"{'feature':22s}{'source':>10s}{'campus':>10s}{'KS':>8s}\n" + "-" * 50 + "\n"
+    for r in rows:
+        t += f"{r['feature'][:22]:22s}{r['source_mean']:10.2f}{r['generated_mean']:10.2f}{r['ks']:8.3f}\n"
+    t += ("\ndependence (Spearman)\n" + "-" * 50 + "\n")
+    for aa, bb, lab in (("arr_h", "dwell", "arrival vs dwell"),
+                        ("arr_h", "kwh", "arrival vs energy"),
+                        ("dwell", "kwh", "dwell vs energy")):
+        rs = st.spearmanr(src[aa], src[bb], nan_policy="omit").statistic
+        rg = st.spearmanr(gen[aa], gen[bb], nan_policy="omit").statistic
+        t += f"{lab:22s}{rs:+10.3f}{rg:+10.3f}\n"
+    axx.text(0.02, 0.98, t, va="top", family="monospace", fontsize=10,
+             transform=axx.transAxes)
+
+    fig.suptitle(f"ACN {a.site} source vs generated campus — unified distributions "
+                 f"(all regions, all buildings, all months pooled)", fontsize=15)
+    fig.tight_layout()
+    fig.savefig(a.unified_out, dpi=120, bbox_inches="tight")
+    pd.DataFrame(rows).to_csv(a.unified_out.with_suffix(".csv"), index=False)
+    print(f"saved {a.unified_out}")
+
+
 def _render_overlay(src, gen, a, cmap, gen_h):
     """Same rows, but every region overlaid inside one panel.
 
@@ -229,6 +297,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=REPO / "docs/experiments/source_vs_campus.png")
     ap.add_argument("--overlay-out", type=Path, default=None,
                     help="also render the regions-overlaid view to this path")
+    ap.add_argument("--unified-out", type=Path, default=None,
+                    help="also render ONE pooled distribution per feature (no region split)")
     a = ap.parse_args(argv)
 
     src = source_frame(a.site, a.population)
@@ -329,6 +399,9 @@ def main(argv=None) -> int:
     fig.tight_layout()
     a.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(a.out, dpi=110, bbox_inches="tight")
+    if a.unified_out is not None:
+        _render_unified(src, gen, a, cmap, gen_h)
+
     if a.overlay_out is not None:
         _render_overlay(src, gen, a, cmap, gen_h)
 
