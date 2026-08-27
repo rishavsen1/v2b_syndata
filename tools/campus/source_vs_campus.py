@@ -105,9 +105,118 @@ def synth_frame(root: Path, units: int, phi_scale: float) -> pd.DataFrame:
                 "arr_h": a.dt.hour + a.dt.minute / 60.0,
                 "dwell": (dep - a).dt.total_seconds() / 3600.0,
                 "kwh": (g["departure_soc"] - g["arrival_soc"]) / 100.0 * cap,
-                "arr_soc": g["arrival_soc"],
+                "arr_soc": g["arrival_soc"], "cap": cap,
             }))
     return pd.concat(frames, ignore_index=True)
+
+
+def _render_overlay(src, gen, a, cmap, gen_h):
+    """Same rows, but every region overlaid inside one panel.
+
+    Columns: SOURCE regions | CAMPUS regions | POOLED source-vs-campus. Shows
+    how much the regions actually differ from EACH OTHER (in the ground truth
+    and in the generator) alongside the aggregate comparison.
+    """
+    rc = {r: plt.get_cmap("tab10").colors[i] for i, r in enumerate(REGIONS)}
+    nrow = len(PARAMS) + 2
+    fig, ax = plt.subplots(nrow, 3, figsize=(17, nrow * 4.1))
+
+    for i, (key, label, bins, rng_) in enumerate(PARAMS):
+        for j, (df, who) in enumerate(((src, "SOURCE"), (gen, "CAMPUS"))):
+            axx = ax[i, j]
+            if key not in df.columns:
+                axx.axis("off"); continue
+            for r in REGIONS:
+                v = df[df.region == r][key].dropna().to_numpy()
+                if len(v) < 30:
+                    continue
+                axx.hist(v, bins=bins, range=rng_, density=True, histtype="step",
+                         lw=2.0, color=rc[r], label=f"{r} (n={len(v):,})")
+            axx.set_title(f"{label} — {who}: regions overlaid", fontsize=10, loc="left")
+            axx.set_xlabel(label); axx.legend(fontsize=7)
+            if j == 0:
+                axx.set_ylabel("density")
+        axx = ax[i, 2]
+        sv = src[key].dropna().to_numpy() if key in src.columns else np.array([])
+        gv = gen[key].dropna().to_numpy()
+        if len(sv) >= 30:
+            ks = st.ks_2samp(sv, gv).statistic
+            axx.hist(sv, bins=bins, range=rng_, density=True, color=SRC_C, alpha=0.55,
+                     label=f"source n={len(sv):,}")
+            axx.set_title(f"{label} — POOLED over all regions   KS={ks:.3f}",
+                          fontsize=10, loc="left")
+        else:
+            axx.set_title(f"{label} — POOLED (generated only)", fontsize=10, loc="left")
+        axx.hist(gv, bins=bins, range=rng_, density=True, histtype="step",
+                 color=GEN_C, lw=2.2, label=f"campus n={len(gv):,}")
+        axx.set_xlabel(label); axx.legend(fontsize=7)
+
+    # arrival-SoC row: regions overlaid (campus only), then by hour, then pooled
+    r0 = len(PARAMS)
+    axx = ax[r0, 0]
+    for r in REGIONS:
+        v = gen[gen.region == r]["arr_soc"].dropna().to_numpy()
+        if len(v) < 30:
+            continue
+        axx.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=2.0,
+                 color=rc[r], label=f"{r} (mean {v.mean():.0f}%)")
+    axx.set_title("arrival SoC — CAMPUS: regions overlaid\n(generated only: SoC is never metered)",
+                  fontsize=10, loc="left")
+    axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=7)
+
+    axx = ax[r0, 1]
+    for i2, hlab in enumerate(HOUR_LABELS):
+        v = gen_h[gen_h.hb == hlab]["arr_soc"].to_numpy()
+        if len(v) < 30:
+            continue
+        axx.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=2.0,
+                 color=cmap(i2 / max(1, len(HOUR_LABELS) - 1)),
+                 label=f"{hlab} (mean {v.mean():.0f}%)")
+    axx.set_title("arrival SoC by arrival hour — ALL REGIONS POOLED", fontsize=10, loc="left")
+    axx.set_xlabel("% SoC at arrival"); axx.legend(fontsize=7)
+
+    axx = ax[r0, 2]
+    caps = sorted(gen["cap"].dropna().unique()) if "cap" in gen.columns else []
+    for i2, c in enumerate(caps):
+        v = gen[gen.cap == c]["arr_soc"].dropna().to_numpy()
+        if len(v) < 30:
+            continue
+        axx.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=2.0,
+                 color=cmap(i2 / max(1, len(caps) - 1)),
+                 label=f"{c:.0f} kWh (mean {v.mean():.0f}%, floor {np.mean(v <= 10.001):.0%})")
+    axx.set_title("arrival SoC by BATTERY CAPACITY — all regions\n"
+                  "(the floor pile-up is capacity-driven, not hour-driven)",
+                  fontsize=10, loc="left")
+    axx.set_xlabel("% SoC at arrival"); axx.legend(fontsize=7)
+
+    # conditional row, all regions pooled
+    for j, key in enumerate(["dwell", "kwh", "arr_soc"]):
+        axx = ax[r0 + 1, j]
+        series = ((gen, GEN_C, "campus"),) if key == "arr_soc" else \
+                 ((src, SRC_C, "source"), (gen, GEN_C, "campus"))
+        for df, c, lab in series:
+            if key not in df.columns:
+                continue
+            d = df.dropna(subset=[key, "arr_h"]).copy()
+            d["hb"] = pd.cut(d.arr_h, HOUR_BINS, labels=HOUR_LABELS)
+            m = d.groupby("hb")[key].mean(); se = d.groupby("hb")[key].sem()
+            axx.errorbar(range(len(HOUR_LABELS)), m.values, yerr=1.96 * se.values,
+                         marker="o", color=c, lw=2, capsize=3, label=lab)
+        rg = st.spearmanr(gen.arr_h, gen[key], nan_policy="omit").statistic
+        sub = (f"campus {rg:+.3f} (generated only)" if key == "arr_soc"
+               else f"source {st.spearmanr(src.arr_h, src[key], nan_policy='omit').statistic:+.3f}"
+                    f" vs campus {rg:+.3f}")
+        axx.set_xticks(range(len(HOUR_LABELS))); axx.set_xticklabels(HOUR_LABELS)
+        axx.set_xlabel("arrival-hour bin")
+        axx.set_title(f"CONDITIONAL (all regions): mean {key} by arrival hour\n{sub}",
+                      fontsize=10, loc="left")
+        axx.legend(fontsize=7); axx.grid(alpha=.25)
+
+    fig.suptitle(f"ACN {a.site} source vs generated campus — ALL REGIONS "
+                 f"(overlaid, and pooled)", fontsize=15, y=0.998)
+    fig.tight_layout()
+    fig.savefig(a.overlay_out, dpi=110, bbox_inches="tight")
+    print(f"saved {a.overlay_out}")
 
 
 def main(argv=None) -> int:
@@ -118,6 +227,8 @@ def main(argv=None) -> int:
     ap.add_argument("--units", type=int, default=300)
     ap.add_argument("--phi-scale", type=float, default=1.5)
     ap.add_argument("--out", type=Path, default=REPO / "docs/experiments/source_vs_campus.png")
+    ap.add_argument("--overlay-out", type=Path, default=None,
+                    help="also render the regions-overlaid view to this path")
     a = ap.parse_args(argv)
 
     src = source_frame(a.site, a.population)
@@ -218,6 +329,9 @@ def main(argv=None) -> int:
     fig.tight_layout()
     a.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(a.out, dpi=110, bbox_inches="tight")
+    if a.overlay_out is not None:
+        _render_overlay(src, gen, a, cmap, gen_h)
+
     sdf = pd.DataFrame(stats)
     sdf.to_csv(a.out.with_suffix(".csv"), index=False)
     print(sdf.pivot_table(index="parameter", columns="region", values="ks").round(3).to_string())
