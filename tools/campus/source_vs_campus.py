@@ -38,20 +38,24 @@ import matplotlib.pyplot as plt  # noqa: E402
 REPO = Path(__file__).resolve().parents[2]
 SRC_C, GEN_C = "#555555", "#d8853b"
 REGIONS = ["rare_consistent", "occasional_consistent", "regular_charger"]
+# Only quantities the SOURCE actually measures. `required_soc_at_depart` is
+# deliberately absent: on the source side it would be
+# `seeded_prior + kWhDelivered / inferred_capacity` — a constant prior (drawn
+# with no relation to arrival hour) divided by a capacity that falls back to
+# 60 kWh for 28% of JPL sessions. Comparing against it measures our prior and
+# our capacity guess, not behaviour. Arrival SoC gets its own generated-only
+# row below for the same reason.
 PARAMS = [
     ("arr_h", "arrival hour", 48, (0, 24)),
     ("dwell", "dwell (h)", 48, (0, 16)),
     ("kwh", "energy delivered (kWh)", 40, (0, 60)),
-    ("req_soc", "required SoC at departure (%)", 40, (0, 100)),
 ]
+HOUR_BINS = [0, 7, 9, 11, 14, 24]
+HOUR_LABELS = ["<7", "7-9", "9-11", "11-14", "14+"]
 
 
 def source_frame(site: str, pop_name: str) -> pd.DataFrame:
     from v2b_syndata.calibration.acn_fetcher import fetch_all_sessions, filter_with_userid
-    from v2b_syndata.calibration.battery_inference import (
-        infer_capacity,
-        reconstruct_arrival_soc,
-    )
     from v2b_syndata.calibration.feature_extractor import (
         aggregate_user_features,
         extract_session,
@@ -65,18 +69,9 @@ def source_frame(site: str, pop_name: str) -> pd.DataFrame:
     sess = [s for s in (extract_session(r, site) for r in raw) if s is not None]
     users = aggregate_user_features(sess, None, None)
     u2r = {u.user_id: (assign_user_to_region(u, axes) or "__unassigned__") for u in users}
-    rng = np.random.default_rng(20260613)
-    rows = []
-    for s in sess:
-        cap, _ = infer_capacity(s)
-        soc = reconstruct_arrival_soc(s, cap, rng=rng)
-        req = np.nan
-        if soc is not None and cap > 0 and s.kwh_delivered:
-            d = min(1 - 1e-6, soc + float(s.kwh_delivered) / float(cap))
-            req = d * 100 if d > soc else np.nan
-        rows.append({"region": u2r.get(s.user_id, "__unassigned__"),
-                     "arr_h": s.arrival_hour, "dwell": s.dwell_hours,
-                     "kwh": s.kwh_delivered, "req_soc": req})
+    rows = [{"region": u2r.get(s.user_id, "__unassigned__"),
+             "arr_h": s.arrival_hour, "dwell": s.dwell_hours,
+             "kwh": s.kwh_delivered} for s in sess]
     return pd.DataFrame(rows)
 
 
@@ -110,7 +105,7 @@ def synth_frame(root: Path, units: int, phi_scale: float) -> pd.DataFrame:
                 "arr_h": a.dt.hour + a.dt.minute / 60.0,
                 "dwell": (dep - a).dt.total_seconds() / 3600.0,
                 "kwh": (g["departure_soc"] - g["arrival_soc"]) / 100.0 * cap,
-                "req_soc": g["departure_soc"],
+                "arr_soc": g["arrival_soc"],
             }))
     return pd.concat(frames, ignore_index=True)
 
@@ -134,7 +129,7 @@ def main(argv=None) -> int:
           {k: round(v, 3) for k, v in gen.region.value_counts(normalize=True).items()})
 
     cols = REGIONS + ["POOLED"]
-    fig, axes = plt.subplots(len(PARAMS) + 1, len(cols), figsize=(20, 19))
+    fig, axes = plt.subplots(len(PARAMS) + 2, len(cols), figsize=(20, 22))
     stats = []
     for i, (key, label, bins, rng_) in enumerate(PARAMS):
         for j, reg in enumerate(cols):
@@ -156,24 +151,55 @@ def main(argv=None) -> int:
             if j == 0:
                 ax.set_ylabel("density")
 
+    # ── arrival-SoC distribution BY ARRIVAL HOUR (generated only) ───────────
+    # No source analogue: SoC is never metered. This row is an INTERNAL
+    # consistency check — after the energy-first fix, arrivals that precede a
+    # large charge must sit lower, so early-hour curves should shift left.
+    gen_h = gen.dropna(subset=["arr_soc", "arr_h"]).copy()
+    gen_h["hb"] = pd.cut(gen_h.arr_h, HOUR_BINS, labels=HOUR_LABELS)
+    cmap = plt.get_cmap("viridis")
+    for j, reg in enumerate(cols):
+        ax = axes[len(PARAMS), j]
+        sub = gen_h if reg == "POOLED" else gen_h[gen_h.region == reg]
+        if len(sub) < 50:
+            ax.axis("off"); continue
+        for i, hlab in enumerate(HOUR_LABELS):
+            v = sub[sub.hb == hlab]["arr_soc"].to_numpy()
+            if len(v) < 30:
+                continue
+            ax.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=1.8,
+                    color=cmap(i / max(1, len(HOUR_LABELS) - 1)),
+                    label=f"{hlab}  (mean {v.mean():.0f}%, n={len(v):,})")
+        ax.set_title(f"arrival SoC by arrival hour — GENERATED ONLY\n{reg}  "
+                     f"(no source analogue: SoC is never metered)", fontsize=9, loc="left")
+        ax.set_xlabel("% SoC at arrival"); ax.legend(fontsize=6.5)
+        if j == 0:
+            ax.set_ylabel("density")
+
     # conditional row: mean of each parameter by arrival-hour bin
-    hb = [0, 7, 9, 11, 14, 24]
-    hl = ["<7", "7-9", "9-11", "11-14", "14+"]
-    for j, key in enumerate(["dwell", "kwh", "req_soc"]):
+    hb, hl = HOUR_BINS, HOUR_LABELS
+    for j, key in enumerate(["dwell", "kwh", "arr_soc"]):
         ax = axes[-1, j]
-        for df, c, lab in ((src, SRC_C, "source"), (gen, GEN_C, "campus")):
+        series = ((gen, GEN_C, "campus"),) if key == "arr_soc" else \
+                 ((src, SRC_C, "source"), (gen, GEN_C, "campus"))
+        for df, c, lab in series:
+            if key not in df.columns:
+                continue
             d = df.dropna(subset=[key, "arr_h"]).copy()
             d["hb"] = pd.cut(d.arr_h, hb, labels=hl)
             m = d.groupby("hb")[key].mean()
             sd = d.groupby("hb")[key].sem()
             ax.errorbar(range(len(hl)), m.values, yerr=1.96 * sd.values, marker="o",
                         color=c, lw=2, capsize=3, label=lab)
-        rs = st.spearmanr(src.arr_h, src[key], nan_policy="omit").statistic
         rg = st.spearmanr(gen.arr_h, gen[key], nan_policy="omit").statistic
         ax.set_xticks(range(len(hl))); ax.set_xticklabels(hl)
         ax.set_xlabel("arrival-hour bin")
-        ax.set_title(f"CONDITIONAL: mean {key} by arrival hour\n"
-                     f"spearman source {rs:+.3f} vs campus {rg:+.3f}", fontsize=9, loc="left")
+        if key == "arr_soc":
+            sub = f"campus {rg:+.3f}  (generated only)"
+        else:
+            rs = st.spearmanr(src.arr_h, src[key], nan_policy="omit").statistic
+            sub = f"spearman source {rs:+.3f} vs campus {rg:+.3f}"
+        ax.set_title(f"CONDITIONAL: mean {key} by arrival hour\n{sub}", fontsize=9, loc="left")
         ax.legend(fontsize=7); ax.grid(alpha=.25)
     axes[-1, -1].axis("off")
     txt = (f"region mix (share of sessions)\n"
