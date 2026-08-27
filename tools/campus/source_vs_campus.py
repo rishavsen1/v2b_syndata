@@ -112,7 +112,7 @@ def synth_frame(root: Path, units: int, phi_scale: float) -> pd.DataFrame:
 
 def _render_unified(src, gen, a, cmap, gen_h):
     """One pooled distribution per feature — no region split anywhere."""
-    fig, ax = plt.subplots(2, 4, figsize=(25, 11))
+    fig, ax = plt.subplots(2, 3, figsize=(19, 11))
     rows = []
     for i, (key, label, bins, rng_) in enumerate(PARAMS):
         axx = ax[0, i]
@@ -140,22 +140,8 @@ def _render_unified(src, gen, a, cmap, gen_h):
                   f"(no source analogue: SoC is never metered)", fontsize=11, loc="left")
     axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=8)
 
-    # arrival SoC, hour by hour
-    axx = ax[1, 1]
-    for i2, hlab in enumerate(HOUR_LABELS):
-        v = gen_h[gen_h.hb == hlab]["arr_soc"].to_numpy()
-        if len(v) < 30:
-            continue
-        axx.hist(v, bins=40, range=(0, 100), density=True, histtype="step", lw=2.0,
-                 color=cmap(i2 / max(1, len(HOUR_LABELS) - 1)),
-                 label=f"{hlab}  mean {v.mean():.0f}%, floor {np.mean(v <= 10.001):.0%}")
-    axx.set_title("arrival SoC BY ARRIVAL HOUR — generated only\n"
-                  "(curves nearly coincide: the spread is capacity-driven, not hour-driven)",
-                  fontsize=11, loc="left")
-    axx.set_xlabel("% SoC at arrival"); axx.set_ylabel("density"); axx.legend(fontsize=8)
-
     # arrival SoC mean + spread per hour bin
-    axx = ax[1, 2]
+    axx = ax[1, 1]
     m = gen_h.groupby("hb")["arr_soc"].mean()
     q1 = gen_h.groupby("hb")["arr_soc"].quantile(0.25)
     q3 = gen_h.groupby("hb")["arr_soc"].quantile(0.75)
@@ -171,7 +157,7 @@ def _render_unified(src, gen, a, cmap, gen_h):
                   fontsize=11, loc="left")
     axx.legend(fontsize=8); axx.grid(alpha=.25)
 
-    axx = ax[1, 3]
+    axx = ax[1, 2]
     for key, c, ls in (("dwell", "#1f4e79", "-"), ("kwh", "#d8853b", "-")):
         for df, lab, mk in ((src, "source", "o"), (gen, "campus", "s")):
             d = df.dropna(subset=[key, "arr_h"]).copy()
@@ -187,7 +173,7 @@ def _render_unified(src, gen, a, cmap, gen_h):
                   "(all regions pooled)", fontsize=11, loc="left")
     axx.legend(fontsize=8); axx.grid(alpha=.25)
 
-    axx = ax[0, 3]; axx.axis("off")
+    # summary text goes into the figure margin (grid is full)
     t = f"{'feature':22s}{'source':>10s}{'campus':>10s}{'KS':>8s}\n" + "-" * 50 + "\n"
     for r in rows:
         t += f"{r['feature'][:22]:22s}{r['source_mean']:10.2f}{r['generated_mean']:10.2f}{r['ks']:8.3f}\n"
@@ -198,12 +184,11 @@ def _render_unified(src, gen, a, cmap, gen_h):
         rs = st.spearmanr(src[aa], src[bb], nan_policy="omit").statistic
         rg = st.spearmanr(gen[aa], gen[bb], nan_policy="omit").statistic
         t += f"{lab:22s}{rs:+10.3f}{rg:+10.3f}\n"
-    axx.text(0.02, 0.98, t, va="top", family="monospace", fontsize=10,
-             transform=axx.transAxes)
+    fig.text(0.995, 0.985, t, va="top", ha="right", family="monospace", fontsize=9.5)
 
     fig.suptitle(f"ACN {a.site} source vs generated campus — unified distributions "
                  f"(all regions, all buildings, all months pooled)", fontsize=15)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 0.995, 0.96))
     fig.savefig(a.unified_out, dpi=120, bbox_inches="tight")
     pd.DataFrame(rows).to_csv(a.unified_out.with_suffix(".csv"), index=False)
     print(f"saved {a.unified_out}")
