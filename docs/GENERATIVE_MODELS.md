@@ -50,9 +50,12 @@ break generation (`distribution_fitter._drop_if_oor`).
 | arrival hour              | per-region 2-component truncated-normal (Gaussian) mixture on [4, 22]; single TruncNorm(μ, σ) fallback | arrivals are **bimodal** (morning commute peak + midday shoulder), which a 2-component truncated-Gaussian captures, with a hard daytime support (no 3 AM arrivals) | `arrival_hour` (local clock hour of connect)               | per-component w/μ/σ · **calibrated** (single μ,σ for synthetic pops); trunc [4,22] **fixed** |
 | dwell                     | Weibull(k, λ), optional 2-component Weibull mixture                                                    | non-negative, right-skewed duration; a 2-component mixture is used where it beats single-Weibull by a KS margin                                                    | `dwell_hours` (disconnect − connect)                       | k, λ (per component) · **calibrated**                                                        |
 | arrival × dwell coupling  | Gaussian copula ρ                                                                                      | couples the two marginals (early arrivers stay longer) _without_ distorting either marginal — applied on the shared uniform draw                                   | Spearman ρ of (`arrival_hour`, `dwell_hours`)              | ρ · **calibrated**                                                                           |
-| arrival SoC               | Beta(α, β) on [0, 1]                                                                                   | natural law for a bounded fraction; α/β set mean and skew independently                                                                                            | _none — SoC is unobserved_ (see below)                     | α, β · **fixed prior** (default Beta(4,6) ≈ 0.40)                                            |
-| departure-SoC requirement | Beta(α, β), else TruncNorm(μ, σ)                                                                       | same bounded-fraction argument as arrival SoC; the TruncNorm fallback is a simple high-SoC prior when no source data exists                                        | `arrival_prior + kWhDelivered/capacity`                    | α, β · **calibrated**; fallback μ/σ · **knobs** (`depart_soc_mu`/`sigma`, default 50/5)      |
-| region frequency          | categorical weights                                                                                    | a car belongs to exactly one behavioral region; weights are just the empirical population mix                                                                      | per-region **user share**                                  | `axes_distribution[*].weight` · **calibrated**                                               |
+| session energy (kWh)      | per-region LogNormal(σ, scale)                                                                         | delivered kWh is the ONLY energy quantity any source meters, and it is cleanly lognormal (JPL per-region KS 0.035–0.055 vs gamma 0.084 / weibull 0.099)            | `kWhDelivered` (metered)                                   | σ, scale · **calibrated** (`region_distributions.<r>.energy`)                                |
+| arrival SoC               | truncated Beta(α, β) on the car's allowed band                                                          | natural law for a bounded fraction; TRUNCATED (not clipped) so no atom forms at the band edge; SoC is unobserved so this is a declared prior                       | _none — SoC is unobserved_ (see below)                     | α, β · **knobs** `arrival_soc_alpha/beta` (default Beta(2,3), mean 0.40)                      |
+| SoC chain (repeat visits) | next arrival = prev required − g·(SoC charged), g ~ U(lo, hi)                                          | ties between-visit usage to the energy the user just charged; continuity arrival < prev departure holds whenever g > 0; E[g] ≈ 1 keeps per-car SoC stationary       | _none — between-visit use is unobservable_                 | mode + g bounds · **knobs** `soc_chain_mode`/`_draw_min`/`_draw_max` (opt-in; default off)   |
+| departure-SoC requirement | DERIVED: arrival + kWh/capacity (energy-calibrated pops); else Beta / TruncNorm fallback               | departure state is arithmetic on the metered energy draw, not an independent model — decouples session energy from the battery-mix prior                            | (energy row above)                                         | — (derived); fallbacks: `soc_depart` Beta · **calibrated**, μ/σ · **knobs**                  |
+| region frequency          | categorical weights over φ bins                                                                        | a car belongs to exactly one φ (visit-frequency) bin; weights are the empirical population mix                                                                     | per-region **user share**                                  | `axes_distribution[*].weight` · **calibrated**                                               |
+| φ appearance rate         | per-bin Beta(α, β) × `phi_scale`, cap 0.95                                                             | the real per-user φ inside a bin is not uniform — the fitted Beta removes the uniform-in-rectangle volume overshoot (drawn E[φ] 0.65 vs real 0.44 for regulars)     | per-user φ values in the bin                               | α, β · **calibrated** (`region_distributions.<r>.phi`); `phi_scale` · **knob** (declared)     |
 | weekend appearance        | Bernoulli rate scaling                                                                                 | weekend turnout is a fraction of the weekday rate; one scalar captures the weekday:weekend ratio                                                                   | weekend vs weekday sessions-per-day ratio                  | `weekend_activity_factor` · **calibrated** (else knob)                                       |
 | DR events                 | inhomogeneous Poisson(λ(t)) + Uniform magnitude                                                        | event arrivals are rare, memoryless, and rate-modulated by season/heat/hour — the textbook point-process model                                                     | _not data-fit_ — program specs from PG&E/CAISO tariff docs | λ_base, magnitude range · **knobs**; modulation factors **fixed**                            |
 | battery capacity          | deterministic inference                                                                                | physics (range × efficiency), not a distribution                                                                                                                   | `milesRequested × WhPerMile × 1.5` (ACN only)              | per-session inferred, else 60 kWh **fixed**                                                  |
@@ -111,7 +114,7 @@ quantile of the copula's shared uniform (`renderers/sessions.py`).
 
 ---
 
-## Dwell — `Weibull(k, λ)`
+## Dwell — 2-component `Weibull` mixture (single `Weibull(k, λ)` fallback)
 
 **Models** how long a car stays plugged in (hours).
 
@@ -165,7 +168,7 @@ Gaussian-copula correlation via `ρ_g = 2·sin(π·ρ_s/6)` and clamped to ±0.9
 
 ---
 
-## Arrival SoC — `Beta(α, β)` (fixed prior)
+## Arrival SoC — truncated `Beta(α, β)` prior (+ optional SoC chain)
 
 **Models** the state-of-charge a car arrives with, as a fraction in [0, 1].
 
@@ -175,34 +178,73 @@ its two shape parameters set mean (`α/(α+β)`) and skew independently.
 **Fit features — none.** **No charging dataset records SoC.** The tempting
 reconstruction `arrival = 1 − kWhRequested/capacity` assumes every request tops
 the car to full, which the data contradicts (ACN delivered/requested ≈ 0.58,
-and `1−req/cap` piles implausibly near 1.0 for small requests). So arrival SoC
-is treated as **unobserved** and drawn from a shared normal prior (mean 0.40,
-`battery_inference.ARRIVAL_SOC_PRIOR_*`) during calibration, and at generation
-from `Beta(α, β)` (default `Beta(4, 6)` ≈ 0.40). A per-car
-distance shift `−δ_km·0.003` lowers it for longer commutes before clamping to
-the car's `[min_allowed_soc, max_allowed_soc]` (`samplers/sessions_dist.sample_f_soc`,
-`renderers/sessions.py`).
+and `1−req/cap` piles implausibly near 1.0 for small requests). Arrival SoC is
+therefore **declared, not fitted**: the knobs
+`user_behavior.arrival_soc_alpha/beta` (default `Beta(2, 3)`, mean 0.40 —
+widened 2026-08 from the old hardcoded `Beta(4, 6)`, same mean, sd
+0.148 → 0.200). Since 2026-08 the `soc_arrival` Beta is **no longer fitted at
+all** (`FIT_SOC_ARRIVAL = False`): fitting it to prior-generated values was
+circular and recovered the prior at every region while claiming data
+provenance. `calibration_metadata.arrival_soc_policy` stamps the prior
+explicitly.
 
-> Because arrival SoC is a prior, its `α, β` are effectively **fixed**; the
-> `soc_arrival` Beta block is only written when a region has the data, and even
-> then it is fit to prior-generated values, so it reflects the prior, not a real
-> observation.
+A per-car distance shift `−δ_km·0.003` (≈ 180 Wh/km on a 60 kWh pack) lowers
+the draw for longer commutes. The draw is **truncated** onto the car's
+`[min_allowed_soc, max_allowed_soc]` band via inverse-CDF — not clipped, which
+would pile the low tail into an atom at exactly min-SoC (10–25 % of draws once
+the shift is applied) and manufacture a fake mode downstream.
+
+**SoC chain (opt-in, `user_behavior.soc_chain_enforce`).** With the chain on,
+only the FIRST session draws the Beta; every repeat visit derives arrival from
+the previous departure. Two modes (`soc_chain_mode`):
+
+- `absolute` (legacy): `arrival = prev_required − U(draw_min, draw_max)` SoC
+  fraction of the pack. Ignores how much was charged — small refills get
+  over-drained (~33 % of a month's arrivals pile onto the min-SoC floor in
+  simulation).
+- `proportional` (2026-08): `arrival = prev_required − g·(SoC charged last
+  visit)`, `g ~ U(draw_min, draw_max)`. Usage scales with the energy the user
+  requested; continuity `arrival < prev departure` holds whenever g > 0, and
+  `E[g] ≈ 1.05` cancels the ceiling-truncation drift. This makes the fleet
+  **building-dependent by construction** (energy in ≈ energy out at this
+  site) — a scenario choice, not a fidelity claim: the real JPL cohort
+  demonstrably charges elsewhere (98 % of users receive less building energy
+  than their own stated driving consumes).
+
+Both modes hard-clamp into `[min_allowed_soc, max_allowed_soc]`.
 
 ---
 
-## Departure-SoC requirement — `Beta(α, β)`, else `TruncNorm(μ, σ)`
+## Session energy → departure-SoC requirement — per-region `LogNormal`, SoC derived
 
-**Models** `required_soc_at_depart` — the SoC the car needs by the time it
-leaves (which, in this dataset, _is_ the departure SoC).
+**Models** the session's **delivered energy (kWh)** — the primal random
+quantity — and derives `required_soc_at_depart = arrival_soc + kWh/capacity`
+from it. In this dataset the requirement IS the delivered energy expressed in
+SoC points (D5 guarantees it is servable within the dwell).
 
-**Why Beta (calibrated path).** Same bounded-fraction argument as arrival SoC.
-Here there _is_ a real per-session signal to fit.
+**Why LogNormal, and why energy-first (2026-08).** Delivered kWh is the ONLY
+energy quantity any source meters (SoC never is). The previous path drew a
+departure-SoC Beta and multiplied by the hand-authored `battery_mix`
+(mean 60 kWh, median 75), making energy an accidental by-product of two modeled
+quantities — it ran ~2× high (round-trip KS 0.354). The metered kWh is cleanly
+lognormal: JPL per-region KS 0.035–0.055 vs gamma 0.084 / weibull 0.099
+pooled. Fitting it directly (`fit_lognorm_energy`,
+`region_distributions.<r>.energy = {sigma, scale}`) and deriving the SoC
+requirement decouples session energy from the battery-mix prior entirely
+(round-trip energy KS 0.354 → 0.079; campus smoke 0.081).
 
-**Fit features.** `arrival_prior + kWhDelivered/capacity` — the SoC the car
-actually left at, using **delivered energy** (the one quantity every source
-records). Delivered, not requested: arrival is already a prior, so using
-requested would make departure ≈ 1.0 by construction (circular). Departures that
-don't exceed arrival are dropped; the rest are fit with `fit_beta_soc(..., leaf_prefix="soc_depart")` (`calibration/api.py`).
+**Constraints.** The derived requirement is clamped to
+`[arrival + ε, max_allowed_soc]` — the ceiling is physical censoring (charging
+stops at the cap; ~20 % of sessions with chained-high arrivals). On this
+calibrated path the D7 behavioral floor (`min_depart_soc`) is **bypassed**: it
+is a discretionary prior for synthetic populations, and letting it bind forced
+small real sessions up to fabricated ~22 kWh refills (`validate.py` D7 skips
+energy-calibrated populations accordingly).
+
+**Fallbacks (uncalibrated populations, unchanged).** `soc_depart`
+`Beta(α, β)` where calibrated-but-not-energy blocks exist; else
+`TruncNorm(μ, σ)` from `depart_soc_mu/sigma` knobs — the legacy chain below
+still describes those paths.
 
 **Why TruncNorm fallback.** For hand-authored populations and sources without
 the data, there is no `soc_depart` block. The fallback is
@@ -222,18 +264,30 @@ unreachable within the dwell at max charger rate it is rejected and resampled
 
 ---
 
-## Behavioral axes (φ, κ, δ) and region frequency
+## Behavioral axes (φ, δ) and region frequency
 
-A car's behavior is summarized by three axes, sampled from a region's range and
-then driving the session marginals:
+A car's behavior is summarized by two axes; regions are **φ bins** (κ was
+removed 2026-08: it was independent of every session quantity —
+|spearman| ≤ 0.15 — unused at generation, and its rectangles manufactured
+empty/degenerate cells; `consist` bounds remain in YAML for schema stability
+but are not read):
 
-- **φ (frequency)** — daily appearance probability. Fit per user as
+- **φ (frequency)** — weekday appearance probability. Fit per user as
   unique-weekdays-observed ÷ weekdays-in-active-window (a _per-user_ window, so
   a sparse-but-regular commuter isn't crushed by a multi-year global
-  denominator) (`aggregate_user_features`).
-- **κ (consistency)** — `1 − CV(arrival_hour)`, the regularity of arrival time.
+  denominator) (`aggregate_user_features`). At generation φ is drawn from the
+  region's **fitted per-bin Beta** (`region_distributions.<r>.phi`, clamped to
+  the bin) rather than Uniform(bin) — the uniform drew E[φ] = 0.65 for
+  regular_charger vs the real 0.44, a ×1.29 session-volume overshoot. An
+  explicit `user_behavior.phi_scale` knob (default 1.0, cap 0.95) densifies
+  beyond the source-faithful ceiling when a scenario wants it, recorded in the
+  manifest.
 - **δ (distance, km)** — `mean(milesRequested) × 1.609` (ACN only; `None`
-  otherwise).
+  otherwise). Drawn Uniform(region.dist_km) at generation — a differentiation
+  prior (`calibration_metadata.delta_km_policy`): the observed value is a
+  charge-request range (median ≈ 95 km, max > 1000), not
+  distance-driven-since-last-plug-in, so it cannot parameterize the arrival-SoC
+  shift.
 
 **Region frequency** — each car is assigned to one of the behavioral regions
 (`stable_commuter`, `flexible_local`, …). The mix weight is the **empirical

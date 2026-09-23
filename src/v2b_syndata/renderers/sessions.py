@@ -68,6 +68,24 @@ def _gaussian_copula_pair(rng: np.random.Generator, rho: float) -> tuple[float, 
     return u1, u2
 
 
+def _gaussian_copula_triple(rng: np.random.Generator, rho_ad: float,
+                            rho_de: float) -> tuple[float, float, float]:
+    """Draw (u_arr, u_dwell, u_energy) with a MARKOV-CHAIN Gaussian copula.
+
+    Structure: arrival -> dwell -> energy, i.e. arrival ⊥ energy | dwell, which
+    the source data satisfies to within ±0.04 per region (see
+    `fit_dwell_energy_rho`). The implied arrival<->energy correlation is
+    ρ_ad·ρ_de, so no third parameter is stored and the 3x3 matrix is
+    positive-definite by construction. Consumes exactly 3 standard normals.
+    """
+    z = rng.standard_normal(3)
+    z_a = z[0]
+    z_d = rho_ad * z_a + (1.0 - rho_ad * rho_ad) ** 0.5 * z[1]
+    z_e = rho_de * z_d + (1.0 - rho_de * rho_de) ** 0.5 * z[2]
+    return (float(stats.norm.cdf(z_a)), float(stats.norm.cdf(z_d)),
+            float(stats.norm.cdf(z_e)))
+
+
 def _truncnorm_ppf_u(u: float, mu: float, sigma: float, lo: float, hi: float) -> float:
     if hi <= lo:
         return lo
@@ -162,6 +180,15 @@ def render(ctx: ScenarioContext) -> None:
     # strictly above car.min_allowed_soc (D6 floor > arrival >= min_allowed), so
     # the clamp preserves arrival < prior departure strictly.
     soc_chain = bool(ctx.knobs.get("user_behavior.soc_chain_enforce"))
+    # Chain mode (2026-08): "absolute" draws U(min,max) SoC POINTS below the
+    # prior departure (legacy, bit-identical default). "proportional" draws a
+    # usage factor g ~ U(min,max) and consumes g x the SoC actually CHARGED
+    # last session — usage scales with the energy the user requested, so small
+    # refills are not over-drained onto the min-SoC floor (the absolute mode
+    # piles ~33% of a month's arrivals there) and continuity
+    # arrival < prior departure holds whenever g > 0.
+    chain_mode = str(ctx.knobs.get("user_behavior.soc_chain_mode")) \
+        if ctx.knobs.has("user_behavior.soc_chain_mode") else "absolute"
     chain_lo_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_min")) * 100.0
     chain_hi_pct = float(ctx.knobs.get("user_behavior.soc_chain_draw_max")) * 100.0
     if soc_chain and chain_lo_pct > chain_hi_pct:
@@ -229,9 +256,14 @@ def render(ctx: ScenarioContext) -> None:
         # future refactors that might re-evaluate region inside the loop.
         rho = float(dw_p.get("rho", 0.0))
         use_copula = abs(rho) >= 1e-9
+        # Third copula edge (dwell <-> energy). Non-zero only for populations
+        # carrying the calibrated leaf; 0.0 keeps the legacy 2-way behaviour.
+        rho_de = float(dw_p.get("rho_de", 0.0))
+        use_triple = use_copula and abs(rho_de) >= 1e-9
 
         prior_departure: pd.Timestamp | None = None
         prior_required_soc: float | None = None
+        prior_arrival_soc: float | None = None
 
         for day in days:
             rng = rng_for_car(ctx.seed, f"sessions:{day.date().isoformat()}", car_id)
@@ -255,8 +287,13 @@ def render(ctx: ScenarioContext) -> None:
                 #    (copula path) or a single fresh draw (independent path); the
                 #    single-TruncNorm / single-Weibull path is byte-identical to
                 #    before. Each draw still consumes EXACTLY ONE uniform.
-                if use_copula:
+                u_energy = None
+                u_arr = u_dwell = None
+                if use_triple:
+                    u_arr, u_dwell, u_energy = _gaussian_copula_triple(rng, rho, rho_de)
+                elif use_copula:
                     u_arr, u_dwell = _gaussian_copula_pair(rng, rho)
+                if u_arr is not None:
                     if arr_mix is not None:
                         arr_hour = _mixture_ppf_u(u_arr, arr_mix,
                                                   arr_p["trunc_lo"], arr_p["trunc_hi"])
@@ -306,17 +343,81 @@ def render(ctx: ScenarioContext) -> None:
                 if departure.date() != arrival.date():
                     continue
 
-                # 3. Sample arrival_soc; clamp to car's allowed band.
+                # 3. ENERGY-FIRST (2026-08): when the region carries a
+                #    calibrated energy block, draw the session's delivered kWh
+                #    BEFORE the arrival SoC, so arrival can be placed on the
+                #    FEASIBLE band [min_allowed, max_allowed - kWh/capacity].
+                #    Rationale: kWh is metered (its marginal must be preserved);
+                #    arrival SoC is unobserved by every dataset, so it is the
+                #    free variable and should accommodate the energy, not censor
+                #    it. Drawing them independently and clamping destroyed 2.9
+                #    kWh of the mean (24.7% of sessions hit the ceiling; 42.7%
+                #    on a 24 kWh pack) and flattened the energy marginal.
+                #    Side benefit: this induces the physically correct negative
+                #    arrival-SoC <-> energy dependence (cars needing a big
+                #    charge arrive depleted) that the source implies.
+                energy_mode = (soc_depart_p is not None
+                               and "energy_sigma" in soc_depart_p)
+                need_pts = None
+                if energy_mode:
+                    # Copula-coupled uniform when the region carries the third
+                    # edge (dwell <-> energy); else an independent draw.
+                    u_e = u_energy if u_energy is not None else float(rng.random())
+                    kwh_draw = float(stats.lognorm.ppf(
+                        u_e,
+                        soc_depart_p["energy_sigma"],
+                        scale=soc_depart_p["energy_scale"],
+                    ))
+                    need_pts = kwh_draw / car.capacity_kwh * 100.0
+
+                # 3b. Sample arrival_soc; clamp to car's allowed band.
                 #    SoC chain (opt-in): non-first sessions derive arrival from
                 #    the prior departure minus a uniform external-use draw
                 #    (exactly ONE rng draw, mirroring the Beta path's draw count).
                 if soc_chain and prior_required_soc is not None:
-                    draw_pct = float(rng.uniform(chain_lo_pct, chain_hi_pct))
-                    a_soc_pct = prior_required_soc - draw_pct
+                    if chain_mode == "proportional":
+                        # g x (SoC charged last visit); one uniform, like absolute.
+                        g = float(rng.uniform(chain_lo_pct, chain_hi_pct)) / 100.0
+                        charged_pts = max(0.0, prior_required_soc - (prior_arrival_soc or 0.0))
+                        a_soc_pct = prior_required_soc - g * charged_pts
+                    else:
+                        draw_pct = float(rng.uniform(chain_lo_pct, chain_hi_pct))
+                        a_soc_pct = prior_required_soc - draw_pct
+                    # Energy-first: lower the chained arrival to the feasible
+                    # ceiling so the drawn kWh fits (reads as "drove more than
+                    # the refill" — g is a free prior, so this stays within the
+                    # chain's semantics and never RAISES arrival, preserving
+                    # continuity arrival < prior departure).
+                    if need_pts is not None:
+                        a_soc_pct = min(a_soc_pct, car.max_allowed_soc - need_pts)
+                    # Hard band: the car's [min_allowed_soc, max_allowed_soc]
+                    # is never violated in either mode.
                     a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
                 else:
-                    beta = float(rng.beta(soc_p["alpha"], soc_p["beta"]))
-                    a_soc_pct = (max(soc_p["clip_lo"], min(soc_p["clip_hi"], beta + soc_p["shift"]))) * 100.0
+                    # TRUNCATED Beta draw on the car's allowed band (2026-08).
+                    # The previous clip-after-draw CENSORED the Beta: every
+                    # low-tail draw piled onto exactly min_allowed_soc (10-25%
+                    # of draws once the -delta shift is applied), which showed
+                    # up downstream as a fake mode at prev_ext_use = 80
+                    # (depart-at-90 x arrive-at-10). Truncation via inverse-CDF
+                    # keeps the shape inside the band with no atom; still one
+                    # uniform per draw.
+                    clip_hi_eff = soc_p["clip_hi"]
+                    if need_pts is not None:
+                        # Feasible ceiling in SoC fraction; floor it just above
+                        # clip_lo so the truncated draw stays well defined when
+                        # the pack physically cannot absorb the draw (genuine
+                        # physics — a 24 kWh pack cannot take 25 kWh).
+                        clip_hi_eff = max(soc_p["clip_lo"] + 1e-6,
+                                          min(clip_hi_eff,
+                                              (car.max_allowed_soc - need_pts) / 100.0))
+                    b_lo = min(max(soc_p["clip_lo"] - soc_p["shift"], 0.0), 1.0 - 1e-9)
+                    b_hi = min(max(clip_hi_eff - soc_p["shift"], b_lo + 1e-9), 1.0)
+                    f_lo = float(stats.beta.cdf(b_lo, soc_p["alpha"], soc_p["beta"]))
+                    f_hi = float(stats.beta.cdf(b_hi, soc_p["alpha"], soc_p["beta"]))
+                    u_soc = f_lo + float(rng.random()) * (f_hi - f_lo)
+                    beta = float(stats.beta.ppf(u_soc, soc_p["alpha"], soc_p["beta"]))
+                    a_soc_pct = (beta + soc_p["shift"]) * 100.0
                     a_soc_pct = max(car.min_allowed_soc, min(car.max_allowed_soc, a_soc_pct))
 
                 # 4. Determine valid required-SoC band.
@@ -328,11 +429,27 @@ def render(ctx: ScenarioContext) -> None:
                     # User arrived too charged for any valid target → drop session-day.
                     break
 
-                # Departure-SoC requirement: calibrated Beta per region when
-                # available (sample on [0,1], clamp into the D6/D7 band), else
-                # the hardcoded N(85, 5) — kept bit-identical for uncalibrated
-                # populations (same single RNG draw).
-                if soc_depart_p is not None:
+                # Departure-SoC requirement, by priority (one RNG draw each way):
+                #   1. calibrated per-region ENERGY lognormal — draw the session's
+                #      delivered kWh directly (the only energy quantity the source
+                #      datasets meter) and derive required_soc = arrival +
+                #      kwh/capacity, clamped to the car's headroom. Decouples
+                #      session energy from the hand-authored battery_mix.
+                #   2. calibrated soc_depart Beta (legacy calibrated path).
+                #   3. hardcoded N(85, 5) — bit-identical for uncalibrated
+                #      populations.
+                if energy_mode:
+                    # kwh_draw / need_pts were drawn in step 3 (energy-first).
+                    # The calibrated energy draw REPLACES the D7 behavioral
+                    # floor (min_depart_soc): D7 is a discretionary prior for
+                    # synthetic populations, and letting it bind here forces
+                    # small empirical sessions up to the floor (arrival 10% +
+                    # 5 kWh -> 40% floor = a fabricated 22 kWh session on a
+                    # 75 kWh pack). Only the structural D6 rule (required >
+                    # arrival) and the car's headroom still apply.
+                    floor_e = a_soc_pct + _FLOOR_EPSILON
+                    r_soc_pct = max(floor_e, min(ceiling, a_soc_pct + need_pts))
+                elif soc_depart_p is not None:
                     beta_d = float(rng.beta(soc_depart_p["alpha"], soc_depart_p["beta"])) * 100.0
                     r_soc_pct = max(floor, min(ceiling, beta_d))
                 else:
@@ -377,6 +494,7 @@ def render(ctx: ScenarioContext) -> None:
             sid += 1
             prior_departure = departure_ts
             prior_required_soc = required_soc
+            prior_arrival_soc = arrival_soc
 
     df = pd.DataFrame(rows, columns=_COLUMNS) if rows else pd.DataFrame(columns=_COLUMNS)
     ctx.rendered["sessions.csv"] = df

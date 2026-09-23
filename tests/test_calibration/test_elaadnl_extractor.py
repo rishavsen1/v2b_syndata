@@ -71,7 +71,6 @@ def test_aggregate_user_features_runs(tmp_path):
     assert users, "no users aggregated — check fixture active window"
     for u in users:
         assert 0.0 <= u.phi <= 1.0
-        assert 0.0 <= u.kappa <= 1.0
 
 
 def test_provenance_format():

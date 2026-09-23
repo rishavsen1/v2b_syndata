@@ -54,7 +54,9 @@ def sample_f_arr(ctx: ScenarioContext) -> None:
             }
         else:
             mu = float(cal.get("mu", 8.5))
-            sigma_default = max(2.0 * (1.0 - u.kappa), 1e-3)
+            # κ removed 2026-08; fixed placeholder spread for populations with
+            # no calibrated/hand-authored arrival sigma (G5c warns on those).
+            sigma_default = 0.5
             sigma = float(cal.get("sigma", sigma_default))
             params[car_id] = {"mu": mu, "sigma": sigma, "trunc_lo": trunc_lo,
                               "trunc_hi": trunc_hi, "phi": u.phi}
@@ -65,6 +67,14 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
     """Per-user Weibull(k, λ) parameters + copula ρ. Calibrated leaf wins."""
     assert ctx.a_user is not None
     params = {}
+    # Dwell clip window. Knob-driven since 2026-08 (defaults 0.5 / 14.0 keep the
+    # previously hardcoded values, so existing scenarios stay bitwise-identical).
+    # The upper clip is a hard truncation and is visible in the output as a
+    # density spike at the clip point, so it belongs in the manifest.
+    clip_lo = float(ctx.knobs.get("user_behavior.dwell_clip_lo")) \
+        if ctx.knobs.has("user_behavior.dwell_clip_lo") else 0.5
+    clip_hi = float(ctx.knobs.get("user_behavior.dwell_clip_hi")) \
+        if ctx.knobs.has("user_behavior.dwell_clip_hi") else 14.0
     for car_id, u in ctx.a_user.items():
         dwell_cal = _region_dist(ctx, u.region, "dwell")
         copula_cal = _region_dist(ctx, u.region, "copula")
@@ -74,8 +84,11 @@ def sample_f_dwell(ctx: ScenarioContext) -> None:
         # YAML "lambda" → runtime "lam" rename.
         lam = float(dwell_cal.get("lambda", 8.0 * (0.5 + u.phi)))
         entry = {"k": k, "lam": lam,
-                 "clip_lo": 0.5, "clip_hi": 14.0,
-                 "rho": rho}
+                 "clip_lo": clip_lo, "clip_hi": clip_hi,
+                 "rho": rho,
+                 # Third copula edge (dwell <-> energy). 0.0 => the legacy
+                 # 2-way path, bit-identical for populations without the leaf.
+                 "rho_de": float(copula_cal.get("rho_dwell_energy", 0.0))}
         # A region whose calibrated `dwell` block carries the mixture leaves
         # (w1, k1, lambda1, k2, lambda2) gets a 2-component Weibull mixture;
         # otherwise the single Weibull above (default / hand-authored path,
@@ -97,23 +110,40 @@ def sample_f_soc(ctx: ScenarioContext) -> None:
     assert ctx.a_fleet is not None
     params = {}
     depart_params: dict[Any, dict[str, float] | None] = {}
+    # Arrival-SoC Beta prior defaults (knobs; Beta(2,3) since 2026-08 — same
+    # 0.40 mean as the old hardcoded Beta(4,6), wider spread). A population's
+    # calibrated/hand-authored soc_arrival block still wins per region.
+    alpha_default = float(ctx.knobs.get("user_behavior.arrival_soc_alpha")) \
+        if ctx.knobs.has("user_behavior.arrival_soc_alpha") else 2.0
+    beta_default = float(ctx.knobs.get("user_behavior.arrival_soc_beta")) \
+        if ctx.knobs.has("user_behavior.arrival_soc_beta") else 3.0
     for car_id, u in ctx.a_user.items():
         car = ctx.a_fleet[car_id]
         soc_cal = _region_dist(ctx, u.region, "soc_arrival")
-        alpha = float(soc_cal.get("alpha", 4.0))
-        beta = float(soc_cal.get("beta", 6.0))
+        alpha = float(soc_cal.get("alpha", alpha_default))
+        beta = float(soc_cal.get("beta", beta_default))
         params[car_id] = {
             "alpha": alpha, "beta": beta,
             "shift": -u.delta_km * 0.003,
             "clip_lo": car.min_allowed_soc / 100.0,
             "clip_hi": car.max_allowed_soc / 100.0,
         }
-        # Departure-SoC requirement: None → renderer keeps the hardcoded
-        # N(85, 5) fallback (bit-identical for uncalibrated populations).
+        # Departure-SoC requirement, by priority (renderer branches the same way):
+        #   1. calibrated per-region ENERGY lognormal (2026-08): draw session kWh
+        #      directly (the metered quantity) and derive required_soc — this
+        #      decouples energy from battery_mix;
+        #   2. calibrated soc_depart Beta (legacy calibrated path);
+        #   3. None → renderer keeps the hardcoded N(85, 5) fallback
+        #      (bit-identical for uncalibrated populations).
         dep_cal = _region_dist(ctx, u.region, "soc_depart")
-        depart_params[car_id] = (
-            {"alpha": float(dep_cal["alpha"]), "beta": float(dep_cal["beta"])}
-            if "alpha" in dep_cal and "beta" in dep_cal else None
-        )
+        energy_cal = _region_dist(ctx, u.region, "energy")
+        dep_entry: dict[str, float] | None = None
+        if "alpha" in dep_cal and "beta" in dep_cal:
+            dep_entry = {"alpha": float(dep_cal["alpha"]), "beta": float(dep_cal["beta"])}
+        if "sigma" in energy_cal and "scale" in energy_cal:
+            dep_entry = dict(dep_entry or {})
+            dep_entry["energy_sigma"] = float(energy_cal["sigma"])
+            dep_entry["energy_scale"] = float(energy_cal["scale"])
+        depart_params[car_id] = dep_entry
     ctx.latents["f_soc"] = params
     ctx.latents["f_soc_depart"] = depart_params

@@ -34,6 +34,17 @@ ARRIVAL_LO = 4.0
 ARRIVAL_HI = 22.0
 MIN_SAMPLES = 30
 
+# Arrival SoC is NOT fitted (2026-08). No charging dataset records SoC, and
+# `battery_inference.reconstruct_arrival_soc` ignores the session entirely — it
+# returns clip(N(ARRIVAL_SOC_PRIOR_MEAN, ARRIVAL_SOC_PRIOR_STD)). Fitting a Beta
+# to those draws and shipping it as `calibration:<provenance>` was circular: it
+# recovered the prior at every region of every site (ACN α ≈ 3.6–4.4, β ≈ 5.4–6.4
+# ⇒ E ≈ 0.40 = the prior mean) while claiming data provenance it does not have.
+# Generation now falls through to the declared Beta(4, 6) prior in
+# `sessions_dist.sample_f_soc` (same mean, honest provenance). `soc_depart` IS
+# still fitted — it carries real delivered-energy signal.
+FIT_SOC_ARRIVAL = False
+
 
 def _within(leaf: str, value: float) -> bool:
     lo, hi = DIST_PARAM_RANGES[leaf]
@@ -328,6 +339,59 @@ def fit_beta_soc(soc_fractions: np.ndarray, leaf_prefix: str = "soc_arrival") ->
                         {"alpha": f"{leaf_prefix}.alpha", "beta": f"{leaf_prefix}.beta"})
 
 
+def fit_lognorm_energy(kwh_delivered: np.ndarray) -> dict[str, Any] | None:
+    """Fit LogNormal(sigma, scale) to per-session delivered energy (kWh).
+
+    Delivered kWh is the only energy quantity the source datasets actually
+    meter (SoC is never recorded), so it is fitted directly; generation draws a
+    session's energy from this and derives the departure-SoC requirement.
+    Across-family check on ACN JPL: lognorm KS 0.035-0.055 per region vs
+    gamma 0.084 / weibull 0.099 pooled. Returns None below MIN_SAMPLES or if
+    any param falls outside DIST_PARAM_RANGES (B4 guard).
+    """
+    arr = np.asarray(kwh_delivered, dtype=float)
+    arr = arr[arr > 0.05]
+    n = int(len(arr))
+    if n < MIN_SAMPLES:
+        return None
+    shape, _, scale = st.lognorm.fit(arr, floc=0)
+    shape = float(shape)
+    scale = float(scale)
+    if shape <= 0 or scale <= 0:
+        return None
+    ks = float(st.kstest(arr, "lognorm", args=(shape, 0, scale)).statistic)
+    fit = {"dist": "lognorm", "sigma": shape, "scale": scale,
+           "n_samples": n, "ks_fit_quality": ks}
+    return _drop_if_oor("energy", fit,
+                        {"sigma": "energy.sigma", "scale": "energy.scale"})
+
+
+def fit_dwell_energy_rho(dwells: np.ndarray, kwh: np.ndarray) -> dict[str, Any] | None:
+    """Spearman + Gaussian-copula ρ between dwell and delivered energy.
+
+    The third edge of the session copula. Measured on ACN JPL, the dependence
+    structure is a MARKOV CHAIN arrival -> dwell -> energy: per region,
+    ρ(arrival, energy) ≈ ρ(arrival, dwell) · ρ(dwell, energy) to within ±0.04
+    (rare −0.145 vs −0.187, occasional −0.194 vs −0.183, regular −0.079 vs
+    −0.116). So arrival ⊥ energy | dwell holds, and this ONE extra parameter
+    per region reproduces the arrival→energy dependence for free — the 3x3
+    Gaussian correlation matrix is built as an AR(1)-style chain, which is
+    positive-definite by construction.
+    """
+    a = np.asarray(dwells, float)
+    b = np.asarray(kwh, float)
+    m = np.isfinite(a) & np.isfinite(b) & (b > 0)
+    a, b = a[m], b[m]
+    n = int(len(a))
+    if n < MIN_SAMPLES:
+        return None
+    rho_s = float(st.spearmanr(a, b).statistic)
+    if not np.isfinite(rho_s):
+        return None
+    rho_g = float(2.0 * np.sin(np.pi * rho_s / 6.0))
+    return {"rho_spearman": rho_s, "rho_gaussian": rho_g, "n_samples": n}
+
+
 def fit_copula_rho(arrivals: np.ndarray, dwells: np.ndarray) -> dict[str, Any]:
     """Compute Spearman ρ + Gaussian-copula correlation."""
     n = int(min(len(arrivals), len(dwells)))
@@ -372,7 +436,7 @@ def fit_region(
         )
     else:
         out["dwell"] = None
-    if soc_arrivals is not None and len(soc_arrivals) >= MIN_SAMPLES:
+    if FIT_SOC_ARRIVAL and soc_arrivals is not None and len(soc_arrivals) >= MIN_SAMPLES:
         out["soc_arrival"] = fit_beta_soc(soc_arrivals)
     else:
         out["soc_arrival"] = None

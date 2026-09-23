@@ -57,6 +57,13 @@ def sample_a_user(ctx: ScenarioContext) -> None:
     neg_mix = neg_mix / neg_mix.sum()
     alpha_w1, alpha_w2 = U["w_multiplier"]
 
+    region_dists = U.get("region_distributions") or {}
+    # Global φ multiplier (default 1.0 = source-faithful). Applied to the drawn
+    # φ and capped at 0.95 so appearance stays a proper Bernoulli rate; the
+    # scaled value is what lands in users.csv (the effective rate, honestly).
+    phi_scale = float(ctx.knobs.get("user_behavior.phi_scale")) \
+        if ctx.knobs.has("user_behavior.phi_scale") else 1.0
+
     out: dict[int, UserAttrs] = {}
     for car_id in range(1, ev_count + 1):
         rng = rng_for_car(ctx.seed, "A_user", car_id)
@@ -64,8 +71,22 @@ def sample_a_user(ctx: ScenarioContext) -> None:
         ridx = int(rng.choice(len(region_names), p=region_weights))
         region = axes[ridx]
         rname = region["name"]
-        phi = float(rng.uniform(region["freq"][0], region["freq"][1]))
-        kappa = float(rng.uniform(region["consist"][0], region["consist"][1]))
+        # φ: calibrated per-bin Beta when the region carries a fitted `phi`
+        # block (written by the calibrator from that bin's real user φ values;
+        # kills the uniform-in-rectangle overshoot, e.g. regular_charger drew
+        # E[φ]=0.65 vs the real 0.44). Clamped into the bin so region semantics
+        # hold. Hand-authored populations have no `phi` block → uniform draw,
+        # unchanged. κ is no longer drawn: it described nothing the generator
+        # produced (r = -0.06 against the car's own arrival scatter) and was
+        # read by nothing.
+        phi_lo, phi_hi = float(region["freq"][0]), float(region["freq"][1])
+        phi_cal = region_dists.get(rname, {}).get("phi", {})
+        if "alpha" in phi_cal and "beta" in phi_cal:
+            phi = float(rng.beta(float(phi_cal["alpha"]), float(phi_cal["beta"])))
+            phi = min(max(phi, phi_lo), phi_hi)
+        else:
+            phi = float(rng.uniform(phi_lo, phi_hi))
+        phi = min(0.95, phi * phi_scale)
         delta = float(rng.uniform(region["dist_km"][0], region["dist_km"][1]))
         # Negotiation
         nidx = int(rng.choice(len(NEG_TYPES), p=neg_mix))
@@ -76,7 +97,7 @@ def sample_a_user(ctx: ScenarioContext) -> None:
         w1 = max(0.0, w1) * float(alpha_w1)
         w2 = max(0.0, w2) * float(alpha_w2)
         out[car_id] = UserAttrs(
-            car_id=car_id, region=rname, phi=phi, kappa=kappa,
+            car_id=car_id, region=rname, phi=phi,
             delta_km=delta, negotiation_type=ntype, w1=w1, w2=w2,
         )
     ctx.a_user = out
@@ -108,6 +129,19 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
     min_soc = float(ctx.knobs.get("ev_fleet.min_allowed_soc"))
     max_soc = float(ctx.knobs.get("ev_fleet.max_allowed_soc"))
 
+    # Per-class capacity overrides (knob; empty default = built-in specs, so the
+    # default path is bitwise-identical). Lets a scenario retire a class whose
+    # pack is too small to absorb the calibrated energy draws without the
+    # max-SoC ceiling binding, without changing the class vocabulary.
+    cap_over = (ctx.knobs.get("ev_fleet.battery_capacity_kwh_overrides")
+                if ctx.knobs.has("ev_fleet.battery_capacity_kwh_overrides") else None) or {}
+    unknown = set(cap_over) - set(BATTERY_SPECS)
+    if unknown:
+        raise ValueError(
+            f"ev_fleet.battery_capacity_kwh_overrides has unknown class(es): {sorted(unknown)}; "
+            f"valid: {sorted(BATTERY_SPECS)}"
+        )
+
     out: dict[int, FleetAttrs] = {}
     for car_id in range(1, ev_count + 1):
         if homog:
@@ -118,7 +152,7 @@ def sample_a_fleet(ctx: ScenarioContext) -> None:
         spec = BATTERY_SPECS[cls]
         out[car_id] = FleetAttrs(
             car_id=car_id, battery_class=cls,
-            capacity_kwh=spec["capacity_kwh"],
+            capacity_kwh=float(cap_over.get(cls, spec["capacity_kwh"])),
             min_allowed_soc=min_soc,
             max_allowed_soc=max_soc,
         )

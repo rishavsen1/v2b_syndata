@@ -36,7 +36,6 @@ def _native_users() -> pd.DataFrame:
         "car_id": [1, 2, 3],
         "region": ["stable_commuter", "flexible_local", "stable_commuter"],
         "phi": [0.9, 0.7, 0.85],
-        "kappa": [0.8, 0.6, 0.75],
         "delta_km": [50, 10, 60],
         "negotiation_type": ["type_ii"] * 3,
         "w1": [1.0] * 3, "w2": [1.0] * 3,
@@ -251,6 +250,7 @@ def test_weather_window(tmp_path, monkeypatch):
 
 def test_index_col_constants():
     assert exp.INDEX_COL_FILES == frozenset(
-        {"cars.csv", "chargers.csv", "sessions.csv", "grid_prices.csv"}
+        {"cars.csv", "chargers.csv", "sessions.csv", "grid_prices.csv",
+         "sessions_soc.csv"}
     )
     assert exp.WEATHER_OCCUPANCY == frozenset({"weather_data.csv", "occupancy.csv"})

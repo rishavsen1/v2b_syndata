@@ -17,7 +17,7 @@ Companion docs: `docs/GENERATIVE_MODELS.md` (why each family), `docs/CALIBRATION
 - Fits are **per (population × region)** — never per building. Each building
   *selects* a population; ten buildings sharing a population share one fitted model.
 - The **only input feature is a discrete region label**, derived from two per-driver
-  statistics (φ = visit frequency, κ = arrival-hour consistency). There is no
+  statistics (φ = visit frequency; κ was removed 2026-08 — unused at generation and near-independent of behavior). There is no
   conditioning on weather, price, building, or calendar day inside the marginals.
 - Training-set KS is **0.019–0.15** for arrival/dwell/arrival-SoC and **0.24–0.31**
   for departure SoC. Held-out KS exists for **arrival and dwell only**: median
@@ -71,10 +71,9 @@ driver's whole history (`calibration/feature_extractor.py`):
 | Feature | Symbol | Definition | Range |
 |---|---|---|---|
 | visit frequency | φ | unique weekdays with a session ÷ weekdays in that driver's own active window `[first, last]` | `[0, 1]` |
-| arrival consistency | κ | `1 − (std(arrival_hour) / mean(arrival_hour))`, i.e. one minus the coefficient of variation | `[0, 1]` |
 | commute distance | δ_km | `mean(milesRequested) × 1.609` | km or unobserved |
 
-Region assignment is a **deterministic first-match** of `(φ, κ)` against the
+Region assignment is a **deterministic first-match** of φ against the
 rectangular boxes in `populations.yaml::axes_distribution` (`region_assignment.py`).
 **δ_km is not used as an assignment filter** — it is a noisy, often-missing proxy —
 but it does enter generation as the arrival-SoC shift `-δ_km · 0.003`.
@@ -279,7 +278,7 @@ is therefore the JPL or Caltech column of §4.2/§4.3, reweighted.
 3. **`inl_residential_legacy` is a 65-session, 4-user fixture**, not a corpus. It
    fits only `daily_commuter.arrival` (n = 64) plus a copula. Never cite it as a
    calibration dataset.
-4. **EV WATTS uses port-as-proxy identity**, so its (φ, κ) axes describe per-port
+4. **EV WATTS uses port-as-proxy identity**, so its φ axis describes per-port
    shift consistency, not individual-driver consistency. Its arrival fit is pooled
    across all regions.
 5. **The emitted sessions are a truncated view of these marginals.** The renderer's
@@ -303,7 +302,7 @@ is therefore the JPL or Caltech column of §4.2/§4.3, reweighted.
 | Region boxes + weights | same file → `<population>.axes_distribution` |
 | Fitting code (MLE/EM + range guards) | `src/v2b_syndata/calibration/distribution_fitter.py` |
 | Orchestration, pooled fallback | `src/v2b_syndata/calibration/api.py` |
-| Feature extraction (φ, κ, δ_km) | `src/v2b_syndata/calibration/feature_extractor.py` |
+| Feature extraction (φ, δ_km) | `src/v2b_syndata/calibration/feature_extractor.py` |
 | Region assignment | `src/v2b_syndata/calibration/region_assignment.py` |
 | SoC prior + capacity inference | `src/v2b_syndata/calibration/battery_inference.py` |
 | Dataset normalizers | `src/v2b_syndata/calibration/sources/{acn,elaadnl,evwatts,inl}.py` |

@@ -50,6 +50,8 @@ into `docs/experiments/PAPER_NUMBERS.md`.
 | `source_sanity_check.py` | "Does the ground truth look sane?" gate over each source cohort. |
 | `knob_audit.py` | Knob audit — Stage 1 (existence + isolation), Stage 2 (direction + magnitude). |
 | `pairwise_audit.py` | Pairwise knob-interaction audit; reuses `knob_audit.py`'s probes and metrics. |
+| `acn_anon_sensitivity.py` | Sensitivity of the ACN calibration to excluding anonymous (no-userID) sessions. |
+| `acn_roundtrip_fit.py` | ACN round-trip: refit distributions on generated output and compare to the source fit. |
 
 ## `campus/` — multi-building generation and analysis
 

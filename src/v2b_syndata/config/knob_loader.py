@@ -47,16 +47,39 @@ DIST_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "arrival.sigma1": (0.01, 6.0),
     "arrival.mu2": (4.0, 22.0),
     "arrival.sigma2": (0.01, 6.0),
-    "dwell.k": (0.01, 5.0),
+    # Weibull shape ceiling raised 5.0 → 15.0 (2026-08). A fixed-hours workforce
+    # produces a *sharply peaked* workday dwell — JPL's long component fits at
+    # k ≈ 7.4–7.7, the calibration bootstrap at k ≈ 9.1. The old 5.0 ceiling
+    # silently rejected those mixtures via _drop_if_oor, so the two largest JPL
+    # cells (24k of 27k sessions) fell back to a single Weibull at KS 0.14–0.16.
+    # k is a shape, not a rate: k = 8 is an ordinary tight peak, not a
+    # degenerate fit. 15.0 leaves the guard's real job (catching k → ∞ spikes
+    # on near-constant data, e.g. the k = 23.4 fixture) intact.
+    "dwell.k": (0.01, 15.0),
     "dwell.lambda": (0.01, 24.0),
     # Optional 2-component Weibull dwell mixture (short top-up + long workday).
     # Present only when calibration selects a mixture; w2 = 1 - w1. Single
     # Weibull (k/lambda above) remains the default.
     "dwell.w1": (0.0, 1.0),
-    "dwell.k1": (0.01, 5.0),
+    "dwell.k1": (0.01, 15.0),
     "dwell.lambda1": (0.01, 24.0),
-    "dwell.k2": (0.01, 5.0),
+    "dwell.k2": (0.01, 15.0),
     "dwell.lambda2": (0.01, 24.0),
+    # Per-bin φ (weekday appearance rate) Beta, fitted by the calibrator to the
+    # region's real per-user φ values (2026-08). Kills the uniform-in-rectangle
+    # volume overshoot. Drawn per car in per_entity.sample_a_user.
+    "phi.alpha": (0.01, 100.0),
+    "phi.beta": (0.01, 100.0),
+    # Per-session delivered-energy lognormal (2026-08): kWh is the ONLY energy
+    # quantity any charging dataset measures, so generation draws it directly
+    # and DERIVES required_soc = arrival + kwh/capacity — decoupling session
+    # energy from the hand-authored battery_mix. sigma is the lognorm shape,
+    # scale = exp(mu) in kWh.
+    # Third copula edge: dwell <-> delivered energy (see fit_dwell_energy_rho).
+    # arrival<->energy is implied by the chain, not stored.
+    "copula.rho_dwell_energy": (-0.99, 0.99),
+    "energy.sigma": (0.01, 5.0),
+    "energy.scale": (0.1, 100.0),
     "soc_arrival.alpha": (0.01, 50.0),
     "soc_arrival.beta": (0.01, 50.0),
     "soc_depart.alpha": (0.01, 50.0),
@@ -188,6 +211,16 @@ def _check_type_and_range(path: str, value: Any, spec: dict[str, Any]) -> None:
             total += float(entry["weight"])
         if abs(total - 1.0) > 1e-6:
             raise KnobValidationError(f"{path}: region weights must sum to 1.0, got {total}")
+    elif typ == "map[str,float]":
+        if not isinstance(value, dict):
+            raise KnobValidationError(f"{path}: expected mapping, got {type(value).__name__}")
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise KnobValidationError(f"{path}: key {k!r} must be a string")
+            if not isinstance(v, (int, float)) or isinstance(v, bool):
+                raise KnobValidationError(f"{path}: value for {k!r} must be numeric, got {v!r}")
+            if float(v) <= 0:
+                raise KnobValidationError(f"{path}: value for {k!r} must be > 0, got {v}")
     elif typ == "timestamp":
         # null, ISO string, or date/datetime (YAML parses 'YYYY-MM-DD' to date).
         import datetime as _dt

@@ -40,6 +40,12 @@ ev_fleet:
     description: "Per-car capacity variance mode. Couples to sessions via D5 rejection sampling (see battery_mix)."
     affects_csv: [cars.csv, sessions.csv]
 
+  battery_capacity_kwh_overrides:
+    type: map[str,float]
+    default: {}
+    description: "Per-battery-class capacity override in kWh, e.g. {leaf_24: 60.0}. Empty default = the built-in BATTERY_SPECS capacities (24/40/75/100), so existing scenarios are bitwise-identical. Use when a scenario's fleet should not contain a class as specced — e.g. swapping the 24 kWh entry to 60 kWh because a 24 kWh pack cannot physically absorb the calibrated session-energy draws (it hits the max-SoC ceiling on 43% of sessions). Keys must be existing class names; the class LABEL is unchanged in cars.csv, only its capacity."
+    affects_csv: [cars.csv, sessions.csv]
+
   battery_mix_dirichlet_alpha:
     type: float
     range: [1.0, 1000000.0]
@@ -150,19 +156,61 @@ user_behavior:
     description: "When true, each car's NON-FIRST session draws arrival_soc as prior_departure_soc − U[soc_chain_draw_min, soc_chain_draw_max] (in SoC fraction), clamped to the car's [min_allowed_soc, max_allowed_soc] band — so arrival SoC is strictly below the SoC the car departed with, and previous_day_external_use_soc lands in the draw band. First sessions (and default false) keep the calibrated per-region Beta arrival draw. Default false → existing scenarios byte-identical."
     affects_csv: [sessions.csv]
 
+  soc_chain_mode:
+    type: categorical
+    choices: [absolute, proportional]
+    default: absolute
+    description: "How the between-visit draw is applied when soc_chain_enforce is true. 'absolute' (legacy, bit-identical): next arrival = prev required − U(draw_min, draw_max) SoC FRACTION of the pack. 'proportional' (2026-08): next arrival = prev required − g × (SoC charged last visit), g ~ U(draw_min, draw_max) — usage scales with the energy the user requested, avoiding the min-SoC pile-up the absolute margin causes on small refills; arrival < prev departure whenever g > 0. Both modes hard-clamp into [min_allowed_soc, max_allowed_soc]."
+    affects_csv: [sessions.csv]
+
   soc_chain_draw_min:
     type: float
-    range: [0.0, 1.0]
+    range: [0.0, 3.0]
     default: 0.10
-    description: "Lower bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true. Must be <= soc_chain_draw_max."
+    description: "Lower bound of the between-visit chain draw (soc_chain_enforce true). Mode 'absolute': SoC fraction of the pack consumed. Mode 'proportional': usage factor g on the SoC charged last visit (E[g]≈1 keeps per-car SoC stationary; g>1 = drove more than the refill). Must be <= soc_chain_draw_max."
     affects_csv: [sessions.csv]
 
   soc_chain_draw_max:
     type: float
-    range: [0.0, 1.0]
+    range: [0.0, 3.0]
     default: 0.50
-    description: "Upper bound (SoC fraction) of the uniform between-visit external-use draw applied when soc_chain_enforce is true."
+    description: "Upper bound of the between-visit chain draw (pairs with soc_chain_draw_min; same mode-dependent meaning)."
     affects_csv: [sessions.csv]
+
+  dwell_clip_lo:
+    type: float
+    range: [0.0, 24.0]
+    default: 0.5
+    description: "Lower clip (hours) on every sampled session dwell, applied after the Weibull/mixture draw. Default 0.5 matches the calibration-side MIN_DWELL_HOURS filter, so the generator cannot emit a session shorter than the shortest session any fit was trained on. Must be < dwell_clip_hi."
+    affects_csv: [sessions.csv]
+
+  dwell_clip_hi:
+    type: float
+    range: [0.5, 24.0]
+    default: 14.0
+    description: "Upper clip (hours) on every sampled session dwell. Was hardcoded 14.0 in sessions_dist.py; promoted to a knob 2026-08 because it is a hard truncation that shows up in the output as a spike at the clip point (real ACN same-day dwells reach 20 h). Default 14.0 keeps existing scenarios bitwise-identical; raise it for cohorts whose calibrated dwell has mass above 14 h."
+    affects_csv: [sessions.csv]
+
+  arrival_soc_alpha:
+    type: float
+    range: [0.1, 50.0]
+    default: 2.0
+    description: "Alpha of the arrival-SoC Beta prior (used when the population carries no calibrated soc_arrival block — the ACN populations, since SoC is never metered). Default Beta(2,3): mean 0.40, sd 0.20. Pre-2026-08 the fallback was a hardcoded Beta(4,6) (same mean, sd 0.148); widened per dataset-design decision to spread arrival states. The per-user −δ_km·0.003 commute shift and the [min_allowed_soc, max_allowed_soc] clamp still apply."
+    affects_csv: [sessions.csv]
+
+  arrival_soc_beta:
+    type: float
+    range: [0.1, 50.0]
+    default: 3.0
+    description: "Beta of the arrival-SoC Beta prior (pairs with arrival_soc_alpha; mean = α/(α+β))."
+    affects_csv: [sessions.csv]
+
+  phi_scale:
+    type: float
+    range: [0.1, 3.0]
+    default: 1.0
+    description: "Global multiplier on every car's weekday appearance rate φ, applied after the per-region draw and capped at 0.95. Default 1.0 = source-faithful (ACN JPL regular chargers plug in ~53% of weekdays, so a 30-EV veryhigh-tier building sees ~14 distinct users/day). Raise to densify utilization beyond what the source cohort exhibits (1.45 → ~20/day, 1.74 → ~24/day at 30 EVs); the manifest records the departure from calibration. Session-level marginals (arrival/dwell/energy) are unaffected."
+    affects_csv: [users.csv, sessions.csv]
 
   weekend_activity_factor:
     type: float

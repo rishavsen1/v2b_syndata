@@ -73,7 +73,7 @@ def _write_minimal_output(d: Path, *, arrival_soc: float, required_soc: float,
         "battery_class": ["m3_75"],
     }).to_csv(d / "cars.csv", index=False)
     pd.DataFrame({
-        "car_id": [1], "region": ["us_west"], "phi": [0.5], "kappa": [0.5],
+        "car_id": [1], "region": ["us_west"], "phi": [0.5],
         "delta_km": [10.0], "negotiation_type": ["type_i"], "w1": [0.5],
         "w2": [0.5],
     }).to_csv(d / "users.csv", index=False)

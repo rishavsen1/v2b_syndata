@@ -324,7 +324,7 @@ buildings:
 
 ## Architecture
 
-See `handoff/spec/` for full spec (PLAN.md, BAYES_NET.md, validate_spec.md, knobs.yaml).
+Spec content lives in `docs/` (the former `handoff/spec/` was folded in).
 
 Tier 0 descriptors → Tier 1 roots → Tier 1.5 per-entity → Tier 2 latents → Tier 3 renderers.
 
@@ -355,14 +355,49 @@ n=55,201; `docs/experiments/`) then checked those choices against the data.
 
 | quantity | family | input feature(s) | why this family | empirical verdict |
 |---|---|---|---|---|
-| **arrival hour** | TruncNorm(μ,σ) on [6,20] | local clock-hour of connection | unimodal commute peak on a bounded daytime support; closed-form truncated quantile drives the copula | **deliberate simplification** — arrival is *bimodal* and ~8% of arrivals fall outside [6,20]; a mixture fits better (KS 0.03 vs 0.11) |
-| **dwell** | Weibull(k,λ) | disconnect − connect | canonical non-negative, right-skewed duration with a closed-form quantile | **best of the standard families** (wins AIC + KS; Gamma a close 2nd) |
-| **arrival × dwell** | Gaussian copula ρ | Spearman ρ of (arrival, dwell) | couples the marginals without distorting them; one rank-based parameter | captures a strong **negative** dependence (τ≈−0.44) and ≫ independence; Frank fits marginally better |
-| **arrival SoC** | Beta(α,β) prior | **none — unobserved** | bounded fraction on [0,1]; mean ≈ 0.40 | **not fittable** — no charger records SoC; deliberately *not* derived from kWhRequested |
-| **departure SoC** | Beta(α,β) [TruncNorm fallback] | arrival_prior + delivered/capacity | bounded fraction; conjugate, interpretable | Beta ≈ Kumaraswamy (defensible); fit partly synthetic (real signal is delivered/capacity ≈ 0.30) |
-| **φ, κ, δ / region mix** | empirical (uniform-in-region; categorical share) | weekday frequency; 1−CV(arrival); miles×1.609 | membership is discrete; the only honest "parameter" is the observed mix | region weights are the **exact** empirical user share |
+| **arrival hour** | per-region 2-comp TruncNorm mixture on [4,22] | local clock-hour of connection | arrivals are bimodal (commute peak + midday shoulder) on a bounded daytime support; mixture quantile drives the copula | mixture KS 0.02–0.05 vs single 0.10–0.15 (largest single fit gain in the pipeline) |
+| **dwell** | per-region 2-comp Weibull mixture, single Weibull fallback | disconnect − connect (same-local-day sessions) | dwell is bimodal — short top-up (~2 h) + full workday (~9.5 h); Weibull shape k up to ~8 captures the tight workday peak | mixture KS 0.03–0.06 vs single 0.06–0.16; every ACN cell selects the mixture |
+| **arrival × dwell** | Gaussian copula ρ | Spearman ρ of (arrival, dwell) | couples the marginals without distorting them; without it departure-hour sd inflates ~50% (p95 past midnight) | strong **negative** dependence (ρ ≈ −0.55/−0.64); KS(departure) 0.15–0.16 if dropped |
+| **session energy (kWh)** | per-region LogNormal(σ, scale) | metered `kWhDelivered` — the primal energy draw | the only energy quantity any source meters; `required_soc_at_depart` is DERIVED as arrival + kWh/capacity | lognorm KS 0.035–0.055 vs gamma 0.084 / weibull 0.099; round-trip energy KS 0.354 → 0.08 |
+| **arrival SoC** | truncated Beta(α,β) prior (knobs, default Beta(2,3)) | **none — unobserved** | bounded fraction, mean 0.40; truncated (not clipped) onto the car's SoC band so no atom forms at the band edge | **not fittable** — no charger records SoC; declared prior, stamped in `calibration_metadata` |
+| **SoC chain** (opt-in) | next arrival = prev required − g·(SoC charged), g~U | **none — unobservable** | ties between-visit usage to the energy just charged; continuity arrival < prev departure; E[g]≈1 keeps SoC stationary | design prior; makes the fleet building-dependent **by construction** (scenario choice) |
+| **φ appearance rate** | per-bin Beta(α,β), × `phi_scale` knob | per-user unique-weekdays ÷ active-window weekdays | the real φ inside a bin is not uniform; the fitted Beta removes a ×1.29 session-volume overshoot | Beta fitted per bin (n = 38–168 users); source-faithful ceiling ≈ 14 users/day per 30 EVs |
+| **region mix / δ** | categorical user share; δ ~ U(bin) prior | per-region user counts; miles×1.609 (prior only) | membership is discrete — regions are φ bins (κ removed 2026-08: unused, near-independent of behavior) | region weights are the **exact** empirical user share |
 
 Full rationale and per-model detail: [`docs/GENERATIVE_MODELS.md`](docs/GENERATIVE_MODELS.md).
+
+### How a month of users is generated
+
+```mermaid
+flowchart TD
+    subgraph MONTH["per building-month sample (scenario + seed)"]
+        K["resolve knobs: CLI > scenario > descriptor > defaults<br/>populations.yaml supplies axes_distribution + region_distributions"]
+    end
+    subgraph CARS["once per EV (fixed for the horizon)"]
+        R["region ~ Categorical(empirical user-share weights)"]
+        PHI["φ ~ region's fitted Beta × phi_scale (cap 0.95)"]
+        DELTA["δ ~ U(region.dist_km)   ·   capacity ~ Categorical(battery_mix)"]
+        MODELS["region label → fitted models:<br/>arrival mixture · dwell mixture · copula ρ · energy LogNormal"]
+        R --> PHI & DELTA & MODELS
+    end
+    K --> R
+    subgraph DAY["per EV × per day (RNG keyed on seed, date, car)"]
+        B{"appear? Bernoulli(φ)<br/>weekends: φ × weekend_activity_factor"}
+        B -- no --> Z["no session"]
+        B -- yes --> CU["(u1,u2) ~ copula(ρ)"]
+        CU --> AT["arrival = arrival-mixture⁻¹(u1)<br/>dwell = dwell-mixture⁻¹(u2), clipped, 15-min grid"]
+        AT --> CHK{"in window · no overlap ·<br/>same-day departure?"}
+        CHK -- no --> RETRY["retry ≤ 5"] --> CU
+        CHK -- yes --> SOC["arrival_soc: first visit ~ truncated Beta − δ·0.003;<br/>repeats (chain on): prev required − g·(SoC charged), g~U"]
+        SOC --> EN["kWh ~ LogNormal(σ, scale)  — the session's delivered energy"]
+        EN --> REQ["required_soc_at_depart = arrival + kWh/capacity<br/>clamped [arrival+ε, max_allowed_soc]"]
+        REQ --> D5{"D5: kWh ≤ charger kW × dwell?"}
+        D5 -- no --> RETRY
+        D5 -- yes --> ROW["session row"]
+    end
+    MODELS --> CU
+    PHI --> B
+```
 
 ### Source vs generated distributions
 

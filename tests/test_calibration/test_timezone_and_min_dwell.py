@@ -56,6 +56,30 @@ def test_acn_exactly_30min_kept():
     assert sf is not None and sf.dwell_hours == pytest.approx(0.5, abs=0.01)
 
 
+# ---- ACN: overnight sessions dropped, judged on the LOCAL calendar day ----
+
+def test_acn_overnight_session_dropped():
+    # 22:00 PST Mon → 06:00 PST Tue: disconnect lands on a later local day.
+    assert extract_session(_acn("Tue, 07 Jan 2020 06:00:00 GMT",
+                                "Tue, 07 Jan 2020 14:00:00 GMT"), site="caltech") is None
+
+
+def test_acn_utc_day_rollover_kept_when_local_day_is_same():
+    # 08:00 → 16:00 PST is one local day, even though the disconnect crosses
+    # midnight in UTC. The filter must read Pacific, not GMT.
+    sf = extract_session(_acn("Mon, 06 Jan 2020 16:00:00 GMT",
+                              "Tue, 07 Jan 2020 00:00:00 GMT"), site="caltech")
+    assert sf is not None and sf.dwell_hours == pytest.approx(8.0, abs=0.01)
+
+
+def test_acn_long_same_day_session_kept():
+    # 05:00 → 22:00 PST: 17 h, well past the generator's clip, but same local
+    # day — the filter is a calendar-day rule, not a duration cap.
+    sf = extract_session(_acn("Mon, 06 Jan 2020 13:00:00 GMT",
+                              "Tue, 07 Jan 2020 06:00:00 GMT"), site="caltech")
+    assert sf is not None and sf.dwell_hours == pytest.approx(17.0, abs=0.01)
+
+
 # ---- Naive-local sources: hour preserved, NOT shifted ----
 
 def test_elaadnl_local_hour_preserved():

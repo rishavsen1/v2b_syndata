@@ -63,3 +63,51 @@ def test_copula_correlated():
     fit = fit_copula_rho(z[:, 0], z[:, 1])
     assert fit["rho_spearman"] > 0.5
     assert fit["rho_gaussian"] > 0.5
+
+
+# --------------------------------------------------------------------------- #
+# Arrival SoC is a declared prior, never a fit (2026-08)
+# --------------------------------------------------------------------------- #
+def test_fit_region_does_not_fit_arrival_soc():
+    """No dataset records SoC; reconstruct_arrival_soc returns a prior draw that
+    ignores the session. Fitting a Beta to those draws and shipping it as
+    calibrated was circular — it recovered the prior at every region."""
+    import numpy as np
+
+    from v2b_syndata.calibration.distribution_fitter import FIT_SOC_ARRIVAL, fit_region
+
+    rng = np.random.default_rng(7)
+    out = fit_region(
+        arrivals=rng.normal(9.0, 1.0, 500),
+        dwells=rng.weibull(2.0, 500) * 8.0,
+        soc_arrivals=np.clip(rng.normal(0.4, 0.15, 500), 0.05, 0.95),
+        soc_departs=np.clip(rng.normal(0.8, 0.1, 500), 0.05, 0.99),
+    )
+    assert FIT_SOC_ARRIVAL is False
+    assert out["soc_arrival"] is None
+    assert out["soc_depart"] is not None, "departure SoC carries real signal — keep it"
+
+
+# --------------------------------------------------------------------------- #
+# Per-session delivered-energy lognormal (2026-08)
+# --------------------------------------------------------------------------- #
+def test_fit_lognorm_energy_recovers_params():
+    import numpy as np
+
+    from v2b_syndata.calibration.distribution_fitter import fit_lognorm_energy
+
+    rng = np.random.default_rng(5)
+    kwh = rng.lognormal(mean=np.log(11.5), sigma=0.7, size=5000)
+    fit = fit_lognorm_energy(kwh)
+    assert fit is not None and fit["dist"] == "lognorm"
+    assert abs(fit["scale"] - 11.5) < 1.0
+    assert abs(fit["sigma"] - 0.7) < 0.05
+    assert fit["ks_fit_quality"] < 0.03
+
+
+def test_fit_lognorm_energy_below_min_samples_returns_none():
+    import numpy as np
+
+    from v2b_syndata.calibration.distribution_fitter import fit_lognorm_energy
+
+    assert fit_lognorm_energy(np.array([5.0] * 10)) is None

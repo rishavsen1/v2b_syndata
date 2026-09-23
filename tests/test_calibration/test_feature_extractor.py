@@ -92,9 +92,7 @@ def test_aggregate_user_features_phi_kappa(synthetic_sessions):
     assert len(users) == 1
     u = users[0]
     assert 0.0 <= u.phi <= 1.0
-    assert 0.0 <= u.kappa <= 1.0
     # arrival_hour ~ 9 ± 0.1, very consistent → kappa close to 1
-    assert u.kappa > 0.9
     # delta_km from 40 mi requested
     assert u.delta_km == pytest.approx(40 * 1.609344, abs=0.01)
 
